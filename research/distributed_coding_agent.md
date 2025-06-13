@@ -49,30 +49,8 @@ end
 
 ### Replacing ETS/DETS with Mnesia
 
-Mnesia provides distributed persistence with ACID guarantees, making it ideal for managing AI assistant state across nodes. The migration follows a phased approach:
+Mnesia provides distributed persistence with ACID guarantees, making it ideal for managing AI assistant state across nodes. 
 
-**Phase 1: Parallel operation**
-```elixir
-defmodule AIAssistant.Storage.Migrator do
-  def migrate_to_mnesia(table_name, attributes) do
-    # Create Mnesia table matching ETS structure
-    mnesia:create_table(table_name, [
-      {attributes, attributes},
-      {disc_copies, [node() | Node.list()]},
-      {type, set}
-    ])
-    
-    # Bulk transfer with transaction safety
-    mnesia:transaction(fun() ->
-      ets:foldl(fun(record, _) ->
-        mnesia:write(record)
-      end, ok, table_name)
-    end)
-  end
-end
-```
-
-**Phase 2: Mnesia schema design**
 ```elixir
 # Core AI assistant tables
 -record(ai_context, {

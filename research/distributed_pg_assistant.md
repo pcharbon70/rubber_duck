@@ -7,6 +7,9 @@ Building robust event-driven architectures in Elixir using only OTP primitives p
 The Registry module offers the most scalable foundation for building pub/sub systems in pure OTP. Unlike custom GenServer implementations with ETS, Registry provides built-in process monitoring, automatic cleanup, and efficient concurrent access patterns tested up to 40 cores.
 
 ### Registry-based pub/sub pattern
+- Communication between the applications must use the OTP `pg` library
+- Persistence is done via the `Mnesia` library.
+- Local state is saved in ETS.
 
 ```elixir
 defmodule RegistryPubSub do
