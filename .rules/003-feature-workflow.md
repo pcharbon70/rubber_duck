@@ -2,6 +2,13 @@
 
 **THIS IS A MANDATORY WORKFLOW - NO STEPS CAN BE SKIPPED**
 
+**TRIGGER CONDITIONS**: This workflow is automatically triggered when:
+- Implementing any new section (e.g., 1.1, 1.2, 2.1, etc.) from the distributed implementation plan
+- Adding any new feature functionality
+- Creating new modules or major functionality
+
+**MANDATORY TDD INTEGRATION**: This workflow MUST trigger the TDD workflow for all implementation tasks.
+
 ## PHASE 1: RESEARCH & PLANNING (MANDATORY)
 
 ### Step 1.1: Initial Research
@@ -86,13 +93,16 @@ k
 
 ### Step 3.2: Implementation Rules
 **MANDATORY SEQUENCE FOR EACH TASK**:
-1. Check for relevant generator using `list_generators`
-2. Run generator with `--yes` if exists
-3. Research docs again for specific implementation details
-4. Implement using Ash patterns ONLY
-5. Compile and check for errors
-6. Run tests if applicable
-7. Update log with results
+1. **APPLY TDD WORKFLOW**: Follow the complete TDD workflow (write failing tests first, then minimal implementation, then refactor)
+2. Check for relevant generator using `list_generators`
+3. Run generator with `--yes` if exists
+4. Research docs again for specific implementation details
+5. Write failing tests BEFORE any implementation code
+6. Implement minimal code to make tests pass
+7. Refactor if needed while keeping tests green
+8. Compile and check for errors
+9. Ensure all tests pass
+10. Update log with results
 
 ### Step 3.3: Progress Reporting
 **AFTER EACH SUBTASK**:

@@ -1,3 +1,12 @@
+# TEST-DRIVEN DEVELOPMENT (TDD) WORKFLOW
+
+**THIS WORKFLOW IS MANDATORY FOR ALL IMPLEMENTATION TASKS**
+
+**TRIGGER CONDITIONS**: This workflow is automatically triggered by:
+- The Feature Implementation Workflow (mandatory integration)
+- Any implementation task that involves writing new code
+- Any bug fix or modification to existing functionality
+
 ## Planning
 
 **When asked to create a or add to an existing plan you must:** 

@@ -23,3 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Fixes 
 {{include: .rules/005-fix-workflow.md}}
 
+## Implementation Triggers 
+{{include: .rules/007-implementation-triggers.md}}
+
+**Important** You must never mention yourself or any other AI or LLM in code or commit messages.
