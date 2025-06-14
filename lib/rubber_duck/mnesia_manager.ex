@@ -15,7 +15,7 @@ defmodule RubberDuck.MnesiaManager do
     :tables
   ]
 
-  @required_tables [:sessions, :models, :model_stats, :cluster_nodes]
+  @required_tables [:sessions, :models, :model_stats, :cluster_nodes, :llm_responses, :llm_provider_status]
 
   @table_definitions %{
     sessions: [
@@ -37,6 +37,18 @@ defmodule RubberDuck.MnesiaManager do
       attributes: [:node_name, :status, :joined_at, :last_seen, :metadata],
       type: :ordered_set,
       storage_type: :ram_copies
+    ],
+    llm_responses: [
+      attributes: [:response_id, :prompt_hash, :provider, :model, :prompt, :response, :tokens_used, :cost, :latency, :created_at, :expires_at, :session_id, :node],
+      type: :set,
+      storage_type: :disc_copies,
+      indexes: [:prompt_hash, :provider, :model, :created_at, :session_id]
+    ],
+    llm_provider_status: [
+      attributes: [:provider_id, :provider_name, :status, :health_score, :total_requests, :successful_requests, :failed_requests, :average_latency, :cost_total, :rate_limit_remaining, :rate_limit_reset, :last_updated, :node],
+      type: :set,
+      storage_type: :disc_copies,
+      indexes: [:provider_name, :status, :last_updated]
     ]
   }
 
@@ -268,7 +280,10 @@ defmodule RubberDuck.MnesiaManager do
 
   defp create_tables do
     results = Enum.map(@table_definitions, fn {table_name, opts} ->
-      create_table(table_name, opts)
+      case create_table(table_name, opts) do
+        :ok -> create_indexes(table_name, opts)
+        error -> error
+      end
     end)
     
     case Enum.find(results, &(&1 != :ok)) do
@@ -292,6 +307,23 @@ defmodule RubberDuck.MnesiaManager do
       {:atomic, :ok} -> :ok
       {:aborted, {:already_exists, _}} -> :ok
       {:aborted, reason} -> {:error, reason}
+    end
+  end
+
+  defp create_indexes(table_name, opts) do
+    indexes = Keyword.get(opts, :indexes, [])
+    
+    results = Enum.map(indexes, fn index_field ->
+      case :mnesia.add_table_index(table_name, index_field) do
+        {:atomic, :ok} -> :ok
+        {:aborted, {:already_exists, _}} -> :ok
+        {:aborted, reason} -> {:error, reason}
+      end
+    end)
+    
+    case Enum.find(results, &(&1 != :ok)) do
+      nil -> :ok
+      error -> error
     end
   end
 

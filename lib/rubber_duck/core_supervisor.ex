@@ -17,12 +17,22 @@ defmodule RubberDuck.CoreSupervisor do
     children = [
       # Database management (must start first)
       {RubberDuck.MnesiaManager, []},
-      # Circuit breaker registry for LLM providers
-      {Registry, keys: :unique, name: RubberDuck.CircuitBreakerRegistry},
-      # LLM provider abstraction layer
-      {RubberDuck.LLMAbstraction.ProviderRegistry, []},
-      {RubberDuck.LLMAbstraction.LoadBalancer, []},
-      {RubberDuck.LLMAbstraction.FailoverManager, []},
+
+      # Multi-tier cache system (Nebulex) - only start the multilevel cache
+      {RubberDuck.Nebulex.Cache, []},
+      # Performance optimization modules
+      {RubberDuck.PerformanceOptimizer, []},
+      {RubberDuck.CacheManager, []},
+      {RubberDuck.TableMaintenance, []},
+      # LLM data management
+      {RubberDuck.LLMDataMaintenance, []},
+      # LLM Performance Monitoring and Optimization (Section 4.3)
+      {RubberDuck.LLMMetricsCollector, []},
+      {RubberDuck.LLMPerformanceDashboard, []},
+      {RubberDuck.LLMPerformanceBenchmarker, []},
+      {RubberDuck.AdaptiveCacheManager, []},
+      {RubberDuck.LLMPerformanceAlerting, []},
+
       # Distributed state synchronization
       {RubberDuck.DistributedLock, []},
       {RubberDuck.StateSynchronizer, []},
@@ -31,7 +41,11 @@ defmodule RubberDuck.CoreSupervisor do
       # AI model coordination domain
       {RubberDuck.ModelSupervisor, []},
       # Configuration management
-      {RubberDuck.ConfigSupervisor, []}
+      {RubberDuck.ConfigSupervisor, []},
+      # ILP (Intelligent Language Processing) - Section 5.1
+      {RubberDuck.ILP.ResourceIsolator, []},
+      {RubberDuck.ILP.RealTime.Pipeline, []},
+      {RubberDuck.ILP.Batch.Orchestrator, []}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)

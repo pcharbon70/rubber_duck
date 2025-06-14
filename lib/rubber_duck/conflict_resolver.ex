@@ -16,6 +16,21 @@ defmodule RubberDuck.ConflictResolver do
 
   @resolution_strategies [:last_writer_wins, :merge_compatible, :manual_review, :custom]
 
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      type: :worker,
+      restart: :permanent,
+      shutdown: 500
+    }
+  end
+
+  def start_link(_opts) do
+    # This module doesn't need a process, it's just utility functions
+    :ignore
+  end
+
   @doc """
   Resolve a conflict between two versions of a record
   """
@@ -91,19 +106,6 @@ defmodule RubberDuck.ConflictResolver do
     end)
   end
 
-  @doc """
-  Start the conflict resolver agent
-  """
-  def start_link(_opts \\ []) do
-    Agent.start_link(fn ->
-      %__MODULE__{
-        strategy: :last_writer_wins,
-        pending_conflicts: %{},
-        resolution_history: [],
-        custom_resolvers: %{}
-      }
-    end, name: __MODULE__)
-  end
 
   # Private Functions
 
