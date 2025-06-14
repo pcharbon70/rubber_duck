@@ -23,6 +23,14 @@ defmodule RubberDuck.CoreSupervisor do
       {RubberDuck.PerformanceOptimizer, []},
       {RubberDuck.CacheManager, []},
       {RubberDuck.TableMaintenance, []},
+      # LLM data management
+      {RubberDuck.LLMDataMaintenance, []},
+      # LLM Performance Monitoring and Optimization (Section 4.3)
+      {RubberDuck.LLMMetricsCollector, []},
+      {RubberDuck.LLMPerformanceDashboard, []},
+      {RubberDuck.LLMPerformanceBenchmarker, []},
+      {RubberDuck.AdaptiveCacheManager, []},
+      {RubberDuck.LLMPerformanceAlerting, []},
       # Distributed state synchronization
       {RubberDuck.ConflictResolver, []},
       {RubberDuck.DistributedLock, []},

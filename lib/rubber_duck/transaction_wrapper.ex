@@ -24,7 +24,16 @@ defmodule RubberDuck.TransactionWrapper do
   @doc """
   Execute a write transaction with change broadcasting
   """
-  def write_transaction(table, operation, record, opts \\ []) do
+  def write_transaction(table, operation, record, opts \\ [])
+
+  def write_transaction(_table, _operation, _record, fun) when is_function(fun) do
+    # Handle custom transaction functions (like cleanup)
+    timeout = @default_timeout
+    retries = @default_retries
+    execute_with_retry(fun, :write, timeout, retries)
+  end
+
+  def write_transaction(table, operation, record, opts) when is_list(opts) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
     retries = Keyword.get(opts, :retries, @default_retries)
     metadata = Keyword.get(opts, :metadata, %{})
