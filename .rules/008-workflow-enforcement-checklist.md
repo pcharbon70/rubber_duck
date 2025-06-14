@@ -62,7 +62,11 @@ Before starting ANY implementation work, ask yourself:
 3. Have I received explicit approval to proceed?
 4. Am I following the TDD workflow?
 
-If ANY answer is "no" - STOP and correct it!
+Before ANY git commit, ask yourself:
+5. Does my commit message mention AI, LLM, Claude, or myself? (If YES - REMOVE IT!)
+6. Does my commit message attribute work to any AI tool? (If YES - REMOVE IT!)
+
+If ANY answer is "no" or violates the rules - STOP and correct it!
 
 ## RECOVERY PROCEDURE
 
