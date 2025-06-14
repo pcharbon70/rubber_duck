@@ -27,3 +27,5 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 {{include: .rules/007-implementation-triggers.md}}
 
 **Important** You must never mention yourself or any other AI or LLM in code or commit messages.
+
+**IMPORTANT:** Never attribute any work to yourself or any other AI tool to yourself in any git command
