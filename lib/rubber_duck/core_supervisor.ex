@@ -40,7 +40,11 @@ defmodule RubberDuck.CoreSupervisor do
       # AI model coordination domain
       {RubberDuck.ModelSupervisor, []},
       # Configuration management
-      {RubberDuck.ConfigSupervisor, []}
+      {RubberDuck.ConfigSupervisor, []},
+      # ILP (Intelligent Language Processing) - Section 5.1
+      {RubberDuck.ILP.ResourceIsolator, []},
+      {RubberDuck.ILP.RealTime.Pipeline, []},
+      {RubberDuck.ILP.Batch.Orchestrator, []}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)
