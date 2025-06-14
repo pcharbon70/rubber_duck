@@ -17,6 +17,10 @@ defmodule RubberDuck.CoreSupervisor do
     children = [
       # Database management (must start first)
       {RubberDuck.MnesiaManager, []},
+      # Performance optimization modules
+      {RubberDuck.PerformanceOptimizer, []},
+      {RubberDuck.CacheManager, []},
+      {RubberDuck.TableMaintenance, []},
       # Distributed state synchronization
       {RubberDuck.ConflictResolver, []},
       {RubberDuck.DistributedLock, []},
