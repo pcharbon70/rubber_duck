@@ -17,6 +17,8 @@ defmodule RubberDuck.CoreSupervisor do
     children = [
       # Database management (must start first)
       {RubberDuck.MnesiaManager, []},
+      # LLM provider abstraction layer
+      {RubberDuck.LLMAbstraction.ProviderRegistry, []},
       # Context management domain
       {RubberDuck.ContextSupervisor, []},
       # AI model coordination domain
