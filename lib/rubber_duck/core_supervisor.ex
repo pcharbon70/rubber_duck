@@ -17,6 +17,7 @@ defmodule RubberDuck.CoreSupervisor do
     children = [
       # Database management (must start first)
       {RubberDuck.MnesiaManager, []},
+
       # Multi-tier cache system (Nebulex) - only start the multilevel cache
       {RubberDuck.Nebulex.Cache, []},
       # Performance optimization modules
@@ -31,8 +32,8 @@ defmodule RubberDuck.CoreSupervisor do
       {RubberDuck.LLMPerformanceBenchmarker, []},
       {RubberDuck.AdaptiveCacheManager, []},
       {RubberDuck.LLMPerformanceAlerting, []},
+
       # Distributed state synchronization
-      {RubberDuck.ConflictResolver, []},
       {RubberDuck.DistributedLock, []},
       {RubberDuck.StateSynchronizer, []},
       # Context management domain
