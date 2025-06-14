@@ -26,6 +26,22 @@ Start with generators wherever possible. They provide a starting point for your 
 
 Always use `package_docs_search` to find relevant documentation before beginning work.
 
+## IMPLEMENTATION WORKFLOW ENFORCEMENT
+
+**CRITICAL REMINDER**: When you see requests like "implement section X.X", "let's implement", "start working on":
+
+1. **STOP IMMEDIATELY** - Do not start coding
+2. **CREATE FEATURE BRANCH FIRST**: `git checkout -b feature/<section>-<name>`  
+3. **VERIFY BRANCH**: `git branch`
+4. **FOLLOW FEATURE WORKFLOW**: Go through phases 1-5 properly
+5. **NO CODE** until you're on the correct feature branch and have approval
+
+**Common violations to avoid:**
+- Writing code on main branch
+- Creating files before feature branch
+- Skipping the feature plan document
+- Starting implementation without approval
+
 ## Don't start or stop phoenix applications
 
 Never attempt to start or stop a phoenix application.
