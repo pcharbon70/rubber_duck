@@ -32,6 +32,14 @@
 ### Step 1.3: Create Feature Plan Document
 **CREATE FILE**: `<project_root>/notes/features/<number>-<name>.md` (inside the project directory)
 
+### Step 1.4: Create and Switch to Feature Branch
+**MANDATORY BEFORE ANY IMPLEMENTATION**:
+1. Create feature branch: `git checkout -b feature/<section-number>-<feature-name>`
+2. Example: `git checkout -b feature/1.3-initial-clustering-infrastructure`
+3. Verify you are on the feature branch: `git branch`
+4. ALL implementation work MUST happen on this feature branch
+5. Keep main branch clean for other work
+
 **MANDATORY STRUCTURE**:
 ```markdown
 # Feature: <Feature Name>
@@ -79,9 +87,10 @@ k
 
 **YOU MUST STOP HERE**:
 1. Present the plan document
-2. Explicitly ask: "Please review this plan. Should I proceed with implementation?"
-3. WAIT for explicit approval
-4. Do NOT proceed without approval
+2. Confirm you are on the correct feature branch
+3. Explicitly ask: "Please review this plan. Should I proceed with implementation?"
+4. WAIT for explicit approval
+5. Do NOT proceed without approval
 
 ## PHASE 3: IMPLEMENTATION
 
@@ -132,8 +141,9 @@ k
 **FINAL REQUIREMENTS**:
 1. Present summary of implementation
 2. Show test results
-3. Ask: "Feature implementation complete. Any additional changes needed?"
-4. WAIT for confirmation before marking complete
+3. Ensure all changes are committed on feature branch
+4. Ask: "Feature implementation complete. Ready to create pull request?"
+5. WAIT for confirmation before creating pull request or merging to main
 
 # REMEMBER
 
