@@ -17,6 +17,10 @@ defmodule RubberDuck.CoreSupervisor do
     children = [
       # Database management (must start first)
       {RubberDuck.MnesiaManager, []},
+      # Distributed state synchronization
+      {RubberDuck.ConflictResolver, []},
+      {RubberDuck.DistributedLock, []},
+      {RubberDuck.StateSynchronizer, []},
       # Context management domain
       {RubberDuck.ContextSupervisor, []},
       # AI model coordination domain
