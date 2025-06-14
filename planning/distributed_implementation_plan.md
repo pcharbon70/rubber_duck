@@ -68,11 +68,79 @@ Purpose: Tune Mnesia configuration and implement caching strategies specifically
 - [ ] Optimize query patterns for common operations
 - [ ] Implement table maintenance and cleanup procedures
 
-## Phase 3: Process Registry and Distributed Coordination ☐
+## Phase 3: LLM Abstraction and Provider Management ☐
+
+This phase implements a comprehensive LLM abstraction layer that provides unified access to multiple AI providers with distributed load balancing, caching, and fault tolerance. The implementation leverages OTP's native distributed capabilities including pg for event broadcasting, Horde for process distribution, and integrates with the existing Mnesia infrastructure for persistent state management.
+
+### 3.1 Core LLM Abstraction Framework ☐
+Purpose: Establish the foundational behavior-based provider pattern and protocol-driven message handling that enables unified access to multiple LLM providers while maintaining type safety and runtime flexibility.
+
+- [ ] Define LLMAbstraction.Provider behavior with standardized callbacks
+- [ ] Implement LLMAbstraction.Message protocol for provider-agnostic messaging
+- [ ] Create LLMAbstraction.Response structure for unified response handling
+- [ ] Build LangChain Elixir adapter for existing provider ecosystem
+- [ ] Implement custom provider registration and validation system
+- [ ] Create provider capability discovery and metadata management
+
+### 3.2 Distributed Load Balancing and Routing ☐
+Purpose: Implement intelligent request routing and load balancing across multiple providers and API keys using consistent hashing and capability-based selection to optimize performance and cost while handling rate limits.
+
+- [ ] Create LoadBalancer GenServer with multi-level routing strategies
+- [ ] Implement ConsistentHash for API key distribution across requests
+- [ ] Build capability-based model routing with scoring algorithms
+- [ ] Add rate limiting with Hammer for provider API compliance
+- [ ] Create provider health monitoring with circuit breaker patterns
+- [ ] Implement automatic failover and provider redistribution
+
+### 3.3 Event Broadcasting and Cluster Coordination ☐
+Purpose: Establish distributed event coordination using OTP's native pg (process groups) for provider health monitoring, metrics collection, and cluster-wide state synchronization without external dependencies.
+
+- [ ] Implement EventBroadcaster using OTP pg for distributed messaging
+- [ ] Create MetricsCollector for aggregating provider performance data
+- [ ] Build ClusterEventCoordinator for handling node join/leave events
+- [ ] Add cross-node provider failover and redistribution mechanisms
+- [ ] Implement health status broadcasting and subscription patterns
+- [ ] Create event-driven provider rebalancing on cluster changes
+
+## Phase 4: Distributed Caching and State Optimization ☐
+
+This phase implements multi-tier distributed caching using Nebulex and optimizes the Mnesia integration for LLM workloads, focusing on intelligent cache strategies, response deduplication, and performance optimization for AI-specific data patterns.
+
+### 4.1 Multi-tier Caching Architecture ☐
+Purpose: Implement sophisticated caching strategies with local L1 and distributed L2 caches to minimize LLM API calls while ensuring cache consistency across the cluster.
+
+- [ ] Configure Nebulex with Local and Replicated adapters
+- [ ] Implement Multilevel cache with L1/L2 hierarchy
+- [ ] Create intelligent cache key generation for prompt/response pairs
+- [ ] Add TTL strategies based on model type and response characteristics
+- [ ] Implement cache warming and precomputation for common queries
+- [ ] Build cache invalidation patterns for model updates
+
+### 4.2 Mnesia Integration for LLM Data ☐
+Purpose: Extend the existing Mnesia schema to support LLM-specific data patterns including response storage, provider metrics, and distributed cache coordination.
+
+- [ ] Create llm_responses table for persistent response storage
+- [ ] Implement llm_provider_status table for health and metrics
+- [ ] Add indexes for prompt-based queries and temporal data
+- [ ] Create transaction wrappers for LLM data operations
+- [ ] Implement background cleanup and data retention policies
+- [ ] Add backup and recovery procedures for LLM data
+
+### 4.3 Performance Optimization and Monitoring ☐
+Purpose: Optimize the caching and storage layers for AI workloads with comprehensive monitoring, metrics collection, and performance tuning for production readiness.
+
+- [ ] Implement provider performance metrics and analytics
+- [ ] Create cost tracking and optimization algorithms
+- [ ] Add latency monitoring and SLA compliance tracking
+- [ ] Build cache hit ratio optimization and analysis
+- [ ] Implement automatic performance tuning based on usage patterns
+- [ ] Create comprehensive dashboards for LLM operations
+
+## Phase 5: Process Registry and Distributed Coordination ☐
 
 This phase implements global process registry using Syn and establishes distributed coordination patterns. The focus is on creating reliable process discovery, load balancing, and coordination mechanisms that enable the AI assistant to distribute work efficiently across the cluster while handling node failures gracefully.
 
-### 3.1 Global Process Registry Implementation ☐
+### 5.1 Global Process Registry Implementation ☐
 Purpose: Replace local registries with Syn for cluster-wide process discovery and management, enabling seamless process location across all nodes.
 
 - [ ] Install and configure Syn for global process registry
@@ -82,7 +150,7 @@ Purpose: Replace local registries with Syn for cluster-wide process discovery an
 - [ ] Add automatic process re-registration on node changes
 - [ ] Implement process cleanup and garbage collection
 
-### 3.2 Distributed Process Coordination ☐
+### 5.2 Distributed Process Coordination ☐
 Purpose: Establish coordination patterns using Horde for distributed supervision and dynamic process management across the cluster.
 
 - [ ] Install and configure Horde for distributed supervision
@@ -92,21 +160,21 @@ Purpose: Establish coordination patterns using Horde for distributed supervision
 - [ ] Implement process migration during node changes
 - [ ] Create coordination patterns for dependent processes
 
-### 3.3 Event-Driven Architecture ☐
-Purpose: Build a robust event bus system using Phoenix PubSub to enable loose coupling and real-time communication between distributed components.
+### 5.3 Legacy Event Architecture Migration ☐
+Purpose: Migrate any remaining Phoenix PubSub usage to OTP pg for consistency with the LLM abstraction layer and eliminate external dependencies.
 
-- [ ] Design event schemas and topic organization
-- [ ] Implement EventBus module with PubSub integration
-- [ ] Create event enrichment and metadata handling
-- [ ] Add event persistence for audit and replay
-- [ ] Implement event routing and filtering
-- [ ] Create monitoring and metrics for event flow
+- [ ] Audit existing PubSub usage in core components
+- [ ] Migrate ContextManager events to pg-based broadcasting
+- [ ] Update ModelCoordinator to use pg for health notifications
+- [ ] Create unified event schemas and topic organization
+- [ ] Add event persistence for audit and replay capabilities
+- [ ] Implement comprehensive event monitoring and metrics
 
-## Phase 4: Interface Layer Abstraction ☐
+## Phase 6: Interface Layer Abstraction ☐
 
 This phase implements the adapter pattern to decouple business logic from interface-specific implementations. The goal is to create a unified interface gateway that can handle requests from CLI, web, and IDE interfaces while maintaining the same core business logic and enabling interface-specific optimizations.
 
-### 4.1 Interface Behavior and Adapter Pattern ☐
+### 6.1 Interface Behavior and Adapter Pattern ☐
 Purpose: Create a common interface behavior that all interaction methods (CLI, web, IDE) must implement, enabling consistent business logic while allowing interface-specific customizations.
 
 - [ ] Define InterfaceBehaviour with common callback functions
@@ -116,7 +184,7 @@ Purpose: Create a common interface behavior that all interaction methods (CLI, w
 - [ ] Create interface-specific error handling patterns
 - [ ] Implement request/response transformation utilities
 
-### 4.2 CLI Adapter Implementation ☐
+### 6.2 CLI Adapter Implementation ☐
 Purpose: Refactor existing CLI functionality to work with the distributed system while maintaining the familiar command-line interface and adding new distributed features.
 
 - [ ] Create CLI.Adapter implementing InterfaceBehaviour
@@ -126,7 +194,7 @@ Purpose: Refactor existing CLI functionality to work with the distributed system
 - [ ] Add progress indicators for distributed operations
 - [ ] Create CLI configuration for cluster connection
 
-### 4.3 Interface Testing and Validation ☐
+### 6.3 Interface Testing and Validation ☐
 Purpose: Establish comprehensive testing strategies that validate interface behavior consistency while allowing for interface-specific features and optimizations.
 
 - [ ] Create interface behavior test suite
@@ -136,11 +204,11 @@ Purpose: Establish comprehensive testing strategies that validate interface beha
 - [ ] Implement chaos testing for interface resilience
 - [ ] Add automated interface compatibility validation
 
-## Phase 5: Phoenix LiveView Integration ☐
+## Phase 7: Phoenix LiveView Integration ☐
 
 This phase adds a modern web interface using Phoenix LiveView with real-time updates and distributed state synchronization. The implementation focuses on creating an intuitive chat-based interface that provides immediate feedback while seamlessly integrating with the distributed backend services.
 
-### 5.1 Phoenix Application Setup ☐
+### 7.1 Phoenix Application Setup ☐
 Purpose: Establish the Phoenix web application structure with proper routing, authentication, and integration with the existing OTP application.
 
 - [ ] Add Phoenix dependencies and generate base application
@@ -150,7 +218,7 @@ Purpose: Establish the Phoenix web application structure with proper routing, au
 - [ ] Create base templates and layout structure
 - [ ] Configure assets pipeline and build process
 
-### 5.2 Real-time Chat Interface ☐
+### 7.2 Real-time Chat Interface ☐
 Purpose: Build the core chat interface using LiveView that provides real-time communication with the AI assistant while maintaining synchronization across multiple browser sessions.
 
 - [ ] Create ChatLive module with session management
@@ -160,7 +228,7 @@ Purpose: Build the core chat interface using LiveView that provides real-time co
 - [ ] Implement typing indicators and presence features
 - [ ] Add file upload and code sharing capabilities
 
-### 5.3 Distributed State Integration ☐
+### 7.3 Distributed State Integration ☐
 Purpose: Connect the LiveView interface to the distributed backend, ensuring real-time synchronization of context and conversation state across all connected clients and nodes.
 
 - [ ] Integrate with distributed ContextManager
@@ -170,11 +238,11 @@ Purpose: Connect the LiveView interface to the distributed backend, ensuring rea
 - [ ] Implement conflict resolution for concurrent edits
 - [ ] Add offline support and reconnection handling
 
-## Phase 6: VS Code LSP Implementation ☐
+## Phase 8: VS Code LSP Implementation ☐
 
 This phase develops a Language Server Protocol implementation that integrates VS Code with the distributed AI assistant. The focus is on providing intelligent code assistance, real-time analysis, and seamless integration with the editor workflow while leveraging the distributed system's capabilities.
 
-### 6.1 LSP Server Foundation ☐
+### 8.1 LSP Server Foundation ☐
 Purpose: Create the basic Language Server Protocol infrastructure that can communicate with VS Code and other LSP-compatible editors while connecting to the distributed AI system.
 
 - [ ] Install GenLSP dependency and create base server
@@ -184,7 +252,7 @@ Purpose: Create the basic Language Server Protocol infrastructure that can commu
 - [ ] Implement workspace management and configuration
 - [ ] Create LSP client extension for VS Code
 
-### 6.2 AI-Powered Features Implementation ☐
+### 8.2 AI-Powered Features Implementation ☐
 Purpose: Integrate AI assistance features like intelligent code completion, error analysis, and automated fixes by connecting to the distributed AI models and context management.
 
 - [ ] Implement intelligent code completion using distributed AI
@@ -194,7 +262,7 @@ Purpose: Integrate AI assistance features like intelligent code completion, erro
 - [ ] Create code analysis and refactoring suggestions
 - [ ] Add chat interface within the editor
 
-### 6.3 Editor Integration and User Experience ☐
+### 8.3 Editor Integration and User Experience ☐
 Purpose: Polish the VS Code integration to provide a seamless developer experience with proper configuration, debugging support, and performance optimization.
 
 - [ ] Create comprehensive VS Code extension configuration
@@ -204,11 +272,11 @@ Purpose: Polish the VS Code integration to provide a seamless developer experien
 - [ ] Implement extension lifecycle management
 - [ ] Add comprehensive documentation and tutorials
 
-## Phase 7: Security and Production Readiness ☐
+## Phase 9: Security and Production Readiness ☐
 
 This final phase focuses on implementing comprehensive security measures, monitoring, and production deployment strategies. The goal is to ensure the distributed AI assistant is secure, observable, and ready for production use with proper authentication, authorization, and operational monitoring.
 
-### 7.1 Security Implementation ☐
+### 9.1 Security Implementation ☐
 Purpose: Implement comprehensive security measures including authentication, authorization, encryption, and secure communication between distributed nodes.
 
 - [ ] Implement multi-interface authentication system
@@ -218,7 +286,7 @@ Purpose: Implement comprehensive security measures including authentication, aut
 - [ ] Implement audit logging and security monitoring
 - [ ] Add input validation and sanitization
 
-### 7.2 Monitoring and Observability ☐
+### 9.2 Monitoring and Observability ☐
 Purpose: Establish comprehensive monitoring, logging, and observability to ensure the distributed system operates reliably and performance issues can be quickly identified and resolved.
 
 - [ ] Implement distributed tracing with OpenTelemetry
@@ -228,7 +296,7 @@ Purpose: Establish comprehensive monitoring, logging, and observability to ensur
 - [ ] Add performance profiling and optimization tools
 - [ ] Create alerting and incident response procedures
 
-### 7.3 Production Deployment ☐
+### 9.3 Production Deployment ☐
 Purpose: Prepare the application for production deployment with proper containerization, orchestration, and deployment strategies that support the distributed architecture.
 
 - [ ] Create Docker containers and Kubernetes manifests
@@ -238,7 +306,7 @@ Purpose: Prepare the application for production deployment with proper container
 - [ ] Implement blue-green deployment capabilities
 - [ ] Add comprehensive production documentation
 
-### 7.4 Load Testing and Performance Validation ☐
+### 9.4 Load Testing and Performance Validation ☐
 Purpose: Validate the distributed system's performance under realistic load conditions and optimize for production workloads.
 
 - [ ] Create comprehensive load testing scenarios
