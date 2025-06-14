@@ -30,6 +30,7 @@ defmodule RubberDuck.MixProject do
       {:nebulex_adapters_cachex, "~> 2.1"},
       {:gen_stage, "~> 1.2"},
       {:flow, "~> 1.2"},
+      {:horde, "~> 0.8"},
       {:syn, "~> 3.3"}
       # Multi-language parsing will be implemented with native Elixir parsers
       # and simulated Tree-sitter interface for demonstration
