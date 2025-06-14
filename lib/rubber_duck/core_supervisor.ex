@@ -17,6 +17,12 @@ defmodule RubberDuck.CoreSupervisor do
     children = [
       # Database management (must start first)
       {RubberDuck.MnesiaManager, []},
+      # Circuit breaker registry for LLM providers
+      {Registry, keys: :unique, name: RubberDuck.CircuitBreakerRegistry},
+      # LLM provider abstraction layer
+      {RubberDuck.LLMAbstraction.ProviderRegistry, []},
+      {RubberDuck.LLMAbstraction.LoadBalancer, []},
+      {RubberDuck.LLMAbstraction.FailoverManager, []},
       # Distributed state synchronization
       {RubberDuck.DistributedLock, []},
       {RubberDuck.StateSynchronizer, []},
