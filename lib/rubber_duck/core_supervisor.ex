@@ -15,6 +15,8 @@ defmodule RubberDuck.CoreSupervisor do
   @impl true
   def init(_opts) do
     children = [
+      # Database management (must start first)
+      {RubberDuck.MnesiaManager, []},
       # Context management domain
       {RubberDuck.ContextSupervisor, []},
       # AI model coordination domain
