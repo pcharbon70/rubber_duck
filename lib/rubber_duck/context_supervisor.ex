@@ -15,8 +15,7 @@ defmodule RubberDuck.ContextSupervisor do
   @impl true
   def init(_opts) do
     children = [
-      # Context management processes will be added here
-      # in subsequent implementation steps
+      {RubberDuck.ContextManager, []}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)

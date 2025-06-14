@@ -15,8 +15,7 @@ defmodule RubberDuck.ModelSupervisor do
   @impl true
   def init(_opts) do
     children = [
-      # Model coordination processes will be added here
-      # in subsequent implementation steps
+      {RubberDuck.ModelCoordinator, []}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)

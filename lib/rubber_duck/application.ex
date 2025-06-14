@@ -11,10 +11,10 @@ defmodule RubberDuck.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      # Registry for local process management (must start before processes that use it)
+      {Registry, keys: :unique, name: RubberDuck.Registry},
       # Core supervisor for different domains
       {RubberDuck.CoreSupervisor, []},
-      # Registry for local process management
-      {Registry, keys: :unique, name: RubberDuck.Registry},
       # Telemetry supervisor for metrics and monitoring
       {RubberDuck.TelemetrySupervisor, []}
     ]
