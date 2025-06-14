@@ -13,6 +13,8 @@ defmodule RubberDuck.Application do
     children = [
       # Registry for local process management (must start before processes that use it)
       {Registry, keys: :unique, name: RubberDuck.Registry},
+      # Global process monitor for automatic cleanup and recovery
+      {RubberDuck.Registry.ProcessMonitor, []},
       # Cluster supervisor for distributed operations
       {RubberDuck.ClusterSupervisor, []},
       # Core supervisor for different domains

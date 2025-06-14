@@ -15,7 +15,7 @@ defmodule RubberDuck.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger, :mnesia],
+      extra_applications: [:logger, :mnesia, :syn],
       mod: {RubberDuck.Application, []}
     ]
   end
@@ -29,7 +29,8 @@ defmodule RubberDuck.MixProject do
       {:nebulex, "~> 2.6"},
       {:nebulex_adapters_cachex, "~> 2.1"},
       {:gen_stage, "~> 1.2"},
-      {:flow, "~> 1.2"}
+      {:flow, "~> 1.2"},
+      {:syn, "~> 3.3"}
       # Multi-language parsing will be implemented with native Elixir parsers
       # and simulated Tree-sitter interface for demonstration
       # {:dep_from_hexpm, "~> 0.3.0"},
