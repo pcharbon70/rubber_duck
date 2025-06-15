@@ -798,11 +798,14 @@ defmodule RubberDuck.LLM.ModelSelector do
   defp count_abstract_concepts(content), do: length(Regex.scan(~r/\b(concept|abstract|theory|principle)\b/i, content))
   defp count_reasoning_indicators(content), do: length(Regex.scan(~r/\b(because|therefore|thus|hence|since)\b/i, content))
   defp determine_task_type(task), do: :general
-  defp get_model_capability_score(_capabilities, level), do: case level do
-    :simple -> 0.9
-    :moderate -> 0.8
-    :complex -> 0.7
-    :highly_complex -> 0.6
+  defp get_model_capability_score(_capabilities, level) do
+    case level do
+      :simple -> 0.9
+      :moderate -> 0.8
+      :complex -> 0.7
+      :highly_complex -> 0.6
+      _ -> 0.5
+    end
   end
   defp get_performance_adjustment(_profile, _level), do: 0.8
   defp calculate_context_window_score(_model, _analysis), do: 0.8
