@@ -166,7 +166,7 @@ defmodule RubberDuck.Interface.CLI.CommandParser do
         case File.read(file_path) do
           {:ok, file_content} -> file_content
           {:error, reason} -> 
-            return {:error, "Cannot read file #{file_path}: #{reason}"}
+            {:error, "Cannot read file #{file_path}: #{reason}"}
         end
     end
     
@@ -438,7 +438,8 @@ defmodule RubberDuck.Interface.CLI.CommandParser do
   defp validate_ask_args(params) do
     case Map.get(params, :message) do
       nil -> {:error, "Message is required"}
-      msg when is_binary(msg) and byte_size(String.trim(msg)) > 0 -> :ok
+      msg when is_binary(msg) -> 
+        if byte_size(String.trim(msg)) > 0, do: :ok, else: {:error, "Message must be a non-empty string"}
       _ -> {:error, "Message must be a non-empty string"}
     end
   end
@@ -446,7 +447,8 @@ defmodule RubberDuck.Interface.CLI.CommandParser do
   defp validate_complete_args(params) do
     case Map.get(params, :prompt) do
       nil -> {:error, "Prompt is required"}
-      prompt when is_binary(prompt) and byte_size(String.trim(prompt)) > 0 -> :ok
+      prompt when is_binary(prompt) -> 
+        if byte_size(String.trim(prompt)) > 0, do: :ok, else: {:error, "Prompt must be a non-empty string"}
       _ -> {:error, "Prompt must be a non-empty string"}
     end
   end
@@ -454,7 +456,8 @@ defmodule RubberDuck.Interface.CLI.CommandParser do
   defp validate_analyze_args(params) do
     case Map.get(params, :content) do
       nil -> {:error, "Content is required"}
-      content when is_binary(content) and byte_size(String.trim(content)) > 0 -> :ok
+      content when is_binary(content) -> 
+        if byte_size(String.trim(content)) > 0, do: :ok, else: {:error, "Content must be a non-empty string"}
       _ -> {:error, "Content must be a non-empty string"}
     end
   end

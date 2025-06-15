@@ -284,8 +284,8 @@ defmodule Mix.Tasks.RubberDuck.Version do
                   {:ok, {^module, [{:compile_info, info}]}} ->
                     case Keyword.get(info, :time) do
                       {{year, month, day}, {hour, minute, second}} ->
-                        "#{year}-#{:io_lib.format(\"~2..0w\", [month])}-#{:io_lib.format(\"~2..0w\", [day])} " <>
-                        "#{:io_lib.format(\"~2..0w\", [hour])}:#{:io_lib.format(\"~2..0w\", [minute])}:#{:io_lib.format(\"~2..0w\", [second])}"
+                        "#{year}-#{:io_lib.format(~c"~2..0w", [month])}-#{:io_lib.format(~c"~2..0w", [day])} " <>
+                        "#{:io_lib.format(~c"~2..0w", [hour])}:#{:io_lib.format(~c"~2..0w", [minute])}:#{:io_lib.format(~c"~2..0w", [second])}"
                       _ -> "unknown"
                     end
                   _ -> "unknown"
