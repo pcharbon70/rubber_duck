@@ -352,12 +352,13 @@ defmodule RubberDuck.LLM.TaskRouter do
     system_load = calculate_system_load(state)
     
     # Choose sub-algorithm based on conditions
-    if system_load > 0.8 do
-      route_by_load_balancing(models, task_analysis, state)
-    elsif recent_performance[:avg_cost_efficiency] < 0.5 do
-      route_by_cost_optimization(models, task_analysis, state)
-    else
-      route_by_performance_weight(models, task_analysis, state)
+    cond do
+      system_load > 0.8 ->
+        route_by_load_balancing(models, task_analysis, state)
+      recent_performance[:avg_cost_efficiency] < 0.5 ->
+        route_by_cost_optimization(models, task_analysis, state)
+      true ->
+        route_by_performance_weight(models, task_analysis, state)
     end
   end
 

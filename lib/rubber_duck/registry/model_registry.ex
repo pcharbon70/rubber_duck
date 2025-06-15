@@ -170,7 +170,8 @@ defmodule RubberDuck.Registry.ModelRegistry do
   Triggers load balancing across model instances.
   """
   def balance_model_load do
-    models_by_type = group_models_by_type()
+    all_models = Registry.select(RubberDuck.Registry, [{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2", :"$3"}}]}])
+    models_by_type = group_models_by_type(all_models)
     
     rebalancing_actions = Enum.flat_map(models_by_type, fn {model_type, models} ->
       analyze_and_rebalance_model_group(model_type, models)
@@ -556,7 +557,7 @@ defmodule RubberDuck.Registry.ModelRegistry do
     
     Map.merge(health_counts, %{
       total: total,
-      health_ratio: if total > 0, do: health_counts.healthy / total, else: 0.0
+      health_ratio: (if total > 0, do: health_counts.healthy / total, else: 0.0)
     })
   end
 

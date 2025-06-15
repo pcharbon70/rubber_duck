@@ -381,7 +381,7 @@ defmodule RubberDuck.ModelCoordinator do
           "system",  # No specific session for this usage tracking
           model_name,
           "inference",
-          if status == :success, do: :completed, else: :failed,
+          (if status == :success, do: :completed, else: :failed),
           duration_ms: latency
         )
         EventBroadcaster.broadcast_async(%{
