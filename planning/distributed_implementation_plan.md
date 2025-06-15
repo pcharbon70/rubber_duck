@@ -214,11 +214,79 @@ Purpose: Migrate any remaining Phoenix PubSub usage to OTP pg for consistency wi
 - [x] Add event persistence for audit and replay capabilities
 - [x] Implement comprehensive event monitoring and metrics
 
-## Phase 7: Interface Layer Abstraction ☐
+## Phase 7: AI Coding Assistance Engines ☐
+
+This phase implements specialized AI-powered coding assistance engines within the distributed OTP architecture. Building on the existing ILP system and LLM abstraction layer, this phase adds dedicated engines for code analysis, explanation, refactoring, and test generation. Each engine operates as a supervised distributed process with real-time and batch processing capabilities, leveraging the established Tree-sitter parsing, Nebulex caching, and Mnesia state management infrastructure.
+
+### 7.1 Engine Architecture and Behavior Framework ☐
+Purpose: Establish the foundational engine behavior pattern and base implementation that all coding assistance engines will follow, ensuring consistent operation within the distributed system.
+
+- [ ] Define CodingAssistant.EngineBehaviour with standardized callbacks
+- [ ] Create base CodingAssistant.Engine GenServer implementation
+- [ ] Implement Horde-based distributed engine supervision
+- [ ] Add engine registration and discovery through global registry
+- [ ] Create dual-mode processing framework (real-time < 100ms, batch)
+- [ ] Implement engine health monitoring and telemetry integration
+
+### 7.2 CodeAnalyser Engine Implementation ☐
+Purpose: Implement comprehensive code analysis capabilities including syntax checking, complexity analysis, security scanning, and code smell detection using Tree-sitter parsing and distributed processing.
+
+- [ ] Create CodeAnalyser engine with Tree-sitter integration
+- [ ] Implement real-time syntax and structure analysis
+- [ ] Add complexity metrics calculation (cyclomatic, cognitive, halstead)
+- [ ] Build security vulnerability detection patterns
+- [ ] Create code smell identification and reporting
+- [ ] Add multi-language analysis support (Elixir, Erlang, JavaScript, Python)
+- [ ] Implement caching strategy for analysis results
+
+### 7.3 ExplanationEngine Implementation ☐
+Purpose: Develop AI-powered code explanation capabilities that provide detailed, context-aware explanations of code functionality, patterns, and design decisions using LLM integration.
+
+- [ ] Create ExplanationEngine with LLM client integration
+- [ ] Implement code structure analysis and context extraction
+- [ ] Build explanation template system for consistent formatting
+- [ ] Add multiple explanation types (summary, detailed, step-by-step)
+- [ ] Create complexity assessment and adaptive explanation depth
+- [ ] Implement fallback mechanisms for LLM unavailability
+- [ ] Add explanation caching and quality validation
+
+### 7.4 RefactoringEngine Implementation ☐
+Purpose: Implement safe, AST-based code refactoring capabilities that can suggest and apply transformations while ensuring code correctness and maintaining semantic equivalence.
+
+- [ ] Create RefactoringEngine with AST transformation capabilities
+- [ ] Implement safe variable and function renaming
+- [ ] Add extract function/module refactoring operations
+- [ ] Build inline function and dead code elimination
+- [ ] Create refactoring safety validation and conflict detection
+- [ ] Implement diff generation and preview functionality
+- [ ] Add rollback capabilities for refactoring operations
+
+### 7.5 TestGenerator Engine Implementation ☐
+Purpose: Develop intelligent test generation capabilities that create comprehensive test suites using property-based testing, example generation, and edge case identification.
+
+- [ ] Create TestGenerator engine with ExUnitProperties integration
+- [ ] Implement function signature analysis and type inference
+- [ ] Build property-based test generation from function specifications
+- [ ] Add example-based test creation with realistic data
+- [ ] Create edge case identification and boundary testing
+- [ ] Implement test coverage estimation and gap analysis
+- [ ] Add test code formatting and organization features
+
+### 7.6 Engine Coordination and Integration ☐
+Purpose: Establish coordination patterns between engines and integration with the existing distributed system components for comprehensive coding assistance workflows.
+
+- [ ] Create EngineCoordinator for multi-engine orchestration
+- [ ] Implement engine load balancing and task distribution
+- [ ] Add cross-engine communication and data sharing
+- [ ] Create comprehensive analysis workflows combining multiple engines
+- [ ] Implement engine performance monitoring and optimization
+- [ ] Add integration with existing ILP pipeline and LLM coordination
+
+## Phase 8: Interface Layer Abstraction ☐
 
 This phase implements the adapter pattern to decouple business logic from interface-specific implementations. The goal is to create a unified interface gateway that can handle requests from CLI, TUI, web, and IDE interfaces while maintaining the same core business logic and enabling interface-specific optimizations.
 
-### 7.1 Interface Behavior and Adapter Pattern ✅
+### 8.1 Interface Behavior and Adapter Pattern ✅
 Purpose: Create a common interface behavior that all interaction methods (CLI, TUI, web, IDE) must implement, enabling consistent business logic while allowing interface-specific customizations.
 
 - [x] Define InterfaceBehaviour with common callback functions
@@ -228,7 +296,7 @@ Purpose: Create a common interface behavior that all interaction methods (CLI, T
 - [x] Create interface-specific error handling patterns
 - [x] Implement request/response transformation utilities
 
-### 7.2 CLI Adapter Implementation ☐
+### 8.2 CLI Adapter Implementation ☐
 Purpose: Refactor existing CLI functionality to work with the distributed system while maintaining the familiar command-line interface and adding new distributed features.
 
 - [ ] Create CLI.Adapter implementing InterfaceBehaviour
@@ -238,7 +306,7 @@ Purpose: Refactor existing CLI functionality to work with the distributed system
 - [ ] Add progress indicators for distributed operations
 - [ ] Create CLI configuration for cluster connection
 
-### 7.3 TUI (Terminal User Interface) Adapter Implementation ☐
+### 8.3 TUI (Terminal User Interface) Adapter Implementation ☐
 Purpose: Create an interactive terminal user interface that provides a rich, visual chat experience within the terminal, offering features like conversation history, real-time typing indicators, and intuitive navigation.
 
 - [ ] Research and select TUI library (e.g., Ratatui/crossterm for Rust bindings, or pure Elixir solution)
@@ -254,7 +322,7 @@ Purpose: Create an interactive terminal user interface that provides a rich, vis
 - [ ] Implement session management with tabs or window switching
 - [ ] Create configuration interface for TUI preferences and themes
 
-### 7.4 Interface Testing and Validation ☐
+### 8.4 Interface Testing and Validation ☐
 Purpose: Establish comprehensive testing strategies that validate interface behavior consistency while allowing for interface-specific features and optimizations.
 
 - [ ] Create interface behavior test suite
@@ -264,11 +332,11 @@ Purpose: Establish comprehensive testing strategies that validate interface beha
 - [ ] Implement chaos testing for interface resilience
 - [ ] Add automated interface compatibility validation
 
-## Phase 8: Security and Production Readiness ☐
+## Phase 9: Security and Production Readiness ☐
 
 This final phase focuses on implementing comprehensive security measures, monitoring, and production deployment strategies. The goal is to ensure the distributed AI assistant is secure, observable, and ready for production use with proper authentication, authorization, and operational monitoring.
 
-### 8.1 Security Implementation ☐
+### 9.1 Security Implementation ☐
 Purpose: Implement comprehensive security measures including authentication, authorization, encryption, and secure communication between distributed nodes.
 
 - [ ] Implement multi-interface authentication system
@@ -278,7 +346,7 @@ Purpose: Implement comprehensive security measures including authentication, aut
 - [ ] Implement audit logging and security monitoring
 - [ ] Add input validation and sanitization
 
-### 8.2 Monitoring and Observability ☐
+### 9.2 Monitoring and Observability ☐
 Purpose: Establish comprehensive monitoring, logging, and observability to ensure the distributed system operates reliably and performance issues can be quickly identified and resolved.
 
 - [ ] Implement distributed tracing with OpenTelemetry
@@ -288,7 +356,7 @@ Purpose: Establish comprehensive monitoring, logging, and observability to ensur
 - [ ] Add performance profiling and optimization tools
 - [ ] Create alerting and incident response procedures
 
-### 8.3 Production Deployment ☐
+### 9.3 Production Deployment ☐
 Purpose: Prepare the application for production deployment with proper containerization, orchestration, and deployment strategies that support the distributed architecture.
 
 - [ ] Create Docker containers and Kubernetes manifests
@@ -298,7 +366,7 @@ Purpose: Prepare the application for production deployment with proper container
 - [ ] Implement blue-green deployment capabilities
 - [ ] Add comprehensive production documentation
 
-### 8.4 Load Testing and Performance Validation ☐
+### 9.4 Load Testing and Performance Validation ☐
 Purpose: Validate the distributed system's performance under realistic load conditions and optimize for production workloads.
 
 - [ ] Create comprehensive load testing scenarios
