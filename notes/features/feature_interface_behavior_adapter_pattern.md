@@ -166,13 +166,13 @@ config :rubber_duck, RubberDuck.Interface.Gateway,
 - Integrates with current event system
 
 ## Completion Checklist
-- [ ] InterfaceBehaviour defined
-- [ ] InterfaceGateway implemented
-- [ ] BaseAdapter created
-- [ ] Transformer utilities built
-- [ ] ErrorHandler system complete
-- [ ] Capabilities module done
-- [ ] Unit tests passing
+- [x] InterfaceBehaviour defined
+- [x] InterfaceGateway implemented
+- [x] BaseAdapter created
+- [x] Transformer utilities built
+- [x] ErrorHandler system complete
+- [x] Capabilities module done
+- [x] Unit tests passing
 - [ ] Integration tests passing
 - [ ] Documentation complete
 - [ ] Example adapter created
