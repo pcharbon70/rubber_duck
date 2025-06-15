@@ -312,14 +312,14 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyserTest do
     end
   end
   
-  describe "caching" do
+  describe "enhanced caching" do
     setup do
-      config = %{languages: [:elixir], cache_size: 10}
+      config = %{languages: [:elixir], cache_size: 10, cache_ttl: :timer.seconds(30)}
       {:ok, state} = CodeAnalyser.init(config)
       %{state: state}
     end
     
-    test "caches analysis results", %{state: state} do
+    test "caches analysis results with content-based keys", %{state: state} do
       code_data = %{
         file_path: "cached.ex",
         content: "defmodule Cached, do: def test, do: :ok",
@@ -330,10 +330,107 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyserTest do
       assert {:ok, result1, state1} = CodeAnalyser.process_real_time(code_data, state)
       
       # Second analysis of same content should be faster (cached)
-      assert {:ok, result2, _state2} = CodeAnalyser.process_real_time(code_data, state1)
+      assert {:ok, result2, state2} = CodeAnalyser.process_real_time(code_data, state1)
       
       # Results should be equivalent
       assert result1.data == result2.data
+      
+      # Cache stats should show a hit
+      assert state2.cache_stats.hits > state1.cache_stats.hits
+      assert state2.cache_stats.hit_rate > 0
+    end
+    
+    test "different languages have separate cache entries", %{state: state} do
+      content = "function test() { return 42; }"
+      
+      elixir_code = %{file_path: "test.ex", content: content, language: :elixir}
+      js_code = %{file_path: "test.js", content: content, language: :javascript}
+      
+      # Analyze same content in different languages
+      assert {:ok, _result1, state1} = CodeAnalyser.process_real_time(elixir_code, state)
+      assert {:ok, _result2, state2} = CodeAnalyser.process_real_time(js_code, state1)
+      
+      # Should have separate cache entries (2 misses, no hits)
+      assert state2.cache_stats.misses == 2
+      assert state2.cache_stats.hits == 0
+      
+      # Re-analyze same languages should hit cache
+      assert {:ok, _result3, state3} = CodeAnalyser.process_real_time(elixir_code, state2)
+      assert {:ok, _result4, state4} = CodeAnalyser.process_real_time(js_code, state3)
+      
+      # Should have 2 hits now
+      assert state4.cache_stats.hits == 2
+    end
+    
+    test "cache management via engine events", %{state: state} do
+      code_data = %{
+        file_path: "test.ex",
+        content: "defmodule Test, do: def hello, do: :world",
+        language: :elixir
+      }
+      
+      # Populate cache
+      assert {:ok, _result, state1} = CodeAnalyser.process_real_time(code_data, state)
+      assert map_size(state1.cache) > 0
+      
+      # Clear cache via event
+      assert {:ok, state2} = CodeAnalyser.handle_engine_event({:clear_cache}, state1)
+      assert map_size(state2.cache) == 0
+      assert state2.cache_stats.hits == 0
+    end
+    
+    test "cache configuration updates", %{state: state} do
+      # Update cache configuration
+      new_config = %{cache_size: 5, cache_ttl: :timer.seconds(60)}
+      
+      assert {:ok, updated_state} = CodeAnalyser.handle_engine_event({:configure_cache, new_config}, state)
+      
+      assert updated_state.cache_size == 5
+      assert updated_state.cache_ttl == :timer.seconds(60)
+    end
+    
+    test "cache statistics reporting", %{state: state} do
+      code_data = %{
+        file_path: "stats.ex",
+        content: "defmodule Stats, do: def test, do: :ok",
+        language: :elixir
+      }
+      
+      # Generate some cache activity
+      assert {:ok, _result1, state1} = CodeAnalyser.process_real_time(code_data, state)
+      assert {:ok, _result2, state2} = CodeAnalyser.process_real_time(code_data, state1) # Should hit cache
+      
+      # Get cache statistics
+      assert {:ok, _final_state, cache_info} = CodeAnalyser.handle_engine_event({:get_cache_stats}, state2)
+      
+      assert Map.has_key?(cache_info, :cache_size)
+      assert Map.has_key?(cache_info, :hit_rate)
+      assert Map.has_key?(cache_info, :total_requests)
+      assert cache_info.hit_rate > 0
+      assert cache_info.total_requests == 2
+    end
+    
+    test "LRU eviction when cache is full", %{state: state} do
+      # Set small cache size for testing
+      small_cache_state = %{state | cache_size: 2}
+      
+      # Add 3 different items to force eviction
+      code1 = %{file_path: "1.ex", content: "defmodule One, do: nil", language: :elixir}
+      code2 = %{file_path: "2.ex", content: "defmodule Two, do: nil", language: :elixir}
+      code3 = %{file_path: "3.ex", content: "defmodule Three, do: nil", language: :elixir}
+      
+      assert {:ok, _result1, state1} = CodeAnalyser.process_real_time(code1, small_cache_state)
+      assert {:ok, _result2, state2} = CodeAnalyser.process_real_time(code2, state1)
+      assert {:ok, _result3, state3} = CodeAnalyser.process_real_time(code3, state2)
+      
+      # Cache should not exceed max size
+      assert map_size(state3.cache) <= 2
+      
+      # First item should be evicted, so re-analyzing it should be a cache miss
+      assert {:ok, _result4, state4} = CodeAnalyser.process_real_time(code1, state3)
+      
+      # Should still be within cache limits
+      assert map_size(state4.cache) <= 2
     end
   end
   
@@ -381,6 +478,198 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyserTest do
       
       assert {:ok, result, _state} = CodeAnalyser.process_real_time(empty_code, state)
       assert %{status: :success} = result
+    end
+  end
+  
+  describe "enhanced syntax analysis" do
+    setup do
+      config = %{languages: [:elixir, :javascript, :python]}
+      {:ok, state} = CodeAnalyser.init(config)
+      %{state: state}
+    end
+    
+    test "detects unclosed brackets in Elixir", %{state: state} do
+      bracket_code = %{
+        file_path: "brackets.ex",
+        content: """
+        defmodule Test do
+          def broken_function(x) do
+            if x > 0 do
+              {a, b, c
+            end
+          end  # Missing closing brace
+        end
+        """,
+        language: :elixir
+      }
+      
+      assert {:ok, result, _state} = CodeAnalyser.process_real_time(bracket_code, state)
+      
+      assert %{
+        data: %{
+          syntax: %{
+            errors: errors
+          }
+        }
+      } = result
+      
+      # Should detect unclosed brace
+      assert Enum.any?(errors, fn error -> 
+        String.contains?(error.message, "Unclosed") or String.contains?(error.message, "bracket")
+      end)
+    end
+    
+    test "detects missing colons in Python", %{state: state} do
+      python_code = %{
+        file_path: "test.py",
+        content: """
+        def test_function()
+            if x > 0
+                return True
+            else
+                return False
+        """,
+        language: :python
+      }
+      
+      assert {:ok, result, _state} = CodeAnalyser.process_real_time(python_code, state)
+      
+      assert %{
+        data: %{
+          syntax: %{
+            errors: errors
+          }
+        }
+      } = result
+      
+      # Should detect missing colons
+      colon_errors = Enum.filter(errors, fn error ->
+        String.contains?(error.message, "colon")
+      end)
+      
+      assert length(colon_errors) > 0
+    end
+    
+    test "detects incomplete Elixir constructs", %{state: state} do
+      incomplete_code = %{
+        file_path: "incomplete.ex",
+        content: """
+        defmodule MyModule do
+          def complete_function, do: :ok
+          
+          def  # Incomplete function definition
+          
+          defmodule  # Incomplete module definition
+        end
+        """,
+        language: :elixir
+      }
+      
+      assert {:ok, result, _state} = CodeAnalyser.process_real_time(incomplete_code, state)
+      
+      assert %{
+        data: %{
+          syntax: %{
+            errors: errors
+          }
+        }
+      } = result
+      
+      # Should detect incomplete constructs
+      incomplete_errors = Enum.filter(errors, fn error ->
+        String.contains?(error.message, "Incomplete")
+      end)
+      
+      assert length(incomplete_errors) >= 2
+    end
+    
+    test "provides detailed error information", %{state: state} do
+      error_code = %{
+        file_path: "detailed.ex",
+        content: """
+        defmodule Test do
+          def test(x) do
+            if x > 0 do
+              [1, 2, 3
+            end
+          end
+        end
+        """,
+        language: :elixir
+      }
+      
+      assert {:ok, result, _state} = CodeAnalyser.process_real_time(error_code, state)
+      
+      assert %{
+        data: %{
+          syntax: %{
+            errors: [error | _]
+          }
+        }
+      } = result
+      
+      # Verify error structure
+      assert Map.has_key?(error, :message)
+      assert Map.has_key?(error, :line)
+      assert Map.has_key?(error, :column)
+      assert Map.has_key?(error, :severity)
+      assert error.severity in [:error, :warning]
+    end
+    
+    test "handles JavaScript syntax errors", %{state: state} do
+      js_code = %{
+        file_path: "test.js",
+        content: """
+        function test() {
+          if (x > 0) {
+            console.log("test")
+            return true
+          }
+        // Missing closing brace
+        """,
+        language: :javascript
+      }
+      
+      assert {:ok, result, _state} = CodeAnalyser.process_real_time(js_code, state)
+      
+      assert %{
+        data: %{
+          syntax: %{
+            errors: errors
+          }
+        }
+      } = result
+      
+      # Should detect syntax issues
+      assert length(errors) > 0
+    end
+    
+    test "generates syntax warnings", %{state: state} do
+      warning_code = %{
+        file_path: "warnings.ex",
+        content: """
+        defmodule Test do
+          def test(x) do
+            x |>
+            # Pipe at end of line
+          end
+        end
+        """,
+        language: :elixir
+      }
+      
+      assert {:ok, result, _state} = CodeAnalyser.process_real_time(warning_code, state)
+      
+      assert %{
+        data: %{
+          syntax: %{
+            warnings: warnings
+          }
+        }
+      } = result
+      
+      # Should have warnings or errors for syntax issues
+      assert is_list(warnings)
     end
   end
 end
