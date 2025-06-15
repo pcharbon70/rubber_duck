@@ -199,7 +199,7 @@ defmodule RubberDuck.Interface.CLI.ResponseFormatter do
 
   defp format_stream_response(response, _request, config) do
     case response.data do
-      %{chunk: chunk} -> format_stream_chunk(chunk, config)
+      %{chunk: chunk} -> format_stream_data(chunk, config)
       %{message: message} -> message
       data -> inspect(data, pretty: true)
     end
