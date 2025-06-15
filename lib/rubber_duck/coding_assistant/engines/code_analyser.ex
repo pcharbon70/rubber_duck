@@ -581,34 +581,80 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
     max(1, ast_score + content_score)
   end
 
-  defp calculate_cognitive_complexity(ast, content, _language) do
-    # Simplified cognitive complexity (same as cyclomatic for now)
-    calculate_cyclomatic_complexity(ast, content, _language)
+  defp calculate_cognitive_complexity(ast, content, language) do
+    # Cognitive complexity considers nesting and structural complexity
+    base_complexity = calculate_cyclomatic_complexity(ast, content, language)
+    nesting_penalty = calculate_nesting_penalty(content, language)
+    logical_penalty = calculate_logical_operator_penalty(content, language)
+    
+    base_complexity + nesting_penalty + logical_penalty
   end
 
-  defp calculate_halstead_metrics(_ast, _language) do
-    # Placeholder Halstead metrics
+  defp calculate_halstead_metrics(ast, language) do
+    # Halstead complexity metrics based on operators and operands
+    {operators, operands} = extract_halstead_components(ast, language)
+    
+    n1 = length(Enum.uniq(operators))  # unique operators
+    n2 = length(Enum.uniq(operands))  # unique operands
+    big_n1 = length(operators)        # total operators
+    big_n2 = length(operands)         # total operands
+    
+    program_length = big_n1 + big_n2
+    program_vocabulary = n1 + n2
+    program_volume = if program_vocabulary > 0, do: program_length * :math.log2(program_vocabulary), else: 0.0
+    difficulty = if n2 > 0, do: (n1 / 2.0) * (big_n2 / n2), else: 0.0
+    effort = difficulty * program_volume
+    
     %{
-      program_length: 0,
-      program_vocabulary: 0,
-      program_volume: 0.0,
-      difficulty: 0.0,
-      effort: 0.0
+      program_length: program_length,
+      program_vocabulary: program_vocabulary,
+      program_volume: Float.round(program_volume, 2),
+      difficulty: Float.round(difficulty, 2),
+      effort: Float.round(effort, 2)
     }
   end
 
   defp count_lines_of_code(ast) do
-    # Count non-empty lines (simplified)
+    # Count non-empty, non-comment lines
     case ast do
       nil -> 0
-      %{children: children} when is_list(children) -> length(children)
+      %{content: content} when is_binary(content) ->
+        content
+        |> String.split("\n")
+        |> Enum.count(fn line ->
+          trimmed = String.trim(line)
+          # Count lines that are not empty and not just comments
+          String.length(trimmed) > 0 and not String.starts_with?(trimmed, "#") and not String.starts_with?(trimmed, "//")
+        end)
+      %{children: children} when is_list(children) -> 
+        max(1, length(children))
       _ -> 1
     end
   end
 
-  defp calculate_maintainability_index(_ast, _language) do
-    # Placeholder maintainability index
-    85.0
+  defp calculate_maintainability_index(ast, language) do
+    # Microsoft Maintainability Index formula
+    # MI = 171 - 5.2 * ln(Halstead Volume) - 0.23 * (Cyclomatic Complexity) - 16.2 * ln(Lines of Code) + 50 * sin(sqrt(2.4 * perCM))
+    # Simplified version without comment percentage
+    
+    halstead_metrics = calculate_halstead_metrics(ast, language)
+    volume = halstead_metrics.program_volume
+    complexity = count_decision_points(ast)
+    loc = count_lines_of_code(ast)
+    
+    # Ensure we have valid values for calculation
+    safe_volume = max(1.0, volume)
+    safe_complexity = max(1, complexity)
+    safe_loc = max(1, loc)
+    
+    # Calculate maintainability index
+    mi = 171 - 5.2 * :math.log(safe_volume) - 0.23 * safe_complexity - 16.2 * :math.log(safe_loc)
+    
+    # Clamp between 0-100 and round
+    mi
+    |> max(0.0)
+    |> min(100.0)
+    |> Float.round(1)
   end
 
   defp count_decision_points(nil), do: 0
@@ -634,6 +680,158 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
       matches = content |> String.split(keyword) |> length() |> Kernel.-(1)
       acc + max(0, matches)
     end)
+  end
+
+  # Cognitive complexity helper functions
+
+  defp calculate_nesting_penalty(content, language) do
+    lines = String.split(content, "\n")
+    max_nesting = calculate_max_nesting_level(lines, language)
+    # Add penalty for each level of nesting beyond 1
+    max(0, max_nesting - 1)
+  end
+
+  defp calculate_max_nesting_level(lines, language) do
+    case language do
+      :elixir -> calculate_elixir_nesting(lines)
+      :javascript -> calculate_brace_nesting(lines)
+      :python -> calculate_indentation_nesting(lines)
+      _ -> 1
+    end
+  end
+
+  defp calculate_elixir_nesting(lines) do
+    {_, max_level} = Enum.reduce(lines, {0, 0}, fn line, {current_level, max_level} ->
+      trimmed = String.trim(line)
+      
+      # Count opening constructs
+      opens = count_opens_in_line(trimmed)
+      # Count closing constructs
+      closes = if String.contains?(trimmed, "end"), do: 1, else: 0
+      
+      new_level = current_level + opens - closes
+      {new_level, max(max_level, new_level)}
+    end)
+    max_level
+  end
+
+  defp count_opens_in_line(line) do
+    open_keywords = ["def ", "defmodule ", "if ", "case ", "cond ", "for ", "with "]
+    Enum.reduce(open_keywords, 0, fn keyword, acc ->
+      if String.contains?(line, keyword), do: acc + 1, else: acc
+    end)
+  end
+
+  defp calculate_brace_nesting(lines) do
+    {_, max_level} = Enum.reduce(lines, {0, 0}, fn line, {current_level, max_level} ->
+      opens = String.graphemes(line) |> Enum.count(&(&1 == "{"))
+      closes = String.graphemes(line) |> Enum.count(&(&1 == "}"))
+      new_level = current_level + opens - closes
+      {new_level, max(max_level, new_level)}
+    end)
+    max_level
+  end
+
+  defp calculate_indentation_nesting(lines) do
+    lines
+    |> Enum.map(fn line ->
+      if String.trim(line) == "", do: 0, else: count_leading_spaces(line) / 4
+    end)
+    |> Enum.max(fn -> 0 end)
+    |> trunc()
+  end
+
+  defp count_leading_spaces(line) do
+    line
+    |> String.graphemes()
+    |> Enum.take_while(&(&1 == " "))
+    |> length()
+  end
+
+  defp calculate_logical_operator_penalty(content, _language) do
+    # Count logical operators that add cognitive load
+    logical_ops = ["&&", "||", "and ", "or ", "not ", "!"]
+    Enum.reduce(logical_ops, 0, fn op, acc ->
+      matches = content |> String.split(op) |> length() |> Kernel.-(1)
+      acc + matches
+    end)
+  end
+
+  # Halstead metrics helper functions
+
+  defp extract_halstead_components(ast, language) do
+    case language do
+      :elixir -> extract_elixir_halstead(ast)
+      :javascript -> extract_javascript_halstead(ast)
+      :python -> extract_python_halstead(ast)
+      _ -> {[], []}
+    end
+  end
+
+  defp extract_elixir_halstead(ast) do
+    operators = extract_elixir_operators(ast)
+    operands = extract_elixir_operands(ast)
+    {operators, operands}
+  end
+
+  defp extract_elixir_operators(ast) do
+    # Extract operators from AST or use content-based extraction as fallback
+    basic_operators = ["+", "-", "*", "/", "=", "==", "!=", "<", ">", "<=", ">=", 
+                       "|>", "++", "--", "and", "or", "not", "&&", "||", "!",
+                       "def", "defmodule", "if", "case", "when", "cond", "for"]
+    
+    case ast do
+      %{content: content} when is_binary(content) ->
+        extract_operators_from_content(content, basic_operators)
+      _ ->
+        basic_operators |> Enum.take(5)  # Return subset for AST without content
+    end
+  end
+
+  defp extract_elixir_operands(ast) do
+    # Extract variable names, function names, atoms, numbers
+    case ast do
+      %{content: content} when is_binary(content) ->
+        extract_operands_from_content(content)
+      _ ->
+        ["x", "y", "result"]  # Basic operands for AST without content
+    end
+  end
+
+  defp extract_javascript_halstead(ast) do
+    operators = ["+", "-", "*", "/", "=", "==", "===", "!=", "!==", "<", ">", 
+                 "<=", ">=", "&&", "||", "!", "function", "if", "else", "for", "while"]
+    operands = extract_operands_from_ast(ast, :javascript)
+    {operators |> Enum.take(10), operands}
+  end
+
+  defp extract_python_halstead(ast) do
+    operators = ["+", "-", "*", "/", "=", "==", "!=", "<", ">", "<=", ">=", 
+                 "and", "or", "not", "def", "if", "elif", "else", "for", "while"]
+    operands = extract_operands_from_ast(ast, :python)
+    {operators |> Enum.take(10), operands}
+  end
+
+  defp extract_operators_from_content(content, operator_list) do
+    Enum.filter(operator_list, fn op ->
+      String.contains?(content, op)
+    end)
+  end
+
+  defp extract_operands_from_content(content) do
+    # Extract variable-like tokens (simplified approach)
+    content
+    |> String.split(~r/[^a-zA-Z0-9_]/)
+    |> Enum.filter(fn token -> 
+      String.length(token) > 1 and String.match?(token, ~r/^[a-zA-Z_][a-zA-Z0-9_]*$/)
+    end)
+    |> Enum.uniq()
+    |> Enum.take(20)  # Limit to prevent excessive operand lists
+  end
+
+  defp extract_operands_from_ast(_ast, _language) do
+    # Simplified operand extraction
+    ["var", "result", "value", "item", "data"]
   end
 
   # Enhanced syntax analysis functions
