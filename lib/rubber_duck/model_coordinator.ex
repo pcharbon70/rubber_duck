@@ -6,6 +6,9 @@ defmodule RubberDuck.ModelCoordinator do
   and usage statistics for AI models in the system.
   """
   use GenServer
+  
+  alias RubberDuck.{EventSchemas}
+  alias RubberDuck.EventBroadcasting.EventBroadcaster
 
   # Client API
 
@@ -143,6 +146,20 @@ defmodule RubberDuck.ModelCoordinator do
       registered_at: DateTime.utc_now()
     })
     
+    # Broadcast model registration event
+    event_payload = EventSchemas.model_health_event(
+      model.name,
+      Map.get(model, :provider, "unknown"),
+      :healthy,
+      reason: "Model registered"
+    )
+    EventBroadcaster.broadcast_async(%{
+      topic: "model.registration.completed",
+      payload: event_payload,
+      priority: :normal,
+      metadata: %{component: "model_coordinator", operation: "register"}
+    })
+    
     new_state = put_in(state, [:models, model.name], model)
     {:reply, :ok, new_state}
   end
@@ -185,6 +202,7 @@ defmodule RubberDuck.ModelCoordinator do
   @impl true
   def handle_call({:select_model, criteria}, _from, state) do
     capability = Keyword.get(criteria, :capability)
+    session_id = Keyword.get(criteria, :session_id)
     
     available_models = state.models
     |> Map.values()
@@ -192,8 +210,45 @@ defmodule RubberDuck.ModelCoordinator do
     |> filter_by_capability(capability)
     
     case available_models do
-      [] -> {:reply, {:error, :no_model_available}, state}
-      models -> {:reply, {:ok, Enum.random(models)}, state}
+      [] -> 
+        # Broadcast model selection failed event
+        if session_id do
+          event_payload = EventSchemas.model_selection_event(
+            session_id,
+            criteria,
+            nil,
+            "No healthy models available for criteria: #{inspect(capability)}"
+          )
+          EventBroadcaster.broadcast_async(%{
+            topic: EventSchemas.suggest_topic(:model_selected),
+            payload: event_payload,
+            priority: :high,
+            metadata: %{component: "model_coordinator", result: "failed"}
+          })
+        end
+        
+        {:reply, {:error, :no_model_available}, state}
+        
+      models -> 
+        selected_model = Enum.random(models)
+        
+        # Broadcast model selection success event
+        if session_id do
+          event_payload = EventSchemas.model_selection_event(
+            session_id,
+            criteria,
+            selected_model.name,
+            "Model selected based on availability and capability match"
+          )
+          EventBroadcaster.broadcast_async(%{
+            topic: EventSchemas.suggest_topic(:model_selected),
+            payload: event_payload,
+            priority: :normal,
+            metadata: %{component: "model_coordinator", result: "success"}
+          })
+        end
+        
+        {:reply, {:ok, selected_model}, state}
     end
   end
 
@@ -220,14 +275,31 @@ defmodule RubberDuck.ModelCoordinator do
     case Map.get(state.models, model_name) do
       nil -> 
         {:reply, {:error, :model_not_found}, state}
-      _model ->
+      model ->
+        previous_status = model.health_status
+        
         new_state = update_in(state, [:models, model_name], fn model ->
           model
           |> Map.put(:health_status, :unhealthy)
           |> Map.put(:health_reason, reason)
         end)
         
-        # Notify ContextManager about health change
+        # Broadcast model health change event
+        event_payload = EventSchemas.model_health_event(
+          model_name,
+          Map.get(model, :provider, "unknown"),
+          :unhealthy,
+          previous_status: previous_status,
+          reason: reason
+        )
+        EventBroadcaster.broadcast_async(%{
+          topic: EventSchemas.suggest_topic(:model_health_changed),
+          payload: event_payload,
+          priority: :high,
+          metadata: %{component: "model_coordinator", severity: "critical"}
+        })
+        
+        # Notify ContextManager about health change (backward compatibility)
         RubberDuck.ContextManager.update_model_health_warning(RubberDuck.ContextManager, model_name, :unhealthy, reason)
         
         {:reply, :ok, new_state}
@@ -239,14 +311,31 @@ defmodule RubberDuck.ModelCoordinator do
     case Map.get(state.models, model_name) do
       nil -> 
         {:reply, {:error, :model_not_found}, state}
-      _model ->
+      model ->
+        previous_status = model.health_status
+        
         new_state = update_in(state, [:models, model_name], fn model ->
           model
           |> Map.put(:health_status, :healthy)
           |> Map.put(:health_reason, nil)
         end)
         
-        # Notify ContextManager about health change
+        # Broadcast model health change event
+        event_payload = EventSchemas.model_health_event(
+          model_name,
+          Map.get(model, :provider, "unknown"),
+          :healthy,
+          previous_status: previous_status,
+          reason: "Model recovered"
+        )
+        EventBroadcaster.broadcast_async(%{
+          topic: EventSchemas.suggest_topic(:model_health_changed),
+          payload: event_payload,
+          priority: :normal,
+          metadata: %{component: "model_coordinator", severity: "info"}
+        })
+        
+        # Notify ContextManager about health change (backward compatibility)
         RubberDuck.ContextManager.update_model_health_warning(RubberDuck.ContextManager, model_name, :healthy)
         
         {:reply, :ok, new_state}
@@ -283,6 +372,25 @@ defmodule RubberDuck.ModelCoordinator do
           Map.update!(stats, :failure_count, &(&1 + 1))
       end
     end)
+    
+    # Broadcast model usage event
+    case Map.get(state.models, model_name) do
+      nil -> :ok  # Model not found, skip event
+      _model ->
+        event_payload = EventSchemas.model_usage_event(
+          "system",  # No specific session for this usage tracking
+          model_name,
+          "inference",
+          if status == :success, do: :completed, else: :failed,
+          duration_ms: latency
+        )
+        EventBroadcaster.broadcast_async(%{
+          topic: "model.usage.tracked",
+          payload: event_payload,
+          priority: :low,
+          metadata: %{component: "model_coordinator", tracking: true}
+        })
+    end
     
     {:noreply, new_state}
   end

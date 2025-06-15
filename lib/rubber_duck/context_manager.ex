@@ -7,7 +7,8 @@ defmodule RubberDuck.ContextManager do
   """
   use GenServer
   
-  alias RubberDuck.{TransactionWrapper, StateSynchronizer}
+  alias RubberDuck.{TransactionWrapper, StateSynchronizer, EventSchemas}
+  alias RubberDuck.EventBroadcasting.EventBroadcaster
 
   # Client API
 
@@ -152,6 +153,15 @@ defmodule RubberDuck.ContextManager do
     
     case TransactionWrapper.create_record(:sessions, session, metadata: %{operation: :create_session}) do
       {:ok, _} ->
+        # Broadcast session creation event
+        event_payload = EventSchemas.session_event(session_id, :created)
+        EventBroadcaster.broadcast_async(%{
+          topic: EventSchemas.suggest_topic(:session_created),
+          payload: event_payload,
+          priority: :normal,
+          metadata: %{component: "context_manager", node: state.node_id}
+        })
+        
         # Update local cache
         new_cache = Map.put(state.local_cache, session_id, session)
         {:reply, {:ok, session_id}, %{state | local_cache: new_cache}}
@@ -198,6 +208,21 @@ defmodule RubberDuck.ContextManager do
         
         case TransactionWrapper.update_record(:sessions, session_id, updates, metadata: %{operation: :add_message}) do
           {:ok, updated_session} ->
+            # Broadcast message added event
+            event_payload = EventSchemas.message_event(
+              session_id, 
+              generate_message_id(timestamped_message), 
+              timestamped_message.role, 
+              timestamped_message.content,
+              timestamped_message
+            )
+            EventBroadcaster.broadcast_async(%{
+              topic: EventSchemas.suggest_topic(:message_added),
+              payload: event_payload,
+              priority: :normal,
+              metadata: %{component: "context_manager", node: updated_state.node_id}
+            })
+            
             # Update local cache
             new_cache = Map.put(updated_state.local_cache, session_id, updated_session)
             {:reply, :ok, %{updated_state | local_cache: new_cache}}
@@ -220,6 +245,15 @@ defmodule RubberDuck.ContextManager do
         
         case TransactionWrapper.update_record(:sessions, session_id, updates, metadata: %{operation: :update_metadata}) do
           {:ok, updated_session} ->
+            # Broadcast session updated event
+            event_payload = EventSchemas.session_event(session_id, :updated, metadata)
+            EventBroadcaster.broadcast_async(%{
+              topic: EventSchemas.suggest_topic(:session_updated),
+              payload: event_payload,
+              priority: :normal,
+              metadata: %{component: "context_manager", node: updated_state.node_id}
+            })
+            
             # Update local cache
             new_cache = Map.put(updated_state.local_cache, session_id, updated_session)
             {:reply, :ok, %{updated_state | local_cache: new_cache}}
@@ -257,6 +291,15 @@ defmodule RubberDuck.ContextManager do
   def handle_call({:delete_session, session_id}, _from, state) do
     case TransactionWrapper.delete_record(:sessions, session_id, metadata: %{operation: :delete_session}) do
       {:ok, _} ->
+        # Broadcast session deletion event
+        event_payload = EventSchemas.session_event(session_id, :deleted)
+        EventBroadcaster.broadcast_async(%{
+          topic: EventSchemas.suggest_topic(:session_deleted),
+          payload: event_payload,
+          priority: :normal,
+          metadata: %{component: "context_manager", node: state.node_id}
+        })
+        
         # Remove from local cache
         new_cache = Map.delete(state.local_cache, session_id)
         {:reply, :ok, %{state | local_cache: new_cache}}
@@ -449,5 +492,15 @@ defmodule RubberDuck.ContextManager do
   defp generate_session_id do
     :crypto.strong_rand_bytes(16)
     |> Base.encode16(case: :lower)
+  end
+
+  defp generate_message_id(message) do
+    # Generate a message ID based on content hash and timestamp
+    content_hash = :crypto.hash(:sha256, inspect(message))
+    |> Base.encode16(case: :lower)
+    |> String.slice(0, 8)
+    
+    timestamp = System.system_time(:microsecond)
+    "msg_#{content_hash}_#{timestamp}"
   end
 end

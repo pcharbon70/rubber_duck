@@ -204,15 +204,15 @@ Purpose: Establish coordination patterns using Horde for distributed supervision
 - [x] Implement process migration during node changes
 - [x] Create coordination patterns for dependent processes
 
-### 6.3 Legacy Event Architecture Migration ☐
+### 6.3 Legacy Event Architecture Migration ✅
 Purpose: Migrate any remaining Phoenix PubSub usage to OTP pg for consistency with the LLM abstraction layer and eliminate external dependencies.
 
-- [ ] Audit existing PubSub usage in core components
-- [ ] Migrate ContextManager events to pg-based broadcasting
-- [ ] Update ModelCoordinator to use pg for health notifications
-- [ ] Create unified event schemas and topic organization
-- [ ] Add event persistence for audit and replay capabilities
-- [ ] Implement comprehensive event monitoring and metrics
+- [x] Audit existing PubSub usage in core components
+- [x] Migrate ContextManager events to pg-based broadcasting
+- [x] Update ModelCoordinator to use pg for health notifications
+- [x] Create unified event schemas and topic organization
+- [x] Add event persistence for audit and replay capabilities
+- [x] Implement comprehensive event monitoring and metrics
 
 ## Phase 7: Interface Layer Abstraction ☐
 

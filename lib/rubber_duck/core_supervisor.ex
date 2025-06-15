@@ -18,6 +18,11 @@ defmodule RubberDuck.CoreSupervisor do
       # Database management (must start first)
       {RubberDuck.MnesiaManager, []},
 
+      # Event broadcasting and monitoring infrastructure (Section 6.3)
+      {RubberDuck.EventBroadcasting.EventBroadcaster, []},
+      {RubberDuck.EventPersistence, []},
+      {RubberDuck.EventMonitoring, []},
+
       # Multi-tier cache system (Nebulex) - only start the multilevel cache
       {RubberDuck.Nebulex.Cache, []},
       # Performance optimization modules
