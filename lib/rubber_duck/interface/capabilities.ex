@@ -52,6 +52,14 @@ defmodule RubberDuck.Interface.Capabilities do
     :configuration_management, :plugin_system
   ]
 
+  @tui_capabilities [
+    :chat, :complete, :analyze, :streaming, :file_upload, :file_download,
+    :session_management, :history, :export, :health_check, :real_time_updates,
+    :visual_chat_interface, :conversation_browser, :syntax_highlighting,
+    :keyboard_shortcuts, :mouse_navigation, :responsive_layout,
+    :status_indicators, :session_tabs, :configuration_interface
+  ]
+
   @web_capabilities [
     :chat, :complete, :analyze, :streaming, :file_upload, :file_download,
     :authentication, :session_management, :multi_model, :context_management,
@@ -102,7 +110,7 @@ defmodule RubberDuck.Interface.Capabilities do
           else
             # Treat as interface type
             case module do
-              interface when interface in [:cli, :web, :lsp] ->
+              interface when interface in [:cli, :tui, :web, :lsp] ->
                 build_default_capability_set(interface, options)
               _ ->
                 {:error, :invalid_adapter_or_interface}
@@ -273,6 +281,7 @@ defmodule RubberDuck.Interface.Capabilities do
   def get_interface_capabilities(interface) do
     case interface do
       :cli -> @cli_capabilities
+      :tui -> @tui_capabilities
       :web -> @web_capabilities
       :lsp -> @lsp_capabilities
       _ -> @core_capabilities
@@ -501,6 +510,88 @@ defmodule RubberDuck.Interface.Capabilities do
           metadata: %{category: :cli, priority: :low}
         }
       }
+      :tui -> %{
+        visual_chat_interface: %{
+          level: :standard,
+          status: :available,
+          version: "1.0.0",
+          description: "Visual chat interface with panels and windows",
+          dependencies: [:chat],
+          metadata: %{category: :tui, priority: :high}
+        },
+        conversation_browser: %{
+          level: :advanced,
+          status: :available,
+          version: "1.0.0",
+          description: "Browse and search conversation history",
+          dependencies: [:history, :session_management],
+          metadata: %{category: :tui, priority: :medium}
+        },
+        syntax_highlighting: %{
+          level: :advanced,
+          status: :available,
+          version: "1.0.0",
+          description: "Syntax highlighting for code blocks",
+          dependencies: [],
+          metadata: %{category: :tui, priority: :medium}
+        },
+        keyboard_shortcuts: %{
+          level: :standard,
+          status: :available,
+          version: "1.0.0",
+          description: "Keyboard navigation and shortcuts",
+          dependencies: [],
+          metadata: %{category: :tui, priority: :high}
+        },
+        mouse_navigation: %{
+          level: :standard,
+          status: :available,
+          version: "1.0.0",
+          description: "Mouse support for navigation and interaction",
+          dependencies: [],
+          metadata: %{category: :tui, priority: :medium}
+        },
+        responsive_layout: %{
+          level: :advanced,
+          status: :available,
+          version: "1.0.0",
+          description: "Layout adapts to terminal size changes",
+          dependencies: [],
+          metadata: %{category: :tui, priority: :medium}
+        },
+        status_indicators: %{
+          level: :standard,
+          status: :available,
+          version: "1.0.0",
+          description: "Visual indicators for connection, typing, processing",
+          dependencies: [],
+          metadata: %{category: :tui, priority: :high}
+        },
+        session_tabs: %{
+          level: :advanced,
+          status: :available,
+          version: "1.0.0",
+          description: "Multiple session management with tabs",
+          dependencies: [:session_management],
+          metadata: %{category: :tui, priority: :medium}
+        },
+        configuration_interface: %{
+          level: :advanced,
+          status: :available,
+          version: "1.0.0",
+          description: "Interactive configuration and preferences",
+          dependencies: [],
+          metadata: %{category: :tui, priority: :low}
+        },
+        real_time_updates: %{
+          level: :advanced,
+          status: :available,
+          version: "1.0.0",
+          description: "Real-time updates and streaming responses",
+          dependencies: [:streaming],
+          metadata: %{category: :tui, priority: :high}
+        }
+      }
       :web -> %{
         websocket_support: %{
           level: :advanced,
@@ -639,6 +730,8 @@ defmodule RubberDuck.Interface.Capabilities do
     module_name = Module.split(module) |> List.last() |> String.downcase()
     
     cond do
+      String.contains?(module_name, "tui") -> :tui
+      String.contains?(module_name, "terminal") -> :tui
       String.contains?(module_name, "cli") -> :cli
       String.contains?(module_name, "web") -> :web
       String.contains?(module_name, "lsp") -> :lsp

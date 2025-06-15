@@ -19,6 +19,18 @@ defmodule RubberDuck.Interface.CapabilitiesTest do
       assert :interactive_mode in capability_names
     end
     
+    test "discovers capabilities for TUI interface" do
+      {:ok, capability_set} = Capabilities.discover_capabilities(:tui)
+      
+      assert capability_set.interface == :tui
+      capability_names = Enum.map(capability_set.capabilities, &Map.get(&1, :name))
+      assert :chat in capability_names
+      assert :streaming in capability_names
+      assert :visual_chat_interface in capability_names
+      assert :keyboard_shortcuts in capability_names
+      assert :syntax_highlighting in capability_names
+    end
+    
     test "discovers capabilities for Web interface" do
       {:ok, capability_set} = Capabilities.discover_capabilities(:web)
       
@@ -263,15 +275,21 @@ defmodule RubberDuck.Interface.CapabilitiesTest do
   describe "get_interface_capabilities/1" do
     test "returns capabilities for each interface type" do
       cli_caps = Capabilities.get_interface_capabilities(:cli)
+      tui_caps = Capabilities.get_interface_capabilities(:tui)
       web_caps = Capabilities.get_interface_capabilities(:web)
       lsp_caps = Capabilities.get_interface_capabilities(:lsp)
       
       assert is_list(cli_caps)
+      assert is_list(tui_caps)
       assert is_list(web_caps)
       assert is_list(lsp_caps)
       
       # CLI should have interactive mode
       assert :interactive_mode in cli_caps
+      
+      # TUI should have visual interface
+      assert :visual_chat_interface in tui_caps
+      assert :keyboard_shortcuts in tui_caps
       
       # Web should have streaming
       assert :streaming in web_caps
@@ -281,6 +299,7 @@ defmodule RubberDuck.Interface.CapabilitiesTest do
       
       # All should have some common capabilities
       assert :chat in cli_caps
+      assert :chat in tui_caps
       assert :chat in web_caps
     end
     

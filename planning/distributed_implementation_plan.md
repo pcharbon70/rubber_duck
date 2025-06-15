@@ -216,10 +216,10 @@ Purpose: Migrate any remaining Phoenix PubSub usage to OTP pg for consistency wi
 
 ## Phase 7: Interface Layer Abstraction ☐
 
-This phase implements the adapter pattern to decouple business logic from interface-specific implementations. The goal is to create a unified interface gateway that can handle requests from CLI, web, and IDE interfaces while maintaining the same core business logic and enabling interface-specific optimizations.
+This phase implements the adapter pattern to decouple business logic from interface-specific implementations. The goal is to create a unified interface gateway that can handle requests from CLI, TUI, web, and IDE interfaces while maintaining the same core business logic and enabling interface-specific optimizations.
 
 ### 7.1 Interface Behavior and Adapter Pattern ☐
-Purpose: Create a common interface behavior that all interaction methods (CLI, web, IDE) must implement, enabling consistent business logic while allowing interface-specific customizations.
+Purpose: Create a common interface behavior that all interaction methods (CLI, TUI, web, IDE) must implement, enabling consistent business logic while allowing interface-specific customizations.
 
 - [ ] Define InterfaceBehaviour with common callback functions
 - [ ] Create InterfaceGateway for unified request routing
@@ -238,7 +238,23 @@ Purpose: Refactor existing CLI functionality to work with the distributed system
 - [ ] Add progress indicators for distributed operations
 - [ ] Create CLI configuration for cluster connection
 
-### 7.3 Interface Testing and Validation ☐
+### 7.3 TUI (Terminal User Interface) Adapter Implementation ☐
+Purpose: Create an interactive terminal user interface that provides a rich, visual chat experience within the terminal, offering features like conversation history, real-time typing indicators, and intuitive navigation.
+
+- [ ] Research and select TUI library (e.g., Ratatui/crossterm for Rust bindings, or pure Elixir solution)
+- [ ] Create TUI.Adapter implementing InterfaceBehaviour
+- [ ] Design TUI layout with chat area, input field, and status panels
+- [ ] Implement real-time chat interface with message streaming
+- [ ] Add conversation history browser with search and filtering
+- [ ] Create interactive menus for model selection and settings
+- [ ] Implement keyboard shortcuts and mouse navigation
+- [ ] Add visual indicators for typing, processing, and connection status
+- [ ] Design responsive layout that adapts to terminal size
+- [ ] Add syntax highlighting for code blocks and responses
+- [ ] Implement session management with tabs or window switching
+- [ ] Create configuration interface for TUI preferences and themes
+
+### 7.4 Interface Testing and Validation ☐
 Purpose: Establish comprehensive testing strategies that validate interface behavior consistency while allowing for interface-specific features and optimizations.
 
 - [ ] Create interface behavior test suite
