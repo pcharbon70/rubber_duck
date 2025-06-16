@@ -31,7 +31,7 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
       {:ok, result, new_state} = CodeAnalyser.process_real_time(code_data, state)
   """
 
-  @behaviour RubberDuck.CodingAssistant.EngineBehaviour
+  use RubberDuck.CodingAssistant.Engine
   
   alias RubberDuck.ILP.Parser.TreeSitterWrapper
   
@@ -884,30 +884,48 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
 
   defp check_elixir_invalid_chars(line, line_num) do
     # Check for common Elixir syntax issues
-    def_errors = if String.contains?(line, "def ") and not String.contains?(line, " do") and not String.contains?(line, ", do:") do
-      if String.trim(line) |> String.ends_with?("def") or not String.contains?(line, "(") do
-        [%{message: "Function definition missing 'do' keyword or incomplete", line: line_num, column: 0, severity: :error}]
-      else
-        []
-      end
-    else
-      []
+    trimmed = String.trim(line)
+    
+    def_errors = cond do
+      # Check for def with function name and params but no 'do'
+      String.match?(trimmed, ~r/^def\s+\w+\s*\([^)]*\)\s*$/) ->
+        [%{message: "Function definition missing 'do' keyword", line: line_num, column: 0, severity: :error}]
+      
+      # Check for incomplete def
+      String.match?(trimmed, ~r/^def\s*$/) or String.match?(trimmed, ~r/^def\s+$/) ->
+        [%{message: "Incomplete function definition", line: line_num, column: 0, severity: :error}]
+      
+      true -> []
     end
     
-    module_errors = if String.contains?(line, "defmodule ") and not String.contains?(line, " do") do
-      [%{message: "Module definition missing 'do' keyword", line: line_num, column: 0, severity: :error}]
-    else
-      []
+    module_errors = cond do
+      # Check for defmodule with name but no 'do'
+      String.match?(trimmed, ~r/^defmodule\s+[\w\.]+\s*$/) ->
+        [%{message: "Module definition missing 'do' keyword", line: line_num, column: 0, severity: :error}]
+      
+      # Check for incomplete defmodule
+      String.match?(trimmed, ~r/^defmodule\s*$/) ->
+        [%{message: "Incomplete module definition", line: line_num, column: 0, severity: :error}]
+        
+      true -> []
     end
     
     def_errors ++ module_errors
   end
 
   defp check_js_invalid_chars(line, line_num) do
-    if String.contains?(line, "function ") and not String.contains?(line, "{") and not String.contains?(line, "=>") do
-      [%{message: "Function declaration missing opening brace", line: line_num, column: 0, severity: :error}]
-    else
-      []
+    trimmed = String.trim(line)
+    
+    cond do
+      # Check for function declaration without opening brace
+      String.match?(trimmed, ~r/^function\s+\w+\s*\([^)]*\)\s*$/) ->
+        [%{message: "Function declaration missing opening brace", line: line_num, column: 0, severity: :error}]
+      
+      # Check for arrow function with single = instead of =>
+      String.match?(trimmed, ~r/^(const|let|var)\s+\w+\s*=\s*\([^)]*\)\s*=\s*\{/) ->
+        [%{message: "Invalid arrow function syntax: use '=>' instead of '='", line: line_num, column: 0, severity: :error}]
+        
+      true -> []
     end
   end
 
@@ -936,12 +954,24 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
 
   defp check_python_indentation(line, line_num) do
     # Basic Python indentation check
-    if String.trim(line) != "" do
+    trimmed = String.trim(line)
+    if trimmed != "" do
       leading_spaces = String.length(line) - String.length(String.trim_leading(line))
-      if rem(leading_spaces, 4) != 0 and leading_spaces > 0 do
-        [%{message: "Inconsistent indentation (expected multiple of 4 spaces)", line: line_num, column: 0, severity: :warning}]
-      else
-        []
+      
+      cond do
+        # Check if line starts with keywords that require indentation on next line
+        String.match?(trimmed, ~r/^(def|class|if|elif|else|for|while|try|except|finally|with)\s*.*:$/) ->
+          []  # These lines are fine at any indentation
+        
+        # Check if it's the first line after a colon (should be indented)
+        String.match?(trimmed, ~r/^(print|return|pass|continue|break|import|from)/) and leading_spaces == 0 ->
+          [%{message: "Indentation error: expected indented block", line: line_num, column: 0, severity: :error}]
+        
+        # Check for inconsistent indentation (not multiple of 4)
+        rem(leading_spaces, 4) != 0 and leading_spaces > 0 ->
+          [%{message: "Inconsistent indentation (expected multiple of 4 spaces)", line: line_num, column: 0, severity: :warning}]
+          
+        true -> []
       end
     else
       []
@@ -977,12 +1007,43 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
       []
     end
     
-    # Additional checks for specific malformed patterns
-    incomplete_errors = if String.contains?(content, "def incomplete") do
-      [%{message: "Incomplete function definition", line: 1, column: 0, severity: :error}]
-    else
-      []
-    end
+    # Check for module attributes without @
+    lines = String.split(content, "\n") |> Enum.with_index(1)
+    
+    attribute_errors = Enum.flat_map(lines, fn {line, line_num} ->
+      trimmed = String.trim(line)
+      
+      # Check for moduledoc without @
+      if String.match?(trimmed, ~r/^\s*moduledoc\s+"/) do
+        [%{message: "Missing '@' for module attribute 'moduledoc'", line: line_num, column: 0, severity: :error}]
+      else
+        []
+      end
+    end)
+    
+    # Check for invalid pattern matching (using atoms as variables)
+    pattern_errors = Enum.flat_map(lines, fn {line, line_num} ->
+      trimmed = String.trim(line)
+      
+      # Check for pattern like {ok, result} = instead of {:ok, result} =
+      if String.match?(trimmed, ~r/\{[a-z_]+,\s*[a-z_]+\}\s*=/) do
+        [%{message: "Invalid pattern match: atoms must be prefixed with ':' (e.g., {:ok, result})", line: line_num, column: 0, severity: :error}]
+      else
+        []
+      end
+    end)
+    
+    # Check for incomplete expressions (e.g., ending with operators)
+    incomplete_errors = Enum.flat_map(lines, fn {line, line_num} ->
+      trimmed = String.trim(line)
+      
+      # Check if line ends with operators that expect continuation
+      if String.match?(trimmed, ~r/(\+|\-|\*|\/|=|\||&&|\|\||<>|==|!=)$/) do
+        [%{message: "Incomplete expression: line ends with operator", line: line_num, column: String.length(trimmed), severity: :error}]
+      else
+        []
+      end
+    end)
     
     # Check for pipe operator misuse
     pipe_errors = if String.contains?(content, "|>") do
@@ -998,7 +1059,7 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
       []
     end
     
-    end_errors ++ incomplete_errors ++ pipe_errors
+    end_errors ++ attribute_errors ++ pattern_errors ++ incomplete_errors ++ pipe_errors
   end
 
   defp check_javascript_specific_errors(ast, content) do
@@ -1025,7 +1086,7 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
     errors ++ semicolon_errors
   end
 
-  defp check_python_specific_errors(ast, content) do
+  defp check_python_specific_errors(_ast, content) do
     errors = []
     
     # Check for common Python issues
@@ -1045,7 +1106,18 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
       end
     end)
     
-    errors ++ colon_errors
+    # Check for await outside async function
+    has_async_def = String.contains?(content, "async def")
+    await_errors = Enum.flat_map(lines, fn {line, line_num} ->
+      trimmed = String.trim(line)
+      if String.contains?(trimmed, "await ") and not has_async_def do
+        [%{message: "'await' can only be used inside an async function", line: line_num, column: 0, severity: :error}]
+      else
+        []
+      end
+    end)
+    
+    errors ++ colon_errors ++ await_errors
   end
 
   defp check_erlang_specific_errors(_ast, content) do
@@ -1069,7 +1141,7 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
     errors ++ period_errors
   end
 
-  defp check_bracket_balance(content, _language) do
+  defp check_bracket_balance(content, language) do
     brackets = %{
       "(" => ")",
       "[" => "]", 
@@ -1119,7 +1191,8 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
   defp check_incomplete_constructs(content, language) do
     lines = String.split(content, "\n") |> Enum.with_index(1)
     
-    Enum.flat_map(lines, fn {line, line_num} ->
+    # First check for specific incomplete constructs line by line
+    line_errors = Enum.flat_map(lines, fn {line, line_num} ->
       trimmed = String.trim(line)
       case language do
         :elixir ->
@@ -1130,6 +1203,9 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
             # Check for lines that are just "defmodule" or "defmodule " with optional comments
             String.trim(trimmed) == "defmodule" or String.match?(trimmed, ~r/^\s*defmodule\s*(#.*)?$/) ->
               [%{message: "Incomplete module definition", line: line_num, column: 0, severity: :error}]
+            # Check for case clauses ending with ->
+            String.match?(trimmed, ~r/^.*->\s*$/) ->
+              [%{message: "Incomplete case clause", line: line_num, column: 0, severity: :error}]
             true -> []
           end
         
@@ -1152,6 +1228,27 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
         _ -> []
       end
     end)
+    
+    # Also check for unclosed blocks in Elixir
+    block_errors = if language == :elixir do
+      # Count opening blocks
+      do_count = Regex.scan(~r/\bdo\b/, content) |> length()
+      case_count = Regex.scan(~r/\bcase\b/, content) |> length()
+      if_count = Regex.scan(~r/\bif\b/, content) |> length()
+      # Count closing ends
+      end_count = Regex.scan(~r/\bend\b/, content) |> length()
+      
+      expected_ends = do_count + case_count
+      if expected_ends > end_count do
+        [%{message: "Unclosed block: missing 'end' keyword", line: length(lines), column: 0, severity: :error}]
+      else
+        []
+      end
+    else
+      []
+    end
+    
+    line_errors ++ block_errors
   end
 
   defp check_deprecated_syntax(_ast, language) do
