@@ -439,11 +439,13 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
   defp analyze_code_smells(ast, content, language, _smell_detector) do
     # Detect various code smells
     detected_smells = [
-      detect_long_functions(ast, language),
-      detect_deep_nesting(ast, language),
-      detect_too_many_parameters(ast, language),
+      detect_long_functions(content, language),
+      detect_deep_nesting(content, language),
+      detect_too_many_parameters(content, language),
       detect_duplicate_code(content, language),
-      detect_large_classes(ast, language)
+      detect_large_classes(content, language),
+      detect_magic_numbers(content, language),
+      detect_dead_code(content, language)
     ] |> List.flatten() |> Enum.reject(&is_nil/1)
     
     smell_result = %{
@@ -1687,11 +1689,116 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
     end)
   end
 
-  defp detect_long_functions(_ast, _language), do: nil
-  defp detect_deep_nesting(_ast, _language), do: nil  
-  defp detect_too_many_parameters(_ast, _language), do: nil
-  defp detect_duplicate_code(_content, _language), do: nil
-  defp detect_large_classes(_ast, _language), do: nil
+  # Code smell detection implementations
+  
+  defp detect_long_functions(content, language) do
+    lines = String.split(content, "\n")
+    function_blocks = extract_function_blocks(lines, language)
+    
+    Enum.flat_map(function_blocks, fn {func_name, start_line, end_line} ->
+      function_length = end_line - start_line + 1
+      
+      cond do
+        function_length > 50 -> 
+          [create_smell(:long_function, :high, "Function '#{func_name}' is very long (#{function_length} lines)", start_line)]
+        function_length > 25 -> 
+          [create_smell(:long_function, :medium, "Function '#{func_name}' is too long (#{function_length} lines)", start_line)]
+        true -> 
+          []
+      end
+    end)
+  end
+  
+  defp detect_deep_nesting(content, language) do
+    lines = String.split(content, "\n") |> Enum.with_index(1)
+    max_nesting = calculate_max_nesting_for_smell_detection(lines, language)
+    
+    cond do
+      max_nesting > 6 ->
+        [create_smell(:deep_nesting, :high, "Excessive nesting depth (#{max_nesting} levels)", 1)]
+      max_nesting > 4 ->
+        [create_smell(:deep_nesting, :medium, "Deep nesting detected (#{max_nesting} levels)", 1)]
+      true ->
+        []
+    end
+  end
+  
+  defp detect_too_many_parameters(content, language) do
+    function_signatures = extract_function_signatures(content, language)
+    
+    Enum.flat_map(function_signatures, fn {func_name, param_count, line_num} ->
+      cond do
+        param_count > 8 ->
+          [create_smell(:too_many_parameters, :high, "Function '#{func_name}' has too many parameters (#{param_count})", line_num)]
+        param_count > 5 ->
+          [create_smell(:too_many_parameters, :medium, "Function '#{func_name}' has many parameters (#{param_count})", line_num)]
+        true ->
+          []
+      end
+    end)
+  end
+  
+  defp detect_duplicate_code(content, language) do
+    lines = String.split(content, "\n")
+    # Simple duplicate detection - look for repeated blocks of 3+ lines
+    duplicates = find_duplicate_blocks(lines, 3)
+    
+    if length(duplicates) > 0 do
+      [create_smell(:duplicate_code, :medium, "#{length(duplicates)} duplicate code blocks detected", 1)]
+    else
+      []
+    end
+  end
+  
+  defp detect_large_classes(content, language) do
+    class_info = extract_class_info(content, language)
+    
+    Enum.flat_map(class_info, fn {class_name, method_count, line_count, start_line} ->
+      cond do
+        method_count > 20 or line_count > 500 ->
+          [create_smell(:large_class, :high, "#{class_name} is very large (#{method_count} methods, #{line_count} lines)", start_line)]
+        method_count > 15 or line_count > 300 ->
+          [create_smell(:large_class, :medium, "#{class_name} is large (#{method_count} methods, #{line_count} lines)", start_line)]
+        true ->
+          []
+      end
+    end)
+  end
+  
+  defp detect_magic_numbers(content, _language) do
+    # Look for numeric literals that aren't 0, 1, -1, or obvious constants
+    magic_numbers = Regex.scan(~r/\b(?!0\b|1\b|-1\b)\d+\.?\d*\b/, content)
+    
+    if length(magic_numbers) > 3 do
+      [create_smell(:magic_numbers, :low, "#{length(magic_numbers)} magic numbers detected", 1)]
+    else
+      []
+    end
+  end
+  
+  defp detect_dead_code(content, language) do
+    # Simple dead code detection - look for unused functions
+    functions = extract_all_functions(content, language)
+    function_calls = extract_function_calls(content, language)
+    
+    # Filter out common entry points and special functions
+    entry_points = ["main", "__init__", "constructor", "init"]
+    
+    unused_functions = Enum.filter(functions, fn func_name ->
+      # Don't consider entry points as dead code
+      not (func_name in entry_points) and
+      # Check if function is called anywhere
+      not Enum.any?(function_calls, fn call_name -> 
+        String.downcase(call_name) == String.downcase(func_name)
+      end)
+    end)
+    
+    if length(unused_functions) > 0 do
+      [create_smell(:dead_code, :medium, "#{length(unused_functions)} potentially unused functions detected: #{Enum.join(unused_functions, ", ")}", 1)]
+    else
+      []
+    end
+  end
 
   defp calculate_smell_score(smells) do
     case length(smells) do
@@ -1702,8 +1809,339 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
 
   defp generate_smell_suggestions(smells) do
     Enum.map(smells, fn smell ->
-      "Consider refactoring: #{smell.type}"
+      case smell.type do
+        :long_function -> "Break down long function into smaller, focused functions"
+        :too_many_parameters -> "Reduce parameters by grouping them into structs or maps"
+        :deep_nesting -> "Reduce nesting by using early returns and guard clauses"
+        :large_class -> "Split large class into smaller, single-responsibility classes"
+        :duplicate_code -> "Extract common code into shared functions or modules"
+        :magic_numbers -> "Replace magic numbers with named constants"
+        :dead_code -> "Remove unused functions and clean up codebase"
+        _ -> "Consider refactoring: #{smell.type}"
+      end
     end)
+  end
+  
+  # Helper functions for code smell detection
+  
+  defp create_smell(type, severity, message, line) do
+    %{
+      type: type,
+      severity: severity,
+      message: message,
+      line: line,
+      column: 0
+    }
+  end
+  
+  defp extract_function_blocks(lines, language) do
+    case language do
+      :elixir -> extract_elixir_function_blocks(lines)
+      :javascript -> extract_javascript_function_blocks(lines)
+      :python -> extract_python_function_blocks(lines)
+      _ -> []
+    end
+  end
+  
+  defp extract_elixir_function_blocks(lines) do
+    lines
+    |> Enum.with_index(1)
+    |> Enum.reduce([], fn {line, line_num}, acc ->
+      case Regex.run(~r/\s*def\s+([a-zA-Z_][a-zA-Z0-9_?!]*)/u, line) do
+        [_, func_name] ->
+          # Find the matching 'end' for this function
+          end_line = find_matching_end(lines, line_num)
+          [{func_name, line_num, end_line} | acc]
+        nil ->
+          acc
+      end
+    end)
+    |> Enum.reverse()
+  end
+  
+  defp extract_javascript_function_blocks(lines) do
+    lines
+    |> Enum.with_index(1)
+    |> Enum.reduce([], fn {line, line_num}, acc ->
+      case Regex.run(~r/function\s+([a-zA-Z_][a-zA-Z0-9_]*)|([a-zA-Z_][a-zA-Z0-9_]*)\s*[:=]\s*function/, line) do
+        [_, func_name] when func_name != nil ->
+          end_line = find_matching_brace(lines, line_num)
+          [{func_name, line_num, end_line} | acc]
+        [_, nil, func_name] when func_name != nil ->
+          end_line = find_matching_brace(lines, line_num)
+          [{func_name, line_num, end_line} | acc]
+        nil ->
+          acc
+      end
+    end)
+    |> Enum.reverse()
+  end
+  
+  defp extract_python_function_blocks(lines) do
+    lines
+    |> Enum.with_index(1)
+    |> Enum.reduce([], fn {line, line_num}, acc ->
+      case Regex.run(~r/^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)/u, line) do
+        [_, func_name] ->
+          end_line = find_python_function_end(lines, line_num)
+          [{func_name, line_num, end_line} | acc]
+        nil ->
+          acc
+      end
+    end)
+    |> Enum.reverse()
+  end
+  
+  defp find_matching_end(lines, start_line) do
+    # Simple implementation - find next 'end' at same indentation level
+    remaining_lines = Enum.drop(lines, start_line)
+    end_index = Enum.find_index(remaining_lines, fn line ->
+      String.trim(line) == "end"
+    end)
+    
+    if end_index, do: start_line + end_index, else: start_line + 10
+  end
+  
+  defp find_matching_brace(lines, start_line) do
+    # Simple implementation - find closing brace
+    remaining_lines = Enum.drop(lines, start_line)
+    brace_index = Enum.find_index(remaining_lines, fn line ->
+      String.contains?(line, "}")
+    end)
+    
+    if brace_index, do: start_line + brace_index, else: start_line + 10
+  end
+  
+  defp find_python_function_end(lines, start_line) do
+    # Find next function or class definition at same indentation level
+    start_indent = get_indentation_level(Enum.at(lines, start_line - 1) || "")
+    
+    remaining_lines = Enum.drop(lines, start_line)
+    end_index = Enum.find_index(remaining_lines, fn line ->
+      trimmed = String.trim(line)
+      if trimmed == "" do
+        false
+      else
+        indent = get_indentation_level(line)
+        indent <= start_indent and (String.starts_with?(trimmed, "def ") or String.starts_with?(trimmed, "class "))
+      end
+    end)
+    
+    if end_index, do: start_line + end_index, else: length(lines)
+  end
+  
+  defp get_indentation_level(line) do
+    line
+    |> String.graphemes()
+    |> Enum.take_while(&(&1 == " "))
+    |> length()
+  end
+  
+  defp calculate_max_nesting_for_smell_detection(lines, language) do
+    case language do
+      :elixir -> calculate_elixir_nesting_for_smells(lines)
+      :javascript -> calculate_javascript_nesting_for_smells(lines)
+      :python -> calculate_python_nesting_for_smells(lines)
+      _ -> 0
+    end
+  end
+  
+  defp calculate_elixir_nesting_for_smells(lines) do
+    {_, max_level} = Enum.reduce(lines, {0, 0}, fn {line, _line_num}, {current_level, max_level} ->
+      trimmed = String.trim(line)
+      
+      opens = count_nesting_opens(trimmed, :elixir)
+      closes = if String.contains?(trimmed, "end"), do: 1, else: 0
+      
+      new_level = current_level + opens - closes
+      {max(new_level, 0), max(max_level, new_level)}
+    end)
+    max_level
+  end
+  
+  defp calculate_javascript_nesting_for_smells(lines) do
+    {_, max_level} = Enum.reduce(lines, {0, 0}, fn {line, _line_num}, {current_level, max_level} ->
+      opens = String.graphemes(line) |> Enum.count(&(&1 == "{"))
+      closes = String.graphemes(line) |> Enum.count(&(&1 == "}"))
+      new_level = current_level + opens - closes
+      {max(new_level, 0), max(max_level, new_level)}
+    end)
+    max_level
+  end
+  
+  defp calculate_python_nesting_for_smells(lines) do
+    max_indent = Enum.reduce(lines, 0, fn {line, _line_num}, max_indent ->
+      if String.trim(line) != "" do
+        indent = get_indentation_level(line) |> div(4)
+        max(max_indent, indent)
+      else
+        max_indent
+      end
+    end)
+    max_indent
+  end
+  
+  defp count_nesting_opens(line, :elixir) do
+    nesting_keywords = ["if ", "case ", "cond ", "for ", "with "]
+    Enum.count(nesting_keywords, &String.contains?(line, &1))
+  end
+  
+  defp extract_function_signatures(content, language) do
+    case language do
+      :elixir -> extract_elixir_signatures(content)
+      :javascript -> extract_javascript_signatures(content)
+      :python -> extract_python_signatures(content)
+      _ -> []
+    end
+  end
+  
+  defp extract_elixir_signatures(content) do
+    content
+    |> String.split("\n")
+    |> Enum.with_index(1)
+    |> Enum.flat_map(fn {line, line_num} ->
+      case Regex.run(~r/\s*def\s+([a-zA-Z_][a-zA-Z0-9_?!]*)\s*\(([^)]*)/u, line) do
+        [_, func_name, params] ->
+          param_count = if String.trim(params) == "", do: 0, else: length(String.split(params, ","))
+          [{func_name, param_count, line_num}]
+        nil ->
+          []
+      end
+    end)
+  end
+  
+  defp extract_javascript_signatures(content) do
+    content
+    |> String.split("\n")
+    |> Enum.with_index(1)
+    |> Enum.flat_map(fn {line, line_num} ->
+      case Regex.run(~r/function\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)/, line) do
+        [_, func_name, params] ->
+          param_count = if String.trim(params) == "", do: 0, else: length(String.split(params, ","))
+          [{func_name, param_count, line_num}]
+        nil ->
+          []
+      end
+    end)
+  end
+  
+  defp extract_python_signatures(content) do
+    content
+    |> String.split("\n")
+    |> Enum.with_index(1)
+    |> Enum.flat_map(fn {line, line_num} ->
+      case Regex.run(~r/^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)/u, line) do
+        [_, func_name, params] ->
+          param_count = if String.trim(params) == "", do: 0, else: length(String.split(params, ","))
+          [{func_name, param_count, line_num}]
+        nil ->
+          []
+      end
+    end)
+  end
+  
+  defp find_duplicate_blocks(lines, min_length) do
+    # Simple duplicate detection
+    blocks = create_line_blocks(lines, min_length)
+    
+    blocks
+    |> Enum.group_by(& &1.content)
+    |> Enum.filter(fn {_content, instances} -> length(instances) > 1 end)
+    |> Enum.map(fn {content, instances} -> {content, instances} end)
+  end
+  
+  defp create_line_blocks(lines, block_size) do
+    lines
+    |> Enum.with_index()
+    |> Enum.chunk_every(block_size, 1, :discard)
+    |> Enum.map(fn chunk ->
+      content = Enum.map(chunk, fn {line, _} -> String.trim(line) end) |> Enum.join("\n")
+      start_line = elem(List.first(chunk), 1) + 1
+      %{content: content, start_line: start_line}
+    end)
+    |> Enum.reject(fn %{content: content} -> String.trim(content) == "" end)
+  end
+  
+  defp extract_class_info(content, language) do
+    case language do
+      :elixir -> extract_elixir_module_info(content)
+      :javascript -> extract_javascript_class_info(content)
+      :python -> extract_python_class_info(content)
+      _ -> []
+    end
+  end
+  
+  defp extract_elixir_module_info(content) do
+    lines = String.split(content, "\n")
+    
+    lines
+    |> Enum.with_index(1)
+    |> Enum.flat_map(fn {line, line_num} ->
+      case Regex.run(~r/\s*defmodule\s+([A-Z][a-zA-Z0-9_.]*)/u, line) do
+        [_, module_name] ->
+          method_count = count_functions_in_module(content)
+          line_count = length(lines)
+          [{module_name, method_count, line_count, line_num}]
+        nil ->
+          []
+      end
+    end)
+  end
+  
+  defp extract_javascript_class_info(content) do
+    lines = String.split(content, "\n")
+    
+    lines
+    |> Enum.with_index(1)
+    |> Enum.flat_map(fn {line, line_num} ->
+      case Regex.run(~r/class\s+([A-Z][a-zA-Z0-9_]*)/u, line) do
+        [_, class_name] ->
+          method_count = count_methods_in_class(content)
+          line_count = length(lines)
+          [{class_name, method_count, line_count, line_num}]
+        nil ->
+          []
+      end
+    end)
+  end
+  
+  defp extract_python_class_info(content) do
+    lines = String.split(content, "\n")
+    
+    lines
+    |> Enum.with_index(1)
+    |> Enum.flat_map(fn {line, line_num} ->
+      case Regex.run(~r/^\s*class\s+([A-Z][a-zA-Z0-9_]*)/u, line) do
+        [_, class_name] ->
+          method_count = count_methods_in_class(content)
+          line_count = length(lines)
+          [{class_name, method_count, line_count, line_num}]
+        nil ->
+          []
+      end
+    end)
+  end
+  
+  defp count_functions_in_module(content) do
+    Regex.scan(~r/\s*def\s+/u, content) |> length()
+  end
+  
+  defp count_methods_in_class(content) do
+    Regex.scan(~r/\s*(def|function)\s+/u, content) |> length()
+  end
+  
+  defp extract_all_functions(content, language) do
+    case language do
+      :elixir -> Regex.scan(~r/\s*def\s+([a-zA-Z_][a-zA-Z0-9_?!]*)/u, content, capture: :all_but_first) |> List.flatten()
+      :javascript -> Regex.scan(~r/function\s+([a-zA-Z_][a-zA-Z0-9_]*)/u, content, capture: :all_but_first) |> List.flatten()
+      :python -> Regex.scan(~r/^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)/u, content, capture: :all_but_first) |> List.flatten()
+      _ -> []
+    end
+  end
+  
+  defp extract_function_calls(content, _language) do
+    # Simple function call extraction - look for patterns like "function_name("
+    Regex.scan(~r/([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/u, content, capture: :all_but_first) |> List.flatten()
   end
 
   defp update_statistics(stats, _mode, processing_time, result) do
