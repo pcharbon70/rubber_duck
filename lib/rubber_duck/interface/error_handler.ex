@@ -10,7 +10,6 @@ defmodule RubberDuck.Interface.ErrorHandler do
 
   alias RubberDuck.Interface.Behaviour
   alias RubberDuck.EventBroadcasting.EventBroadcaster
-  alias RubberDuck.EventSchemas
 
   require Logger
 

@@ -37,7 +37,6 @@ defmodule RubberDuck.Benchmarking.BenchmarkSuite do
 
   alias RubberDuck.CodingAssistant.Engines.{CodeAnalyser, StreamingAnalyser}
   alias RubberDuck.CodingAssistant.FileSizeManager
-  alias RubberDuck.LLMAbstraction.{ProviderRegistry, PerformanceMonitor}
   alias RubberDuck.Benchmarking.{TestDataGenerator, StatisticalAnalyzer, ReportGenerator}
 
   defstruct [
@@ -414,7 +413,7 @@ defmodule RubberDuck.Benchmarking.BenchmarkSuite do
     }
   end
 
-  defp compare_streaming_vs_standard(test_data, config) do
+  defp compare_streaming_vs_standard(test_data, _config) do
     Enum.map(test_data, fn test_case ->
       # Measure standard analysis
       standard_result = measure_code_analysis_performance(test_case)
@@ -598,7 +597,7 @@ defmodule RubberDuck.Benchmarking.BenchmarkSuite do
     }
   end
 
-  defp benchmark_memory_usage(config, state) do
+  defp benchmark_memory_usage(config, _state) do
     # Profile memory usage over time
     initial_memory = get_process_memory()
     memory_snapshots = [%{time: 0, memory: initial_memory, phase: :initial}]

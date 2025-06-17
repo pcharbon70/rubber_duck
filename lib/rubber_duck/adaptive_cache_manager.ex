@@ -14,8 +14,7 @@ defmodule RubberDuck.AdaptiveCacheManager do
   use GenServer
   require Logger
   
-  alias RubberDuck.LLMMetricsCollector
-  alias RubberDuck.EventBroadcaster
+  alias RubberDuck.EventBroadcasting.EventBroadcaster
   alias RubberDuck.Nebulex.Cache
   
   @learning_window :timer.hours(24)
@@ -23,44 +22,6 @@ defmodule RubberDuck.AdaptiveCacheManager do
   @cache_optimization_interval :timer.hours(2)
   @min_pattern_confidence 0.7
   
-  # Cache strategy types
-  @cache_strategies %{
-    frequency_based: %{
-      description: "Cache based on access frequency",
-      ttl_multiplier: 1.0,
-      priority_weight: 0.3
-    },
-    
-    recency_based: %{
-      description: "Cache based on recent access",
-      ttl_multiplier: 0.8,
-      priority_weight: 0.2
-    },
-    
-    cost_based: %{
-      description: "Cache expensive operations longer",
-      ttl_multiplier: 2.0,
-      priority_weight: 0.4
-    },
-    
-    semantic_similarity: %{
-      description: "Cache semantically similar content",
-      ttl_multiplier: 1.5,
-      priority_weight: 0.3
-    },
-    
-    session_context: %{
-      description: "Cache within session context",
-      ttl_multiplier: 0.5,
-      priority_weight: 0.4
-    },
-    
-    temporal_pattern: %{
-      description: "Cache based on time-of-day patterns",
-      ttl_multiplier: 1.2,
-      priority_weight: 0.2
-    }
-  }
   
   # Usage patterns for adaptive strategies
   @usage_patterns %{
@@ -999,7 +960,7 @@ defmodule RubberDuck.AdaptiveCacheManager do
   
   defp get_access_frequency(key, time_window) do
     current_time = :os.system_time(:millisecond)
-    since = current_time - time_window
+    _since = current_time - time_window
     
     case :ets.lookup(:cache_patterns, {:access_counter, key, :get}) do
       [{_, count}] -> count
@@ -1055,12 +1016,12 @@ defmodule RubberDuck.AdaptiveCacheManager do
     Logger.debug("Warming cache for session: #{session}")
   end
   
-  defp get_frequent_keys(since, limit) do
+  defp get_frequent_keys(_since, _limit) do
     # Get most frequently accessed keys since timestamp
     []
   end
   
-  defp get_temporal_patterns(hour) do
+  defp get_temporal_patterns(_hour) do
     # Get temporal patterns for specific hour
     []
   end

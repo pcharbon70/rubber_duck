@@ -279,7 +279,7 @@ defmodule RubberDuck.LoadBalancing.CircuitBreaker do
     updated_circuit = %{circuit | state: :open, last_failure_time: System.monotonic_time(:millisecond)}
     updated_state = put_circuit(state, provider_id, updated_circuit)
     
-    Logger.warn("Circuit breaker for #{provider_id} manually opened")
+    Logger.warning("Circuit breaker for #{provider_id} manually opened")
     {:reply, :ok, updated_state}
   end
   
@@ -476,7 +476,7 @@ defmodule RubberDuck.LoadBalancing.CircuitBreaker do
       :closed ->
         if updated_circuit.failure_count >= circuit.config.failure_threshold do
           # Transition to open
-          Logger.warn("Circuit breaker for #{circuit.provider_id} opened due to #{circuit.config.failure_threshold} failures. Last error: #{inspect(reason)}")
+          Logger.warning("Circuit breaker for #{circuit.provider_id} opened due to #{circuit.config.failure_threshold} failures. Last error: #{inspect(reason)}")
           %{updated_circuit | state: :open}
         else
           updated_circuit
@@ -484,7 +484,7 @@ defmodule RubberDuck.LoadBalancing.CircuitBreaker do
       
       :half_open ->
         # Any failure in half-open should return to open
-        Logger.warn("Circuit breaker for #{circuit.provider_id} returned to open from half-open due to failure: #{inspect(reason)}")
+        Logger.warning("Circuit breaker for #{circuit.provider_id} returned to open from half-open due to failure: #{inspect(reason)}")
         %{updated_circuit | 
           state: :open,
           half_open_start_time: nil

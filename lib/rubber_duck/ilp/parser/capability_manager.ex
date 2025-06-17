@@ -6,7 +6,7 @@ defmodule RubberDuck.ILP.Parser.CapabilityManager do
   use GenServer
   require Logger
 
-  alias RubberDuck.ILP.Parser.{Abstraction, PluginManager}
+  alias RubberDuck.ILP.Parser.Abstraction
 
   defstruct [
     :language_capabilities,

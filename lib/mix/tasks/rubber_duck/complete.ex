@@ -292,47 +292,63 @@ defmodule Mix.Tasks.RubberDuck.Complete do
     metadata = response.metadata || %{}
     completion_data = response.data || %{}
     
-    metadata_lines = [
+    base_lines = [
       "",
       colorize("Completion Metadata:", :dim, config)
     ]
     
+    lines = []
+    
     # Language detection
-    if language = get_detected_language(response) do
-      metadata_lines = [colorize("Detected language: #{language}", :dim, config) | metadata_lines]
+    lines = if language = get_detected_language(response) do
+      [colorize("Detected language: #{language}", :dim, config) | lines]
+    else
+      lines
     end
     
     # Confidence score
-    if confidence = get_confidence_score(response) do
+    lines = if confidence = get_confidence_score(response) do
       score_text = "Confidence: #{Float.round(confidence, 2)}"
-      metadata_lines = [colorize(score_text, :dim, config) | metadata_lines]
+      [colorize(score_text, :dim, config) | lines]
+    else
+      lines
     end
     
     # Processing time
-    if metadata[:processing_time] do
+    lines = if metadata[:processing_time] do
       time_ms = metadata.processing_time
-      metadata_lines = [colorize("Processing time: #{time_ms}ms", :dim, config) | metadata_lines]
+      [colorize("Processing time: #{time_ms}ms", :dim, config) | lines]
+    else
+      lines
     end
     
     # Tokens used
-    if metadata[:tokens_used] do
+    lines = if metadata[:tokens_used] do
       tokens = metadata.tokens_used
-      metadata_lines = [colorize("Tokens used: #{tokens}", :dim, config) | metadata_lines]
+      [colorize("Tokens used: #{tokens}", :dim, config) | lines]
+    else
+      lines
     end
     
     # Model used
-    if metadata[:model_used] do
+    lines = if metadata[:model_used] do
       model = metadata.model_used
-      metadata_lines = [colorize("Model: #{model}", :dim, config) | metadata_lines]
+      [colorize("Model: #{model}", :dim, config) | lines]
+    else
+      lines
     end
     
     # Suggestions
-    if completion_data[:suggestions] && not Enum.empty?(completion_data.suggestions) do
+    lines = if completion_data[:suggestions] && not Enum.empty?(completion_data.suggestions) do
       suggestions_text = "Suggestions: #{length(completion_data.suggestions)} available"
-      metadata_lines = [colorize(suggestions_text, :dim, config) | metadata_lines]
+      [colorize(suggestions_text, :dim, config) | lines]
+    else
+      lines
     end
     
-    Enum.reverse(metadata_lines)
+    metadata_lines = base_lines ++ Enum.reverse(lines)
+    
+    metadata_lines
     |> Enum.each(&Mix.shell().info/1)
   end
 
@@ -372,7 +388,7 @@ defmodule Mix.Tasks.RubberDuck.Complete do
     Enum.reverse(flags)
   end
 
-  defp build_request_context(config, options) do
+  defp build_request_context(config, _options) do
     %{
       interface: :cli,
       mode: :direct,
@@ -438,7 +454,7 @@ defmodule Mix.Tasks.RubberDuck.Complete do
 
   # File size validation and streaming support
 
-  defp validate_file_size_for_completion(content, file_path, options) do
+  defp validate_file_size_for_completion(content, _file_path, options) do
     content_size = byte_size(content)
     
     # Check if streaming is forced via options
@@ -497,7 +513,7 @@ defmodule Mix.Tasks.RubberDuck.Complete do
     end
   end
 
-  defp confirm_streaming_processing(strategy) do
+  defp confirm_streaming_processing(_strategy) do
     Mix.shell().yes?([
       :bright, :green, "Use streaming analysis for optimal performance? ",
       :reset, "(recommended for files > 1MB)"

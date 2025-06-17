@@ -208,11 +208,9 @@ defmodule RubberDuck.TableMaintenance do
   defp should_delete_record?(record, cutoff_date) do
     # Extract timestamp based on table structure
     timestamp = case record do
-      {_table, _id, _session_id, _content, _metadata, timestamp} ->
+      {_table, _id, _session_id, _field4, _field5, timestamp} ->
         timestamp
       {_table, _id, _session_id, _prompt, _response, timestamp, _metadata} ->
-        timestamp
-      {_table, _id, _session_id, _prompt, _response, timestamp} ->
         timestamp
       _ ->
         nil
@@ -269,11 +267,9 @@ defmodule RubberDuck.TableMaintenance do
   
   defp extract_timestamp(record) do
     case record do
-      {_table, _id, _session_id, _content, _metadata, timestamp} ->
+      {_table, _id, _session_id, _field4, _field5, timestamp} ->
         timestamp
       {_table, _id, _session_id, _prompt, _response, timestamp, _metadata} ->
-        timestamp
-      {_table, _id, _session_id, _prompt, _response, timestamp} ->
         timestamp
       _ ->
         DateTime.utc_now()

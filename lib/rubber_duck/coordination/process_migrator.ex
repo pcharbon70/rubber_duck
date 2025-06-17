@@ -7,8 +7,7 @@ defmodule RubberDuck.Coordination.ProcessMigrator do
   use GenServer
   require Logger
 
-  alias RubberDuck.Coordination.{HordeSupervisor, LoadBalancer}
-  alias RubberDuck.Registry.GlobalRegistry
+  alias RubberDuck.Coordination.LoadBalancer
 
   defstruct [
     :migration_strategies,
@@ -213,7 +212,7 @@ defmodule RubberDuck.Coordination.ProcessMigrator do
 
   @impl true
   def handle_info({:nodedown, departed_node}, state) do
-    Logger.warn("Node departed during migrations: #{departed_node}")
+    Logger.warning("Node departed during migrations: #{departed_node}")
     new_state = handle_node_departure_during_migration(departed_node, state)
     {:noreply, new_state}
   end
@@ -439,7 +438,7 @@ defmodule RubberDuck.Coordination.ProcessMigrator do
   end
 
   defp attempt_migration_cancellation(migration, reason, state) do
-    Logger.warn("Cancelling migration #{migration.id}: #{reason}")
+    Logger.warning("Cancelling migration #{migration.id}: #{reason}")
     
     case migration.status do
       :pending ->
@@ -468,7 +467,7 @@ defmodule RubberDuck.Coordination.ProcessMigrator do
     
     # Get cluster balance information
     case LoadBalancer.analyze_cluster_balance() do
-      %{rebalancing_recommendations: recommendations} when length(recommendations) > 0 ->
+      %{rebalancing_recommendations: [_ | _] = recommendations} ->
         execute_recommended_migrations(recommendations, state)
       
       _balanced_cluster ->
@@ -497,7 +496,7 @@ defmodule RubberDuck.Coordination.ProcessMigrator do
   defp handle_migration_step(migration_id, step, state) do
     case Map.get(state.active_migrations, migration_id) do
       nil ->
-        Logger.warn("Received step for unknown migration: #{migration_id}")
+        Logger.warning("Received step for unknown migration: #{migration_id}")
         state
       
       migration ->
@@ -509,7 +508,7 @@ defmodule RubberDuck.Coordination.ProcessMigrator do
   end
 
   defp handle_migration_timeout(migration_id, state) do
-    Logger.warn("Migration timeout: #{migration_id}")
+    Logger.warning("Migration timeout: #{migration_id}")
     
     case Map.get(state.active_migrations, migration_id) do
       nil ->
@@ -536,7 +535,7 @@ defmodule RubberDuck.Coordination.ProcessMigrator do
     end)
     
     Enum.reduce(affected_migrations, state, fn {migration_id, migration}, acc_state ->
-      Logger.warn("Migration #{migration_id} affected by node departure: #{departed_node}")
+      Logger.warning("Migration #{migration_id} affected by node departure: #{departed_node}")
       
       case handle_migration_node_failure(migration, departed_node, acc_state) do
         {:ok, updated_migration, new_state} ->

@@ -7,7 +7,6 @@ defmodule RubberDuck.LLM.FallbackManager do
   use GenServer
   require Logger
 
-  alias RubberDuck.LLM.{Coordinator, TaskRouter, ModelSelector}
 
   defstruct [
     :fallback_chains,
@@ -271,12 +270,12 @@ defmodule RubberDuck.LLM.FallbackManager do
           
           {:error, failure_reason} ->
             # Primary failed, try fallback chain
-            Logger.warn("Primary model #{primary_model_id} failed: #{inspect(failure_reason)}")
+            Logger.warning("Primary model #{primary_model_id} failed: #{inspect(failure_reason)}")
             execute_fallback_chain(task, primary_model_id, context, fallback_strategy, opts, state)
         end
       
       %{available: false, reason: reason} ->
-        Logger.warn("Primary model #{primary_model_id} unavailable: #{inspect(reason)}")
+        Logger.warning("Primary model #{primary_model_id} unavailable: #{inspect(reason)}")
         execute_fallback_chain(task, primary_model_id, context, fallback_strategy, opts, state)
     end
   end
@@ -466,7 +465,7 @@ defmodule RubberDuck.LLM.FallbackManager do
         # Calculate retry delay
         delay = calculate_retry_delay(retry_strategy, attempt)
         
-        Logger.warn("Model #{model_id} failed (attempt #{attempt + 1}/#{max_retries + 1}): #{inspect(failure_reason)}, retrying in #{delay}ms")
+        Logger.warning("Model #{model_id} failed (attempt #{attempt + 1}/#{max_retries + 1}): #{inspect(failure_reason)}, retrying in #{delay}ms")
         
         if delay > 0 do
           :timer.sleep(delay)

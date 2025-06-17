@@ -494,11 +494,13 @@ defmodule RubberDuck.ILP.Context.LRUEviction do
     else
       total_accesses = access_order
       |> Map.values()
-      |> Enum.sum(fn info -> Map.get(info, :access_count, 0) end)
+      |> Enum.map(fn info -> Map.get(info, :access_count, 0) end)
+      |> Enum.sum()
       
       total_recency = access_order
       |> Map.values()
-      |> Enum.sum(fn info -> current_time - Map.get(info, :last_accessed, current_time) end)
+      |> Enum.map(fn info -> current_time - Map.get(info, :last_accessed, current_time) end)
+      |> Enum.sum()
       
       context_count = map_size(access_order)
       

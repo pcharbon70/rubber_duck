@@ -8,7 +8,6 @@ defmodule RubberDuck.Coordination.LoadBalancer do
   require Logger
 
   alias RubberDuck.Coordination.HordeSupervisor
-  alias RubberDuck.Registry.GlobalRegistry
 
   defstruct [
     :balancing_strategies,
@@ -230,7 +229,7 @@ defmodule RubberDuck.Coordination.LoadBalancer do
 
   @impl true
   def handle_info({:nodedown, node}, state) do
-    Logger.warn("Node left cluster: #{node}")
+    Logger.warning("Node left cluster: #{node}")
     
     new_state = handle_node_leave(node, state)
     
@@ -398,7 +397,7 @@ defmodule RubberDuck.Coordination.LoadBalancer do
       
       {:error, reason} ->
         # Fallback to default strategy
-        Logger.warn("Custom rule failed, falling back to default strategy: #{inspect(reason)}")
+        Logger.warning("Custom rule failed, falling back to default strategy: #{inspect(reason)}")
         default_strategy = get_current_strategy(state.balancing_strategies)
         apply_standard_placement_strategy(process_spec, default_strategy, placement_opts, state)
     end

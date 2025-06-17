@@ -29,8 +29,6 @@ defmodule Mix.Tasks.RubberDuck.Version do
 
   use Mix.Task
 
-  alias RubberDuck.Interface.CLI.ConfigManager
-
   @shortdoc "Show RubberDuck CLI version information"
 
   @switches [

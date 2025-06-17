@@ -14,7 +14,6 @@ defmodule RubberDuck.EventMonitoring do
   use GenServer
   require Logger
   
-  alias RubberDuck.{EventSchemas}
   alias RubberDuck.EventBroadcasting.EventBroadcaster
   
   @type metric_window :: :minute | :hour | :day
@@ -556,7 +555,9 @@ defmodule RubberDuck.EventMonitoring do
       :unknown
     else
       error_count = count_error_events_in_topics(topic_stats)
-      total_count = Enum.sum(Enum.map(topic_stats, fn {_topic, stats} -> stats.count end))
+      total_count = topic_stats
+      |> Enum.map(fn {_topic, stats} -> stats.count end)
+      |> Enum.sum()
       
       error_rate = if total_count > 0, do: error_count / total_count, else: 0
       
@@ -642,7 +643,8 @@ defmodule RubberDuck.EventMonitoring do
     |> Enum.filter(fn {topic, _stats} -> 
       topic =~ ~r/\.(error|failed|unhealthy)/
     end)
-    |> Enum.sum(fn {_topic, stats} -> stats.count end)
+    |> Enum.map(fn {_topic, stats} -> stats.count end)
+    |> Enum.sum()
   end
   
   defp topic_matches?(topic, pattern) do

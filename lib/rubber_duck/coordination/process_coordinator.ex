@@ -8,7 +8,6 @@ defmodule RubberDuck.Coordination.ProcessCoordinator do
   require Logger
 
   alias RubberDuck.Coordination.HordeSupervisor
-  alias RubberDuck.Registry.GlobalRegistry
 
   defstruct [
     :coordination_patterns,
@@ -420,7 +419,7 @@ defmodule RubberDuck.Coordination.ProcessCoordinator do
   end
 
   defp handle_coordinated_process_failure(failed_process, failure_reason, state) do
-    Logger.warn("Handling coordinated process failure: #{inspect(failed_process)}")
+    Logger.warning("Handling coordinated process failure: #{inspect(failed_process)}")
     
     # Find dependent processes
     dependents = find_dependent_processes(failed_process, state.dependency_graph)
@@ -623,7 +622,7 @@ defmodule RubberDuck.Coordination.ProcessCoordinator do
   end
 
   defp handle_workflow_timeout(_workflow_id, state) do
-    Logger.warn("Workflow timeout occurred")
+    Logger.warning("Workflow timeout occurred")
     state
   end
 

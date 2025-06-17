@@ -16,7 +16,7 @@ defmodule RubberDuck.Registry.GlobalRegistry do
         :ok
       
       {:error, :taken} ->
-        Logger.warn("Process name #{inspect(name)} already taken")
+        Logger.warning("Process name #{inspect(name)} already taken")
         {:error, :already_registered}
       
       {:error, reason} ->
@@ -56,7 +56,7 @@ defmodule RubberDuck.Registry.GlobalRegistry do
         if Process.alive?(pid) do
           pid
         else
-          Logger.warn("Found dead process for #{inspect(name)}, cleaning up")
+          Logger.warning("Found dead process for #{inspect(name)}, cleaning up")
           unregister(name)
           nil
         end
@@ -242,13 +242,13 @@ defmodule RubberDuck.Registry.GlobalRegistry do
   Handles node leave events for process failover.
   """
   def handle_node_leave(node) do
-    Logger.warn("Node left cluster: #{node}")
+    Logger.warning("Node left cluster: #{node}")
     
     # Find processes that were on the departed node
     lost_processes = find_processes_on_node(node)
     
     if length(lost_processes) > 0 do
-      Logger.warn("Lost #{length(lost_processes)} processes from node #{node}")
+      Logger.warning("Lost #{length(lost_processes)} processes from node #{node}")
       
       # Trigger recovery for lost processes
       spawn(fn -> recover_lost_processes(lost_processes) end)
@@ -332,7 +332,7 @@ defmodule RubberDuck.Registry.GlobalRegistry do
     # Try to restart the process based on its metadata
     case Map.get(metadata, :recovery_module) do
       nil ->
-        Logger.warn("No recovery module specified for #{inspect(name)}")
+        Logger.warning("No recovery module specified for #{inspect(name)}")
       
       module when is_atom(module) ->
         try do

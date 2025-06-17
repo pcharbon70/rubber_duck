@@ -7,7 +7,7 @@ defmodule RubberDuck.LLM.CostOptimizer do
   use GenServer
   require Logger
 
-  alias RubberDuck.LLM.{Coordinator, TaskRouter, ModelSelector}
+  alias RubberDuck.LLM.Coordinator
 
   defstruct [
     :cost_tracking,

@@ -571,7 +571,7 @@ defmodule RubberDuck.Benchmarking.StatisticalAnalyzer do
     recommendations
   end
 
-  defp generate_performance_recommendations(results) do
+  defp generate_performance_recommendations(_results) do
     # Generate generic performance recommendations based on analysis
     recommendations = []
     
@@ -651,5 +651,4 @@ defmodule RubberDuck.Benchmarking.StatisticalAnalyzer do
   defp analyze_streaming_memory_efficiency(_results), do: %{}
   defp analyze_chunk_size_impact(_results), do: %{}
   defp analyze_streaming_scalability(_results), do: %{}
-  defp analyze_streaming_comparison(_comparison), do: %{}
 end

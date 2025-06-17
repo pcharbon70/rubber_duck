@@ -7,8 +7,7 @@ defmodule RubberDuck.ILP.Context.Manager do
   use GenServer
   require Logger
 
-  alias RubberDuck.ILP.Semantic.{Chunker, ContextStrategies}
-  alias RubberDuck.ILP.Context.{Compressor, Storage, VersionControl}
+  alias RubberDuck.ILP.Context.{Storage, VersionControl}
 
   defstruct [
     :compression_algorithm,

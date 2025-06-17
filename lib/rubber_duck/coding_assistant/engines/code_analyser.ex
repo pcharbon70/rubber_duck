@@ -937,30 +937,6 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
     |> Float.round(1)
   end
 
-  defp count_decision_points(nil), do: 0
-  defp count_decision_points(%{children: children}) when is_list(children) do
-    Enum.reduce(children, 0, fn child, acc ->
-      acc + count_decision_points(child) + decision_point_value(child)
-    end)
-  end
-  defp count_decision_points(%{value: value}) when is_binary(value) do
-    # Count keywords that indicate decision points in the content
-    content_score = count_keywords_in_content(value)
-    content_score
-  end
-  defp count_decision_points(_), do: 0
-
-  defp decision_point_value(%{type: type}) when type in [:if, :case, :while, :for], do: 1
-  defp decision_point_value(_), do: 0
-
-  defp count_keywords_in_content(content) do
-    # Count decision point keywords in the entire content
-    keywords = ["if ", "case ", "when ", "while ", "for ", "cond ", "else"]
-    Enum.reduce(keywords, 0, fn keyword, acc ->
-      matches = content |> String.split(keyword) |> length() |> Kernel.-(1)
-      acc + max(0, matches)
-    end)
-  end
   
   defp count_elixir_decision_points(content) do
     # Count basic decision points
@@ -1809,27 +1785,7 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
     end
   end
 
-  defp apply_security_rule(rule, _ast, content, _language) do
-    case Regex.scan(rule.pattern, content) do
-      [] -> []
-      matches ->
-        [%{
-          rule_id: rule.id,
-          severity: rule.severity,
-          message: rule.message,
-          matches: length(matches)
-        }]
-    end
-  end
 
-  defp calculate_security_score(vulnerabilities) do
-    case length(vulnerabilities) do
-      0 -> 100
-      n when n <= 2 -> 80
-      n when n <= 5 -> 60
-      _ -> 40
-    end
-  end
 
   defp apply_security_rule(rule, _ast, content, language) do
     # Check if rule applies to this language

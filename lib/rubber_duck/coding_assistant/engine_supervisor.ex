@@ -38,7 +38,7 @@ defmodule RubberDuck.CodingAssistant.EngineSupervisor do
 
   use Horde.DynamicSupervisor
 
-  alias RubberDuck.CodingAssistant.{Engine, EngineRegistry}
+  alias RubberDuck.CodingAssistant.EngineRegistry
 
   @doc """
   Start the engine supervisor.

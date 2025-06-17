@@ -96,7 +96,7 @@ defmodule RubberDuck.Registry.Migration do
     if validation_results.migration_complete do
       Logger.info("Migration validation successful: all processes migrated")
     else
-      Logger.warn("Migration validation found #{length(remaining_local)} remaining local processes")
+      Logger.warning("Migration validation found #{length(remaining_local)} remaining local processes")
     end
     
     validation_results
@@ -106,7 +106,7 @@ defmodule RubberDuck.Registry.Migration do
   Provides rollback functionality in case migration needs to be reversed.
   """
   def rollback_migration do
-    Logger.warn("Rolling back migration to local Registry")
+    Logger.warning("Rolling back migration to local Registry")
     
     global_processes = GlobalRegistry.list_processes()
     
@@ -178,7 +178,7 @@ defmodule RubberDuck.Registry.Migration do
           migrate_general_process(name, pid, value)
         
         {:unknown, _} ->
-          Logger.warn("Unknown process type for key: #{inspect(key)}")
+          Logger.warning("Unknown process type for key: #{inspect(key)}")
           {:error, :unknown_process_type}
       end
     rescue

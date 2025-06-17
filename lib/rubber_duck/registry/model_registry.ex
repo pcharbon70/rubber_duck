@@ -7,7 +7,6 @@ defmodule RubberDuck.Registry.ModelRegistry do
   require Logger
 
   alias RubberDuck.Registry.{GlobalRegistry, ProcessMonitor}
-  alias RubberDuck.LLM.{Coordinator, TaskRouter}
 
   @model_prefix "model"
   @health_check_interval 60_000  # 1 minute
@@ -160,7 +159,7 @@ defmodule RubberDuck.Registry.ModelRegistry do
     unhealthy_count = Enum.count(health_results, fn {_name, status} -> status != :healthy end)
     
     if unhealthy_count > 0 do
-      Logger.warn("Health check found #{unhealthy_count} unhealthy models")
+      Logger.warning("Health check found #{unhealthy_count} unhealthy models")
     end
     
     {:ok, health_results}
