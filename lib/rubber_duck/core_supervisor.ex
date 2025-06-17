@@ -50,7 +50,10 @@ defmodule RubberDuck.CoreSupervisor do
       # ILP (Intelligent Language Processing) - Section 5.1
       {RubberDuck.ILP.ResourceIsolator, []},
       {RubberDuck.ILP.RealTime.Pipeline, []},
-      {RubberDuck.ILP.Batch.Orchestrator, []}
+      {RubberDuck.ILP.Batch.Orchestrator, []},
+      
+      # Coding Assistant domain (Section 7.2)
+      {RubberDuck.CodingAssistantSupervisor, []}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)

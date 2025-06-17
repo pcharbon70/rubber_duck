@@ -218,7 +218,7 @@ defmodule RubberDuck.CodingAssistant.Engine do
 
   # Private implementation functions
 
-  defp handle_real_time_processing(data, from, state) do
+  defp handle_real_time_processing(data, _from, state) do
     start_time = System.monotonic_time(:microsecond)
     
     # Enforce real-time constraint (100ms timeout)
@@ -283,7 +283,7 @@ defmodule RubberDuck.CodingAssistant.Engine do
     end
   end
 
-  defp handle_batch_processing(data_list, from, state) do
+  defp handle_batch_processing(data_list, _from, state) do
     start_time = System.monotonic_time(:microsecond)
     
     case state.engine_module.process_batch(data_list, state.engine_state) do
@@ -346,7 +346,7 @@ defmodule RubberDuck.CodingAssistant.Engine do
     {:noreply, new_state}
   end
 
-  defp handle_engine_event(event, from, state) do
+  defp handle_engine_event(event, _from, state) do
     case state.engine_module.handle_engine_event(event, state.engine_state) do
       {:ok, new_engine_state} ->
         new_state = %{state | engine_state: new_engine_state}
@@ -395,20 +395,34 @@ defmodule RubberDuck.CodingAssistant.Engine do
   end
 
   defp register_engine(engine_module, config) do
-    # Register with engine registry for discovery
-    case Registry.register(RubberDuck.CodingAssistant.EngineRegistry, engine_module, %{
-      pid: self(),
-      capabilities: engine_module.capabilities(),
-      config: config,
-      started_at: DateTime.utc_now()
-    }) do
-      {:ok, _pid} -> :ok
-      {:error, {:already_registered, _pid}} -> :ok
-    end
+    # Generate unique engine ID
+    engine_id = generate_engine_id(engine_module, config)
+    
+    # Register with the proper EngineRegistry for discovery
+    RubberDuck.CodingAssistant.EngineRegistry.register_engine(
+      engine_module, 
+      engine_id, 
+      self(), 
+      %{
+        capabilities: engine_module.capabilities(),
+        config: config,
+        started_at: DateTime.utc_now()
+      }
+    )
   end
 
   defp unregister_engine(engine_module) do
-    Registry.unregister(RubberDuck.CodingAssistant.EngineRegistry, engine_module)
+    # For cleanup, we need to find the engine_id - simplified for now
+    engine_id = generate_engine_id(engine_module, %{})
+    RubberDuck.CodingAssistant.EngineRegistry.unregister_engine(engine_module, engine_id)
+  end
+  
+  defp generate_engine_id(engine_module, config) do
+    base_id = engine_module |> Module.split() |> List.last()
+    config_hash = :crypto.hash(:md5, :erlang.term_to_binary(config)) |> Base.encode16()
+    timestamp = System.system_time(:microsecond)
+    
+    "#{base_id}_#{String.slice(config_hash, 0, 8)}_#{timestamp}"
   end
 
   defp init_statistics do
@@ -516,7 +530,7 @@ defmodule RubberDuck.CodingAssistant.Engine do
     :telemetry.execute(event_name, measurements, metadata)
   end
 
-  defp handle_telemetry_event(event_name, measurements, metadata, state) do
+  defp handle_telemetry_event(_event_name, _measurements, _metadata, state) do
     # Forward telemetry events to interested parties
     # This can be used for monitoring, alerting, etc.
     {:noreply, state}

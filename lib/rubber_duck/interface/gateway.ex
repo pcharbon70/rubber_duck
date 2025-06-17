@@ -102,6 +102,38 @@ defmodule RubberDuck.Interface.Gateway do
   end
 
   @doc """
+  Routes a code analysis request directly to the CodeAnalyser engine.
+  
+  ## Parameters
+  - `code_data` - Map with file_path, content, and language
+  - `options` - Analysis options (mode: :real_time or :batch)
+  
+  ## Returns
+  - `{:ok, analysis_result}` - Analysis completed successfully
+  - `{:error, reason}` - Analysis failed
+  """
+  def analyze_code(code_data, options \\ []) do
+    GenServer.call(__MODULE__, {:analyze_code, code_data, options}, 
+                   Keyword.get(options, :timeout, 30_000))
+  end
+
+  @doc """
+  Routes a batch code analysis request to the CodeAnalyser engine.
+  
+  ## Parameters
+  - `code_data_list` - List of code_data maps
+  - `options` - Analysis options
+  
+  ## Returns
+  - `{:ok, analysis_results}` - Batch analysis completed
+  - `{:error, reason}` - Analysis failed
+  """
+  def analyze_code_batch(code_data_list, options \\ []) do
+    GenServer.call(__MODULE__, {:analyze_code_batch, code_data_list, options}, 
+                   Keyword.get(options, :timeout, 60_000))
+  end
+
+  @doc """
   Lists all registered adapters and their status.
   """
   def list_adapters do
@@ -209,6 +241,45 @@ defmodule RubberDuck.Interface.Gateway do
       {:error, reason} ->
         error = ErrorHandler.create_error(:validation_error, "Request normalization failed: #{reason}")
         {:reply, {:error, error}, state}
+    end
+  end
+
+  @impl true
+  def handle_call({:analyze_code, code_data, options}, _from, state) do
+    case get_code_analyser_engine() do
+      {:ok, engine_info} ->
+        mode = Keyword.get(options, :mode, :real_time)
+        
+        case mode do
+          :real_time ->
+            case GenServer.call(engine_info.pid, {:process_real_time, code_data}, 30_000) do
+              {:ok, result} -> {:reply, {:ok, result}, state}
+              {:error, reason} -> {:reply, {:error, reason}, state}
+            end
+          :batch ->
+            case GenServer.call(engine_info.pid, {:process_batch, [code_data]}, 30_000) do
+              {:ok, [result]} -> {:reply, {:ok, result}, state}
+              {:ok, results} -> {:reply, {:ok, List.first(results)}, state}
+              {:error, reason} -> {:reply, {:error, reason}, state}
+            end
+        end
+      {:error, reason} ->
+        {:reply, {:error, {:engine_unavailable, reason}}, state}
+    end
+  end
+
+  @impl true
+  def handle_call({:analyze_code_batch, code_data_list, options}, _from, state) do
+    case get_code_analyser_engine() do
+      {:ok, engine_info} ->
+        timeout = Keyword.get(options, :timeout, 60_000)
+        
+        case GenServer.call(engine_info.pid, {:process_batch, code_data_list}, timeout) do
+          {:ok, results} -> {:reply, {:ok, results}, state}
+          {:error, reason} -> {:reply, {:error, reason}, state}
+        end
+      {:error, reason} ->
+        {:reply, {:error, {:engine_unavailable, reason}}, state}
     end
   end
 
@@ -395,7 +466,7 @@ defmodule RubberDuck.Interface.Gateway do
     end
   end
 
-  defp handle_normalized_request(request, interface, options, from, state) do
+  defp handle_normalized_request(request, interface, _options, _from, state) do
     case check_circuit_breaker(state, interface) do
       :allow ->
         case get_adapter_pid(state, interface) do
@@ -655,5 +726,17 @@ defmodule RubberDuck.Interface.Gateway do
       priority: :normal,
       metadata: %{component: "interface_gateway"}
     })
+  end
+
+  defp get_code_analyser_engine do
+    case RubberDuck.CodingAssistant.EngineRegistry.find_engines_by_capability(
+      [:syntax_analysis, :complexity_analysis, :security_scanning], 
+      exclude_unhealthy: true
+    ) do
+      [] ->
+        {:error, :no_engines_available}
+      [engine_info | _] ->
+        {:ok, engine_info}
+    end
   end
 end

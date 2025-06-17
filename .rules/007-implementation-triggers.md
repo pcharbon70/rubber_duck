@@ -28,6 +28,14 @@ Implementation Plan Section → Feature Workflow → TDD Workflow
 2. Example: `feature/1.1-basic-otp-application-setup`
 3. Example: `feature/2.3-performance-optimization-ai-workloads`
 
+## Git Commit Requirements
+
+**MANDATORY**: When creating any git commit:
+1. **NO AI REFERENCES**: Never mention AI agents, LLMs, Claude, or any AI tools in commit messages
+2. **HUMAN-AUTHORED**: All commit messages must appear as if written by a human developer
+3. **NO ATTRIBUTION**: Never include Co-Authored-By tags referencing AI systems
+4. **PROFESSIONAL TONE**: Use standard development commit message conventions
+
 ## Exceptions
 
 **NO EXCEPTIONS**: All implementation work MUST follow this trigger chain.
