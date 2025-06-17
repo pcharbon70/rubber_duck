@@ -493,19 +493,77 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
   end
 
   defp load_security_rules(config) do
-    # Load default security rules (would be more sophisticated in real implementation)
     base_rules = [
+      # Code injection vulnerabilities
       %{
         id: :code_eval,
-        pattern: ~r/Code\.eval_string|eval\(/,
+        pattern: ~r/Code\.eval_string|\beval\(|Function\(|setTimeout\(.*['"]|setInterval\(.*['"]|new Function/,
         severity: :high,
-        message: "Potential code injection vulnerability"
+        message: "Potential code injection vulnerability",
+        languages: [:elixir, :javascript, :python]
       },
+      
+      # SQL injection patterns
       %{
         id: :sql_injection,
-        pattern: ~r/query\s*\(\s*".*#\{/,
-        severity: :high, 
-        message: "Potential SQL injection vulnerability"
+        pattern: ~r/query\s*\(\s*['"].*#\{|['"].*#\{.*['"]|SELECT.*\+|INSERT.*\+|UPDATE.*\+|DELETE.*\+/,
+        severity: :high,
+        message: "Potential SQL injection vulnerability",
+        languages: [:elixir, :javascript, :python]
+      },
+      
+      # Command injection
+      %{
+        id: :command_injection,
+        pattern: ~r/os\.system\(|subprocess\.call\(.*shell\s*=\s*True|\bexec\(|Runtime\.getRuntime\(\)\.exec/,
+        severity: :high,
+        message: "Potential command injection vulnerability",
+        languages: [:python, :java]
+      },
+      
+      # Path traversal
+      %{
+        id: :path_traversal,
+        pattern: ~r/\.\.\/|\.\.\\|\+\s*filename|filename\s*\+|\+\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\)|File\(.*\+/,
+        severity: :medium,
+        message: "Potential path traversal vulnerability",
+        languages: [:javascript, :java, :python]
+      },
+      
+      # Hardcoded secrets
+      %{
+        id: :hardcoded_secret,
+        pattern: ~r/(?i)(@|\b)(api[_-]?key|password|secret|token|credential)\s*[=:]?\s*['"][^'"\s]{8,}['"]/,
+        severity: :high,
+        message: "Hardcoded secret detected",
+        languages: [:elixir, :javascript, :python, :java]
+      },
+      
+      # Weak randomness
+      %{
+        id: :weak_randomness,
+        pattern: ~r/:rand\.uniform|Enum\.random|Math\.random|Random\(\)|new Random\(\)/,
+        severity: :medium,
+        message: "Weak randomness detected - use cryptographically secure random",
+        languages: [:elixir, :javascript, :java]
+      },
+      
+      # Insecure HTTP
+      %{
+        id: :insecure_http,
+        pattern: ~r/http:\/\/|port.*80[^0-9]|:80\/|HTTPClient\(.*secure.*false/,
+        severity: :low,
+        message: "Insecure HTTP connection detected",
+        languages: [:elixir, :javascript, :python, :java]
+      },
+      
+      # Unsafe deserialization
+      %{
+        id: :unsafe_deserialization,
+        pattern: ~r/:erlang\.binary_to_term|pickle\.loads|JSON\.parse\(.*user|eval\(.*JSON/,
+        severity: :high,
+        message: "Unsafe deserialization detected",
+        languages: [:elixir, :python, :javascript]
       }
     ]
     
@@ -1569,6 +1627,60 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
     end
   end
 
+  defp apply_security_rule(rule, _ast, content, language) do
+    # Check if rule applies to this language
+    if rule[:languages] == nil or language in rule[:languages] do
+      case Regex.scan(rule.pattern, content, return: :index) do
+        [] -> []
+        matches ->
+          Enum.map(matches, fn [{start, length}] ->
+            line_info = get_line_and_column(content, start)
+            %{
+              rule_id: rule.id,
+              severity: rule.severity,
+              message: rule.message,
+              line: line_info.line,
+              column: line_info.column,
+              matched_text: String.slice(content, start, length),
+              file_path: nil  # Will be set by caller if needed
+            }
+          end)
+      end
+    else
+      []
+    end
+  end
+  
+  defp get_line_and_column(content, position) do
+    # Get substring up to position and count lines
+    substring = String.slice(content, 0, position)
+    lines = String.split(substring, "\n")
+    line_num = length(lines)
+    column = case List.last(lines) do
+      nil -> 0
+      last_line -> String.length(last_line)
+    end
+    
+    %{line: line_num, column: column}
+  end
+  
+  defp calculate_security_score(vulnerabilities) do
+    # Calculate security score based on vulnerabilities found
+    # Start with 100 and subtract points based on severity and count
+    base_score = 100
+    
+    penalty = Enum.reduce(vulnerabilities, 0, fn vuln, acc ->
+      case vuln.severity do
+        :high -> acc + 25    # High severity: -25 points each
+        :medium -> acc + 10  # Medium severity: -10 points each  
+        :low -> acc + 5      # Low severity: -5 points each
+        _ -> acc + 10        # Unknown severity: -10 points
+      end
+    end)
+    
+    max(0, base_score - penalty)
+  end
+  
   defp generate_security_recommendations(vulnerabilities) do
     Enum.map(vulnerabilities, fn vuln ->
       "Consider addressing #{vuln.rule_id}: #{vuln.message}"
