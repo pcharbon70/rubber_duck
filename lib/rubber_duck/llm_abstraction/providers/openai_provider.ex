@@ -15,7 +15,8 @@ defmodule RubberDuck.LLMAbstraction.Providers.OpenAIProvider do
     HTTPClient,
     Message,
     Response,
-    Capability
+    Capability,
+    Telemetry
   }
 
   defstruct [:config, :http_client, :statistics, :health_status]
@@ -56,28 +57,41 @@ defmodule RubberDuck.LLMAbstraction.Providers.OpenAIProvider do
 
   @impl true
   def chat(messages, %__MODULE__{} = state, opts \\ []) do
+    request_id = Telemetry.track_request_start(:openai, :chat, %{model: Config.get_model(state.config)})
     start_time = System.monotonic_time(:millisecond)
     
     case build_chat_request(messages, state, opts) do
       {:ok, request_body} ->
         url = Config.get_endpoint_url(state.config, :chat)
         headers = Config.get_headers(state.config)
-        http_opts = [
-          timeout: state.config.timeout,
-          max_retries: state.config.max_retries
-        ]
         
         case HTTPClient.post(url, request_body, headers: headers, timeout: state.config.timeout) do
           {:ok, http_response} ->
-            process_chat_response(http_response, state, start_time)
+            case process_chat_response(http_response, state, start_time) do
+              {:ok, response, new_state} ->
+                # Track successful completion
+                tokens_used = Response.get_token_usage(response)
+                Telemetry.track_request_stop(request_id, :openai, :chat, :success, %{
+                  start_time: start_time,
+                  tokens_used: tokens_used,
+                  model: Config.get_model(state.config)
+                })
+                {:ok, response, new_state}
+              
+              {:error, reason, new_state} ->
+                Telemetry.track_request_error(request_id, :openai, :chat, reason, %{start_time: start_time})
+                {:error, reason, new_state}
+            end
           
           {:error, reason} ->
             new_state = update_statistics(state, :chat, :error, start_time)
+            Telemetry.track_request_error(request_id, :openai, :chat, {:http_error, reason}, %{start_time: start_time})
             {:error, {:http_error, reason}, new_state}
         end
       
       {:error, reason} ->
         new_state = update_statistics(state, :chat, :error, start_time)
+        Telemetry.track_request_error(request_id, :openai, :chat, reason, %{start_time: start_time})
         {:error, reason, new_state}
     end
   end
@@ -204,11 +218,19 @@ defmodule RubberDuck.LLMAbstraction.Providers.OpenAIProvider do
 
   @impl true
   def health_check(%__MODULE__{} = state) do
-    case perform_health_check(state) do
+    health_status = case perform_health_check(state) do
       :ok -> :healthy
       {:degraded, _reason} -> :degraded
       {:unhealthy, _reason} -> :unhealthy
     end
+    
+    # Track health status change
+    Telemetry.track_provider_health(:openai, health_status, %{
+      provider_module: __MODULE__,
+      config_base_url: state.config.base_url
+    })
+    
+    health_status
   end
 
   @impl true

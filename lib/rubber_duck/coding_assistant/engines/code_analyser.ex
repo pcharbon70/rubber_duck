@@ -34,6 +34,8 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
   use RubberDuck.CodingAssistant.Engine
   
   alias RubberDuck.ILP.Parser.TreeSitterWrapper
+  alias RubberDuck.CodingAssistant.Engines.StreamingAnalyser
+  alias RubberDuck.CodingAssistant.FileSizeManager
   
   @type engine_state :: %{
     languages: [atom()],
@@ -115,46 +117,64 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
         {:ok, error_result, state}
         
       :ok ->
-        # Check cache first with enhanced caching
-        cache_key = generate_enhanced_cache_key(code_data.content, code_data.language)
-        case get_cached_result_with_ttl(state.cache, cache_key, state.cache_ttl) do
-          {:hit, cached_result} ->
-            # Update cache statistics
-            new_stats = update_cache_stats(state.cache_stats, :hit)
-            new_state = %{state | cache_stats: new_stats}
-            {:ok, cached_result, new_state}
-            
-          :miss ->
-            # Perform analysis
-            case analyze_code(code_data, state) do
-              {:ok, analysis_result} ->
-                # Update cache with enhanced LRU and TTL
-                new_cache = put_enhanced_cache(state.cache, cache_key, analysis_result, state.cache_size, state.cache_ttl)
-                
-                # Update cache statistics
-                new_cache_stats = update_cache_stats(state.cache_stats, :miss)
-                
-                # Update statistics
-                processing_time = System.monotonic_time(:microsecond) - start_time
-                new_stats = update_statistics(state.statistics, :real_time, processing_time, :success)
-                
-                new_state = %{state | 
-                  cache: new_cache,
-                  cache_stats: new_cache_stats,
-                  statistics: new_stats
-                }
-                
-                {:ok, analysis_result, new_state}
-                
-              {:error, reason} ->
-                processing_time = System.monotonic_time(:microsecond) - start_time
-                new_stats = update_statistics(state.statistics, :real_time, processing_time, :error)
-                
+        # Check file size and determine processing strategy
+        case check_file_size_and_strategy(code_data, state) do
+          {:stream, streaming_config} ->
+            # Use streaming analysis for large files
+            case delegate_to_streaming_analyser(code_data, streaming_config, state) do
+              {:ok, streaming_result, new_state} ->
+                {:ok, streaming_result, new_state}
+              {:error, reason, new_state} ->
                 error_result = create_error_result(reason)
-                new_state = %{state | statistics: new_stats}
-                
                 {:ok, error_result, new_state}
             end
+            
+          :standard ->
+            # Use standard processing with caching
+            cache_key = generate_enhanced_cache_key(code_data.content, code_data.language)
+            case get_cached_result_with_ttl(state.cache, cache_key, state.cache_ttl) do
+              {:hit, cached_result} ->
+                # Update cache statistics
+                new_stats = update_cache_stats(state.cache_stats, :hit)
+                new_state = %{state | cache_stats: new_stats}
+                {:ok, cached_result, new_state}
+                
+              :miss ->
+                # Perform analysis
+                case analyze_code(code_data, state) do
+                  {:ok, analysis_result} ->
+                    # Update cache with enhanced LRU and TTL
+                    new_cache = put_enhanced_cache(state.cache, cache_key, analysis_result, state.cache_size, state.cache_ttl)
+                    
+                    # Update cache statistics
+                    new_cache_stats = update_cache_stats(state.cache_stats, :miss)
+                    
+                    # Update statistics
+                    processing_time = System.monotonic_time(:microsecond) - start_time
+                    new_stats = update_statistics(state.statistics, :real_time, processing_time, :success)
+                    
+                    new_state = %{state | 
+                      cache: new_cache,
+                      cache_stats: new_cache_stats,
+                      statistics: new_stats
+                    }
+                    
+                    {:ok, analysis_result, new_state}
+                    
+                  {:error, reason} ->
+                    processing_time = System.monotonic_time(:microsecond) - start_time
+                    new_stats = update_statistics(state.statistics, :real_time, processing_time, :error)
+                    
+                    error_result = create_error_result(reason)
+                    new_state = %{state | statistics: new_stats}
+                    
+                    {:ok, error_result, new_state}
+                end
+            end
+            
+          {:error, reason} ->
+            error_result = create_error_result(reason)
+            {:ok, error_result, state}
         end
     end
   end
@@ -235,6 +255,188 @@ defmodule RubberDuck.CodingAssistant.Engines.CodeAnalyser do
     end
   end
   defp validate_code_data(_), do: {:error, :invalid_code_data}
+
+  # File size checking and streaming analysis integration
+
+  defp check_file_size_and_strategy(code_data, state) do
+    content_size = byte_size(code_data.content)
+    file_path = code_data.file_path
+    
+    # Use FileSizeManager to validate and get processing strategy
+    case FileSizeManager.validate_file_size(content_size, %{processing_mode: :standard}) do
+      :ok ->
+        # Check if we should use streaming for this size
+        case FileSizeManager.get_processing_strategy(content_size, :code) do
+          strategy when strategy.type in [:streaming, :memory_mapped, :chunked] ->
+            streaming_config = %{
+              strategy: strategy,
+              file_path: file_path,
+              content_size: content_size,
+              recommended_chunk_size: strategy.recommended_chunk_size
+            }
+            {:stream, streaming_config}
+          
+          _standard_strategy ->
+            :standard
+        end
+      
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp delegate_to_streaming_analyser(code_data, streaming_config, state) do
+    # Prepare request for StreamingAnalyser
+    streaming_request = prepare_streaming_request(code_data, streaming_config)
+    
+    # Initialize StreamingAnalyser if not already done
+    streaming_state = get_or_init_streaming_analyser(state)
+    
+    # Delegate to StreamingAnalyser
+    case StreamingAnalyser.analyze(streaming_request, streaming_state) do
+      {:ok, streaming_result, new_streaming_state} ->
+        # Convert streaming result to CodeAnalyser format
+        converted_result = convert_streaming_result_to_standard(streaming_result, code_data)
+        
+        # Update state with new streaming analyser state
+        new_state = update_streaming_analyser_state(state, new_streaming_state)
+        
+        {:ok, converted_result, new_state}
+      
+      {:error, reason, new_streaming_state} ->
+        new_state = update_streaming_analyser_state(state, new_streaming_state)
+        {:error, reason, new_state}
+    end
+  end
+
+  defp prepare_streaming_request(code_data, streaming_config) do
+    %{
+      file_path: code_data.file_path,
+      content: code_data.content,
+      options: %{
+        analysis_mode: streaming_config.strategy.type,
+        chunk_size: streaming_config.recommended_chunk_size,
+        language: code_data.language,
+        memory_efficient: streaming_config.strategy.memory_efficient,
+        progressive: Map.get(streaming_config.strategy, :progressive, false)
+      }
+    }
+  end
+
+  defp get_or_init_streaming_analyser(state) do
+    # Check if we have streaming analyser state cached
+    case Map.get(state, :streaming_analyser_state) do
+      nil ->
+        # Initialize new StreamingAnalyser
+        streaming_config = %{
+          max_file_size: 50 * 1024 * 1024,  # 50MB max
+          chunk_size: 64 * 1024,            # 64KB chunks
+          max_memory_usage: 100 * 1024 * 1024  # 100MB max memory
+        }
+        case StreamingAnalyser.init(streaming_config) do
+          {:ok, streaming_state} -> streaming_state
+          {:error, _reason} -> %{}  # Fallback to empty state
+        end
+      
+      existing_state ->
+        existing_state
+    end
+  end
+
+  defp update_streaming_analyser_state(state, new_streaming_state) do
+    Map.put(state, :streaming_analyser_state, new_streaming_state)
+  end
+
+  defp convert_streaming_result_to_standard(streaming_result, code_data) do
+    # Convert StreamingAnalyser result format to CodeAnalyser format
+    %{
+      status: :success,
+      data: %{
+        syntax: extract_syntax_from_streaming(streaming_result),
+        complexity: extract_complexity_from_streaming(streaming_result),
+        security: extract_security_from_streaming(streaming_result),
+        code_smells: extract_smells_from_streaming(streaming_result)
+      },
+      metadata: %{
+        file_path: code_data.file_path,
+        language: code_data.language,
+        content_size: byte_size(code_data.content),
+        analyzed_at: DateTime.utc_now(),
+        processing_mode: :streaming,
+        chunks_processed: Map.get(streaming_result, :chunks_processed, 0),
+        streaming_stats: Map.get(streaming_result, :streaming_stats, %{})
+      }
+    }
+  end
+
+  defp extract_syntax_from_streaming(streaming_result) do
+    syntax_errors = streaming_result
+    |> Map.get(:syntax_errors, [])
+    |> List.flatten()
+    
+    %{
+      valid: length(syntax_errors) == 0,
+      errors: syntax_errors,
+      warnings: Map.get(streaming_result, :syntax_warnings, [])
+    }
+  end
+
+  defp extract_complexity_from_streaming(streaming_result) do
+    chunks = Map.get(streaming_result, :chunks, [])
+    
+    # Aggregate complexity metrics from all chunks
+    total_complexity = Enum.reduce(chunks, 0, fn chunk, acc ->
+      chunk_complexity = get_in(chunk, [:complexity_analysis, :score]) || 0
+      acc + chunk_complexity
+    end)
+    
+    total_lines = Map.get(streaming_result, :total_lines, 0)
+    
+    %{
+      cyclomatic: total_complexity,
+      cognitive: round(total_complexity * 1.2),  # Estimate cognitive complexity
+      halstead: %{program_length: total_lines, program_vocabulary: total_lines / 10},
+      lines_of_code: total_lines,
+      maintainability_index: calculate_streaming_maintainability_index(total_complexity, total_lines)
+    }
+  end
+
+  defp extract_security_from_streaming(streaming_result) do
+    security_issues = streaming_result
+    |> Map.get(:security_issues, [])
+    |> List.flatten()
+    
+    %{
+      vulnerabilities: security_issues,
+      security_score: calculate_security_score(security_issues),
+      recommendations: generate_security_recommendations(security_issues)
+    }
+  end
+
+  defp extract_smells_from_streaming(streaming_result) do
+    smells = streaming_result
+    |> Map.get(:code_smells, [])
+    |> List.flatten()
+    
+    %{
+      detected: smells,
+      smell_score: calculate_smell_score(smells),
+      suggestions: generate_smell_suggestions(smells)
+    }
+  end
+
+  defp calculate_streaming_maintainability_index(complexity, lines_of_code) do
+    # Simplified maintainability index for streaming results
+    safe_complexity = max(1, complexity)
+    safe_loc = max(1, lines_of_code)
+    
+    mi = 171 - 5.2 * :math.log(safe_loc) - 0.23 * safe_complexity - 16.2 * :math.log(safe_loc)
+    
+    mi
+    |> max(0.0)
+    |> min(100.0)
+    |> Float.round(1)
+  end
 
   # Enhanced caching functions
 
