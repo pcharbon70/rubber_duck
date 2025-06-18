@@ -37,7 +37,7 @@ defmodule RubberDuck.LLMPerformanceBenchmarker do
     heavy_load: %{
       name: "Heavy Load Test",
       description: "High volume load testing",
-      duration: :timer.minutes(5),
+      duration: @default_benchmark_duration,
       concurrent_users: 20,
       request_rate: 50,
       request_pattern: :constant
@@ -56,8 +56,8 @@ defmodule RubberDuck.LLMPerformanceBenchmarker do
       name: "Provider Comparison",
       description: "Compare performance across LLM providers",
       duration: :timer.minutes(10),
-      concurrent_users: 10,
-      request_rate: 10,
+      concurrent_users: @default_concurrent_users,
+      request_rate: @default_request_rate,
       request_pattern: :round_robin_providers
     },
     
@@ -73,7 +73,7 @@ defmodule RubberDuck.LLMPerformanceBenchmarker do
     query_optimization: %{
       name: "Query Optimization",
       description: "Validate query optimization strategies",
-      duration: :timer.minutes(5),
+      duration: @default_benchmark_duration,
       concurrent_users: 8,
       request_rate: 20,
       request_pattern: :analytical_queries
@@ -91,8 +91,8 @@ defmodule RubberDuck.LLMPerformanceBenchmarker do
     failover_test: %{
       name: "Failover Test",
       description: "Test behavior during provider failures",
-      duration: :timer.minutes(5),
-      concurrent_users: 10,
+      duration: @default_benchmark_duration,
+      concurrent_users: @default_concurrent_users,
       request_rate: 15,
       request_pattern: :with_failures
     }

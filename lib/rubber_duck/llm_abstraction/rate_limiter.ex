@@ -87,7 +87,7 @@ defmodule RubberDuck.LLMAbstraction.RateLimiter do
   @doc """
   Calculate optimal request spacing to avoid rate limits.
   """
-  def calculate_request_spacing(provider, api_key, request_type) do
+  def calculate_request_spacing(provider, _api_key, request_type) do
     limits = get_provider_limits(provider)
     limit_info = Map.get(limits, request_type, %{})
     
@@ -112,7 +112,7 @@ defmodule RubberDuck.LLMAbstraction.RateLimiter do
 
   # Private Functions
 
-  defp check_provider_limit(provider, request_type, tokens) do
+  defp check_provider_limit(provider, request_type, _tokens) do
     limits = get_provider_limits(provider)
     limit_info = Map.get(limits, request_type, %{})
     
@@ -131,7 +131,7 @@ defmodule RubberDuck.LLMAbstraction.RateLimiter do
     end
   end
 
-  defp check_api_key_limit(provider, api_key, request_type, tokens) do
+  defp check_api_key_limit(provider, api_key, request_type, _tokens) do
     limits = get_provider_limits(provider)
     limit_info = Map.get(limits, request_type, %{})
     

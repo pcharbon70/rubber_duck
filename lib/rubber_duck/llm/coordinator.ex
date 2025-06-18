@@ -21,7 +21,6 @@ defmodule RubberDuck.LLM.Coordinator do
   ]
 
   @routing_strategies [:performance_first, :cost_optimized, :balanced, :quality_first, :ensemble]
-  @model_types [:completion, :chat, :embedding, :code_generation, :reasoning, :multimodal]
 
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -666,7 +665,7 @@ defmodule RubberDuck.LLM.Coordinator do
     Map.get(context, :max_cost, 1.0)
   end
 
-  defp extract_special_capabilities(task, context) do
+  defp extract_special_capabilities(_task, _context) do
     []  # Simplified - would analyze for special requirements
   end
 

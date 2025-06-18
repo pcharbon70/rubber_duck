@@ -245,7 +245,7 @@ defmodule RubberDuck.LoadBalancing.RateLimiter do
       {:allow, count} ->
         {:ok, %{allowed: true, remaining: requests_per_minute - count, scope: :provider_requests}}
       
-      {:deny, limit} ->
+      {:deny, _limit} ->
         reset_time = get_bucket_reset_time(bucket_key)
         {:ok, %{allowed: false, remaining: 0, reset_time: reset_time, scope: :provider_requests}}
       
@@ -362,7 +362,7 @@ defmodule RubberDuck.LoadBalancing.RateLimiter do
     end
   end
   
-  defp get_bucket_reset_time(bucket_key) do
+  defp get_bucket_reset_time(_bucket_key) do
     # Estimate reset time based on bucket window
     # In a real implementation, this would query Hammer for exact reset time
     System.system_time(:second) + 60
@@ -407,7 +407,7 @@ defmodule RubberDuck.LoadBalancing.RateLimiter do
     %{state | stats: updated_stats}
   end
   
-  defp update_usage_stats(state, provider_id, request_info) do
+  defp update_usage_stats(state, _provider_id, _request_info) do
     # Could add more detailed usage tracking here
     state
   end

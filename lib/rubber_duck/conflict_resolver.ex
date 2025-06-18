@@ -14,7 +14,6 @@ defmodule RubberDuck.ConflictResolver do
     :custom_resolvers
   ]
 
-  @resolution_strategies [:last_writer_wins, :merge_compatible, :manual_review, :custom]
 
   def child_spec(opts) do
     %{
@@ -216,10 +215,10 @@ defmodule RubberDuck.ConflictResolver do
     end
 
     # Use the structure from the more recent record
-    {base_record, _} = if get_record_timestamp(local) > get_record_timestamp(remote) do
-      {local, :local}
+    base_record = if get_record_timestamp(local) > get_record_timestamp(remote) do
+      local
     else
-      {remote, :remote}
+      remote
     end
 
     merged_record = base_record
