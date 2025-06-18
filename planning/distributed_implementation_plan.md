@@ -282,11 +282,55 @@ Purpose: Establish coordination patterns between engines and integration with th
 - [ ] Implement engine performance monitoring and optimization
 - [ ] Add integration with existing ILP pipeline and LLM coordination
 
-## Phase 8: Interface Layer Abstraction ☐
+## Phase 8: Distributed Commands Subsystem ☐
 
-This phase implements the adapter pattern to decouple business logic from interface-specific implementations. The goal is to create a unified interface gateway that can handle requests from CLI, TUI, web, and IDE interfaces while maintaining the same core business logic and enabling interface-specific optimizations.
+This phase implements a distributed, interface-agnostic commands subsystem that provides unified command execution across CLI, TUI, web, and IDE interfaces. The system leverages Optimus for command parsing, Owl for rich interactions, and Horde for distributed process management, creating a robust foundation for user interactions with the AI assistant engines.
 
-### 8.1 Interface Behavior and Adapter Pattern ✅
+### 8.1 Core Command Infrastructure ☐
+Purpose: Establish the foundational command behavior pattern, registry, and routing infrastructure that enables distributed command execution across the cluster.
+
+- [ ] Define CommandBehaviour and CommandMetadata structures
+- [ ] Implement CommandRegistry with Horde.Registry
+- [ ] Create CommandRouter for distributed command routing
+- [ ] Build CommandHandler GenServer with distributed execution
+- [ ] Add command discovery and registration mechanisms
+- [ ] Implement basic validation and error handling
+
+### 8.2 Command Definition and Metadata System ☐
+Purpose: Create a comprehensive metadata system that enables dynamic interface generation, parameter validation, and rich help documentation for all commands.
+
+- [ ] Create parameter definition system with types and validation
+- [ ] Implement command categories and organization
+- [ ] Add command examples and help generation
+- [ ] Build when-conditions and context-aware availability
+- [ ] Create interface hints for adaptive UI generation
+- [ ] Add command composition and pipeline support
+
+### 8.3 Distributed Execution Layer ☐
+Purpose: Implement robust distributed command execution with fault tolerance, state management, and comprehensive monitoring capabilities.
+
+- [ ] Implement Horde.DynamicSupervisor for command handlers
+- [ ] Add circuit breakers and fault tolerance mechanisms
+- [ ] Create distributed state management with Mnesia integration
+- [ ] Build command history and audit logging
+- [ ] Implement performance monitoring and telemetry
+- [ ] Add graceful handler shutdown with state handoff
+
+### 8.4 Interface Integration Points ☐
+Purpose: Establish integration points with existing interface layer and prepare foundation for rich command interactions across all interface types.
+
+- [ ] Create command execution integration with existing InterfaceBehaviour
+- [ ] Build Optimus integration for CLI command parsing
+- [ ] Add Owl integration for rich TUI command interfaces
+- [ ] Implement command result formatting across interfaces
+- [ ] Create progress tracking and status updates
+- [ ] Add command cancellation and timeout handling
+
+## Phase 9: Interface Layer Abstraction ☐
+
+This phase implements the adapter pattern to decouple business logic from interface-specific implementations. The goal is to create a unified interface gateway that can handle requests from CLI, TUI, web, and IDE interfaces while maintaining the same core business logic and enabling interface-specific optimizations through the distributed commands subsystem.
+
+### 9.1 Interface Behavior and Adapter Pattern ✅
 Purpose: Create a common interface behavior that all interaction methods (CLI, TUI, web, IDE) must implement, enabling consistent business logic while allowing interface-specific customizations.
 
 - [x] Define InterfaceBehaviour with common callback functions
@@ -296,7 +340,7 @@ Purpose: Create a common interface behavior that all interaction methods (CLI, T
 - [x] Create interface-specific error handling patterns
 - [x] Implement request/response transformation utilities
 
-### 8.2 CLI Adapter Implementation ☐
+### 9.2 CLI Adapter Implementation ☐
 Purpose: Refactor existing CLI functionality to work with the distributed system while maintaining the familiar command-line interface and adding new distributed features.
 
 - [ ] Create CLI.Adapter implementing InterfaceBehaviour
@@ -306,7 +350,7 @@ Purpose: Refactor existing CLI functionality to work with the distributed system
 - [ ] Add progress indicators for distributed operations
 - [ ] Create CLI configuration for cluster connection
 
-### 8.3 TUI (Terminal User Interface) Adapter Implementation ☐
+### 9.3 TUI (Terminal User Interface) Adapter Implementation ☐
 Purpose: Create an interactive terminal user interface that provides a rich, visual chat experience within the terminal, offering features like conversation history, real-time typing indicators, and intuitive navigation.
 
 - [ ] Research and select TUI library (e.g., Ratatui/crossterm for Rust bindings, or pure Elixir solution)
@@ -322,7 +366,7 @@ Purpose: Create an interactive terminal user interface that provides a rich, vis
 - [ ] Implement session management with tabs or window switching
 - [ ] Create configuration interface for TUI preferences and themes
 
-### 8.4 Interface Testing and Validation ☐
+### 9.4 Interface Testing and Validation ☐
 Purpose: Establish comprehensive testing strategies that validate interface behavior consistency while allowing for interface-specific features and optimizations.
 
 - [ ] Create interface behavior test suite
@@ -332,11 +376,11 @@ Purpose: Establish comprehensive testing strategies that validate interface beha
 - [ ] Implement chaos testing for interface resilience
 - [ ] Add automated interface compatibility validation
 
-## Phase 9: Security and Production Readiness ☐
+## Phase 10: Security and Production Readiness ☐
 
 This final phase focuses on implementing comprehensive security measures, monitoring, and production deployment strategies. The goal is to ensure the distributed AI assistant is secure, observable, and ready for production use with proper authentication, authorization, and operational monitoring.
 
-### 9.1 Security Implementation ☐
+### 10.1 Security Implementation ☐
 Purpose: Implement comprehensive security measures including authentication, authorization, encryption, and secure communication between distributed nodes.
 
 - [ ] Implement multi-interface authentication system
@@ -346,7 +390,7 @@ Purpose: Implement comprehensive security measures including authentication, aut
 - [ ] Implement audit logging and security monitoring
 - [ ] Add input validation and sanitization
 
-### 9.2 Monitoring and Observability ☐
+### 10.2 Monitoring and Observability ☐
 Purpose: Establish comprehensive monitoring, logging, and observability to ensure the distributed system operates reliably and performance issues can be quickly identified and resolved.
 
 - [ ] Implement distributed tracing with OpenTelemetry
@@ -356,7 +400,7 @@ Purpose: Establish comprehensive monitoring, logging, and observability to ensur
 - [ ] Add performance profiling and optimization tools
 - [ ] Create alerting and incident response procedures
 
-### 9.3 Production Deployment ☐
+### 10.3 Production Deployment ☐
 Purpose: Prepare the application for production deployment with proper containerization, orchestration, and deployment strategies that support the distributed architecture.
 
 - [ ] Create Docker containers and Kubernetes manifests
@@ -366,7 +410,7 @@ Purpose: Prepare the application for production deployment with proper container
 - [ ] Implement blue-green deployment capabilities
 - [ ] Add comprehensive production documentation
 
-### 9.4 Load Testing and Performance Validation ☐
+### 10.4 Load Testing and Performance Validation ☐
 Purpose: Validate the distributed system's performance under realistic load conditions and optimize for production workloads.
 
 - [ ] Create comprehensive load testing scenarios
