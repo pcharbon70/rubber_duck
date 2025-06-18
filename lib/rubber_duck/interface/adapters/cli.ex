@@ -78,7 +78,7 @@ defmodule RubberDuck.Interface.Adapters.CLI do
     }
 
     # Initialize session manager
-    case SessionManager.init(config) do
+    case SessionManager.initialize(config) do
       {:ok, session_state} ->
         new_state = Map.put(state, :session_manager, session_state)
         {:ok, new_state}

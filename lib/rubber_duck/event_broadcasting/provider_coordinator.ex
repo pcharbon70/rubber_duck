@@ -10,8 +10,8 @@ defmodule RubberDuck.EventBroadcasting.ProviderCoordinator do
   use GenServer
   require Logger
   
-  alias RubberDuck.EventBroadcasting.{EventBroadcaster, MetricsCollector, ClusterEventCoordinator}
-  alias RubberDuck.LoadBalancing.{LoadBalancer, FailoverManager, CircuitBreaker}
+  alias RubberDuck.EventBroadcasting.{EventBroadcaster, ClusterEventCoordinator}
+  alias RubberDuck.LoadBalancing.{LoadBalancer, CircuitBreaker}
   
   @type provider_assignment :: %{
     provider_id: term(),

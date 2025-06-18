@@ -11,8 +11,8 @@ defmodule RubberDuck.EventBroadcasting.RebalanceCoordinator do
   use GenServer
   require Logger
   
-  alias RubberDuck.EventBroadcasting.{EventBroadcaster, MetricsCollector, HealthBroadcaster, ProviderCoordinator}
-  alias RubberDuck.LoadBalancing.{LoadBalancer, FailoverManager}
+  alias RubberDuck.EventBroadcasting.{EventBroadcaster, HealthBroadcaster, ProviderCoordinator}
+  alias RubberDuck.LoadBalancing.FailoverManager
   
   @type rebalance_trigger :: :node_join | :node_leave | :health_degradation | :load_imbalance | :manual | :scheduled
   @type rebalance_strategy :: :even_distribution | :capacity_based | :health_weighted | :performance_optimized

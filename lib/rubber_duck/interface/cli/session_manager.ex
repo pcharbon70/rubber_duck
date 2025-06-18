@@ -54,7 +54,7 @@ defmodule RubberDuck.Interface.CLI.SessionManager do
   @doc """
   Initialize the session manager with CLI configuration.
   """
-  def init(config \\ %{}) do
+  def initialize(config \\ %{}) do
     merged_config = Map.merge(@default_config, config)
     
     # Ensure storage directory exists
@@ -295,10 +295,7 @@ defmodule RubberDuck.Interface.CLI.SessionManager do
   # GenServer callbacks
 
   def init(config) do
-    case init(config) do
-      {:ok, state} -> {:ok, state}
-      error -> error
-    end
+    initialize(config)
   end
 
   def handle_call({:create_session, name, context}, _from, state) do

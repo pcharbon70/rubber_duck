@@ -14,7 +14,7 @@ defmodule RubberDuck.LLMMetricsCollector do
   use GenServer
   require Logger
   
-  alias RubberDuck.EventBroadcaster
+  alias RubberDuck.EventBroadcasting.EventBroadcaster
   alias RubberDuck.MetricsCollector
   
   @default_window_size :timer.minutes(5)

@@ -126,7 +126,7 @@ defmodule RubberDuck.Registry.ProcessMonitor do
   def handle_cast({:configure_recovery, name, recovery_config}, state) do
     case Map.get(state.monitored_processes, name) do
       nil ->
-        Logger.warn("Cannot configure recovery for unmonitored process: #{inspect(name)}")
+        Logger.warning("Cannot configure recovery for unmonitored process: #{inspect(name)}")
         {:noreply, state}
       
       monitoring_info ->
@@ -159,7 +159,7 @@ defmodule RubberDuck.Registry.ProcessMonitor do
         {:noreply, state}
       
       {name, monitoring_info} ->
-        Logger.warn("Monitored process #{inspect(name)} went down: #{inspect(reason)}")
+        Logger.warning("Monitored process #{inspect(name)} went down: #{inspect(reason)}")
         
         new_state = handle_process_down(state, name, monitoring_info, reason)
         {:noreply, new_state}
@@ -219,7 +219,7 @@ defmodule RubberDuck.Registry.ProcessMonitor do
   defp should_attempt_recovery?(monitoring_info, reason) do
     # Don't recover if too many attempts already made
     if monitoring_info.recovery_attempts >= @max_recovery_attempts do
-      Logger.warn("Max recovery attempts reached for process, giving up")
+      Logger.warning("Max recovery attempts reached for process, giving up")
       false
     else
       # Don't recover from intentional shutdowns
@@ -245,7 +245,7 @@ defmodule RubberDuck.Registry.ProcessMonitor do
     
     case Map.get(monitoring_info, :recovery_config) do
       nil ->
-        Logger.warn("No recovery configuration for #{inspect(name)}")
+        Logger.warning("No recovery configuration for #{inspect(name)}")
         # Remove from monitoring
         new_monitored = Map.delete(state.monitored_processes, name)
         %{state | monitored_processes: new_monitored}

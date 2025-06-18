@@ -7,7 +7,7 @@ defmodule RubberDuck.LLM.Coordinator do
   use GenServer
   require Logger
 
-  alias RubberDuck.LLM.{TaskRouter, Ensemble, ModelSelector, CostOptimizer, FallbackManager}
+  alias RubberDuck.LLM.{TaskRouter, Ensemble, ModelSelector}
 
   defstruct [
     :available_models,

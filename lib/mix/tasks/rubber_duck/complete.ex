@@ -47,6 +47,7 @@ defmodule Mix.Tasks.RubberDuck.Complete do
 
   alias RubberDuck.Interface.Adapters.CLI
   alias RubberDuck.Interface.CLI.{CommandParser, ResponseFormatter, ConfigManager}
+  alias RubberDuck.CodingAssistant.FileSizeManager
 
   @shortdoc "Complete code or text with RubberDuck AI"
 
@@ -63,7 +64,11 @@ defmodule Mix.Tasks.RubberDuck.Complete do
     verbose: :boolean,
     quiet: :boolean,
     config: :string,
-    help: :boolean
+    help: :boolean,
+    force_streaming: :boolean,
+    auto_stream: :boolean,
+    auto_confirm: :boolean,
+    max_file_size: :string
   ]
 
   @aliases [
@@ -109,7 +114,16 @@ defmodule Mix.Tasks.RubberDuck.Complete do
   defp complete_from_file(input_file, options) do
     case File.read(input_file) do
       {:ok, content} ->
-        complete_prompt(content, options)
+        # Check file size before processing
+        case validate_file_size_for_completion(content, input_file, options) do
+          :ok ->
+            complete_prompt(content, options)
+          {:stream_recommended, strategy} ->
+            handle_large_file_completion(content, input_file, strategy, options)
+          {:error, reason} ->
+            Mix.shell().error("File size validation failed: #{reason}")
+            exit({:shutdown, 1})
+        end
       {:error, reason} ->
         Mix.shell().error("Cannot read input file '#{input_file}': #{reason}")
         exit({:shutdown, 1})
@@ -278,47 +292,63 @@ defmodule Mix.Tasks.RubberDuck.Complete do
     metadata = response.metadata || %{}
     completion_data = response.data || %{}
     
-    metadata_lines = [
+    base_lines = [
       "",
       colorize("Completion Metadata:", :dim, config)
     ]
     
+    lines = []
+    
     # Language detection
-    if language = get_detected_language(response) do
-      metadata_lines = [colorize("Detected language: #{language}", :dim, config) | metadata_lines]
+    lines = if language = get_detected_language(response) do
+      [colorize("Detected language: #{language}", :dim, config) | lines]
+    else
+      lines
     end
     
     # Confidence score
-    if confidence = get_confidence_score(response) do
+    lines = if confidence = get_confidence_score(response) do
       score_text = "Confidence: #{Float.round(confidence, 2)}"
-      metadata_lines = [colorize(score_text, :dim, config) | metadata_lines]
+      [colorize(score_text, :dim, config) | lines]
+    else
+      lines
     end
     
     # Processing time
-    if metadata[:processing_time] do
+    lines = if metadata[:processing_time] do
       time_ms = metadata.processing_time
-      metadata_lines = [colorize("Processing time: #{time_ms}ms", :dim, config) | metadata_lines]
+      [colorize("Processing time: #{time_ms}ms", :dim, config) | lines]
+    else
+      lines
     end
     
     # Tokens used
-    if metadata[:tokens_used] do
+    lines = if metadata[:tokens_used] do
       tokens = metadata.tokens_used
-      metadata_lines = [colorize("Tokens used: #{tokens}", :dim, config) | metadata_lines]
+      [colorize("Tokens used: #{tokens}", :dim, config) | lines]
+    else
+      lines
     end
     
     # Model used
-    if metadata[:model_used] do
+    lines = if metadata[:model_used] do
       model = metadata.model_used
-      metadata_lines = [colorize("Model: #{model}", :dim, config) | metadata_lines]
+      [colorize("Model: #{model}", :dim, config) | lines]
+    else
+      lines
     end
     
     # Suggestions
-    if completion_data[:suggestions] && not Enum.empty?(completion_data.suggestions) do
+    lines = if completion_data[:suggestions] && not Enum.empty?(completion_data.suggestions) do
       suggestions_text = "Suggestions: #{length(completion_data.suggestions)} available"
-      metadata_lines = [colorize(suggestions_text, :dim, config) | metadata_lines]
+      [colorize(suggestions_text, :dim, config) | lines]
+    else
+      lines
     end
     
-    Enum.reverse(metadata_lines)
+    metadata_lines = base_lines ++ Enum.reverse(lines)
+    
+    metadata_lines
     |> Enum.each(&Mix.shell().info/1)
   end
 
@@ -358,7 +388,7 @@ defmodule Mix.Tasks.RubberDuck.Complete do
     Enum.reverse(flags)
   end
 
-  defp build_request_context(config, options) do
+  defp build_request_context(config, _options) do
     %{
       interface: :cli,
       mode: :direct,
@@ -420,5 +450,126 @@ defmodule Mix.Tasks.RubberDuck.Complete do
   defp show_usage_hint do
     Mix.shell().info("Usage: mix rubber_duck.complete <prompt> [options]")
     Mix.shell().info("Run 'mix help rubber_duck.complete' for detailed help")
+  end
+
+  # File size validation and streaming support
+
+  defp validate_file_size_for_completion(content, _file_path, options) do
+    content_size = byte_size(content)
+    
+    # Check if streaming is forced via options
+    if options[:force_streaming] do
+      strategy = %{
+        type: :streaming,
+        file_size: content_size,
+        recommended_chunk_size: 64 * 1024
+      }
+      {:stream_recommended, strategy}
+    else
+      # Use FileSizeManager for validation and strategy recommendation
+      case FileSizeManager.validate_file_size(content_size, %{processing_mode: :completion}) do
+        :ok ->
+          # Check if streaming is recommended for this size
+          case FileSizeManager.get_processing_strategy(content_size, :code) do
+            strategy when strategy.type in [:streaming, :memory_mapped, :chunked] ->
+              if options[:auto_stream] != false do
+                {:stream_recommended, strategy}
+              else
+                :ok  # User can still force standard processing
+              end
+            
+            _standard_strategy ->
+              :ok
+          end
+        
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  defp handle_large_file_completion(content, file_path, strategy, options) do
+    content_size = byte_size(content)
+    
+    # Show information about large file processing
+    Mix.shell().info([
+      :bright, :blue, "Large file detected: ",
+      :reset, format_file_size(content_size)
+    ])
+    
+    Mix.shell().info([
+      :yellow, "Recommended processing strategy: ",
+      :reset, "#{strategy.type}"
+    ])
+    
+    # Ask user for confirmation unless auto-confirm is enabled
+    if options[:auto_confirm] || confirm_streaming_processing(strategy) do
+      # Process with streaming
+      complete_prompt_with_streaming(content, file_path, strategy, options)
+    else
+      # Fall back to standard processing with warning
+      Mix.shell().info([:yellow, "Proceeding with standard processing (may be slow)..."])
+      complete_prompt(content, options)
+    end
+  end
+
+  defp confirm_streaming_processing(_strategy) do
+    Mix.shell().yes?([
+      :bright, :green, "Use streaming analysis for optimal performance? ",
+      :reset, "(recommended for files > 1MB)"
+    ])
+  end
+
+  defp complete_prompt_with_streaming(content, file_path, strategy, options) do
+    # Add streaming metadata to options
+    streaming_options = options
+    |> Keyword.put(:processing_mode, :streaming)
+    |> Keyword.put(:chunk_size, strategy.recommended_chunk_size)
+    |> Keyword.put(:file_info, %{
+      path: file_path,
+      size: byte_size(content),
+      strategy: strategy.type
+    })
+    
+    # Show progress for streaming processing
+    Mix.shell().info([:bright, :blue, "Processing with streaming analysis..."])
+    
+    case complete_prompt(content, streaming_options) do
+      result ->
+        # Show completion statistics if verbose
+        if options[:verbose] do
+          show_streaming_stats(strategy, byte_size(content))
+        end
+        result
+    end
+  end
+
+  defp show_streaming_stats(strategy, content_size) do
+    estimated_chunks = div(content_size, strategy.recommended_chunk_size) + 1
+    estimated_memory = strategy.estimated_memory || (content_size / 4)
+    
+    Mix.shell().info([
+      :bright, :blue, "\nStreaming Analysis Statistics:\n",
+      :reset, "  File size: ", format_file_size(content_size), "\n",
+      "  Strategy: #{strategy.type}\n",
+      "  Estimated chunks: #{estimated_chunks}\n",
+      "  Estimated memory usage: ", format_file_size(round(estimated_memory)), "\n"
+    ])
+  end
+
+  defp format_file_size(bytes) when bytes >= 1024 * 1024 * 1024 do
+    "#{Float.round(bytes / (1024 * 1024 * 1024), 2)} GB"
+  end
+  
+  defp format_file_size(bytes) when bytes >= 1024 * 1024 do
+    "#{Float.round(bytes / (1024 * 1024), 2)} MB"
+  end
+  
+  defp format_file_size(bytes) when bytes >= 1024 do
+    "#{Float.round(bytes / 1024, 2)} KB"
+  end
+  
+  defp format_file_size(bytes) do
+    "#{bytes} bytes"
   end
 end

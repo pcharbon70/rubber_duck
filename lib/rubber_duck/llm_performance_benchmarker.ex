@@ -17,7 +17,7 @@ defmodule RubberDuck.LLMPerformanceBenchmarker do
   alias RubberDuck.LLMDataManager
   alias RubberDuck.LLMMetricsCollector
   alias RubberDuck.LLMQueryOptimizer
-  alias RubberDuck.EventBroadcaster
+  alias RubberDuck.EventBroadcasting.EventBroadcaster
   
   @default_benchmark_duration :timer.minutes(5)
   @default_concurrent_users 10
@@ -287,10 +287,13 @@ defmodule RubberDuck.LLMPerformanceBenchmarker do
     start_time = :os.system_time(:millisecond)
     
     # Record benchmark start
-    EventBroadcaster.broadcast_event("benchmark.run.start", %{
-      benchmark_id: benchmark_id,
-      scenario: scenario_name,
-      config: config
+    EventBroadcaster.broadcast_async(%{
+      topic: "benchmark.run.start",
+      payload: %{
+        benchmark_id: benchmark_id,
+        scenario: scenario_name,
+        config: config
+      }
     })
     
     try do
@@ -315,7 +318,10 @@ defmodule RubberDuck.LLMPerformanceBenchmarker do
       store_benchmark_results(benchmark_id, final_results)
       
       # Notify completion
-      EventBroadcaster.broadcast_event("benchmark.run.complete", final_results)
+      EventBroadcaster.broadcast_async(%{
+        topic: "benchmark.run.complete",
+        payload: final_results
+      })
       GenServer.reply(caller, {:ok, final_results})
       
       Logger.info("Benchmark completed: #{scenario_name} (#{benchmark_id})")

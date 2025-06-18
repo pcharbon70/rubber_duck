@@ -30,7 +30,7 @@ defmodule RubberDuck.CodingAssistant.EngineRegistry do
 
   use GenServer
   
-  alias RubberDuck.CodingAssistant.{EngineBehaviour, EngineSupervisor}
+  alias RubberDuck.CodingAssistant.EngineBehaviour
 
   # Registry name for local process registration
   @registry_name __MODULE__

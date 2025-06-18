@@ -17,7 +17,7 @@ defmodule RubberDuck.LLMPerformanceAlerting do
   
   alias RubberDuck.LLMMetricsCollector
   alias RubberDuck.LLMPerformanceDashboard
-  alias RubberDuck.EventBroadcaster
+  alias RubberDuck.EventBroadcasting.EventBroadcaster
   
   @check_interval :timer.seconds(30)
   @anomaly_detection_window :timer.minutes(15)
@@ -481,7 +481,10 @@ defmodule RubberDuck.LLMPerformanceAlerting do
     send_alert_notifications(alert)
     
     # Broadcast alert event
-    EventBroadcaster.broadcast_event("alert.triggered", alert)
+    EventBroadcaster.broadcast_async(%{
+      topic: "alert.triggered",
+      payload: alert
+    })
     
     Logger.warning("Alert triggered: #{alert.type} - #{alert.title}")
     
@@ -804,7 +807,10 @@ defmodule RubberDuck.LLMPerformanceAlerting do
         }
         
         :ets.insert(:active_alerts, {alert_id, updated_alert})
-        EventBroadcaster.broadcast_event("alert.acknowledged", updated_alert)
+        EventBroadcaster.broadcast_async(%{
+          topic: "alert.acknowledged",
+          payload: updated_alert
+        })
         
         {:ok, updated_alert}
       

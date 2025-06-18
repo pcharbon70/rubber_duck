@@ -10,7 +10,7 @@ defmodule RubberDuck.EventBroadcasting.ClusterEventCoordinator do
   use GenServer
   require Logger
   
-  alias RubberDuck.EventBroadcasting.{EventBroadcaster, MetricsCollector}
+  alias RubberDuck.EventBroadcasting.EventBroadcaster
   alias RubberDuck.LoadBalancing.{LoadBalancer, FailoverManager}
   
   @type node_info :: %{

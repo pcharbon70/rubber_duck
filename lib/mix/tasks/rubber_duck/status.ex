@@ -105,7 +105,7 @@ defmodule Mix.Tasks.RubberDuck.Status do
       _ -> 
         Map.put(base_status, :error, "Unknown check component: #{check_component}")
     end
-    |> add_verbose_info(options[:verbose])
+    |> add_verbose_info(options[:verbose] || false)
     |> determine_overall_health()
   end
 
@@ -157,7 +157,7 @@ defmodule Mix.Tasks.RubberDuck.Status do
       case ConfigManager.load_config() do
         {:ok, config} ->
           # Test session manager initialization
-          case SessionManager.init(config) do
+          case SessionManager.initialize(config) do
             {:ok, session_state} ->
               # Test session creation and deletion
               case SessionManager.create_session("health_check", %{}, session_state) do

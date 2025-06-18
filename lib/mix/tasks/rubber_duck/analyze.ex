@@ -43,7 +43,6 @@ defmodule Mix.Tasks.RubberDuck.Analyze do
   use Mix.Task
 
   alias RubberDuck.CodingAssistant.EngineRegistry
-  alias RubberDuck.Interface.CLI.ResponseFormatter
 
   @switches [
     format: :string,

@@ -216,10 +216,6 @@ defmodule RubberDuck.CacheManager do
     "Precomputed result for: #{query}"
   end
   
-  defp calculate_hit_rate(%{hits: hits, misses: misses}) when hits + misses > 0 do
-    Float.round(hits / (hits + misses) * 100, 2)
-  end
-  defp calculate_hit_rate(_), do: 0.0
 
   defp calculate_hit_rate_from_nebulex(cache_stats) do
     # Calculate overall hit rate from L1 and L2 stats
@@ -236,18 +232,6 @@ defmodule RubberDuck.CacheManager do
     end
   end
   
-  defp estimate_memory_usage do
-    # Get size from Nebulex stats if available
-    cache_stats = Cache.cache_stats(:multilevel)
-    l1_stats = cache_stats[:l1] || %{}
-    l2_stats = cache_stats[:l2] || %{}
-    
-    # Rough estimate: 1KB average per entry
-    l1_size = Map.get(l1_stats, :size, 0)
-    l2_size = Map.get(l2_stats, :size, 0)
-    
-    (l1_size + l2_size) * 1024
-  end
   
   defp clear_matching_keys(pattern) do
     regex = Regex.compile!(pattern)
@@ -270,10 +254,6 @@ defmodule RubberDuck.CacheManager do
     Logger.debug("Skipping persistence - would persist valuable cache entries to Mnesia")
   end
   
-  defp persist_to_mnesia(_key, _value) do
-    # This would integrate with MnesiaManager in production
-    Logger.debug("Would persist to Mnesia")
-  end
   
   defp load_from_persistent(_key) do
     # This would load from Mnesia in production

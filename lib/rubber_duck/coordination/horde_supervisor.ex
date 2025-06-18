@@ -7,7 +7,6 @@ defmodule RubberDuck.Coordination.HordeSupervisor do
   use Horde.DynamicSupervisor
   require Logger
 
-  alias RubberDuck.Registry.GlobalRegistry
 
   @doc """
   Starts the distributed supervisor.
@@ -145,7 +144,7 @@ defmodule RubberDuck.Coordination.HordeSupervisor do
   Handles node leave events for process recovery.
   """
   def handle_node_leave(departed_node) do
-    Logger.warn("Handling node departure: #{departed_node}")
+    Logger.warning("Handling node departure: #{departed_node}")
     
     # Horde automatically handles process migration, but we can log it
     children_before = count_children()
@@ -156,7 +155,7 @@ defmodule RubberDuck.Coordination.HordeSupervisor do
       
       if children_after.active < children_before.active do
         lost_children = children_before.active - children_after.active
-        Logger.warn("Lost #{lost_children} children after node departure")
+        Logger.warning("Lost #{lost_children} children after node departure")
       else
         Logger.info("All children successfully migrated after node departure")
       end

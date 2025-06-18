@@ -16,7 +16,7 @@ defmodule RubberDuck.LLMPerformanceDashboard do
   
   alias RubberDuck.LLMMetricsCollector
   alias RubberDuck.LLMQueryOptimizer
-  alias RubberDuck.EventBroadcaster
+  alias RubberDuck.EventBroadcasting.EventBroadcaster
   
   @dashboard_refresh_interval :timer.seconds(5)
   @metric_history_window :timer.hours(24)

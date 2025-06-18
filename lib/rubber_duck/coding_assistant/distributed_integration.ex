@@ -34,11 +34,7 @@ defmodule RubberDuck.CodingAssistant.DistributedIntegration do
 
   require Logger
   
-  alias RubberDuck.CodingAssistant.{
-    EngineSupervisor,
-    EngineRegistry,
-    ProcessingStateMachine
-  }
+  alias RubberDuck.CodingAssistant.EngineRegistry
   alias RubberDuck.Coordination.HordeSupervisor
   alias RubberDuck.Registry.GlobalRegistry
 
@@ -142,7 +138,7 @@ defmodule RubberDuck.CodingAssistant.DistributedIntegration do
             execute_remote_request(engine_info, request)
             
           {:error, reason} ->
-            Logger.warn("No suitable engines found for capabilities #{inspect(required_capabilities)}: #{reason}")
+            Logger.warning("No suitable engines found for capabilities #{inspect(required_capabilities)}: #{reason}")
             {:error, :no_engines_available}
         end
     end
@@ -206,7 +202,7 @@ defmodule RubberDuck.CodingAssistant.DistributedIntegration do
   end
 
   def handle_node_leave(departed_node) do
-    Logger.warn("Handling node departure for engine management: #{departed_node}")
+    Logger.warning("Handling node departure for engine management: #{departed_node}")
     
     # Notify existing components
     HordeSupervisor.handle_node_leave(departed_node)
@@ -401,7 +397,7 @@ defmodule RubberDuck.CodingAssistant.DistributedIntegration do
     end)
     
     if length(missing_engines) > 0 do
-      Logger.warn("Recovering #{length(missing_engines)} missing engine types")
+      Logger.warning("Recovering #{length(missing_engines)} missing engine types")
       
       Enum.each(missing_engines, fn engine_module ->
         case start_distributed_engine(engine_module, []) do
@@ -425,7 +421,7 @@ defmodule RubberDuck.CodingAssistant.DistributedIntegration do
       # Check cluster health
       case status.cluster_wide.cluster_health do
         :unhealthy ->
-          Logger.warn("Cluster health is unhealthy: #{inspect(status)}")
+          Logger.warning("Cluster health is unhealthy: #{inspect(status)}")
           
         :degraded ->
           Logger.info("Cluster health is degraded: #{inspect(status)}")

@@ -254,7 +254,7 @@ defmodule RubberDuck.LoadBalancing.FailoverManager do
   
   @impl true
   def handle_info({:drain_timeout, provider_id}, state) do
-    Logger.warn("Drain timeout for provider #{provider_id}, forcing completion")
+    Logger.warning("Drain timeout for provider #{provider_id}, forcing completion")
     
     updated_state = complete_drain(provider_id, state, :timeout)
     {:noreply, updated_state}
@@ -338,7 +338,7 @@ defmodule RubberDuck.LoadBalancing.FailoverManager do
     
     case find_failover_target(provider_id, state) do
       {:ok, target_provider} ->
-        Logger.warn("Executing #{strategy} failover from #{provider_id} to #{target_provider}")
+        Logger.warning("Executing #{strategy} failover from #{provider_id} to #{target_provider}")
         
         case perform_failover_strategy(provider_id, target_provider, strategy, state) do
           {:ok, updated_state} ->

@@ -9,9 +9,8 @@ defmodule RubberDuck.Interface.Gateway do
 
   use GenServer
 
-  alias RubberDuck.Interface.{Behaviour, ErrorHandler, Transformer}
+  alias RubberDuck.Interface.{ErrorHandler, Transformer}
   alias RubberDuck.EventBroadcasting.EventBroadcaster
-  alias RubberDuck.EventSchemas
 
   require Logger
 

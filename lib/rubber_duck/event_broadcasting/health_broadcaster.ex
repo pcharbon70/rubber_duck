@@ -10,8 +10,8 @@ defmodule RubberDuck.EventBroadcasting.HealthBroadcaster do
   use GenServer
   require Logger
   
-  alias RubberDuck.EventBroadcasting.{EventBroadcaster, MetricsCollector}
-  alias RubberDuck.LoadBalancing.{CircuitBreaker, FailoverManager}
+  alias RubberDuck.EventBroadcasting.EventBroadcaster
+  alias RubberDuck.LoadBalancing.CircuitBreaker
   
   @type health_status :: %{
     provider_id: term(),
