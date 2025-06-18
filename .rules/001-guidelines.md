@@ -42,6 +42,20 @@ Always use `package_docs_search` to find relevant documentation before beginning
 - Skipping the feature plan document
 - Starting implementation without approval
 
+## Code Quality
+
+**Unused Variables**: Always prefix unused variables with underscore to avoid compiler warnings.
+- Use `_variable` instead of `variable` when the parameter is required but not used
+- Examples: `_state`, `_config`, `_opts`, `_context`
+- This follows Elixir conventions and keeps code clean
+
+**Unreachable Code**: Avoid unreachable clauses and impossible matches.
+- Review function clauses to ensure all patterns are reachable
+- Remove or reorder clauses that can never match due to previous patterns
+- Use `@dialyzer` annotations if intentional (rare cases)
+- Common causes: overly broad patterns, incorrect return type assumptions
+- Always check function return types match what clauses expect
+
 ## Don't start or stop phoenix applications
 
 Never attempt to start or stop a phoenix application.
