@@ -325,6 +325,7 @@ Purpose: Establish integration points with existing interface layer and prepare 
 - [ ] Implement command result formatting across interfaces
 - [ ] Create progress tracking and status updates
 - [ ] Add command cancellation and timeout handling
+- [ ] Migrate existing Mix tasks to use distributed commands subsystem while maintaining backward compatibility
 
 ## Phase 9: Interface Layer Abstraction ☐
 
