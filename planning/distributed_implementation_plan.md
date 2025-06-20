@@ -420,3 +420,65 @@ Purpose: Validate the distributed system's performance under realistic load cond
 - [ ] Validate data consistency under concurrent load
 - [ ] Optimize resource utilization and bottlenecks
 - [ ] Create capacity planning and scaling guidelines
+
+## Phase 11: MemoryOS Integration Subsystem ☐
+
+This phase implements a hierarchical memory system based on MemoryOS principles to enhance context retention and personalization across the distributed AI assistant. The implementation leverages the existing Mnesia infrastructure while introducing a three-tier memory hierarchy (STM, MTM, LPM) with heat-based relevance scoring and semantic retrieval capabilities. The system enables the AI assistant to maintain long-term context across sessions, learn user preferences, and provide increasingly personalized assistance while building upon the established distributed architecture.
+
+### 11.1 Core Memory Infrastructure and Schema ☐
+Purpose: Establish the foundational memory system architecture with Mnesia schema extensions and basic storage patterns that integrate with the existing distributed infrastructure.
+
+- [ ] Extend Mnesia schema with DialoguePage table for short-term memory storage
+- [ ] Create DialogueSegment table for mid-term memory with topic summarization
+- [ ] Add UserPersona and AgentPersona tables for long-term personalization data
+- [ ] Implement STM GenServer with FIFO queue management and capacity limits
+- [ ] Create distributed memory synchronization using existing Mnesia replication
+- [ ] Add LLM integration for embedding generation and keyword extraction
+- [ ] Implement basic memory storage patterns with transaction safety
+- [ ] Create memory configuration system with runtime adjustments
+- [ ] Add telemetry hooks for memory operation monitoring
+- [ ] Establish memory cleanup and maintenance procedures
+
+### 11.2 Mid-Term Memory and Heat-Based Management ☐
+Purpose: Implement sophisticated memory promotion and retrieval mechanisms using heat-based scoring to identify and retain relevant conversational segments across sessions.
+
+- [ ] Implement DialogueSegment creation with LLM-powered topic summarization
+- [ ] Add Fscore calculation combining cosine similarity and Jaccard metrics
+- [ ] Create heat score computation with recency, frequency, and interaction weighting
+- [ ] Build segment eviction logic based on configurable heat thresholds
+- [ ] Implement MTM-to-LPM promotion for high-value conversational patterns
+- [ ] Create two-stage retrieval process (segment selection followed by page retrieval)
+- [ ] Add segment merging and splitting logic for optimal memory organization
+- [ ] Implement background tasks for segment maintenance and optimization
+- [ ] Create heat decay mechanisms for aging conversational relevance
+- [ ] Add segment metadata enrichment with user context and preferences
+
+### 11.3 Long-Term Memory and Personalization ☐
+Purpose: Develop comprehensive user and agent personalization capabilities that enable the AI assistant to learn and adapt to individual user preferences and interaction patterns over time.
+
+- [ ] Design UserPersona schema with profile attributes and knowledge base management
+- [ ] Implement AgentPersona system for session-specific behavioral adaptations
+- [ ] Add 90-dimensional trait vector system for personality modeling
+- [ ] Create knowledge base management with queue-based factual information storage
+- [ ] Implement trait extraction and evolution using LLM analysis of interactions
+- [ ] Build semantic search capabilities for LPM retrieval with embedding similarity
+- [ ] Add trait updating mechanisms based on user feedback and interaction patterns
+- [ ] Create persona-aware response generation and context enrichment
+- [ ] Implement privacy controls and user data management for personalization
+- [ ] Add persona export and import capabilities for user data portability
+
+### 11.4 Engine Integration and Performance Optimization ☐
+Purpose: Integrate the memory system with existing coding assistance engines while optimizing performance for both single-node and distributed deployments through intelligent caching and resource management.
+
+- [ ] Create macro-based integration pattern for existing coding assistance engines
+- [ ] Add memory context retrieval and prompt enrichment for ExplanationEngine
+- [ ] Integrate memory system with CodeAnalyser for pattern learning and improvement
+- [ ] Implement Nebulex caching layer for memory retrieval optimization
+- [ ] Add configuration management with feature flags and runtime adjustments
+- [ ] Create memory usage monitoring and alerting systems
+- [ ] Implement performance benchmarking and optimization tools
+- [ ] Add circuit breakers and fallback mechanisms for LLM failures
+- [ ] Optimize memory operations for single-node deployments
+- [ ] Create comprehensive test suite for memory system reliability
+- [ ] Add memory system documentation and usage examples
+- [ ] Implement gradual rollout mechanisms for memory feature deployment
