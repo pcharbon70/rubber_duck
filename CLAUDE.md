@@ -39,9 +39,6 @@ If you're unsure about:
 3. "CRITICAL RULES" section is absolute - no exceptions
 4. If unsure, default to asking me
 
-## Test-Driven Development (TDD)
-{{include: .rules/tdd.md}}
-
 ## Features 
 {{include: .rules/feature.md}}
 
@@ -50,3 +47,9 @@ If you're unsure about:
 
 ## Fixes 
 {{include: .rules/fix.md}}
+
+## Generating code
+{{include: .rules/code.md}}
+
+## Testing
+{{include: .rules/tests.md}}
