@@ -8,8 +8,14 @@ defmodule RubberDuckStorage.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      # Starts a worker by calling: RubberDuckStorage.Worker.start_link(arg)
-      # {RubberDuckStorage.Worker, arg}
+      # Database repository
+      RubberDuckStorage.Repo,
+      
+      # Context management GenServer
+      RubberDuckStorage.ContextManager,
+      
+      # Caching layer
+      RubberDuckStorage.Cache
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
