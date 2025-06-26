@@ -79,6 +79,14 @@
 
 ## PHASE 3: IMPLEMENTATION
 
+MANDATORY BEFORE ANY IMPLEMENTATION:
+
+1. Create feature branch: git checkout -b feature/<section-number>-<feature-name>
+2. Example: git checkout -b feature/1.3-initial-clustering-infrastructure
+3. Verify you are on the feature branch: git branch
+4. ALL implementation work MUST happen on this feature branch
+5. Keep main branch clean for other work
+
 ### Step 3.1: Set Up Tracking
 **REQUIRED**:
 1. Use TodoWrite to create tasks from implementation checklist
