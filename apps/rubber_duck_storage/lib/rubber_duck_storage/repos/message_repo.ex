@@ -39,7 +39,7 @@ defmodule RubberDuckStorage.Repos.MessageRepo do
   @doc """
   Creates a message from a RubberDuckCore.Message struct.
   """
-  def create(%CoreMessage{} = core_message, conversation_id) do
+  def add(%CoreMessage{} = core_message, conversation_id) do
     attrs = %{
       id: core_message.id,
       role: core_message.role,
@@ -50,27 +50,25 @@ defmodule RubberDuckStorage.Repos.MessageRepo do
       conversation_id: conversation_id
     }
 
-    %Message{}
-    |> Message.create_changeset(attrs)
+    Message.create_changeset(attrs)
     |> Repo.insert()
   end
 
   @doc """
   Creates a message from attributes.
   """
-  def create(attrs) when is_map(attrs) do
-    %Message{}
-    |> Message.create_changeset(attrs)
+  def add(attrs) when is_map(attrs) do
+    Message.create_changeset(attrs)
     |> Repo.insert()
   end
 
   @doc """
   Creates multiple messages in a single transaction (batching).
   """
-  def create_batch(messages_attrs) when is_list(messages_attrs) do
+  def add_batch(messages_attrs) when is_list(messages_attrs) do
     Repo.transaction(fn ->
       Enum.map(messages_attrs, fn attrs ->
-        case create(attrs) do
+        case add(attrs) do
           {:ok, message} -> message
           {:error, changeset} -> Repo.rollback(changeset)
         end
@@ -81,7 +79,7 @@ defmodule RubberDuckStorage.Repos.MessageRepo do
   @doc """
   Creates multiple messages from CoreMessage structs.
   """
-  def create_batch_from_core(core_messages, conversation_id) when is_list(core_messages) do
+  def add_batch_from_core(core_messages, conversation_id) when is_list(core_messages) do
     messages_attrs = 
       Enum.map(core_messages, fn core_message ->
         %{
@@ -95,42 +93,36 @@ defmodule RubberDuckStorage.Repos.MessageRepo do
         }
       end)
 
-    create_batch(messages_attrs)
+    add_batch(messages_attrs)
   end
 
   @doc """
-  Updates a message.
+  Changes a message by struct or id.
   """
-  def update(%Message{} = message, attrs) do
+  def change(%Message{} = message, attrs) do
     message
     |> Message.changeset(attrs)
     |> Repo.update()
   end
 
-  @doc """
-  Updates a message by id.
-  """
-  def update(id, attrs) when is_binary(id) do
+  def change(id, attrs) when is_binary(id) do
     case get(id) do
       nil -> {:error, :not_found}
-      message -> update(message, attrs)
+      message -> change(message, attrs)
     end
   end
 
   @doc """
-  Deletes a message.
+  Removes a message by struct or id.
   """
-  def delete(%Message{} = message) do
+  def remove(%Message{} = message) do
     Repo.delete(message)
   end
 
-  @doc """
-  Deletes a message by id.
-  """
-  def delete(id) when is_binary(id) do
+  def remove(id) when is_binary(id) do
     case get(id) do
       nil -> {:error, :not_found}
-      message -> delete(message)
+      message -> remove(message)
     end
   end
 

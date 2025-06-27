@@ -84,6 +84,11 @@ defmodule RubberDuckEngines.Engines.TestingEngine do
     {:healthy, diagnostics, state}
   end
 
+  @impl true
+  def handle_config_change(_new_config, state) do
+    {:ok, state}
+  end
+
   # Private functions for test analysis
 
   defp analyze_test_coverage(code_content, test_content) do

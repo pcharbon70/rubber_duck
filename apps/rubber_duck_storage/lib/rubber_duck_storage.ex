@@ -44,7 +44,7 @@ defmodule RubberDuckStorage do
   @doc """
   Creates a conversation with messages in a single transaction.
   """
-  defdelegate create_conversation_with_messages(conversation, messages), 
+  defdelegate add_conversation_with_messages(conversation, messages), 
     to: Transaction
 
   @doc """
@@ -66,7 +66,7 @@ defmodule RubberDuckStorage do
   @doc """
   Updates a conversation.
   """
-  defdelegate update_conversation(id, attrs), to: ConversationRepo, as: :update
+  defdelegate change_conversation(id, attrs), to: ConversationRepo, as: :change
 
   @doc """
   Archives a conversation and related data.
@@ -84,19 +84,19 @@ defmodule RubberDuckStorage do
   @doc """
   Creates a message.
   """
-  defdelegate create_message(attrs), to: MessageRepo, as: :create
+  defdelegate add_message(attrs), to: MessageRepo, as: :add
 
   @doc """
   Creates multiple messages in batch.
   """
-  defdelegate create_message_batch(messages_attrs), to: MessageRepo, as: :create_batch
+  defdelegate add_message_batch(messages_attrs), to: MessageRepo, as: :add_batch
 
   # Engine Session Operations
 
   @doc """
   Creates an engine session.
   """
-  defdelegate create_engine_session(attrs), to: EngineSessionRepo, as: :create
+  defdelegate add_engine_session(attrs), to: EngineSessionRepo, as: :add
 
   @doc """
   Gets engine sessions for a conversation.
@@ -131,7 +131,7 @@ defmodule RubberDuckStorage do
   @doc """
   Creates an analysis result.
   """
-  defdelegate create_analysis_result(attrs), to: AnalysisResultRepo, as: :create
+  defdelegate add_analysis_result(attrs), to: AnalysisResultRepo, as: :add
 
   @doc """
   Gets high-confidence analysis results.

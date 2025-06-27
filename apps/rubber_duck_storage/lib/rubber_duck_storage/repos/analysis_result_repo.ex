@@ -64,21 +64,20 @@ defmodule RubberDuckStorage.Repos.AnalysisResultRepo do
   end
 
   @doc """
-  Creates an analysis result.
+  Adds an analysis result.
   """
-  def create(attrs) when is_map(attrs) do
-    %AnalysisResult{}
-    |> AnalysisResult.create_changeset(attrs)
+  def add(attrs) when is_map(attrs) do
+    AnalysisResult.create_changeset(attrs)
     |> Repo.insert()
   end
 
   @doc """
-  Creates multiple analysis results in a single transaction.
+  Adds multiple analysis results in a single transaction.
   """
-  def create_batch(results_attrs) when is_list(results_attrs) do
+  def add_batch(results_attrs) when is_list(results_attrs) do
     Repo.transaction(fn ->
       Enum.map(results_attrs, fn attrs ->
-        case create(attrs) do
+        case add(attrs) do
           {:ok, result} -> result
           {:error, changeset} -> Repo.rollback(changeset)
         end
@@ -87,38 +86,32 @@ defmodule RubberDuckStorage.Repos.AnalysisResultRepo do
   end
 
   @doc """
-  Updates an analysis result.
+  Changes an analysis result by struct or id.
   """
-  def update(%AnalysisResult{} = analysis_result, attrs) do
+  def change(%AnalysisResult{} = analysis_result, attrs) do
     analysis_result
     |> AnalysisResult.changeset(attrs)
     |> Repo.update()
   end
 
-  @doc """
-  Updates an analysis result by id.
-  """
-  def update(id, attrs) when is_binary(id) do
+  def change(id, attrs) when is_binary(id) do
     case get(id) do
       nil -> {:error, :not_found}
-      analysis_result -> update(analysis_result, attrs)
+      analysis_result -> change(analysis_result, attrs)
     end
   end
 
   @doc """
-  Deletes an analysis result.
+  Removes an analysis result by struct or id.
   """
-  def delete(%AnalysisResult{} = analysis_result) do
+  def remove(%AnalysisResult{} = analysis_result) do
     Repo.delete(analysis_result)
   end
 
-  @doc """
-  Deletes an analysis result by id.
-  """
-  def delete(id) when is_binary(id) do
+  def remove(id) when is_binary(id) do
     case get(id) do
       nil -> {:error, :not_found}
-      analysis_result -> delete(analysis_result)
+      analysis_result -> remove(analysis_result)
     end
   end
 

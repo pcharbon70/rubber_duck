@@ -84,6 +84,11 @@ defmodule RubberDuckEngines.Engines.DocumentationEngine do
     {:healthy, diagnostics, state}
   end
 
+  @impl true
+  def handle_config_change(_new_config, state) do
+    {:ok, state}
+  end
+
   # Private functions for documentation analysis
 
   defp analyze_documentation(content) do
