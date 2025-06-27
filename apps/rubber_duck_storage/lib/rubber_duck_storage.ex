@@ -1,12 +1,13 @@
 defmodule RubberDuckStorage do
   @moduledoc """
-  RubberDuckStorage provides comprehensive data persistence for the RubberDuck system.
+  RubberDuckStorage provides comprehensive project-based data persistence for the RubberDuck system.
 
   This module serves as the main API for interacting with the storage layer,
   providing convenient access to:
 
-  - Conversation and message persistence
-  - Engine session and analysis result storage
+  - Project-based data organization and isolation
+  - Conversation and message persistence within project scope
+  - Engine session and analysis result storage with project context
   - Context management and versioning
   - Caching and performance optimization
   - Transaction helpers for complex operations
@@ -14,20 +15,29 @@ defmodule RubberDuckStorage do
   ## Key Components
 
   - `RubberDuckStorage.Repo` - Main Ecto repository
-  - `RubberDuckStorage.Repos.*` - Specialized repository modules
+  - `RubberDuckStorage.Repository` - Unified repository with project-scoped operations
   - `RubberDuckStorage.ContextManager` - Context persistence and versioning
   - `RubberDuckStorage.Cache` - Multi-layer caching system
   - `RubberDuckStorage.Transaction` - Transaction helpers
+
+  ## Project-Based Architecture
+
+  All data operations are scoped to projects, providing natural data isolation
+  and organization. Each project contains its own set of conversations, messages,
+  engine sessions, and analysis results.
 
   ## Usage
 
   The storage layer integrates with RubberDuckCore data structures and protocols:
 
-      # Create a conversation with messages
+      # Create a project first
+      {:ok, project} = RubberDuckStorage.add_project(%{name: "My Project"})
+
+      # Create a conversation with messages within the project
       conversation = RubberDuckCore.Conversation.new(title: "My Chat")
       messages = [RubberDuckCore.Message.user("Hello")]
       
-      {:ok, result} = RubberDuckStorage.create_conversation_with_messages(conversation, messages)
+      {:ok, result} = RubberDuckStorage.add_conversation_with_messages(project.id, conversation, messages)
 
       # Store and retrieve context
       context = %{user_preferences: %{theme: "dark"}}
@@ -36,108 +46,142 @@ defmodule RubberDuckStorage do
 
   """
 
-  alias RubberDuckStorage.{Repo, Cache, ContextManager, Transaction}
-  alias RubberDuckStorage.Repos.{ConversationRepo, MessageRepo, EngineSessionRepo, AnalysisResultRepo}
+  alias RubberDuckStorage.{Repo, Repository, Cache, ContextManager, Transaction}
 
-  # Conversation Operations
+  # Project Operations
+
+  @doc """
+  Gets a project by ID.
+  """
+  defdelegate get_project(id), to: Repository
+
+  @doc """
+  Lists projects with optional filtering.
+  """
+  defdelegate list_projects(opts \\ []), to: Repository
+
+  @doc """
+  Creates a project.
+  """
+  defdelegate add_project(attrs), to: Repository
+
+  @doc """
+  Updates a project.
+  """
+  defdelegate change_project(id, attrs), to: Repository
+
+  @doc """
+  Archives a project.
+  """
+  defdelegate archive_project(id), to: Repository
+
+  # Conversation Operations (Project-scoped)
 
   @doc """
   Creates a conversation with messages in a single transaction.
   """
-  defdelegate add_conversation_with_messages(conversation, messages), 
+  defdelegate add_conversation_with_messages(project_id, conversation, messages), 
     to: Transaction
 
   @doc """
-  Gets a conversation by ID.
+  Gets a conversation by ID within project scope.
   """
-  defdelegate get_conversation(id), to: ConversationRepo, as: :get
+  defdelegate get_conversation(project_id, conversation_id), to: Repository
 
   @doc """
-  Gets a conversation with messages preloaded.
+  Gets a conversation with messages preloaded within project scope.
   """
-  defdelegate get_conversation_with_messages(id), 
-    to: ConversationRepo, as: :get_with_messages
+  defdelegate get_conversation_with_messages(project_id, conversation_id), 
+    to: Repository
 
   @doc """
-  Lists conversations with optional filtering.
+  Lists conversations for a project with optional filtering.
   """
-  defdelegate list_conversations(opts \\ []), to: ConversationRepo, as: :list
+  defdelegate list_conversations(project_id, opts \\ []), to: Repository
 
   @doc """
-  Updates a conversation.
+  Updates a conversation within project scope.
   """
-  defdelegate change_conversation(id, attrs), to: ConversationRepo, as: :change
+  defdelegate change_conversation(project_id, conversation_id, attrs), to: Repository
 
   @doc """
-  Archives a conversation and related data.
+  Archives a conversation and related data within project scope.
   """
-  defdelegate archive_conversation(id), to: Transaction
+  defdelegate archive_conversation(project_id, conversation_id), to: Transaction
 
-  # Message Operations
+  # Message Operations (Project-scoped)
 
   @doc """
-  Gets messages for a conversation.
+  Gets messages for a conversation within project scope.
   """
-  defdelegate get_messages_for_conversation(conversation_id, opts \\ []), 
-    to: MessageRepo, as: :list_for_conversation
+  defdelegate list_messages(project_id, conversation_id, opts \\ []), to: Repository
 
   @doc """
-  Creates a message.
+  Creates a message within project scope.
   """
-  defdelegate add_message(attrs), to: MessageRepo, as: :add
+  defdelegate add_message(project_id, conversation_id, attrs), to: Repository
 
   @doc """
-  Creates multiple messages in batch.
+  Creates multiple messages in batch within project scope.
   """
-  defdelegate add_message_batch(messages_attrs), to: MessageRepo, as: :add_batch
+  defdelegate add_messages_batch(project_id, conversation_id, messages_attrs), to: Repository
 
-  # Engine Session Operations
-
-  @doc """
-  Creates an engine session.
-  """
-  defdelegate add_engine_session(attrs), to: EngineSessionRepo, as: :add
+  # Engine Session Operations (Project-scoped)
 
   @doc """
-  Gets engine sessions for a conversation.
+  Creates an engine session within project scope.
   """
-  defdelegate get_engine_sessions_for_conversation(conversation_id, opts \\ []), 
-    to: EngineSessionRepo, as: :list_for_conversation
+  defdelegate add_engine_session(project_id, attrs), to: Repository
 
   @doc """
-  Starts an engine session.
+  Gets engine sessions for a project.
   """
-  defdelegate start_engine_session(id), to: EngineSessionRepo, as: :start
+  defdelegate list_engine_sessions(project_id, opts \\ []), to: Repository
 
   @doc """
-  Completes an engine session.
+  Gets engine sessions for a conversation within project scope.
   """
-  defdelegate complete_engine_session(id), to: EngineSessionRepo, as: :complete
+  defdelegate list_engine_sessions_for_conversation(project_id, conversation_id, opts \\ []), 
+    to: Repository
 
   @doc """
-  Completes an engine session with final results.
+  Starts an engine session within project scope.
   """
-  defdelegate complete_engine_session_with_results(session_id, results_attrs), 
+  defdelegate start_engine_session(project_id, session_id), to: Repository
+
+  @doc """
+  Completes an engine session within project scope.
+  """
+  defdelegate complete_engine_session(project_id, session_id), to: Repository
+
+  @doc """
+  Completes an engine session with final results within project scope.
+  """
+  defdelegate complete_engine_session_with_results(project_id, session_id, results_attrs), 
     to: Transaction
 
-  # Analysis Result Operations
+  # Analysis Result Operations (Project-scoped)
 
   @doc """
-  Gets analysis results for an engine session.
+  Gets analysis results for a project.
   """
-  defdelegate get_analysis_results_for_session(session_id, opts \\ []), 
-    to: AnalysisResultRepo, as: :list_for_engine_session
+  defdelegate list_analysis_results(project_id, opts \\ []), to: Repository
 
   @doc """
-  Creates an analysis result.
+  Gets analysis results for an engine session within project scope.
   """
-  defdelegate add_analysis_result(attrs), to: AnalysisResultRepo, as: :add
+  defdelegate list_analysis_results_for_session(project_id, session_id, opts \\ []), 
+    to: Repository
 
   @doc """
-  Gets high-confidence analysis results.
+  Creates an analysis result within project scope.
   """
-  defdelegate get_high_confidence_results(threshold \\ 0.8, opts \\ []), 
-    to: AnalysisResultRepo, as: :get_high_confidence
+  defdelegate add_analysis_result(project_id, session_id, attrs), to: Repository
+
+  @doc """
+  Creates multiple analysis results in batch within project scope.
+  """
+  defdelegate add_analysis_results_batch(project_id, session_id, results_attrs), to: Repository
 
   # Context Management
 
