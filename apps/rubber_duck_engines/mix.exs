@@ -22,7 +22,8 @@ defmodule RubberDuckEngines.MixProject do
 
       # Docs
       name: "RubberDuck Engines",
-      description: "Extensible analysis engine framework for code analysis, documentation, and testing for RubberDuck",
+      description:
+        "Extensible analysis engine framework for code analysis, documentation, and testing for RubberDuck",
       source_url: @source_url,
       homepage_url: @source_url,
       docs: [
@@ -49,7 +50,7 @@ defmodule RubberDuckEngines.MixProject do
       # Umbrella dependencies
       {:rubber_duck_core, in_umbrella: true},
       {:rubber_duck_storage, in_umbrella: true},
-      
+
       # Analysis dependencies
       {:jason, "~> 1.4"}
     ]

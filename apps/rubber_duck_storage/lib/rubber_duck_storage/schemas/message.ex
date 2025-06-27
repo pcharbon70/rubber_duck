@@ -8,13 +8,13 @@ defmodule RubberDuckStorage.Schemas.Message do
   @foreign_key_type :string
 
   schema "messages" do
-    field :role, Ecto.Enum, values: [:user, :assistant, :system], default: :user
-    field :content, :string
-    field :content_type, Ecto.Enum, values: [:text, :code, :error, :analysis], default: :text
-    field :metadata, :map, default: %{}
-    field :timestamp, :utc_datetime
+    field(:role, Ecto.Enum, values: [:user, :assistant, :system], default: :user)
+    field(:content, :string)
+    field(:content_type, Ecto.Enum, values: [:text, :code, :error, :analysis], default: :text)
+    field(:metadata, :map, default: %{})
+    field(:timestamp, :utc_datetime)
 
-    belongs_to :conversation, Conversation, foreign_key: :conversation_id, type: :string
+    belongs_to(:conversation, Conversation, foreign_key: :conversation_id, type: :string)
 
     timestamps(type: :utc_datetime)
   end

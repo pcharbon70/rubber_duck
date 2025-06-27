@@ -23,7 +23,8 @@ defmodule RubberDuckWeb.MixProject do
 
       # Docs
       name: "RubberDuck Web",
-      description: "Phoenix/WebSocket communication layer for real-time multi-client support in RubberDuck",
+      description:
+        "Phoenix/WebSocket communication layer for real-time multi-client support in RubberDuck",
       source_url: @source_url,
       homepage_url: @source_url,
       docs: [
@@ -56,7 +57,7 @@ defmodule RubberDuckWeb.MixProject do
       {:jason, "~> 1.4"},
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.5"},
-      
+
       # Umbrella dependencies
       {:rubber_duck_core, in_umbrella: true},
       {:rubber_duck_engines, in_umbrella: true},

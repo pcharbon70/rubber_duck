@@ -24,10 +24,11 @@ defmodule RubberDuckCore.ProtocolImplementations do
     def from_map(map, _type) do
       {:ok, created_at} = DateTime.from_iso8601(map["created_at"])
       {:ok, updated_at} = DateTime.from_iso8601(map["updated_at"])
-      
-      messages = Enum.map(map["messages"] || [], fn msg_map ->
-        Serializable.from_map(msg_map, Message)
-      end)
+
+      messages =
+        Enum.map(map["messages"] || [], fn msg_map ->
+          Serializable.from_map(msg_map, Message)
+        end)
 
       %Conversation{
         id: map["id"],
@@ -55,7 +56,7 @@ defmodule RubberDuckCore.ProtocolImplementations do
 
     def from_map(map, _type) do
       {:ok, timestamp} = DateTime.from_iso8601(map["timestamp"])
-      
+
       %Message{
         id: map["id"],
         role: String.to_existing_atom(map["role"]),
@@ -71,14 +72,16 @@ defmodule RubberDuckCore.ProtocolImplementations do
 
   defimpl Cacheable, for: Conversation do
     def cache_key(%Conversation{id: id}), do: "conversation:#{id}"
-    def cache_ttl(_conversation), do: 3600  # 1 hour
+    # 1 hour
+    def cache_ttl(_conversation), do: 3600
     def cacheable?(%Conversation{status: :archived}), do: false
     def cacheable?(_conversation), do: true
   end
 
   defimpl Cacheable, for: Analysis do
     def cache_key(%Analysis{id: id}), do: "analysis:#{id}"
-    def cache_ttl(_analysis), do: 1800  # 30 minutes
+    # 30 minutes
+    def cache_ttl(_analysis), do: 1800
     def cacheable?(%Analysis{status: :completed}), do: true
     def cacheable?(_analysis), do: false
   end

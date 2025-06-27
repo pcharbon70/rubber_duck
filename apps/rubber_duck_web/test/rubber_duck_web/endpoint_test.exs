@@ -12,7 +12,7 @@ defmodule RubberDuckWeb.EndpointTest do
     sockets = RubberDuckWeb.Endpoint.__sockets__()
     assert is_list(sockets)
     assert length(sockets) > 0
-    
+
     # Check for our UserSocket
     socket_paths = Enum.map(sockets, fn {path, _socket, _opts} -> path end)
     assert "/socket" in socket_paths

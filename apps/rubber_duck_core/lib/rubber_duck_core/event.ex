@@ -1,7 +1,7 @@
 defmodule RubberDuckCore.Event do
   @moduledoc """
   Core event structure for the RubberDuck system.
-  
+
   Events are used for inter-app communication and system-wide notifications.
   """
 
@@ -10,14 +10,14 @@ defmodule RubberDuckCore.Event do
   @type source :: atom()
 
   @type t :: %__MODULE__{
-    id: id(),
-    type: event_type(),
-    source: source(),
-    data: map(),
-    correlation_id: String.t() | nil,
-    timestamp: DateTime.t(),
-    metadata: map()
-  }
+          id: id(),
+          type: event_type(),
+          source: source(),
+          data: map(),
+          correlation_id: String.t() | nil,
+          timestamp: DateTime.t(),
+          metadata: map()
+        }
 
   defstruct [
     :id,

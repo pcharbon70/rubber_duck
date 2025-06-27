@@ -1,7 +1,7 @@
 defmodule RubberDuckWeb.Router do
   @moduledoc """
   Router for RubberDuckWeb application.
-  
+
   Defines the HTTP routes and websocket endpoints for the RubberDuck
   coding assistant system.
   """
@@ -9,13 +9,13 @@ defmodule RubberDuckWeb.Router do
   use RubberDuckWeb, :router
 
   pipeline :api do
-    plug :accepts, ["json"]
+    plug(:accepts, ["json"])
   end
 
   scope "/api", RubberDuckWeb do
-    pipe_through :api
-    
-    get "/health", HealthController, :index
+    pipe_through(:api)
+
+    get("/health", HealthController, :index)
   end
 
   # Enable LiveDashboard in development
@@ -23,9 +23,9 @@ defmodule RubberDuckWeb.Router do
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do
-      pipe_through :api
+      pipe_through(:api)
 
-      live_dashboard "/dashboard", metrics: RubberDuckWeb.Telemetry
+      live_dashboard("/dashboard", metrics: RubberDuckWeb.Telemetry)
     end
   end
 end

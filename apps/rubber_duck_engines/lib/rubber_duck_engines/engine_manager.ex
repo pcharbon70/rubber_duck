@@ -1,7 +1,7 @@
 defmodule RubberDuckEngines.EngineManager do
   @moduledoc """
   Central manager for analysis engines in the RubberDuck system.
-  
+
   Handles engine discovery, registration, lifecycle management,
   and request routing to appropriate engines.
   """
@@ -60,10 +60,12 @@ defmodule RubberDuckEngines.EngineManager do
   def initial_state(_args) do
     # Subscribe to analysis requests from core
     PubSub.subscribe("analysis_requests")
-    
+
     %{
-      engines: %{},              # engine_module => %{pid, capabilities, config}
-      engine_health: %{},        # engine_module => health_info
+      # engine_module => %{pid, capabilities, config}
+      engines: %{},
+      # engine_module => health_info
+      engine_health: %{},
       request_queue: :queue.new(),
       metrics: %{
         total_requests: 0,
@@ -79,19 +81,19 @@ defmodule RubberDuckEngines.EngineManager do
       {:ok, pid} ->
         # Get engine capabilities
         capabilities = GenServer.call(pid, :capabilities)
-        
+
         engine_info = %{
           pid: pid,
           capabilities: capabilities,
           config: config,
           registered_at: DateTime.utc_now()
         }
-        
+
         new_engines = Map.put(state.engines, engine_module, engine_info)
         new_state = %{state | engines: new_engines}
-        
+
         {:reply, {:ok, pid}, new_state}
-      
+
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
@@ -101,19 +103,19 @@ defmodule RubberDuckEngines.EngineManager do
     case Map.get(state.engines, engine_module) do
       nil ->
         {:reply, {:error, :not_found}, state}
-      
+
       %{pid: pid} ->
         GenServer.stop(pid)
         new_engines = Map.delete(state.engines, engine_module)
         new_health = Map.delete(state.engine_health, engine_module)
         new_state = %{state | engines: new_engines, engine_health: new_health}
-        
+
         {:reply, :ok, new_state}
     end
   end
 
   def handle_call(:list_engines, _from, state) do
-    engines_info = 
+    engines_info =
       state.engines
       |> Enum.map(fn {module, info} ->
         %{
@@ -123,7 +125,7 @@ defmodule RubberDuckEngines.EngineManager do
           health: Map.get(state.engine_health, module, %{status: :unknown})
         }
       end)
-    
+
     {:reply, engines_info, state}
   end
 
@@ -133,7 +135,7 @@ defmodule RubberDuckEngines.EngineManager do
         new_metrics = update_metrics(state.metrics, :success)
         new_state = %{state | metrics: new_metrics}
         {:reply, {:ok, result}, new_state}
-      
+
       {:error, reason} ->
         new_metrics = update_metrics(state.metrics, :failure)
         new_state = %{state | metrics: new_metrics}
@@ -142,7 +144,7 @@ defmodule RubberDuckEngines.EngineManager do
   end
 
   def handle_call(:health_status, _from, state) do
-    health_checks = 
+    health_checks =
       state.engines
       |> Enum.map(fn {module, %{pid: pid}} ->
         try do
@@ -153,21 +155,22 @@ defmodule RubberDuckEngines.EngineManager do
         end
       end)
       |> Map.new()
-    
+
     new_state = %{state | engine_health: health_checks}
-    
+
     overall_status = determine_overall_health(health_checks)
+
     result = %{
       overall: overall_status,
       engines: health_checks,
       metrics: state.metrics
     }
-    
+
     {:reply, result, new_state}
   end
 
   def handle_call({:find_engines_for, analysis_type}, _from, state) do
-    matching_engines = 
+    matching_engines =
       state.engines
       |> Enum.filter(fn {_module, info} ->
         Enum.any?(info.capabilities, fn capability ->
@@ -175,7 +178,7 @@ defmodule RubberDuckEngines.EngineManager do
         end)
       end)
       |> Enum.map(fn {module, _info} -> module end)
-    
+
     {:reply, matching_engines, state}
   end
 
@@ -185,7 +188,7 @@ defmodule RubberDuckEngines.EngineManager do
     case event.type do
       :analysis_requested ->
         analysis_request = event.data.analysis_request
-        
+
         # Process async to avoid blocking
         Task.start(fn ->
           case route_analysis_request(analysis_request, state) do
@@ -194,7 +197,7 @@ defmodule RubberDuckEngines.EngineManager do
                 analysis_id: analysis_request.id,
                 result: result
               })
-            
+
             {:error, reason} ->
               PubSub.broadcast("analysis_results", :analysis_failed, %{
                 analysis_id: analysis_request.id,
@@ -202,9 +205,9 @@ defmodule RubberDuckEngines.EngineManager do
               })
           end
         end)
-        
+
         {:noreply, state}
-      
+
       _ ->
         {:noreply, state}
     end
@@ -218,18 +221,18 @@ defmodule RubberDuckEngines.EngineManager do
 
   defp route_analysis_request(%Analysis{type: analysis_type} = request, state) do
     # Find engines that can handle this analysis type
-    capable_engines = 
+    capable_engines =
       state.engines
       |> Enum.filter(fn {_module, info} ->
         Enum.any?(info.capabilities, fn capability ->
           analysis_type in capability.input_types
         end)
       end)
-    
+
     case capable_engines do
       [] ->
         {:error, "No engines available for analysis type: #{analysis_type}"}
-      
+
       [{_module, %{pid: pid}} | _] ->
         # For now, use the first available engine
         # TODO: Implement load balancing and engine selection strategy
@@ -242,27 +245,28 @@ defmodule RubberDuckEngines.EngineManager do
   end
 
   defp update_metrics(metrics, :success) do
-    %{metrics | 
-      total_requests: metrics.total_requests + 1,
-      successful_analyses: metrics.successful_analyses + 1
+    %{
+      metrics
+      | total_requests: metrics.total_requests + 1,
+        successful_analyses: metrics.successful_analyses + 1
     }
   end
 
   defp update_metrics(metrics, :failure) do
-    %{metrics | 
-      total_requests: metrics.total_requests + 1,
-      failed_analyses: metrics.failed_analyses + 1
+    %{
+      metrics
+      | total_requests: metrics.total_requests + 1,
+        failed_analyses: metrics.failed_analyses + 1
     }
   end
 
   defp determine_overall_health(health_checks) do
     statuses = health_checks |> Map.values() |> Enum.map(& &1.status)
-    
+
     cond do
       Enum.all?(statuses, &(&1 == :healthy)) -> :healthy
       Enum.any?(statuses, &(&1 == :unhealthy)) -> :degraded
       true -> :healthy
     end
   end
-
 end

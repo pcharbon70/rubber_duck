@@ -1,7 +1,7 @@
 defmodule RubberDuckEngines.EngineSupervisor do
   @moduledoc """
   Dynamic supervisor for managing analysis engine processes.
-  
+
   Handles starting, stopping, and restarting engine processes
   with proper isolation and fault tolerance.
   """
@@ -26,7 +26,7 @@ defmodule RubberDuckEngines.EngineSupervisor do
       shutdown: 5_000,
       type: :worker
     }
-    
+
     case DynamicSupervisor.start_child(__MODULE__, child_spec) do
       {:ok, pid} -> {:ok, pid}
       {:error, {:already_started, pid}} -> {:ok, pid}
@@ -41,7 +41,7 @@ defmodule RubberDuckEngines.EngineSupervisor do
     case Registry.lookup(RubberDuckEngines.Registry, engine_module) do
       [{pid, _}] ->
         DynamicSupervisor.terminate_child(__MODULE__, pid)
-      
+
       [] ->
         {:error, :not_found}
     end

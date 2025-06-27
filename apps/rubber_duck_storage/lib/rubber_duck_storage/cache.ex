@@ -17,7 +17,8 @@ defmodule RubberDuckStorage.Cache do
   @local_cache_table :rubber_duck_cache
   @cache_stats_table :rubber_duck_cache_stats
   @cleanup_interval :timer.minutes(5)
-  @default_ttl 1800  # 30 minutes
+  # 30 minutes
+  @default_ttl 1800
 
   defstruct [
     :cache_table,
@@ -128,7 +129,7 @@ defmodule RubberDuckStorage.Cache do
 
     # Optional Redis configuration
     redis_adapter = Keyword.get(opts, :redis_adapter)
-    
+
     state = %__MODULE__{
       cache_table: cache_table,
       stats_table: stats_table,
@@ -153,7 +154,7 @@ defmodule RubberDuckStorage.Cache do
           :ets.delete(state.cache_table, key)
           increment_stat(state.stats_table, :misses)
           increment_stat(state.stats_table, :evictions)
-          
+
           # Try Redis if available (currently not implemented)
           _redis_result = get_from_redis(key, state)
           {:reply, {:error, :not_found}, state}
@@ -161,7 +162,7 @@ defmodule RubberDuckStorage.Cache do
 
       [] ->
         increment_stat(state.stats_table, :misses)
-        
+
         # Try Redis if available (currently not implemented)
         _redis_result = get_from_redis(key, state)
         {:reply, {:error, :not_found}, state}
@@ -172,13 +173,13 @@ defmodule RubberDuckStorage.Cache do
   def handle_call({:put, key, value, ttl}, _from, state) do
     ttl = ttl || @default_ttl
     expires_at = DateTime.utc_now() |> DateTime.add(ttl, :second)
-    
+
     # Store in local cache
     :ets.insert(state.cache_table, {key, value, expires_at})
-    
+
     # Store in Redis if available
     put_to_redis(key, value, ttl, state)
-    
+
     Logger.debug("Cached #{key} with TTL #{ttl}s")
     {:reply, :ok, state}
   end
@@ -195,12 +196,12 @@ defmodule RubberDuckStorage.Cache do
     # Convert pattern to match spec
     match_spec = [{{pattern, :_, :_}, [], [true]}]
     keys = :ets.select(state.cache_table, match_spec)
-    
+
     Enum.each(keys, fn key ->
       :ets.delete(state.cache_table, key)
       delete_from_redis(key, state)
     end)
-    
+
     deleted_count = length(keys)
     Logger.debug("Deleted #{deleted_count} keys matching pattern: #{pattern}")
     {:reply, {:ok, deleted_count}, state}
@@ -208,13 +209,15 @@ defmodule RubberDuckStorage.Cache do
 
   @impl true
   def handle_call({:exists, key}, _from, state) do
-    exists = case :ets.lookup(state.cache_table, key) do
-      [{^key, _value, expires_at}] ->
-        DateTime.compare(DateTime.utc_now(), expires_at) == :lt
-      [] ->
-        false
-    end
-    
+    exists =
+      case :ets.lookup(state.cache_table, key) do
+        [{^key, _value, expires_at}] ->
+          DateTime.compare(DateTime.utc_now(), expires_at) == :lt
+
+        [] ->
+          false
+      end
+
     {:reply, exists, state}
   end
 
@@ -222,7 +225,7 @@ defmodule RubberDuckStorage.Cache do
   def handle_call(:stats, _from, state) do
     stats = :ets.tab2list(state.stats_table) |> Enum.into(%{})
     cache_size = :ets.info(state.cache_table, :size)
-    
+
     enhanced_stats = Map.put(stats, :cache_size, cache_size)
     {:reply, enhanced_stats, state}
   end
@@ -238,7 +241,7 @@ defmodule RubberDuckStorage.Cache do
   @impl true
   def handle_cast({:warm_cache, warming_functions}, state) do
     Logger.info("Starting cache warming with #{length(warming_functions)} functions")
-    
+
     Task.start(fn ->
       Enum.each(warming_functions, fn warming_fn ->
         try do
@@ -252,36 +255,41 @@ defmodule RubberDuckStorage.Cache do
             Logger.error("Cache warming function failed: #{inspect(error)}")
         end
       end)
-      
+
       Logger.info("Cache warming completed")
     end)
-    
+
     {:noreply, state}
   end
 
   @impl true
   def handle_info(:cleanup_expired, state) do
     now = DateTime.utc_now()
-    
+
     # Find expired entries
-    expired_keys = :ets.foldl(fn {key, _value, expires_at}, acc ->
-      if DateTime.compare(now, expires_at) == :gt do
-        [key | acc]
-      else
-        acc
-      end
-    end, [], state.cache_table)
-    
+    expired_keys =
+      :ets.foldl(
+        fn {key, _value, expires_at}, acc ->
+          if DateTime.compare(now, expires_at) == :gt do
+            [key | acc]
+          else
+            acc
+          end
+        end,
+        [],
+        state.cache_table
+      )
+
     # Delete expired entries
     Enum.each(expired_keys, fn key ->
       :ets.delete(state.cache_table, key)
       increment_stat(state.stats_table, :evictions)
     end)
-    
+
     if length(expired_keys) > 0 do
       Logger.debug("Cleaned up #{length(expired_keys)} expired cache entries")
     end
-    
+
     # Schedule next cleanup
     cleanup_timer = Process.send_after(self(), :cleanup_expired, @cleanup_interval)
     {:noreply, %{state | cleanup_timer: cleanup_timer}}
@@ -292,12 +300,14 @@ defmodule RubberDuckStorage.Cache do
     if state.cleanup_timer do
       Process.cancel_timer(state.cleanup_timer)
     end
+
     :ok
   end
 
   # Redis Integration (optional)
 
   defp get_from_redis(_key, %{redis_adapter: nil}), do: {:error, :not_available}
+
   defp get_from_redis(key, %{redis_adapter: _adapter}) do
     # This would integrate with a Redis client like Redix
     # For now, it's a placeholder for future Redis integration
@@ -306,6 +316,7 @@ defmodule RubberDuckStorage.Cache do
   end
 
   defp put_to_redis(_key, _value, _ttl, %{redis_adapter: nil}), do: :ok
+
   defp put_to_redis(key, _value, ttl, %{redis_adapter: _adapter}) do
     # This would integrate with a Redis client like Redix
     Logger.debug("Redis put attempted for key: #{key} with TTL: #{ttl}")
@@ -313,6 +324,7 @@ defmodule RubberDuckStorage.Cache do
   end
 
   defp delete_from_redis(_key, %{redis_adapter: nil}), do: :ok
+
   defp delete_from_redis(key, %{redis_adapter: _adapter}) do
     # This would integrate with a Redis client like Redix
     Logger.debug("Redis delete attempted for key: #{key}")
@@ -320,6 +332,7 @@ defmodule RubberDuckStorage.Cache do
   end
 
   defp clear_redis(%{redis_adapter: nil}), do: :ok
+
   defp clear_redis(%{redis_adapter: _adapter}) do
     # This would integrate with a Redis client like Redix
     Logger.debug("Redis clear attempted")

@@ -16,3 +16,5 @@ defmodule RubberDuck do
     :world
   end
 end
+
+# Test comment

@@ -1,11 +1,11 @@
 defmodule RubberDuckStorage.Schemas.Project do
   @moduledoc """
   Schema for projects - the top-level organizational unit for all data.
-  
+
   Projects provide data segregation and organization for conversations,
   messages, engine sessions, and analysis results.
   """
-  
+
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -15,14 +15,14 @@ defmodule RubberDuckStorage.Schemas.Project do
   @foreign_key_type :string
 
   schema "projects" do
-    field :name, :string
-    field :description, :string
-    field :settings, :map, default: %{}
-    field :archived, :boolean, default: false
-    
-    has_many :conversations, Conversation, foreign_key: :project_id
-    has_many :engine_sessions, EngineSession, foreign_key: :project_id
-    has_many :analysis_results, AnalysisResult, foreign_key: :project_id
+    field(:name, :string)
+    field(:description, :string)
+    field(:settings, :map, default: %{})
+    field(:archived, :boolean, default: false)
+
+    has_many(:conversations, Conversation, foreign_key: :project_id)
+    has_many(:engine_sessions, EngineSession, foreign_key: :project_id)
+    has_many(:analysis_results, AnalysisResult, foreign_key: :project_id)
 
     timestamps(type: :utc_datetime)
   end

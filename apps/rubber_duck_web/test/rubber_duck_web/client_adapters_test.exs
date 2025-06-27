@@ -38,12 +38,13 @@ defmodule RubberDuckWeb.ClientAdaptersTest do
         timestamp: ~U[2024-06-26 15:30:00Z],
         role: :user
       }
+
       %{message: message}
     end
 
     test "formats message for web client", %{message: message} do
       formatted = ClientAdapters.format_message(message, :web)
-      
+
       assert formatted.client_type == :web
       assert formatted.formatted_content.type == "text"
       assert formatted.formatted_content.markdown == true
@@ -52,7 +53,7 @@ defmodule RubberDuckWeb.ClientAdaptersTest do
 
     test "formats message for CLI client", %{message: message} do
       formatted = ClientAdapters.format_message(message, :cli)
-      
+
       assert formatted.client_type == :cli
       assert formatted.formatted_content == "Hello world"
       assert is_binary(formatted.timestamp_display)
@@ -60,7 +61,7 @@ defmodule RubberDuckWeb.ClientAdaptersTest do
 
     test "formats message for TUI client", %{message: message} do
       formatted = ClientAdapters.format_message(message, :tui)
-      
+
       assert formatted.client_type == :tui
       assert formatted.formatted_content.content == "Hello world"
       assert formatted.formatted_content.box_style == "normal"
@@ -70,7 +71,7 @@ defmodule RubberDuckWeb.ClientAdaptersTest do
     test "formats code content for web client", %{message: message} do
       code_message = %{message | content: "def hello, do: :world", content_type: :code}
       formatted = ClientAdapters.format_message(code_message, :web)
-      
+
       assert formatted.formatted_content.type == "code"
       assert formatted.formatted_content.highlight == true
       assert formatted.formatted_content.syntax == "elixir"
@@ -79,14 +80,14 @@ defmodule RubberDuckWeb.ClientAdaptersTest do
     test "formats error content for CLI client", %{message: message} do
       error_message = %{message | content: "Something went wrong", content_type: :error}
       formatted = ClientAdapters.format_message(error_message, :cli)
-      
+
       assert formatted.formatted_content == "ERROR: Something went wrong"
     end
 
     test "formats error content for TUI client", %{message: message} do
       error_message = %{message | content: "Something went wrong", content_type: :error}
       formatted = ClientAdapters.format_message(error_message, :tui)
-      
+
       assert formatted.formatted_content.box_style == "error"
       assert formatted.color_scheme == "red"
     end

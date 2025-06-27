@@ -1,7 +1,7 @@
 defmodule RubberDuckWeb.ClientAdapters do
   @moduledoc """
   Client adapters for different interface types in the RubberDuck system.
-  
+
   These adapters provide specialized formatting and handling for different
   client types: web, CLI, and TUI interfaces.
   """
@@ -28,15 +28,21 @@ defmodule RubberDuckWeb.ClientAdapters do
   @spec detect_client_type(map()) :: client_type()
   def detect_client_type(metadata) do
     case metadata do
-      %{"client_type" => "cli"} -> :cli
-      %{"client_type" => "tui"} -> :tui
-      %{"user_agent" => user_agent} when is_binary(user_agent) -> 
+      %{"client_type" => "cli"} ->
+        :cli
+
+      %{"client_type" => "tui"} ->
+        :tui
+
+      %{"user_agent" => user_agent} when is_binary(user_agent) ->
         if String.contains?(user_agent, "curl") or String.contains?(user_agent, "httpie") do
           :cli
         else
           :web
         end
-      _ -> :web
+
+      _ ->
+        :web
     end
   end
 end
@@ -66,7 +72,7 @@ defmodule RubberDuckWeb.ClientAdapters.WebAdapter do
 
   defp format_web_content(content, :error) do
     %{
-      type: "error", 
+      type: "error",
       content: content,
       severity: "error",
       dismissible: true
@@ -176,7 +182,8 @@ defmodule RubberDuckWeb.ClientAdapters.TUIAdapter do
     timestamp
     |> DateTime.to_time()
     |> Time.to_string()
-    |> String.slice(0..7)  # HH:MM:SS
+    # HH:MM:SS
+    |> String.slice(0..7)
   end
 
   defp determine_color_scheme(:error), do: "red"

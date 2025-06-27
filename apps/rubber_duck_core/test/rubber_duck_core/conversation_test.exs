@@ -6,7 +6,7 @@ defmodule RubberDuckCore.ConversationTest do
   describe "new/1" do
     test "creates a conversation with default values" do
       conversation = Conversation.new()
-      
+
       assert conversation.id != nil
       assert conversation.title == nil
       assert conversation.status == :active
@@ -23,9 +23,9 @@ defmodule RubberDuckCore.ConversationTest do
         status: :paused,
         context: %{project: "test"}
       ]
-      
+
       conversation = Conversation.new(attrs)
-      
+
       assert conversation.id == "test-123"
       assert conversation.title == "Test Conversation"
       assert conversation.status == :paused
@@ -37,9 +37,9 @@ defmodule RubberDuckCore.ConversationTest do
     test "adds a message to the conversation" do
       conversation = Conversation.new()
       message = Message.user("Hello")
-      
+
       updated_conversation = Conversation.add_message(conversation, message)
-      
+
       assert length(updated_conversation.messages) == 1
       assert hd(updated_conversation.messages) == message
       assert updated_conversation.updated_at != conversation.updated_at
@@ -49,9 +49,9 @@ defmodule RubberDuckCore.ConversationTest do
   describe "update_status/2" do
     test "updates the conversation status" do
       conversation = Conversation.new()
-      
+
       updated_conversation = Conversation.update_status(conversation, :completed)
-      
+
       assert updated_conversation.status == :completed
       assert updated_conversation.updated_at != conversation.updated_at
     end

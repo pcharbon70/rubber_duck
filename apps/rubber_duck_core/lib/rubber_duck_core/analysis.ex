@@ -1,7 +1,7 @@
 defmodule RubberDuckCore.Analysis do
   @moduledoc """
   Core analysis domain for the RubberDuck system.
-  
+
   This module defines the analysis data structures and operations
   used by various analysis engines in the system.
   """
@@ -11,17 +11,17 @@ defmodule RubberDuckCore.Analysis do
   @type analysis_type :: :code_review | :security | :performance | :documentation | :testing
 
   @type t :: %__MODULE__{
-    id: id(),
-    type: analysis_type(),
-    status: status(),
-    input: map(),
-    result: map() | nil,
-    error: String.t() | nil,
-    engine: atom(),
-    conversation_id: String.t() | nil,
-    created_at: DateTime.t(),
-    completed_at: DateTime.t() | nil
-  }
+          id: id(),
+          type: analysis_type(),
+          status: status(),
+          input: map(),
+          result: map() | nil,
+          error: String.t() | nil,
+          engine: atom(),
+          conversation_id: String.t() | nil,
+          created_at: DateTime.t(),
+          completed_at: DateTime.t() | nil
+        }
 
   defstruct [
     :id,
@@ -68,11 +68,7 @@ defmodule RubberDuckCore.Analysis do
   """
   @spec complete(t(), map()) :: t()
   def complete(%__MODULE__{} = analysis, result) do
-    %{analysis | 
-      status: :completed,
-      result: result,
-      completed_at: DateTime.utc_now()
-    }
+    %{analysis | status: :completed, result: result, completed_at: DateTime.utc_now()}
   end
 
   @doc """
@@ -80,11 +76,7 @@ defmodule RubberDuckCore.Analysis do
   """
   @spec fail(t(), String.t()) :: t()
   def fail(%__MODULE__{} = analysis, error) do
-    %{analysis | 
-      status: :failed,
-      error: error,
-      completed_at: DateTime.utc_now()
-    }
+    %{analysis | status: :failed, error: error, completed_at: DateTime.utc_now()}
   end
 
   defp generate_id do

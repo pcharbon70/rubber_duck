@@ -6,7 +6,7 @@ defmodule RubberDuckCore.AnalysisTest do
   describe "new/1" do
     test "creates an analysis with default values" do
       analysis = Analysis.new()
-      
+
       assert analysis.id != nil
       assert analysis.type == :code_review
       assert analysis.status == :pending
@@ -27,9 +27,9 @@ defmodule RubberDuckCore.AnalysisTest do
         input: %{code: "def hello, do: :world"},
         conversation_id: "conv-456"
       ]
-      
+
       analysis = Analysis.new(attrs)
-      
+
       assert analysis.id == "analysis-123"
       assert analysis.type == :security
       assert analysis.engine == :security_engine
@@ -41,14 +41,14 @@ defmodule RubberDuckCore.AnalysisTest do
   describe "state transitions" do
     test "start/1 marks analysis as running" do
       analysis = Analysis.new() |> Analysis.start()
-      
+
       assert analysis.status == :running
     end
 
     test "complete/2 marks analysis as completed with result" do
       result = %{score: 85, issues: []}
       analysis = Analysis.new() |> Analysis.complete(result)
-      
+
       assert analysis.status == :completed
       assert analysis.result == result
       assert %DateTime{} = analysis.completed_at
@@ -57,7 +57,7 @@ defmodule RubberDuckCore.AnalysisTest do
     test "fail/2 marks analysis as failed with error" do
       error = "Failed to parse code"
       analysis = Analysis.new() |> Analysis.fail(error)
-      
+
       assert analysis.status == :failed
       assert analysis.error == error
       assert %DateTime{} = analysis.completed_at

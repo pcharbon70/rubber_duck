@@ -8,12 +8,12 @@ defmodule RubberDuckStorage.Schemas.Conversation do
   @foreign_key_type :string
 
   schema "conversations" do
-    field :title, :string
-    field :status, Ecto.Enum, values: [:active, :paused, :completed, :archived], default: :active
-    field :context, :map, default: %{}
-    
-    belongs_to :project, Project, foreign_key: :project_id, type: :string
-    has_many :messages, Message, foreign_key: :conversation_id
+    field(:title, :string)
+    field(:status, Ecto.Enum, values: [:active, :paused, :completed, :archived], default: :active)
+    field(:context, :map, default: %{})
+
+    belongs_to(:project, Project, foreign_key: :project_id, type: :string)
+    has_many(:messages, Message, foreign_key: :conversation_id)
 
     timestamps(type: :utc_datetime)
   end

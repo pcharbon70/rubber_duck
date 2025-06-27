@@ -1,0 +1,93 @@
+#!/bin/sh
+#
+# RubberDuck Pre-commit Hook
+# Runs code quality checks before allowing commits
+#
+# This hook runs the following checks:
+# - Code formatting (mix format --check-formatted)
+# - Linting (credo --strict)
+# - Compilation with warnings as errors
+#
+# To skip this hook temporarily, use: git commit --no-verify
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_info() {
+    echo "${BLUE}ℹ${NC} $1"
+}
+
+print_success() {
+    echo "${GREEN}✅${NC} $1"
+}
+
+print_warning() {
+    echo "${YELLOW}⚠${NC} $1"
+}
+
+print_error() {
+    echo "${RED}❌${NC} $1"
+}
+
+# Check if we're in a git repository
+if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+    print_error "Not in a git repository or no commits yet"
+    exit 1
+fi
+
+# Check if this is a merge commit (skip quality checks for merges)
+if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+    print_info "Merge commit detected, skipping pre-commit quality checks"
+    exit 0
+fi
+
+# Check if mix is available
+if ! command -v mix >/dev/null 2>&1; then
+    print_error "Mix is not available. Please ensure Elixir is installed and in your PATH."
+    exit 1
+fi
+
+print_info "Running pre-commit quality checks..."
+echo
+
+# Check if there are any staged .ex, .exs files
+staged_elixir_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ex|exs)$' || true)
+
+if [ -z "$staged_elixir_files" ]; then
+    print_info "No Elixir files staged for commit, skipping quality checks"
+    exit 0
+fi
+
+print_info "Found staged Elixir files:"
+echo "$staged_elixir_files" | sed 's/^/  /'
+echo
+
+# Run quality checks
+print_info "Running code quality checks (mix quality)..."
+
+if mix quality; then
+    echo
+    print_success "All pre-commit quality checks passed!"
+    print_info "Your commit is ready to proceed."
+else
+    echo
+    print_error "Pre-commit quality checks failed!"
+    print_warning "Please fix the issues above before committing."
+    echo
+    print_info "Quick fixes you can try:"
+    print_info "  • Run ${BLUE}mix format.all${NC} to auto-fix formatting issues"
+    print_info "  • Run ${BLUE}mix quality${NC} to see the same checks"
+    print_info "  • Run ${BLUE}mix credo --strict${NC} for detailed linting feedback"
+    echo
+    print_warning "To bypass this hook temporarily (not recommended), use:"
+    print_warning "  ${YELLOW}git commit --no-verify${NC}"
+    echo
+    exit 1
+fi

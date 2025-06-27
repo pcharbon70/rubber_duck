@@ -28,7 +28,7 @@ defmodule RubberDuckStorage.RepositoryTest do
     test "can list projects" do
       # Create a test project first
       {:ok, _project} = Repository.add_project(%{name: "Test Project"})
-      
+
       assert {:ok, projects} = Repository.list_projects()
       assert is_list(projects)
       assert length(projects) >= 1
@@ -104,8 +104,9 @@ defmodule RubberDuckStorage.RepositoryTest do
 
       # Try to add message to project1's conversation from project2 scope
       message_attrs = %{role: :user, content: "Test", content_type: :text}
-      assert {:error, :conversation_not_found} = 
-        Repository.add_message(project2.id, conv1.id, message_attrs)
+
+      assert {:error, :conversation_not_found} =
+               Repository.add_message(project2.id, conv1.id, message_attrs)
     end
   end
 end

@@ -1,7 +1,7 @@
 defmodule RubberDuckEngines.Engines.TestingEngine do
   @moduledoc """
   Analysis engine for test coverage and quality assessment.
-  
+
   Analyzes test files, identifies testing gaps, and provides
   suggestions for improving test coverage and quality.
   """
@@ -20,7 +20,7 @@ defmodule RubberDuckEngines.Engines.TestingEngine do
         gaps_identified: 0
       }
     }
-    
+
     {:ok, state}
   end
 
@@ -28,12 +28,12 @@ defmodule RubberDuckEngines.Engines.TestingEngine do
   def analyze(%Analysis{type: :testing, input: input}, state) do
     code_content = Map.get(input, :code, "")
     test_content = Map.get(input, :tests, "")
-    
+
     try do
       analysis_result = analyze_test_coverage(code_content, test_content)
       gaps = identify_test_gaps(analysis_result)
       suggestions = generate_test_suggestions(gaps, analysis_result)
-      
+
       result = %{
         coverage: analysis_result.coverage,
         test_quality: analysis_result.quality,
@@ -41,15 +41,16 @@ defmodule RubberDuckEngines.Engines.TestingEngine do
         suggestions: suggestions,
         test_score: calculate_test_score(analysis_result)
       }
-      
+
       # Update metrics
-      new_metrics = %{state.metrics |
-        test_analyses: state.metrics.test_analyses + 1,
-        gaps_identified: state.metrics.gaps_identified + length(gaps)
+      new_metrics = %{
+        state.metrics
+        | test_analyses: state.metrics.test_analyses + 1,
+          gaps_identified: state.metrics.gaps_identified + length(gaps)
       }
-      
+
       new_state = %{state | metrics: new_metrics}
-      
+
       {{:ok, result}, new_state}
     catch
       error -> {{:error, "Testing analysis failed: #{inspect(error)}"}, state}
@@ -80,7 +81,7 @@ defmodule RubberDuckEngines.Engines.TestingEngine do
       gaps_identified: state.metrics.gaps_identified,
       min_coverage_threshold: state.min_test_coverage
     }
-    
+
     {:healthy, diagnostics, state}
   end
 
@@ -95,14 +96,14 @@ defmodule RubberDuckEngines.Engines.TestingEngine do
     code_functions = extract_functions(code_content)
     test_functions = extract_test_functions(test_content)
     tested_functions = identify_tested_functions(code_functions, test_content)
-    
-    coverage_percentage = 
+
+    coverage_percentage =
       if length(code_functions) > 0 do
         length(tested_functions) / length(code_functions) * 100
       else
         100
       end
-    
+
     %{
       total_functions: length(code_functions),
       tested_functions: length(tested_functions),
@@ -142,8 +143,10 @@ defmodule RubberDuckEngines.Engines.TestingEngine do
 
   defp extract_test_name(line) do
     case Regex.run(~r/test\s+"([^"]+)"/, line) do
-      [_, test_name] -> test_name
-      _ -> 
+      [_, test_name] ->
+        test_name
+
+      _ ->
         case Regex.run(~r/test\s+:([a-zA-Z_][a-zA-Z0-9_]*)/, line) do
           [_, test_name] -> test_name
           _ -> nil
@@ -161,7 +164,7 @@ defmodule RubberDuckEngines.Engines.TestingEngine do
 
   defp assess_test_quality(test_content) do
     _lines = String.split(test_content, "\n")
-    
+
     quality_metrics = %{
       has_assertions: String.contains?(test_content, "assert"),
       has_setup: String.contains?(test_content, "setup"),
@@ -169,7 +172,7 @@ defmodule RubberDuckEngines.Engines.TestingEngine do
       test_count: count_tests(test_content),
       assertion_count: count_assertions(test_content)
     }
-    
+
     calculate_quality_score(quality_metrics)
   end
 
@@ -181,7 +184,7 @@ defmodule RubberDuckEngines.Engines.TestingEngine do
 
   defp count_assertions(content) do
     assertion_patterns = ["assert", "refute", "assert_receive", "assert_raise"]
-    
+
     assertion_patterns
     |> Enum.map(fn pattern ->
       content
@@ -193,16 +196,16 @@ defmodule RubberDuckEngines.Engines.TestingEngine do
 
   defp calculate_quality_score(metrics) do
     base_score = 50
-    
+
     # Bonus for having assertions
     score = if metrics.has_assertions, do: base_score + 20, else: base_score
-    
+
     # Bonus for setup blocks
     score = if metrics.has_setup, do: score + 10, else: score
-    
+
     # Bonus for describe blocks (organization)
     score = if metrics.has_describe_blocks, do: score + 10, else: score
-    
+
     # Bonus for assertion density
     if metrics.test_count > 0 do
       assertion_density = metrics.assertion_count / metrics.test_count
@@ -215,90 +218,105 @@ defmodule RubberDuckEngines.Engines.TestingEngine do
 
   defp identify_test_gaps(analysis) do
     gaps = []
-    
+
     # Coverage gap
-    gaps = if analysis.coverage < 80 do
-      [%{
-        type: :low_coverage,
-        severity: if(analysis.coverage < 50, do: :high, else: :medium),
-        description: "Test coverage is #{analysis.coverage}% (below recommended 80%)",
-        affected_functions: analysis.untested_functions
-      } | gaps]
-    else
-      gaps
-    end
-    
+    gaps =
+      if analysis.coverage < 80 do
+        [
+          %{
+            type: :low_coverage,
+            severity: if(analysis.coverage < 50, do: :high, else: :medium),
+            description: "Test coverage is #{analysis.coverage}% (below recommended 80%)",
+            affected_functions: analysis.untested_functions
+          }
+          | gaps
+        ]
+      else
+        gaps
+      end
+
     # Missing tests for specific functions
-    gaps = if length(analysis.untested_functions) > 0 do
-      [%{
-        type: :untested_functions,
-        severity: :medium,
-        description: "#{length(analysis.untested_functions)} function(s) have no tests",
-        affected_functions: analysis.untested_functions
-      } | gaps]
-    else
-      gaps
-    end
-    
+    gaps =
+      if length(analysis.untested_functions) > 0 do
+        [
+          %{
+            type: :untested_functions,
+            severity: :medium,
+            description: "#{length(analysis.untested_functions)} function(s) have no tests",
+            affected_functions: analysis.untested_functions
+          }
+          | gaps
+        ]
+      else
+        gaps
+      end
+
     # Test quality issues
-    gaps = if analysis.quality < 70 do
-      [%{
-        type: :test_quality,
-        severity: :low,
-        description: "Test quality score is low (#{Float.round(analysis.quality, 1)}%)",
-        affected_functions: []
-      } | gaps]
-    else
-      gaps
-    end
-    
+    gaps =
+      if analysis.quality < 70 do
+        [
+          %{
+            type: :test_quality,
+            severity: :low,
+            description: "Test quality score is low (#{Float.round(analysis.quality, 1)}%)",
+            affected_functions: []
+          }
+          | gaps
+        ]
+      else
+        gaps
+      end
+
     gaps
   end
 
   defp generate_test_suggestions(gaps, analysis) do
     suggestions = []
-    
-    suggestions = if Enum.any?(gaps, &(&1.type == :low_coverage)) do
-      [
-        "Add tests for untested functions to improve coverage",
-        "Consider using property-based testing for complex functions"
-        | suggestions
-      ]
-    else
-      suggestions
-    end
-    
-    suggestions = if Enum.any?(gaps, &(&1.type == :test_quality)) do
-      quality_suggestions = [
-        "Add more assertions to verify behavior thoroughly",
-        "Use setup blocks to reduce test duplication",
-        "Organize tests with describe blocks for better structure",
-        "Test edge cases and error conditions"
-      ]
-      
-      suggestions ++ quality_suggestions
-    else
-      suggestions
-    end
-    
-    suggestions = if analysis.total_tests == 0 do
-      [
-        "Create a test file with ExUnit.Case",
-        "Start with testing the main public functions",
-        "Add both positive and negative test cases"
-        | suggestions
-      ]
-    else
-      suggestions
-    end
-    
+
+    suggestions =
+      if Enum.any?(gaps, &(&1.type == :low_coverage)) do
+        [
+          "Add tests for untested functions to improve coverage",
+          "Consider using property-based testing for complex functions"
+          | suggestions
+        ]
+      else
+        suggestions
+      end
+
+    suggestions =
+      if Enum.any?(gaps, &(&1.type == :test_quality)) do
+        quality_suggestions = [
+          "Add more assertions to verify behavior thoroughly",
+          "Use setup blocks to reduce test duplication",
+          "Organize tests with describe blocks for better structure",
+          "Test edge cases and error conditions"
+        ]
+
+        suggestions ++ quality_suggestions
+      else
+        suggestions
+      end
+
+    suggestions =
+      if analysis.total_tests == 0 do
+        [
+          "Create a test file with ExUnit.Case",
+          "Start with testing the main public functions",
+          "Add both positive and negative test cases"
+          | suggestions
+        ]
+      else
+        suggestions
+      end
+
     Enum.uniq(suggestions)
   end
 
   defp calculate_test_score(analysis) do
     coverage_score = analysis.coverage
     quality_score = analysis.quality
-    
+
     # Weighted average: 60% coverage, 40% quality
     Float.round(coverage_score * 0.6 + quality_score * 0.4, 1)
   end

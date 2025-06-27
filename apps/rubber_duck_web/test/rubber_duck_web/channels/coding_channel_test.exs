@@ -9,7 +9,7 @@ defmodule RubberDuckWeb.CodingChannelTest do
   test "channel module follows Phoenix.Channel behavior" do
     # Test that the module uses Phoenix.Channel
     assert Code.ensure_loaded?(RubberDuckWeb.CodingChannel)
-    
+
     # Check if it's a valid Phoenix.Channel implementation
     behaviours = RubberDuckWeb.CodingChannel.module_info(:attributes)[:behaviour] || []
     assert Phoenix.Channel in behaviours

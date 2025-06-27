@@ -48,7 +48,7 @@ defmodule RubberDuckCore.MixProject do
     [
       # Core dependencies
       {:jason, "~> 1.4"},
-      
+
       # Development & Testing
       {:igniter, "~> 0.6", only: [:dev, :test]}
     ]

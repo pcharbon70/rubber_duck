@@ -10,10 +10,10 @@ defmodule RubberDuckStorage.Application do
     children = [
       # Database repository
       RubberDuckStorage.Repo,
-      
+
       # Context management GenServer
       RubberDuckStorage.ContextManager,
-      
+
       # Caching layer
       RubberDuckStorage.Cache
     ]

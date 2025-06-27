@@ -8,17 +8,22 @@ defmodule RubberDuckStorage.Schemas.EngineSession do
   @foreign_key_type :string
 
   schema "engine_sessions" do
-    field :engine_type, :string
-    field :engine_config, :map, default: %{}
-    field :status, Ecto.Enum, values: [:pending, :running, :completed, :failed], default: :pending
-    field :started_at, :utc_datetime
-    field :completed_at, :utc_datetime
-    field :error_message, :string
-    field :metadata, :map, default: %{}
+    field(:engine_type, :string)
+    field(:engine_config, :map, default: %{})
 
-    belongs_to :project, Project, foreign_key: :project_id, type: :string
-    belongs_to :conversation, Conversation, foreign_key: :conversation_id, type: :string
-    has_many :analysis_results, AnalysisResult, foreign_key: :engine_session_id
+    field(:status, Ecto.Enum,
+      values: [:pending, :running, :completed, :failed],
+      default: :pending
+    )
+
+    field(:started_at, :utc_datetime)
+    field(:completed_at, :utc_datetime)
+    field(:error_message, :string)
+    field(:metadata, :map, default: %{})
+
+    belongs_to(:project, Project, foreign_key: :project_id, type: :string)
+    belongs_to(:conversation, Conversation, foreign_key: :conversation_id, type: :string)
+    has_many(:analysis_results, AnalysisResult, foreign_key: :engine_session_id)
 
     timestamps(type: :utc_datetime)
   end
@@ -26,7 +31,18 @@ defmodule RubberDuckStorage.Schemas.EngineSession do
   @doc false
   def changeset(engine_session, attrs) do
     engine_session
-    |> cast(attrs, [:id, :engine_type, :engine_config, :status, :started_at, :completed_at, :error_message, :metadata, :project_id, :conversation_id])
+    |> cast(attrs, [
+      :id,
+      :engine_type,
+      :engine_config,
+      :status,
+      :started_at,
+      :completed_at,
+      :error_message,
+      :metadata,
+      :project_id,
+      :conversation_id
+    ])
     |> validate_required([:id, :engine_type, :project_id])
     |> validate_inclusion(:status, [:pending, :running, :completed, :failed])
     |> foreign_key_constraint(:project_id)

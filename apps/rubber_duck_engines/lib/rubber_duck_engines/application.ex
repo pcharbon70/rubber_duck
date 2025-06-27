@@ -10,10 +10,10 @@ defmodule RubberDuckEngines.Application do
     children = [
       # Registry for engine process discovery
       {Registry, keys: :unique, name: RubberDuckEngines.Registry},
-      
+
       # Dynamic supervisor for engine processes
       RubberDuckEngines.EngineSupervisor,
-      
+
       # Engine manager for coordination
       {RubberDuckEngines.EngineManager, [name: RubberDuckEngines.EngineManager]}
     ]

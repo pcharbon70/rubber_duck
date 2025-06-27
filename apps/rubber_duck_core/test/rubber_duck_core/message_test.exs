@@ -6,7 +6,7 @@ defmodule RubberDuckCore.MessageTest do
   describe "new/1" do
     test "creates a message with default values" do
       message = Message.new()
-      
+
       assert message.id != nil
       assert message.role == :user
       assert message.content == ""
@@ -23,9 +23,9 @@ defmodule RubberDuckCore.MessageTest do
         content_type: :code,
         metadata: %{language: "elixir"}
       ]
-      
+
       message = Message.new(attrs)
-      
+
       assert message.id == "msg-123"
       assert message.role == :assistant
       assert message.content == "Hello!"
@@ -37,14 +37,14 @@ defmodule RubberDuckCore.MessageTest do
   describe "convenience constructors" do
     test "user/2 creates a user message" do
       message = Message.user("Hello world")
-      
+
       assert message.role == :user
       assert message.content == "Hello world"
     end
 
     test "assistant/2 creates an assistant message" do
       message = Message.assistant("Hi there", content_type: :text)
-      
+
       assert message.role == :assistant
       assert message.content == "Hi there"
       assert message.content_type == :text
@@ -52,7 +52,7 @@ defmodule RubberDuckCore.MessageTest do
 
     test "system/2 creates a system message" do
       message = Message.system("System initialized")
-      
+
       assert message.role == :system
       assert message.content == "System initialized"
     end

@@ -98,7 +98,10 @@ defmodule RubberDuckStorage.ContextManager do
       prune_timer: prune_timer
     }
 
-    Logger.info("ContextManager started with tables: #{inspect(context_table)}, #{inspect(version_table)}")
+    Logger.info(
+      "ContextManager started with tables: #{inspect(context_table)}, #{inspect(version_table)}"
+    )
+
     {:ok, state}
   end
 
@@ -120,7 +123,10 @@ defmodule RubberDuckStorage.ContextManager do
         {:reply, {:ok, version}, state}
 
       {:error, reason} ->
-        Logger.error("Failed to persist context for conversation #{conversation_id}: #{inspect(reason)}")
+        Logger.error(
+          "Failed to persist context for conversation #{conversation_id}: #{inspect(reason)}"
+        )
+
         {:reply, {:error, reason}, state}
     end
   end
@@ -163,12 +169,17 @@ defmodule RubberDuckStorage.ContextManager do
     case :ets.lookup(state.context_table, conversation_id) do
       [{^conversation_id, existing_context, _version, _timestamp}] ->
         merged_context = merge_contexts(existing_context, new_context, strategy)
-        store_result = handle_call({:store_context, conversation_id, merged_context, nil}, nil, state)
+
+        store_result =
+          handle_call({:store_context, conversation_id, merged_context, nil}, nil, state)
+
         {:reply, elem(store_result, 1), elem(store_result, 2)}
 
       [] ->
         # No existing context, store new context as initial
-        store_result = handle_call({:store_context, conversation_id, new_context, nil}, nil, state)
+        store_result =
+          handle_call({:store_context, conversation_id, new_context, nil}, nil, state)
+
         {:reply, elem(store_result, 1), elem(store_result, 2)}
     end
   end
@@ -176,18 +187,19 @@ defmodule RubberDuckStorage.ContextManager do
   @impl true
   def handle_call({:search_context, search_params}, _from, state) do
     # Search through cached contexts
-    matches = :ets.tab2list(state.context_table)
-    |> Enum.filter(fn {_conversation_id, context, _version, _timestamp} ->
-      matches_search_criteria?(context, search_params)
-    end)
-    |> Enum.map(fn {conversation_id, context, version, timestamp} ->
-      %{
-        conversation_id: conversation_id,
-        context: context,
-        version: version,
-        timestamp: timestamp
-      }
-    end)
+    matches =
+      :ets.tab2list(state.context_table)
+      |> Enum.filter(fn {_conversation_id, context, _version, _timestamp} ->
+        matches_search_criteria?(context, search_params)
+      end)
+      |> Enum.map(fn {conversation_id, context, version, timestamp} ->
+        %{
+          conversation_id: conversation_id,
+          context: context,
+          version: version,
+          timestamp: timestamp
+        }
+      end)
 
     {:reply, {:ok, matches}, state}
   end
@@ -195,8 +207,9 @@ defmodule RubberDuckStorage.ContextManager do
   @impl true
   def handle_call({:prune_context, conversation_id}, _from, state) do
     # Get all versions for this conversation
-    versions = :ets.lookup(state.version_table, conversation_id)
-    |> Enum.sort_by(fn {_id, _version, _context, timestamp} -> timestamp end, {:desc, DateTime})
+    versions =
+      :ets.lookup(state.version_table, conversation_id)
+      |> Enum.sort_by(fn {_id, _version, _context, timestamp} -> timestamp end, {:desc, DateTime})
 
     # Keep only the latest N versions
     {_keep, to_delete} = Enum.split(versions, @max_versions_per_conversation)
@@ -207,18 +220,22 @@ defmodule RubberDuckStorage.ContextManager do
     end)
 
     pruned_count = length(to_delete)
-    Logger.debug("Pruned #{pruned_count} old context versions for conversation #{conversation_id}")
+
+    Logger.debug(
+      "Pruned #{pruned_count} old context versions for conversation #{conversation_id}"
+    )
 
     {:reply, {:ok, pruned_count}, state}
   end
 
   @impl true
   def handle_call({:get_version_history, conversation_id}, _from, state) do
-    versions = :ets.lookup(state.version_table, conversation_id)
-    |> Enum.map(fn {_id, version, _context, timestamp} ->
-      %{version: version, timestamp: timestamp}
-    end)
-    |> Enum.sort_by(& &1.timestamp, {:desc, DateTime})
+    versions =
+      :ets.lookup(state.version_table, conversation_id)
+      |> Enum.map(fn {_id, version, _context, timestamp} ->
+        %{version: version, timestamp: timestamp}
+      end)
+      |> Enum.sort_by(& &1.timestamp, {:desc, DateTime})
 
     {:reply, {:ok, versions}, state}
   end
@@ -226,9 +243,10 @@ defmodule RubberDuckStorage.ContextManager do
   @impl true
   def handle_info(:prune_old_versions, state) do
     # Prune old versions across all conversations
-    all_conversations = :ets.tab2list(state.context_table)
-    |> Enum.map(fn {conversation_id, _context, _version, _timestamp} -> conversation_id end)
-    |> Enum.uniq()
+    all_conversations =
+      :ets.tab2list(state.context_table)
+      |> Enum.map(fn {conversation_id, _context, _version, _timestamp} -> conversation_id end)
+      |> Enum.uniq()
 
     Enum.each(all_conversations, fn conversation_id ->
       handle_call({:prune_context, conversation_id}, nil, state)
@@ -244,6 +262,7 @@ defmodule RubberDuckStorage.ContextManager do
     if state.prune_timer do
       Process.cancel_timer(state.prune_timer)
     end
+
     :ok
   end
 
@@ -283,6 +302,7 @@ defmodule RubberDuckStorage.ContextManager do
     Map.merge(existing, new, fn
       _key, existing_val, new_val when is_map(existing_val) and is_map(new_val) ->
         merge_contexts(existing_val, new_val, :deep_merge)
+
       _key, _existing_val, new_val ->
         new_val
     end)
@@ -313,7 +333,8 @@ defmodule RubberDuckStorage.ContextManager do
     end)
   end
 
-  defp matches_value?(context_value, search_value) when is_binary(context_value) and is_binary(search_value) do
+  defp matches_value?(context_value, search_value)
+       when is_binary(context_value) and is_binary(search_value) do
     String.contains?(String.downcase(context_value), String.downcase(search_value))
   end
 

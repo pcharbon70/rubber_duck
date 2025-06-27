@@ -1,7 +1,7 @@
 defmodule RubberDuckCore.ConversationManager do
   @moduledoc """
   GenServer for managing conversations in the RubberDuck system.
-  
+
   This server demonstrates the BaseServer pattern and provides
   conversation management functionality.
   """
@@ -52,12 +52,13 @@ defmodule RubberDuckCore.ConversationManager do
   def handle_call({:create_conversation, attrs}, _from, state) do
     conversation = Conversation.new(attrs)
     new_conversations = Map.put(state.conversations, conversation.id, conversation)
-    
-    new_state = %{state | 
-      conversations: new_conversations,
-      conversation_count: state.conversation_count + 1
+
+    new_state = %{
+      state
+      | conversations: new_conversations,
+        conversation_count: state.conversation_count + 1
     }
-    
+
     {:reply, {:ok, conversation}, new_state}
   end
 
@@ -70,14 +71,14 @@ defmodule RubberDuckCore.ConversationManager do
 
   def handle_call({:add_message, conversation_id, message}, _from, state) do
     case Map.get(state.conversations, conversation_id) do
-      nil -> 
+      nil ->
         {:reply, {:error, :conversation_not_found}, state}
-      
+
       conversation ->
         updated_conversation = Conversation.add_message(conversation, message)
         new_conversations = Map.put(state.conversations, conversation_id, updated_conversation)
         new_state = %{state | conversations: new_conversations}
-        
+
         {:reply, {:ok, updated_conversation}, new_state}
     end
   end

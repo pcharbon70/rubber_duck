@@ -1,7 +1,7 @@
 defmodule RubberDuckWeb.CodingChannel do
   @moduledoc """
   Phoenix Channel for coding assistant interactions.
-  
+
   Handles real-time communication between clients and the RubberDuck
   coding assistant system, including conversation management and
   analysis requests.
@@ -16,13 +16,13 @@ defmodule RubberDuckWeb.CodingChannel do
     if authorized?(payload) do
       # Subscribe to conversation events
       PubSub.subscribe("conversation:#{conversation_id}")
-      
+
       # Assign conversation ID to socket
       socket = assign(socket, :conversation_id, conversation_id)
-      
+
       # Get or create conversation
       conversation = get_or_create_conversation(conversation_id)
-      
+
       {:ok, %{conversation: conversation}, socket}
     else
       {:error, %{reason: "unauthorized"}}
@@ -31,16 +31,18 @@ defmodule RubberDuckWeb.CodingChannel do
 
   # Handle incoming messages from clients
   @impl true
-  def handle_in("message", %{"content" => content, "type" => type}, socket) when is_binary(content) and is_binary(type) do
+  def handle_in("message", %{"content" => content, "type" => type}, socket)
+      when is_binary(content) and is_binary(type) do
     conversation_id = socket.assigns.conversation_id
     user_id = socket.assigns.user_id
-    
+
     # Create user message
-    message = Message.user(content, 
-      content_type: String.to_existing_atom(type),
-      metadata: %{user_id: user_id}
-    )
-    
+    message =
+      Message.user(content,
+        content_type: String.to_existing_atom(type),
+        metadata: %{user_id: user_id}
+      )
+
     # Add to conversation
     case ConversationManager.add_message(ConversationManager, conversation_id, message) do
       {:ok, updated_conversation} ->
@@ -49,15 +51,15 @@ defmodule RubberDuckWeb.CodingChannel do
           message: serialize_message(message),
           conversation: serialize_conversation(updated_conversation)
         })
-        
+
         # Publish to core PubSub for processing
         PubSub.broadcast("conversation:#{conversation_id}", :message_added, %{
           conversation_id: conversation_id,
           message: message
         })
-        
+
         {:reply, {:ok, %{message: serialize_message(message)}}, socket}
-      
+
       {:error, reason} ->
         {:reply, {:error, %{reason: reason}}, socket}
     end
@@ -68,6 +70,7 @@ defmodule RubberDuckWeb.CodingChannel do
       user_id: socket.assigns.user_id,
       typing: typing
     })
+
     {:noreply, socket}
   end
 
@@ -85,17 +88,17 @@ defmodule RubberDuckWeb.CodingChannel do
           message: serialize_message(event.data.message),
           analysis: event.data.analysis
         })
-      
+
       :analysis_complete ->
         push(socket, "analysis_complete", %{
           analysis_id: event.data.analysis_id,
           result: event.data.result
         })
-      
+
       _ ->
         :ok
     end
-    
+
     {:noreply, socket}
   end
 
@@ -109,12 +112,14 @@ defmodule RubberDuckWeb.CodingChannel do
     case ConversationManager.get_conversation(ConversationManager, conversation_id) do
       {:ok, conversation} ->
         conversation
-      
+
       {:error, :not_found} ->
-        {:ok, conversation} = ConversationManager.create_conversation(ConversationManager, 
-          id: conversation_id,
-          title: "WebSocket Conversation"
-        )
+        {:ok, conversation} =
+          ConversationManager.create_conversation(ConversationManager,
+            id: conversation_id,
+            title: "WebSocket Conversation"
+          )
+
         conversation
     end
   end

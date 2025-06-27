@@ -14,7 +14,7 @@ defmodule RubberDuck.Umbrella.MixProject do
       aliases: aliases(),
       preferred_cli_env: preferred_cli_env(),
       test_coverage: [tool: ExCoveralls],
-      
+
       # Docs
       name: "RubberDuck",
       source_url: @source_url,
@@ -44,10 +44,10 @@ defmodule RubberDuck.Umbrella.MixProject do
     [
       # Setup all apps
       setup: ["deps.get", "cmd mix setup"],
-      
+
       # Run tests in all apps
       test: ["cmd mix test"],
-      
+
       # Check code quality
       quality: [
         "format --check-formatted",
@@ -55,15 +55,25 @@ defmodule RubberDuck.Umbrella.MixProject do
         "compile --warnings-as-errors",
         "cmd mix compile --warnings-as-errors"
       ],
-      
+
       # Run all checks before committing
       check: ["quality", "test"],
-      
+
       # Generate documentation
       docs: ["cmd mix docs", "docs"],
-      
+
       # Format all files
-      "format.all": ["format", "cmd mix format"]
+      "format.all": ["format", "cmd mix format"],
+
+      # Git hooks
+      "hooks.install": [
+        "run -e 'Mix.Tasks.Hooks.Install.run(System.argv())'",
+        "cmd --app rubber_duck_core mix compile"
+      ],
+      "hooks.uninstall": [
+        "run -e 'Mix.Tasks.Hooks.Uninstall.run(System.argv())'",
+        "cmd --app rubber_duck_core mix compile"
+      ]
     ]
   end
 

@@ -1,7 +1,7 @@
 defmodule RubberDuckWeb.Presence do
   @moduledoc """
   Provides presence tracking for users connected to coding channels.
-  
+
   This module tracks which users are actively connected to conversations
   and provides real-time updates when users join or leave.
   """
