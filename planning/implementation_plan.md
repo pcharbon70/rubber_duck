@@ -100,6 +100,88 @@ This section sets up essential development tools and quality assurance mechanism
 [ ] Configuration hot-reloading test
 [ ] Memory leak detection test
 
+## Phase 1.5: Repository Consolidation and Project-Based Data Organization (Week 2.5)
+
+This phase consolidates all separate repository modules into a single unified repository and introduces the concept of projects to organize and segregate conversations, messages, engine sessions, and analysis results by project context.
+
+### 1.5.1 Project Schema Design and Implementation
+
+This section introduces the project concept as the top-level organizational unit for all data.
+
+1.5.1.1. [ ] Design Project schema with fields (id, name, description, settings, created_at, updated_at)
+1.5.1.2. [ ] Create Project Ecto schema and migration
+1.5.1.3. [ ] Update Conversation schema to belong_to Project
+1.5.1.4. [ ] Update Message schema to reference Project through Conversation
+1.5.1.5. [ ] Update EngineSession schema to belong_to Project
+1.5.1.6. [ ] Update AnalysisResult schema to belong_to Project
+1.5.1.7. [ ] Add foreign key constraints and indexes for project relationships
+1.5.1.8. [ ] Create project-based data isolation queries
+1.5.1.9. [ ] Implement project settings and configuration schema
+1.5.1.10. [ ] Add project-level permissions and access control
+
+**Tests for 1.5.1:**
+[ ] Test Project schema validation and constraints
+[ ] Test all entity-to-project relationships
+[ ] Test foreign key constraint enforcement
+[ ] Test project-based data isolation
+[ ] Test project settings functionality
+[ ] Test project access control
+
+### 1.5.2 Unified Repository Implementation
+
+This section consolidates all repository modules into a single unified Repository module.
+
+1.5.2.1. [ ] Create unified Repository module structure
+1.5.2.2. [ ] Implement project operations (add, remove, change, get, list)
+1.5.2.3. [ ] Implement project-scoped conversation operations
+1.5.2.4. [ ] Implement project-scoped message operations with batch support
+1.5.2.5. [ ] Implement project-scoped engine session operations
+1.5.2.6. [ ] Implement project-scoped analysis result operations
+1.5.2.7. [ ] Create unified transaction helpers with project context
+1.5.2.8. [ ] Implement cross-entity queries within project scope
+1.5.2.9. [ ] Add project-aware caching strategy
+1.5.2.10. [ ] Implement project-level bulk operations and cleanup
+
+**Tests for 1.5.2:**
+[ ] Test all project operations
+[ ] Test project-scoped data operations
+[ ] Test cross-entity queries within projects
+[ ] Test transaction boundary correctness
+[ ] Test project data isolation
+[ ] Test bulk operations and cleanup
+[ ] Test caching effectiveness per project
+
+### 1.5.3 Migration and Legacy Repository Consolidation
+
+This section handles the migration from multiple repositories to the unified project-based repository.
+
+1.5.3.1. [ ] Create data migration scripts to add project_id to existing records
+1.5.3.2. [ ] Create default project for existing data during migration
+1.5.3.3. [ ] Update all service layer calls to use unified Repository
+1.5.3.4. [ ] Update Transaction module to use unified Repository with project context
+1.5.3.5. [ ] Remove ConversationRepo, MessageRepo, EngineSessionRepo, AnalysisResultRepo modules
+1.5.3.6. [ ] Update all tests to use unified Repository with project context
+1.5.3.7. [ ] Update core domain models to include project context
+1.5.3.8. [ ] Update inter-app communication to pass project context
+1.5.3.9. [ ] Verify all functionality works with project-scoped unified repository
+1.5.3.10. [ ] Performance test unified repository vs old repositories
+
+**Tests for 1.5.3:**
+[ ] Test data migration script correctness
+[ ] Test service layer integration with project context
+[ ] Test transaction module with unified repository
+[ ] Test all existing functionality preserved
+[ ] Test project context propagation
+[ ] Test performance meets or exceeds baseline
+[ ] Test no data leakage between projects
+
+**Phase 1.5 Integration Tests:**
+[ ] Full application functionality test with unified project-based repository
+[ ] Multi-project data isolation test
+[ ] Cross-project query prevention test
+[ ] Project-scoped transaction test
+[ ] Performance and memory usage optimization test
+
 ## Phase 2: Engine Framework and Basic Engines (Weeks 3-4)
 
 This phase implements the engine abstraction layer and creates the first set of analysis engines. Each engine will follow the established patterns while providing specific functionality.
