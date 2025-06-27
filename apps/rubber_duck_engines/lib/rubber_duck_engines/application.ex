@@ -14,6 +14,9 @@ defmodule RubberDuckEngines.Application do
       # Dynamic supervisor for engine processes
       RubberDuckEngines.EngineSupervisor,
 
+      # Engine pool supervisor with rest_for_one strategy
+      RubberDuckEngines.EnginePool.Supervisor,
+
       # Engine manager for coordination
       {RubberDuckEngines.EngineManager, [name: RubberDuckEngines.EngineManager]}
     ]
