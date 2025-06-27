@@ -46,9 +46,9 @@ defmodule RubberDuckStorage.Repos.ConversationRepo do
   end
 
   @doc """
-  Creates a conversation from a RubberDuckCore.Conversation struct.
+  Adds a conversation from a RubberDuckCore.Conversation struct or attributes.
   """
-  def create(%CoreConversation{} = core_conversation) do
+  def add(%CoreConversation{} = core_conversation) do
     attrs = %{
       id: core_conversation.id,
       title: core_conversation.title,
@@ -56,53 +56,42 @@ defmodule RubberDuckStorage.Repos.ConversationRepo do
       context: core_conversation.context
     }
 
-    %Conversation{}
-    |> Conversation.create_changeset(attrs)
+    Conversation.create_changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def add(attrs) when is_map(attrs) do
+    Conversation.create_changeset(attrs)
     |> Repo.insert()
   end
 
   @doc """
-  Creates a conversation from attributes.
+  Changes a conversation by struct or id.
   """
-  def create(attrs) when is_map(attrs) do
-    %Conversation{}
-    |> Conversation.create_changeset(attrs)
-    |> Repo.insert()
-  end
-
-  @doc """
-  Updates a conversation.
-  """
-  def update(%Conversation{} = conversation, attrs) do
+  def change(%Conversation{} = conversation, attrs) do
     conversation
     |> Conversation.changeset(attrs)
     |> Repo.update()
   end
 
-  @doc """
-  Updates a conversation by id.
-  """
-  def update(id, attrs) when is_binary(id) do
+  def change(id, attrs) when is_binary(id) do
     case get(id) do
       nil -> {:error, :not_found}
-      conversation -> update(conversation, attrs)
+      conversation -> change(conversation, attrs)
     end
   end
 
   @doc """
-  Deletes a conversation.
+  Removes a conversation by struct or id.
   """
-  def delete(%Conversation{} = conversation) do
+  def remove(%Conversation{} = conversation) do
     Repo.delete(conversation)
   end
 
-  @doc """
-  Deletes a conversation by id.
-  """
-  def delete(id) when is_binary(id) do
+  def remove(id) when is_binary(id) do
     case get(id) do
       nil -> {:error, :not_found}
-      conversation -> delete(conversation)
+      conversation -> remove(conversation)
     end
   end
 
@@ -110,7 +99,7 @@ defmodule RubberDuckStorage.Repos.ConversationRepo do
   Archives a conversation (sets status to :archived).
   """
   def archive(id) when is_binary(id) do
-    update(id, %{status: :archived})
+    change(id, %{status: :archived})
   end
 
   @doc """

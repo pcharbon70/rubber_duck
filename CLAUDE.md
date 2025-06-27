@@ -53,3 +53,8 @@ If you're unsure about:
 
 ## Testing
 {{include: .rules/tests.md}}
+
+# INTERACTION RULES
+
+## Response Guidelines
+- When asked "What is next?", I must only tell Pascal what the next step is without starting the work

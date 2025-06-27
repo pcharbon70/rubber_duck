@@ -14,7 +14,6 @@ defmodule RubberDuckStorage.ContextManager do
   require Logger
 
   alias RubberDuckStorage.Repos.ConversationRepo
-  alias RubberDuckCore.Protocols.{Serializable, Cacheable}
 
   @context_table :context_cache
   @version_table :context_versions
@@ -115,7 +114,7 @@ defmodule RubberDuckStorage.ContextManager do
     :ets.insert(state.version_table, {conversation_id, version, context, timestamp})
 
     # Persist to database
-    case ConversationRepo.update(conversation_id, %{context: serialize_context(context)}) do
+    case ConversationRepo.change(conversation_id, %{context: serialize_context(context)}) do
       {:ok, _conversation} ->
         Logger.debug("Context stored for conversation #{conversation_id}, version #{version}")
         {:reply, {:ok, version}, state}

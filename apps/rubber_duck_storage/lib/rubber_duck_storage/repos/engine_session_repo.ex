@@ -59,30 +59,26 @@ defmodule RubberDuckStorage.Repos.EngineSessionRepo do
   end
 
   @doc """
-  Creates an engine session.
+  Adds an engine session.
   """
-  def create(attrs) when is_map(attrs) do
-    %EngineSession{}
-    |> EngineSession.create_changeset(attrs)
+  def add(attrs) when is_map(attrs) do
+    EngineSession.create_changeset(attrs)
     |> Repo.insert()
   end
 
   @doc """
-  Updates an engine session.
+  Changes an engine session by struct or id.
   """
-  def update(%EngineSession{} = engine_session, attrs) do
+  def change(%EngineSession{} = engine_session, attrs) do
     engine_session
     |> EngineSession.changeset(attrs)
     |> Repo.update()
   end
 
-  @doc """
-  Updates an engine session by id.
-  """
-  def update(id, attrs) when is_binary(id) do
+  def change(id, attrs) when is_binary(id) do
     case get(id) do
       nil -> {:error, :not_found}
-      engine_session -> update(engine_session, attrs)
+      engine_session -> change(engine_session, attrs)
     end
   end
 
@@ -95,9 +91,6 @@ defmodule RubberDuckStorage.Repos.EngineSessionRepo do
     |> Repo.update()
   end
 
-  @doc """
-  Starts an engine session by id.
-  """
   def start(id) when is_binary(id) do
     case get(id) do
       nil -> {:error, :not_found}
@@ -114,9 +107,6 @@ defmodule RubberDuckStorage.Repos.EngineSessionRepo do
     |> Repo.update()
   end
 
-  @doc """
-  Completes an engine session by id.
-  """
   def complete(id) when is_binary(id) do
     case get(id) do
       nil -> {:error, :not_found}
@@ -133,9 +123,6 @@ defmodule RubberDuckStorage.Repos.EngineSessionRepo do
     |> Repo.update()
   end
 
-  @doc """
-  Fails an engine session by id.
-  """
   def fail(id, error_message) when is_binary(id) do
     case get(id) do
       nil -> {:error, :not_found}
@@ -144,19 +131,16 @@ defmodule RubberDuckStorage.Repos.EngineSessionRepo do
   end
 
   @doc """
-  Deletes an engine session.
+  Removes an engine session by struct or id.
   """
-  def delete(%EngineSession{} = engine_session) do
+  def remove(%EngineSession{} = engine_session) do
     Repo.delete(engine_session)
   end
 
-  @doc """
-  Deletes an engine session by id.
-  """
-  def delete(id) when is_binary(id) do
+  def remove(id) when is_binary(id) do
     case get(id) do
       nil -> {:error, :not_found}
-      engine_session -> delete(engine_session)
+      engine_session -> remove(engine_session)
     end
   end
 

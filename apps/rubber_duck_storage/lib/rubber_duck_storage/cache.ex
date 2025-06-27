@@ -154,21 +154,17 @@ defmodule RubberDuckStorage.Cache do
           increment_stat(state.stats_table, :misses)
           increment_stat(state.stats_table, :evictions)
           
-          # Try Redis if available
-          case get_from_redis(key, state) do
-            {:ok, value} -> {:reply, {:ok, value}, state}
-            _ -> {:reply, {:error, :not_found}, state}
-          end
+          # Try Redis if available (currently not implemented)
+          _redis_result = get_from_redis(key, state)
+          {:reply, {:error, :not_found}, state}
         end
 
       [] ->
         increment_stat(state.stats_table, :misses)
         
-        # Try Redis if available
-        case get_from_redis(key, state) do
-          {:ok, value} -> {:reply, {:ok, value}, state}
-          _ -> {:reply, {:error, :not_found}, state}
-        end
+        # Try Redis if available (currently not implemented)
+        _redis_result = get_from_redis(key, state)
+        {:reply, {:error, :not_found}, state}
     end
   end
 
@@ -302,7 +298,7 @@ defmodule RubberDuckStorage.Cache do
   # Redis Integration (optional)
 
   defp get_from_redis(_key, %{redis_adapter: nil}), do: {:error, :not_available}
-  defp get_from_redis(key, %{redis_adapter: adapter}) do
+  defp get_from_redis(key, %{redis_adapter: _adapter}) do
     # This would integrate with a Redis client like Redix
     # For now, it's a placeholder for future Redis integration
     Logger.debug("Redis get attempted for key: #{key}")
@@ -310,21 +306,21 @@ defmodule RubberDuckStorage.Cache do
   end
 
   defp put_to_redis(_key, _value, _ttl, %{redis_adapter: nil}), do: :ok
-  defp put_to_redis(key, value, ttl, %{redis_adapter: adapter}) do
+  defp put_to_redis(key, _value, ttl, %{redis_adapter: _adapter}) do
     # This would integrate with a Redis client like Redix
     Logger.debug("Redis put attempted for key: #{key} with TTL: #{ttl}")
     :ok
   end
 
   defp delete_from_redis(_key, %{redis_adapter: nil}), do: :ok
-  defp delete_from_redis(key, %{redis_adapter: adapter}) do
+  defp delete_from_redis(key, %{redis_adapter: _adapter}) do
     # This would integrate with a Redis client like Redix
     Logger.debug("Redis delete attempted for key: #{key}")
     :ok
   end
 
   defp clear_redis(%{redis_adapter: nil}), do: :ok
-  defp clear_redis(%{redis_adapter: adapter}) do
+  defp clear_redis(%{redis_adapter: _adapter}) do
     # This would integrate with a Redis client like Redix
     Logger.debug("Redis clear attempted")
     :ok
