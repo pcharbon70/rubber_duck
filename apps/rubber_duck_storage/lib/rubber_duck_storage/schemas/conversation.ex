@@ -2,7 +2,7 @@ defmodule RubberDuckStorage.Schemas.Conversation do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias RubberDuckStorage.Schemas.Message
+  alias RubberDuckStorage.Schemas.{Message, Project}
 
   @primary_key {:id, :string, []}
   @foreign_key_type :string
@@ -12,6 +12,7 @@ defmodule RubberDuckStorage.Schemas.Conversation do
     field :status, Ecto.Enum, values: [:active, :paused, :completed, :archived], default: :active
     field :context, :map, default: %{}
     
+    belongs_to :project, Project, foreign_key: :project_id, type: :string
     has_many :messages, Message, foreign_key: :conversation_id
 
     timestamps(type: :utc_datetime)
@@ -20,9 +21,10 @@ defmodule RubberDuckStorage.Schemas.Conversation do
   @doc false
   def changeset(conversation, attrs) do
     conversation
-    |> cast(attrs, [:id, :title, :status, :context])
-    |> validate_required([:id, :status])
+    |> cast(attrs, [:id, :title, :status, :context, :project_id])
+    |> validate_required([:id, :status, :project_id])
     |> validate_inclusion(:status, [:active, :paused, :completed, :archived])
+    |> foreign_key_constraint(:project_id)
     |> unique_constraint(:id, name: :conversations_pkey)
   end
 
