@@ -1,7 +1,7 @@
 defmodule RubberDuckEngines.Engine do
   @moduledoc """
   Behavior for defining analysis engines in the RubberDuck system.
-  
+
   All analysis engines must implement this behavior to provide consistent
   interfaces for discovery, configuration, and analysis capabilities.
   """
@@ -10,60 +10,60 @@ defmodule RubberDuckEngines.Engine do
   @type analysis_request :: RubberDuckCore.Analysis.t()
   @type analysis_result :: {:ok, map()} | {:error, String.t()}
   @type capability :: %{
-    name: atom(),
-    description: String.t(),
-    input_types: [atom()],
-    output_format: atom()
-  }
+          name: atom(),
+          description: String.t(),
+          input_types: [atom()],
+          output_format: atom()
+        }
   @type health_status :: :healthy | :degraded | :unhealthy
 
   @doc """
   Initializes the engine with the given configuration.
-  
+
   Returns the initial state for the engine.
   """
   @callback init_engine(config :: map()) :: {:ok, engine_state()} | {:error, String.t()}
 
   @doc """
   Performs analysis on the given request.
-  
+
   Takes an analysis request and the current engine state,
   returns the analysis result.
   """
-  @callback analyze(analysis_request(), engine_state()) :: 
-    {analysis_result(), engine_state()}
+  @callback analyze(analysis_request(), engine_state()) ::
+              {analysis_result(), engine_state()}
 
   @doc """
   Returns the capabilities of this engine.
-  
+
   Describes what types of analysis this engine can perform.
   """
   @callback capabilities() :: [capability()]
 
   @doc """
   Performs a health check on the engine.
-  
+
   Returns the current health status and any diagnostic information.
   """
-  @callback health_check(engine_state()) :: 
-    {health_status(), map(), engine_state()}
+  @callback health_check(engine_state()) ::
+              {health_status(), map(), engine_state()}
 
   @doc """
   Optional callback for handling configuration updates.
-  
+
   If not implemented, engine restarts on configuration changes.
   """
   @callback handle_config_change(new_config :: map(), engine_state()) ::
-    {:ok, engine_state()} | {:restart, map()}
+              {:ok, engine_state()} | {:restart, map()}
 
   @optional_callbacks handle_config_change: 2
 
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
       @behaviour RubberDuckEngines.Engine
-      
+
       use RubberDuckCore.BaseServer, Keyword.put(opts, :registry, RubberDuckEngines.Registry)
-      
+
       alias RubberDuckCore.Analysis
       alias RubberDuckEngines.Engine
 

@@ -1,7 +1,7 @@
 defmodule RubberDuckEngines do
   @moduledoc """
   Analysis engines for the RubberDuck coding assistant system.
-  
+
   This module provides the main API for interacting with analysis engines,
   including engine registration, analysis requests, and system monitoring.
   """
@@ -73,7 +73,7 @@ defmodule RubberDuckEngines do
       {RubberDuckEngines.Engines.DocumentationEngine, %{}},
       {RubberDuckEngines.Engines.TestingEngine, %{}}
     ]
-    
+
     Enum.map(engines, fn {engine_module, config} ->
       case register_engine(engine_module, config) do
         {:ok, pid} -> {:ok, engine_module, pid}
@@ -86,11 +86,11 @@ defmodule RubberDuckEngines do
   Creates a new analysis request.
   """
   def new_analysis(type, input, opts \\ []) do
-    Analysis.new([
+    Analysis.new(
       type: type,
       input: input,
       engine: Keyword.get(opts, :engine),
       conversation_id: Keyword.get(opts, :conversation_id)
-    ])
+    )
   end
 end

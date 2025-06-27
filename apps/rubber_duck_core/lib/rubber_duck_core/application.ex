@@ -1,7 +1,7 @@
 defmodule RubberDuckCore.Application do
   @moduledoc """
   The RubberDuckCore Application.
-  
+
   This is the main OTP application for the core business logic of the RubberDuck
   coding assistant system. It provides the central supervision tree and manages
   core services that other applications depend on.
@@ -14,7 +14,7 @@ defmodule RubberDuckCore.Application do
     children = [
       # Registry for process discovery
       {Registry, keys: :unique, name: RubberDuckCore.Registry},
-      
+
       # Core supervisor for business logic processes
       RubberDuckCore.Supervisor
     ]

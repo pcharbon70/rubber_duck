@@ -1,7 +1,7 @@
 defmodule RubberDuckStorage.Repository do
   @moduledoc """
   Unified repository for all data operations with project-based data isolation.
-  
+
   This module consolidates all separate repository modules into a single
   interface that enforces project-scoped operations for conversations,
   messages, engine sessions, and analysis results.
@@ -88,8 +88,10 @@ defmodule RubberDuckStorage.Repository do
   """
   def archive_project(id) when is_binary(id) do
     case get_project(id) do
-      nil -> {:error, :not_found}
-      project -> 
+      nil ->
+        {:error, :not_found}
+
+      project ->
         project
         |> Project.archive_changeset()
         |> Repo.update()
@@ -151,7 +153,7 @@ defmodule RubberDuckStorage.Repository do
 
   def add_conversation(project_id, attrs) when is_map(attrs) do
     attrs_with_project = Map.put(attrs, :project_id, project_id)
-    
+
     Conversation.create_changeset(attrs_with_project)
     |> Repo.insert()
   end
@@ -161,8 +163,10 @@ defmodule RubberDuckStorage.Repository do
   """
   def change_conversation(project_id, conversation_id, attrs) do
     case get_conversation(project_id, conversation_id) do
-      nil -> {:error, :not_found}
-      conversation -> 
+      nil ->
+        {:error, :not_found}
+
+      conversation ->
         conversation
         |> Conversation.changeset(attrs)
         |> Repo.update()
@@ -193,13 +197,16 @@ defmodule RubberDuckStorage.Repository do
   """
   def list_messages(project_id, conversation_id, opts \\ []) do
     # First verify the conversation belongs to the project
-    conversation_query = from(c in Conversation,
-      where: c.id == ^conversation_id and c.project_id == ^project_id,
-      select: c.id
-    )
+    conversation_query =
+      from(c in Conversation,
+        where: c.id == ^conversation_id and c.project_id == ^project_id,
+        select: c.id
+      )
 
     case Repo.one(conversation_query) do
-      nil -> {:error, :conversation_not_found}
+      nil ->
+        {:error, :conversation_not_found}
+
       _conversation_id ->
         query = from(m in Message, where: m.conversation_id == ^conversation_id)
 
@@ -218,10 +225,12 @@ defmodule RubberDuckStorage.Repository do
   def add_message(project_id, conversation_id, attrs) when is_map(attrs) do
     # First verify the conversation belongs to the project
     case get_conversation(project_id, conversation_id) do
-      nil -> {:error, :conversation_not_found}
+      nil ->
+        {:error, :conversation_not_found}
+
       _conversation ->
         attrs_with_conversation = Map.put(attrs, :conversation_id, conversation_id)
-        
+
         Message.create_changeset(attrs_with_conversation)
         |> Repo.insert()
     end
@@ -230,12 +239,15 @@ defmodule RubberDuckStorage.Repository do
   @doc """
   Adds multiple messages in batch to a conversation within project scope.
   """
-  def add_messages_batch(project_id, conversation_id, messages_attrs) when is_list(messages_attrs) do
+  def add_messages_batch(project_id, conversation_id, messages_attrs)
+      when is_list(messages_attrs) do
     # First verify the conversation belongs to the project
     case get_conversation(project_id, conversation_id) do
-      nil -> {:error, :conversation_not_found}
+      nil ->
+        {:error, :conversation_not_found}
+
       _conversation ->
-        changesets = 
+        changesets =
           Enum.map(messages_attrs, fn attrs ->
             attrs_with_conversation = Map.put(attrs, :conversation_id, conversation_id)
             Message.create_changeset(attrs_with_conversation)
@@ -297,11 +309,14 @@ defmodule RubberDuckStorage.Repository do
   def list_engine_sessions_for_conversation(project_id, conversation_id, opts \\ []) do
     # First verify the conversation belongs to the project
     case get_conversation(project_id, conversation_id) do
-      nil -> {:error, :conversation_not_found}
+      nil ->
+        {:error, :conversation_not_found}
+
       _conversation ->
-        query = from(es in EngineSession, 
-          where: es.project_id == ^project_id and es.conversation_id == ^conversation_id
-        )
+        query =
+          from(es in EngineSession,
+            where: es.project_id == ^project_id and es.conversation_id == ^conversation_id
+          )
 
         query
         |> maybe_filter_engine_sessions_by_status(opts[:status])
@@ -318,7 +333,7 @@ defmodule RubberDuckStorage.Repository do
   """
   def add_engine_session(project_id, attrs) when is_map(attrs) do
     attrs_with_project = Map.put(attrs, :project_id, project_id)
-    
+
     EngineSession.create_changeset(attrs_with_project)
     |> Repo.insert()
   end
@@ -328,7 +343,9 @@ defmodule RubberDuckStorage.Repository do
   """
   def start_engine_session(project_id, session_id) do
     case get_engine_session(project_id, session_id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       session ->
         session
         |> EngineSession.start_changeset()
@@ -341,7 +358,9 @@ defmodule RubberDuckStorage.Repository do
   """
   def complete_engine_session(project_id, session_id) do
     case get_engine_session(project_id, session_id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       session ->
         session
         |> EngineSession.complete_changeset()
@@ -354,7 +373,9 @@ defmodule RubberDuckStorage.Repository do
   """
   def fail_engine_session(project_id, session_id, error_message) do
     case get_engine_session(project_id, session_id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       session ->
         session
         |> EngineSession.fail_changeset(error_message)
@@ -367,7 +388,9 @@ defmodule RubberDuckStorage.Repository do
   """
   def change_engine_session(project_id, session_id, attrs) do
     case get_engine_session(project_id, session_id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       session ->
         session
         |> EngineSession.changeset(attrs)
@@ -419,11 +442,14 @@ defmodule RubberDuckStorage.Repository do
   def list_analysis_results_for_session(project_id, session_id, opts \\ []) do
     # First verify the session belongs to the project
     case get_engine_session(project_id, session_id) do
-      nil -> {:error, :session_not_found}
+      nil ->
+        {:error, :session_not_found}
+
       _session ->
-        query = from(ar in AnalysisResult,
-          where: ar.project_id == ^project_id and ar.engine_session_id == ^session_id
-        )
+        query =
+          from(ar in AnalysisResult,
+            where: ar.project_id == ^project_id and ar.engine_session_id == ^session_id
+          )
 
         query
         |> maybe_filter_analysis_results_by_type(opts[:result_type])
@@ -441,13 +467,15 @@ defmodule RubberDuckStorage.Repository do
   def add_analysis_result(project_id, session_id, attrs) when is_map(attrs) do
     # First verify the session belongs to the project
     case get_engine_session(project_id, session_id) do
-      nil -> {:error, :session_not_found}
+      nil ->
+        {:error, :session_not_found}
+
       _session ->
-        attrs_with_ids = 
+        attrs_with_ids =
           attrs
           |> Map.put(:project_id, project_id)
           |> Map.put(:engine_session_id, session_id)
-        
+
         AnalysisResult.create_changeset(attrs_with_ids)
         |> Repo.insert()
     end
@@ -456,18 +484,21 @@ defmodule RubberDuckStorage.Repository do
   @doc """
   Adds multiple analysis results in batch to a project and engine session.
   """
-  def add_analysis_results_batch(project_id, session_id, results_attrs) when is_list(results_attrs) do
+  def add_analysis_results_batch(project_id, session_id, results_attrs)
+      when is_list(results_attrs) do
     # First verify the session belongs to the project
     case get_engine_session(project_id, session_id) do
-      nil -> {:error, :session_not_found}
+      nil ->
+        {:error, :session_not_found}
+
       _session ->
-        changesets = 
+        changesets =
           Enum.map(results_attrs, fn attrs ->
-            attrs_with_ids = 
+            attrs_with_ids =
               attrs
               |> Map.put(:project_id, project_id)
               |> Map.put(:engine_session_id, session_id)
-            
+
             AnalysisResult.create_changeset(attrs_with_ids)
           end)
 
@@ -487,7 +518,9 @@ defmodule RubberDuckStorage.Repository do
   """
   def change_analysis_result(project_id, result_id, attrs) do
     case get_analysis_result(project_id, result_id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       result ->
         result
         |> AnalysisResult.changeset(attrs)
@@ -508,51 +541,61 @@ defmodule RubberDuckStorage.Repository do
   # Helper functions for query building
 
   defp maybe_filter_projects_by_archived(query, nil), do: query
+
   defp maybe_filter_projects_by_archived(query, archived) do
     from(p in query, where: p.archived == ^archived)
   end
 
   defp maybe_filter_conversations_by_status(query, nil), do: query
+
   defp maybe_filter_conversations_by_status(query, status) do
     from(c in query, where: c.status == ^status)
   end
 
   defp maybe_filter_messages_by_role(query, nil), do: query
+
   defp maybe_filter_messages_by_role(query, role) do
     from(m in query, where: m.role == ^role)
   end
 
   defp maybe_filter_engine_sessions_by_status(query, nil), do: query
+
   defp maybe_filter_engine_sessions_by_status(query, status) do
     from(es in query, where: es.status == ^status)
   end
 
   defp maybe_filter_engine_sessions_by_type(query, nil), do: query
+
   defp maybe_filter_engine_sessions_by_type(query, engine_type) do
     from(es in query, where: es.engine_type == ^engine_type)
   end
 
   defp maybe_filter_engine_sessions_by_conversation(query, nil), do: query
+
   defp maybe_filter_engine_sessions_by_conversation(query, conversation_id) do
     from(es in query, where: es.conversation_id == ^conversation_id)
   end
 
   defp maybe_filter_analysis_results_by_type(query, nil), do: query
+
   defp maybe_filter_analysis_results_by_type(query, result_type) do
     from(ar in query, where: ar.result_type == ^result_type)
   end
 
   defp maybe_filter_analysis_results_by_session(query, nil), do: query
+
   defp maybe_filter_analysis_results_by_session(query, session_id) do
     from(ar in query, where: ar.engine_session_id == ^session_id)
   end
 
   defp maybe_filter_analysis_results_by_confidence(query, nil), do: query
+
   defp maybe_filter_analysis_results_by_confidence(query, min_confidence) do
     from(ar in query, where: ar.confidence >= ^min_confidence)
   end
 
   defp maybe_limit(query, nil), do: query
+
   defp maybe_limit(query, limit) do
     from(q in query, limit: ^limit)
   end

@@ -1,7 +1,7 @@
 defmodule RubberDuckCore.Supervisor do
   @moduledoc """
   Main supervisor for RubberDuckCore business logic processes.
-  
+
   This supervisor manages the core business logic processes including:
   - Conversation management
   - Analysis coordination

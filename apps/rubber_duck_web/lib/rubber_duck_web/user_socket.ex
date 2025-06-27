@@ -1,7 +1,7 @@
 defmodule RubberDuckWeb.UserSocket do
   @moduledoc """
   UserSocket for WebSocket connections to RubberDuck system.
-  
+
   Handles authentication and channel routing for real-time
   communication with coding assistant clients.
   """
@@ -14,7 +14,7 @@ defmodule RubberDuckWeb.UserSocket do
   # assign values that can be accessed by your channel topics.
 
   ## Channels
-  channel "coding:*", RubberDuckWeb.CodingChannel
+  channel("coding:*", RubberDuckWeb.CodingChannel)
 
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After

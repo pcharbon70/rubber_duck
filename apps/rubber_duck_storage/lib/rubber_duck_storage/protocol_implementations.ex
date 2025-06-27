@@ -39,7 +39,8 @@ defmodule RubberDuckStorage.ProtocolImplementations do
   # Cacheable protocol implementation for Conversation
   defimpl Cacheable, for: Conversation do
     def cache_key(%Conversation{id: id}), do: "conversation:#{id}"
-    def cache_ttl(_conversation), do: 3600  # 1 hour
+    # 1 hour
+    def cache_ttl(_conversation), do: 3600
     def cacheable?(_conversation), do: true
   end
 
@@ -64,7 +65,8 @@ defmodule RubberDuckStorage.ProtocolImplementations do
         id: map["id"] || map[:id],
         role: String.to_existing_atom(map["role"] || map[:role] || "user"),
         content: map["content"] || map[:content],
-        content_type: String.to_existing_atom(map["content_type"] || map[:content_type] || "text"),
+        content_type:
+          String.to_existing_atom(map["content_type"] || map[:content_type] || "text"),
         metadata: map["metadata"] || map[:metadata] || %{},
         timestamp: parse_datetime(map["timestamp"] || map[:timestamp]),
         conversation_id: map["conversation_id"] || map[:conversation_id],
@@ -81,8 +83,10 @@ defmodule RubberDuckStorage.ProtocolImplementations do
   # Cacheable protocol implementation for Message
   defimpl Cacheable, for: Message do
     def cache_key(%Message{id: id}), do: "message:#{id}"
-    def cache_ttl(_message), do: 1800  # 30 minutes
-    def cacheable?(%Message{content_type: :error}), do: false  # Don't cache error messages
+    # 30 minutes
+    def cache_ttl(_message), do: 1800
+    # Don't cache error messages
+    def cacheable?(%Message{content_type: :error}), do: false
     def cacheable?(_message), do: true
   end
 
@@ -129,9 +133,12 @@ defmodule RubberDuckStorage.ProtocolImplementations do
   # Cacheable protocol implementation for EngineSession
   defimpl Cacheable, for: EngineSession do
     def cache_key(%EngineSession{id: id}), do: "engine_session:#{id}"
-    def cache_ttl(%EngineSession{status: :running}), do: 300   # 5 minutes for running sessions
-    def cache_ttl(%EngineSession{status: :pending}), do: 600   # 10 minutes for pending sessions
-    def cache_ttl(_session), do: 1800  # 30 minutes for completed/failed sessions
+    # 5 minutes for running sessions
+    def cache_ttl(%EngineSession{status: :running}), do: 300
+    # 10 minutes for pending sessions
+    def cache_ttl(%EngineSession{status: :pending}), do: 600
+    # 30 minutes for completed/failed sessions
+    def cache_ttl(_session), do: 1800
     def cacheable?(_session), do: true
   end
 
@@ -173,9 +180,12 @@ defmodule RubberDuckStorage.ProtocolImplementations do
   # Cacheable protocol implementation for AnalysisResult
   defimpl Cacheable, for: AnalysisResult do
     def cache_key(%AnalysisResult{id: id}), do: "analysis_result:#{id}"
-    def cache_ttl(%AnalysisResult{confidence: confidence}) when confidence >= 0.8, do: 7200  # 2 hours for high confidence
-    def cache_ttl(_result), do: 1800  # 30 minutes for lower confidence
-    def cacheable?(%AnalysisResult{confidence: confidence}) when confidence < 0.3, do: false  # Don't cache low confidence results
+    # 2 hours for high confidence
+    def cache_ttl(%AnalysisResult{confidence: confidence}) when confidence >= 0.8, do: 7200
+    # 30 minutes for lower confidence
+    def cache_ttl(_result), do: 1800
+    # Don't cache low confidence results
+    def cacheable?(%AnalysisResult{confidence: confidence}) when confidence < 0.3, do: false
     def cacheable?(_result), do: true
   end
 end

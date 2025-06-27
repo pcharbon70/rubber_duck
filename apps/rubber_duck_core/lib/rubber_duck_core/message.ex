@@ -1,7 +1,7 @@
 defmodule RubberDuckCore.Message do
   @moduledoc """
   Core message structure for the RubberDuck system.
-  
+
   This module defines the message data structure used in conversations
   between users and the coding assistant.
   """
@@ -11,13 +11,13 @@ defmodule RubberDuckCore.Message do
   @type content_type :: :text | :code | :error | :analysis
 
   @type t :: %__MODULE__{
-    id: id(),
-    role: role(),
-    content: String.t(),
-    content_type: content_type(),
-    metadata: map(),
-    timestamp: DateTime.t()
-  }
+          id: id(),
+          role: role(),
+          content: String.t(),
+          content_type: content_type(),
+          metadata: map(),
+          timestamp: DateTime.t()
+        }
 
   defstruct [
     :id,

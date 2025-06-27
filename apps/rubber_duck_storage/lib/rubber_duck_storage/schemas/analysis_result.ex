@@ -8,14 +8,14 @@ defmodule RubberDuckStorage.Schemas.AnalysisResult do
   @foreign_key_type :string
 
   schema "analysis_results" do
-    field :result_type, :string
-    field :content, :map
-    field :confidence, :float
-    field :metadata, :map, default: %{}
-    field :tags, {:array, :string}, default: []
+    field(:result_type, :string)
+    field(:content, :map)
+    field(:confidence, :float)
+    field(:metadata, :map, default: %{})
+    field(:tags, {:array, :string}, default: [])
 
-    belongs_to :project, Project, foreign_key: :project_id, type: :string
-    belongs_to :engine_session, EngineSession, foreign_key: :engine_session_id, type: :string
+    belongs_to(:project, Project, foreign_key: :project_id, type: :string)
+    belongs_to(:engine_session, EngineSession, foreign_key: :engine_session_id, type: :string)
 
     timestamps(type: :utc_datetime)
   end
@@ -23,7 +23,16 @@ defmodule RubberDuckStorage.Schemas.AnalysisResult do
   @doc false
   def changeset(analysis_result, attrs) do
     analysis_result
-    |> cast(attrs, [:id, :result_type, :content, :confidence, :metadata, :tags, :project_id, :engine_session_id])
+    |> cast(attrs, [
+      :id,
+      :result_type,
+      :content,
+      :confidence,
+      :metadata,
+      :tags,
+      :project_id,
+      :engine_session_id
+    ])
     |> validate_required([:id, :result_type, :content, :project_id, :engine_session_id])
     |> validate_number(:confidence, greater_than_or_equal_to: 0.0, less_than_or_equal_to: 1.0)
     |> foreign_key_constraint(:project_id)

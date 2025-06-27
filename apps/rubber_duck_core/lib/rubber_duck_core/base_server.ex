@@ -1,7 +1,7 @@
 defmodule RubberDuckCore.BaseServer do
   @moduledoc """
   Base GenServer pattern for RubberDuck system components.
-  
+
   This module provides common patterns and utilities that can be used
   by other GenServer implementations throughout the umbrella project.
   """
@@ -21,6 +21,7 @@ defmodule RubberDuckCore.BaseServer do
 
       def child_spec(args) do
         name = Keyword.get(args, :name, __MODULE__)
+
         %{
           id: name,
           start: {__MODULE__, :start_link, [args]},

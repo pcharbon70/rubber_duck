@@ -80,7 +80,7 @@ defmodule RubberDuckStorage do
   @doc """
   Creates a conversation with messages in a single transaction.
   """
-  defdelegate add_conversation_with_messages(project_id, conversation, messages), 
+  defdelegate add_conversation_with_messages(project_id, conversation, messages),
     to: Transaction
 
   @doc """
@@ -91,7 +91,7 @@ defmodule RubberDuckStorage do
   @doc """
   Gets a conversation with messages preloaded within project scope.
   """
-  defdelegate get_conversation_with_messages(project_id, conversation_id), 
+  defdelegate get_conversation_with_messages(project_id, conversation_id),
     to: Repository
 
   @doc """
@@ -141,7 +141,7 @@ defmodule RubberDuckStorage do
   @doc """
   Gets engine sessions for a conversation within project scope.
   """
-  defdelegate list_engine_sessions_for_conversation(project_id, conversation_id, opts \\ []), 
+  defdelegate list_engine_sessions_for_conversation(project_id, conversation_id, opts \\ []),
     to: Repository
 
   @doc """
@@ -157,7 +157,7 @@ defmodule RubberDuckStorage do
   @doc """
   Completes an engine session with final results within project scope.
   """
-  defdelegate complete_engine_session_with_results(project_id, session_id, results_attrs), 
+  defdelegate complete_engine_session_with_results(project_id, session_id, results_attrs),
     to: Transaction
 
   # Analysis Result Operations (Project-scoped)
@@ -170,7 +170,7 @@ defmodule RubberDuckStorage do
   @doc """
   Gets analysis results for an engine session within project scope.
   """
-  defdelegate list_analysis_results_for_session(project_id, session_id, opts \\ []), 
+  defdelegate list_analysis_results_for_session(project_id, session_id, opts \\ []),
     to: Repository
 
   @doc """
@@ -188,7 +188,7 @@ defmodule RubberDuckStorage do
   @doc """
   Stores context for a conversation.
   """
-  defdelegate store_context(conversation_id, context, version \\ nil), 
+  defdelegate store_context(conversation_id, context, version \\ nil),
     to: ContextManager
 
   @doc """
@@ -199,7 +199,7 @@ defmodule RubberDuckStorage do
   @doc """
   Merges context with existing context.
   """
-  defdelegate merge_context(conversation_id, new_context, strategy \\ :deep_merge), 
+  defdelegate merge_context(conversation_id, new_context, strategy \\ :deep_merge),
     to: ContextManager
 
   @doc """
@@ -234,7 +234,7 @@ defmodule RubberDuckStorage do
   @doc """
   Executes operations with retry logic.
   """
-  defdelegate with_retry(operation, max_attempts \\ 3, base_delay \\ 100), 
+  defdelegate with_retry(operation, max_attempts \\ 3, base_delay \\ 100),
     to: Transaction
 
   @doc """
@@ -251,13 +251,13 @@ defmodule RubberDuckStorage do
     try do
       # Check database connectivity
       Repo.query!("SELECT 1")
-      
+
       # Check cache
       Cache.stats()
-      
+
       # Check context manager
       ContextManager.search_context(%{})
-      
+
       {:ok, :healthy}
     rescue
       error -> {:error, error}

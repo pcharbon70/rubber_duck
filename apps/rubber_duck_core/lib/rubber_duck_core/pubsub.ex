@@ -1,7 +1,7 @@
 defmodule RubberDuckCore.PubSub do
   @moduledoc """
   Inter-app communication hub for the RubberDuck system.
-  
+
   This module provides publish/subscribe functionality for communication
   between different apps in the umbrella project.
   """
@@ -68,9 +68,12 @@ defmodule RubberDuckCore.PubSub do
   @impl true
   def init(_opts) do
     state = %{
-      topics: %{},  # topic -> [pid]
-      subscribers: %{}  # pid -> [topic]
+      # topic -> [pid]
+      topics: %{},
+      # pid -> [topic]
+      subscribers: %{}
     }
+
     {:ok, state}
   end
 
@@ -78,38 +81,52 @@ defmodule RubberDuckCore.PubSub do
   def handle_call({:subscribe, topic, pid}, _from, state) do
     # Monitor the subscriber process
     Process.monitor(pid)
-    
+
     # Add to topics
-    topics = Map.update(state.topics, topic, [pid], fn pids -> 
-      if pid in pids, do: pids, else: [pid | pids]
-    end)
-    
+    topics =
+      Map.update(state.topics, topic, [pid], fn pids ->
+        if pid in pids, do: pids, else: [pid | pids]
+      end)
+
     # Add to subscribers
-    subscribers = Map.update(state.subscribers, pid, [topic], fn topics_list ->
-      if topic in topics_list, do: topics_list, else: [topic | topics_list]
-    end)
-    
+    subscribers =
+      Map.update(state.subscribers, pid, [topic], fn topics_list ->
+        if topic in topics_list, do: topics_list, else: [topic | topics_list]
+      end)
+
     new_state = %{state | topics: topics, subscribers: subscribers}
     {:reply, :ok, new_state}
   end
 
   def handle_call({:unsubscribe, topic, pid}, _from, state) do
     # Remove from topics
-    topics = case Map.get(state.topics, topic) do
-      nil -> state.topics
-      pids -> 
-        new_pids = List.delete(pids, pid)
-        if new_pids == [], do: Map.delete(state.topics, topic), else: Map.put(state.topics, topic, new_pids)
-    end
-    
+    topics =
+      case Map.get(state.topics, topic) do
+        nil ->
+          state.topics
+
+        pids ->
+          new_pids = List.delete(pids, pid)
+
+          if new_pids == [],
+            do: Map.delete(state.topics, topic),
+            else: Map.put(state.topics, topic, new_pids)
+      end
+
     # Remove from subscribers
-    subscribers = case Map.get(state.subscribers, pid) do
-      nil -> state.subscribers
-      topics_list ->
-        new_topics = List.delete(topics_list, topic)
-        if new_topics == [], do: Map.delete(state.subscribers, pid), else: Map.put(state.subscribers, pid, new_topics)
-    end
-    
+    subscribers =
+      case Map.get(state.subscribers, pid) do
+        nil ->
+          state.subscribers
+
+        topics_list ->
+          new_topics = List.delete(topics_list, topic)
+
+          if new_topics == [],
+            do: Map.delete(state.subscribers, pid),
+            else: Map.put(state.subscribers, pid, new_topics)
+      end
+
     new_state = %{state | topics: topics, subscribers: subscribers}
     {:reply, :ok, new_state}
   end
@@ -122,13 +139,15 @@ defmodule RubberDuckCore.PubSub do
   @impl true
   def handle_cast({:publish, topic, event}, state) do
     case Map.get(state.topics, topic) do
-      nil -> :ok
-      pids -> 
+      nil ->
+        :ok
+
+      pids ->
         Enum.each(pids, fn pid ->
           send(pid, {:pubsub_event, topic, event})
         end)
     end
-    
+
     {:noreply, state}
   end
 
@@ -136,21 +155,26 @@ defmodule RubberDuckCore.PubSub do
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
     # Clean up when a subscriber process dies
     case Map.get(state.subscribers, pid) do
-      nil -> {:noreply, state}
+      nil ->
+        {:noreply, state}
+
       topics_list ->
         # Remove from all topics
-        topics = Enum.reduce(topics_list, state.topics, fn topic, acc ->
-          case Map.get(acc, topic) do
-            nil -> acc
-            pids ->
-              new_pids = List.delete(pids, pid)
-              if new_pids == [], do: Map.delete(acc, topic), else: Map.put(acc, topic, new_pids)
-          end
-        end)
-        
+        topics =
+          Enum.reduce(topics_list, state.topics, fn topic, acc ->
+            case Map.get(acc, topic) do
+              nil ->
+                acc
+
+              pids ->
+                new_pids = List.delete(pids, pid)
+                if new_pids == [], do: Map.delete(acc, topic), else: Map.put(acc, topic, new_pids)
+            end
+          end)
+
         # Remove from subscribers
         subscribers = Map.delete(state.subscribers, pid)
-        
+
         new_state = %{state | topics: topics, subscribers: subscribers}
         {:noreply, new_state}
     end

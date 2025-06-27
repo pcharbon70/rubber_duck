@@ -22,7 +22,8 @@ defmodule RubberDuckStorage.MixProject do
 
       # Docs
       name: "RubberDuck Storage",
-      description: "Data persistence layer with Ecto and PostgreSQL for RubberDuck coding assistant",
+      description:
+        "Data persistence layer with Ecto and PostgreSQL for RubberDuck coding assistant",
       source_url: @source_url,
       homepage_url: @source_url,
       docs: [
@@ -49,10 +50,10 @@ defmodule RubberDuckStorage.MixProject do
       # Database
       {:ecto_sql, "~> 3.12"},
       {:postgrex, "~> 0.19.0"},
-      
+
       # JSON handling
       {:jason, "~> 1.4"},
-      
+
       # Umbrella dependencies
       {:rubber_duck_core, in_umbrella: true}
     ]

@@ -1,7 +1,7 @@
 defmodule RubberDuckEngines.Engines.CodeReviewEngine do
   @moduledoc """
   Analysis engine for automated code review.
-  
+
   Provides code quality analysis, style checking, and best practice
   recommendations for Elixir code.
   """
@@ -20,34 +20,35 @@ defmodule RubberDuckEngines.Engines.CodeReviewEngine do
         issues_found: 0
       }
     }
-    
+
     {:ok, state}
   end
 
   @impl true
   def analyze(%Analysis{type: :code_review, input: input}, state) do
     content = Map.get(input, :code, "")
-    
+
     try do
       # Perform code analysis
       issues = analyze_code(content, state.rules)
       metrics = calculate_metrics(content)
-      
+
       result = %{
         issues: issues,
         metrics: metrics,
         score: calculate_score(issues, metrics),
         suggestions: generate_suggestions(issues)
       }
-      
+
       # Update engine metrics
-      new_metrics = %{state.metrics | 
-        reviews_performed: state.metrics.reviews_performed + 1,
-        issues_found: state.metrics.issues_found + length(issues)
+      new_metrics = %{
+        state.metrics
+        | reviews_performed: state.metrics.reviews_performed + 1,
+          issues_found: state.metrics.issues_found + length(issues)
       }
-      
+
       new_state = %{state | metrics: new_metrics}
-      
+
       {{:ok, result}, new_state}
     catch
       error -> {{:error, "Code analysis failed: #{inspect(error)}"}, state}
@@ -78,7 +79,7 @@ defmodule RubberDuckEngines.Engines.CodeReviewEngine do
       issues_found: state.metrics.issues_found,
       rules_count: length(state.rules)
     }
-    
+
     {:healthy, diagnostics, state}
   end
 
@@ -102,38 +103,43 @@ defmodule RubberDuckEngines.Engines.CodeReviewEngine do
   defp analyze_code(content, rules) do
     # Basic static analysis - this would be expanded with real analysis
     issues = []
-    
-    issues = if :unused_variables in rules do
-      issues ++ check_unused_variables(content)
-    else
-      issues
-    end
-    
-    issues = if :long_functions in rules do
-      issues ++ check_function_length(content)
-    else
-      issues
-    end
-    
-    issues = if :missing_documentation in rules do
-      issues ++ check_documentation(content)
-    else
-      issues
-    end
-    
+
+    issues =
+      if :unused_variables in rules do
+        issues ++ check_unused_variables(content)
+      else
+        issues
+      end
+
+    issues =
+      if :long_functions in rules do
+        issues ++ check_function_length(content)
+      else
+        issues
+      end
+
+    issues =
+      if :missing_documentation in rules do
+        issues ++ check_documentation(content)
+      else
+        issues
+      end
+
     issues
   end
 
   defp check_unused_variables(content) do
     # Simple check for variables starting with _ that might be unused
     if String.contains?(content, "= _") do
-      [%{
-        type: :warning,
-        rule: :unused_variables,
-        message: "Possible unused variable assignment",
-        line: 1,
-        suggestion: "Consider using pattern matching or renaming variable"
-      }]
+      [
+        %{
+          type: :warning,
+          rule: :unused_variables,
+          message: "Possible unused variable assignment",
+          line: 1,
+          suggestion: "Consider using pattern matching or renaming variable"
+        }
+      ]
     else
       []
     end
@@ -141,15 +147,17 @@ defmodule RubberDuckEngines.Engines.CodeReviewEngine do
 
   defp check_function_length(content) do
     lines = String.split(content, "\n")
-    
+
     if length(lines) > 20 do
-      [%{
-        type: :warning,
-        rule: :long_functions,
-        message: "Function appears to be quite long (#{length(lines)} lines)",
-        line: 1,
-        suggestion: "Consider breaking into smaller functions"
-      }]
+      [
+        %{
+          type: :warning,
+          rule: :long_functions,
+          message: "Function appears to be quite long (#{length(lines)} lines)",
+          line: 1,
+          suggestion: "Consider breaking into smaller functions"
+        }
+      ]
     else
       []
     end
@@ -158,39 +166,47 @@ defmodule RubberDuckEngines.Engines.CodeReviewEngine do
   defp check_documentation(content) do
     has_moduledoc = String.contains?(content, "@moduledoc")
     has_doc = String.contains?(content, "@doc")
-    
+
     issues = []
-    
-    issues = if not has_moduledoc do
-      [%{
-        type: :info,
-        rule: :missing_documentation,
-        message: "Module documentation missing",
-        line: 1,
-        suggestion: "Add @moduledoc to describe the module's purpose"
-      } | issues]
-    else
-      issues
-    end
-    
-    issues = if String.contains?(content, "def ") and not has_doc do
-      [%{
-        type: :info,
-        rule: :missing_documentation,
-        message: "Function documentation missing",
-        line: 1,
-        suggestion: "Add @doc to describe function behavior"
-      } | issues]
-    else
-      issues
-    end
-    
+
+    issues =
+      if not has_moduledoc do
+        [
+          %{
+            type: :info,
+            rule: :missing_documentation,
+            message: "Module documentation missing",
+            line: 1,
+            suggestion: "Add @moduledoc to describe the module's purpose"
+          }
+          | issues
+        ]
+      else
+        issues
+      end
+
+    issues =
+      if String.contains?(content, "def ") and not has_doc do
+        [
+          %{
+            type: :info,
+            rule: :missing_documentation,
+            message: "Function documentation missing",
+            line: 1,
+            suggestion: "Add @doc to describe function behavior"
+          }
+          | issues
+        ]
+      else
+        issues
+      end
+
     issues
   end
 
   defp calculate_metrics(content) do
     lines = String.split(content, "\n")
-    
+
     %{
       lines_of_code: length(lines),
       functions: count_functions(content),
@@ -207,12 +223,12 @@ defmodule RubberDuckEngines.Engines.CodeReviewEngine do
   defp calculate_complexity(content) do
     # Simple complexity calculation based on control structures
     complexity = 1
-    
+
     complexity = complexity + count_occurrences(content, "if ")
     complexity = complexity + count_occurrences(content, "case ")
     complexity = complexity + count_occurrences(content, "cond ")
     complexity = complexity + count_occurrences(content, "with ")
-    
+
     complexity
   end
 
@@ -226,21 +242,22 @@ defmodule RubberDuckEngines.Engines.CodeReviewEngine do
 
   defp calculate_score(issues, metrics) do
     base_score = 100
-    
+
     # Deduct points for issues
-    deductions = issues
-    |> Enum.map(fn issue ->
-      case issue.type do
-        :error -> 10
-        :warning -> 5
-        :info -> 1
-      end
-    end)
-    |> Enum.sum()
-    
+    deductions =
+      issues
+      |> Enum.map(fn issue ->
+        case issue.type do
+          :error -> 10
+          :warning -> 5
+          :info -> 1
+        end
+      end)
+      |> Enum.sum()
+
     # Complexity penalty
     complexity_penalty = max(0, metrics.complexity - 5) * 2
-    
+
     max(0, base_score - deductions - complexity_penalty)
   end
 
