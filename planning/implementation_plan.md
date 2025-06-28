@@ -8,15 +8,15 @@ This phase establishes the fundamental OTP architecture and project structure th
 
 This section sets up the proper Elixir project structure, migrating from a simple Mix project to an umbrella application that can accommodate the multiple subsystems of our coding assistant.
 
-1.1.1. [ ] Convert current project to umbrella structure
-1.1.2. [ ] Create apps/rubber_duck_core for business logic
-1.1.3. [ ] Create apps/rubber_duck_web for Phoenix/WebSocket layer
-1.1.4. [ ] Create apps/rubber_duck_engines for analysis engines
-1.1.5. [ ] Create apps/rubber_duck_storage for data persistence
-1.1.6. [ ] Update mix.exs files for each application
-1.1.7. [ ] Add core dependencies to each app (Phoenix, Ecto, GenStateMachine, etc.)
-1.1.8. [ ] Configure inter-app dependencies
-1.1.9. [ ] Set up shared configuration structure
+1.1.1. [x] Convert current project to umbrella structure
+1.1.2. [x] Create apps/rubber_duck_core for business logic
+1.1.3. [x] Create apps/rubber_duck_web for Phoenix/WebSocket layer
+1.1.4. [x] Create apps/rubber_duck_engines for analysis engines
+1.1.5. [x] Create apps/rubber_duck_storage for data persistence
+1.1.6. [x] Update mix.exs files for each application
+1.1.7. [x] Add core dependencies to each app (Phoenix, Ecto, GenStateMachine, etc.)
+1.1.8. [x] Configure inter-app dependencies
+1.1.9. [x] Set up shared configuration structure
 1.1.10. [ ] Create development/test/prod environment configs
 
 **Tests for 1.1:**
@@ -31,8 +31,8 @@ This section implements the fundamental OTP supervision tree that provides fault
 
 1.2.1. [ ] Create RubberDuck.Application supervisor
 1.2.2. [ ] Implement Registry for engine discovery
-1.2.3. [ ] Add DynamicSupervisor for on-demand engine spawning
-1.2.4. [ ] Create EnginePool.Supervisor with rest_for_one strategy
+1.2.3. [x] Add DynamicSupervisor for on-demand engine spawning
+1.2.4. [x] Create EnginePool.Supervisor with rest_for_one strategy
 1.2.5. [ ] Implement basic Engine.Supervisor template
 1.2.6. [ ] Add WebSocketHandler.Supervisor placeholder
 1.2.7. [ ] Add DatabaseConnection.Supervisor placeholder
@@ -79,7 +79,7 @@ This section sets up essential development tools and quality assurance mechanism
 1.4.2. [ ] Configure Dialyzer with type specifications
 1.4.3. [ ] Add ExDoc for documentation generation
 1.4.4. [ ] Set up ExCoveralls for test coverage
-1.4.5. [ ] Configure Git hooks for pre-commit checks
+1.4.5. [x] Configure Git hooks for pre-commit checks
 1.4.6. [ ] Add mix aliases for common tasks
 1.4.7. [ ] Create development seeds and fixtures
 1.4.8. [ ] Set up property-based testing with StreamData
@@ -108,16 +108,16 @@ This phase consolidates all separate repository modules into a single unified re
 
 This section introduces the project concept as the top-level organizational unit for all data.
 
-1.5.1.1. [ ] Design Project schema with fields (id, name, description, settings, created_at, updated_at)
-1.5.1.2. [ ] Create Project Ecto schema and migration
-1.5.1.3. [ ] Update Conversation schema to belong_to Project
-1.5.1.4. [ ] Update Message schema to reference Project through Conversation
-1.5.1.5. [ ] Update EngineSession schema to belong_to Project
-1.5.1.6. [ ] Update AnalysisResult schema to belong_to Project
-1.5.1.7. [ ] Add foreign key constraints and indexes for project relationships
-1.5.1.8. [ ] Create project-based data isolation queries
-1.5.1.9. [ ] Implement project settings and configuration schema
-1.5.1.10. [ ] Add project-level permissions and access control
+1.5.1.1. [x] Design Project schema with fields (id, name, description, settings, created_at, updated_at)
+1.5.1.2. [x] Create Project Ecto schema and migration
+1.5.1.3. [x] Update Conversation schema to belong_to Project
+1.5.1.4. [x] Update Message schema to reference Project through Conversation
+1.5.1.5. [x] Update EngineSession schema to belong_to Project
+1.5.1.6. [x] Update AnalysisResult schema to belong_to Project
+1.5.1.7. [x] Add foreign key constraints and indexes for project relationships
+1.5.1.8. [x] Create project-based data isolation queries
+1.5.1.9. [x] Implement project settings and configuration schema
+1.5.1.10. [x] Add project-level permissions and access control
 
 **Tests for 1.5.1:**
 [ ] Test Project schema validation and constraints
@@ -131,16 +131,16 @@ This section introduces the project concept as the top-level organizational unit
 
 This section consolidates all repository modules into a single unified Repository module.
 
-1.5.2.1. [ ] Create unified Repository module structure
-1.5.2.2. [ ] Implement project operations (add, remove, change, get, list)
-1.5.2.3. [ ] Implement project-scoped conversation operations
-1.5.2.4. [ ] Implement project-scoped message operations with batch support
-1.5.2.5. [ ] Implement project-scoped engine session operations
-1.5.2.6. [ ] Implement project-scoped analysis result operations
-1.5.2.7. [ ] Create unified transaction helpers with project context
-1.5.2.8. [ ] Implement cross-entity queries within project scope
-1.5.2.9. [ ] Add project-aware caching strategy
-1.5.2.10. [ ] Implement project-level bulk operations and cleanup
+1.5.2.1. [x] Create unified Repository module structure
+1.5.2.2. [x] Implement project operations (add, remove, change, get, list)
+1.5.2.3. [x] Implement project-scoped conversation operations
+1.5.2.4. [x] Implement project-scoped message operations with batch support
+1.5.2.5. [x] Implement project-scoped engine session operations
+1.5.2.6. [x] Implement project-scoped analysis result operations
+1.5.2.7. [x] Create unified transaction helpers with project context
+1.5.2.8. [x] Implement cross-entity queries within project scope
+1.5.2.9. [x] Add project-aware caching strategy
+1.5.2.10. [x] Implement project-level bulk operations and cleanup
 
 **Tests for 1.5.2:**
 [ ] Test all project operations
@@ -155,16 +155,16 @@ This section consolidates all repository modules into a single unified Repositor
 
 This section handles the migration from multiple repositories to the unified project-based repository.
 
-1.5.3.1. [ ] Create data migration scripts to add project_id to existing records
-1.5.3.2. [ ] Create default project for existing data during migration
-1.5.3.3. [ ] Update all service layer calls to use unified Repository
-1.5.3.4. [ ] Update Transaction module to use unified Repository with project context
-1.5.3.5. [ ] Remove ConversationRepo, MessageRepo, EngineSessionRepo, AnalysisResultRepo modules
-1.5.3.6. [ ] Update all tests to use unified Repository with project context
-1.5.3.7. [ ] Update core domain models to include project context
-1.5.3.8. [ ] Update inter-app communication to pass project context
-1.5.3.9. [ ] Verify all functionality works with project-scoped unified repository
-1.5.3.10. [ ] Performance test unified repository vs old repositories
+1.5.3.1. [x] Create data migration scripts to add project_id to existing records
+1.5.3.2. [x] Create default project for existing data during migration
+1.5.3.3. [x] Update all service layer calls to use unified Repository
+1.5.3.4. [x] Update Transaction module to use unified Repository with project context
+1.5.3.5. [x] Remove ConversationRepo, MessageRepo, EngineSessionRepo, AnalysisResultRepo modules
+1.5.3.6. [x] Update all tests to use unified Repository with project context
+1.5.3.7. [x] Update core domain models to include project context
+1.5.3.8. [x] Update inter-app communication to pass project context
+1.5.3.9. [x] Verify all functionality works with project-scoped unified repository
+1.5.3.10. [x] Performance test unified repository vs old repositories
 
 **Tests for 1.5.3:**
 [ ] Test data migration script correctness
