@@ -14,6 +14,10 @@ defmodule RubberDuck.Umbrella.MixProject do
       aliases: aliases(),
       preferred_cli_env: preferred_cli_env(),
       test_coverage: [tool: ExCoveralls],
+      
+      # Enable umbrella-level tests
+      test_paths: ["test"],
+      elixirc_paths: elixirc_paths(Mix.env()),
 
       # Docs
       name: "RubberDuck",
@@ -25,6 +29,10 @@ defmodule RubberDuck.Umbrella.MixProject do
       ]
     ]
   end
+
+  # Specifies which paths to compile per environment.
+  defp elixirc_paths(:test), do: ["test/support"]
+  defp elixirc_paths(_), do: []
 
   # Dependencies listed here are only for configuration
   # and cannot be accessed from applications inside the apps folder.
@@ -45,8 +53,8 @@ defmodule RubberDuck.Umbrella.MixProject do
       # Setup all apps
       setup: ["deps.get", "cmd mix setup"],
 
-      # Run tests in all apps
-      test: ["cmd mix test"],
+      # Run tests in all apps and umbrella
+      test: ["test --no-deps-check", "cmd mix test"],
 
       # Check code quality
       quality: [
