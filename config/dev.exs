@@ -1,13 +1,16 @@
 import Config
 
 # Configure the database
-# config :rubber_duck_storage, RubberDuckStorage.Repo,
-#   username: "postgres",
-#   password: "postgres",
-#   hostname: "localhost",
-#   database: "rubber_duck_dev",
-#   show_sensitive_data_on_connection_error: true,
-#   pool_size: 10
+config :rubber_duck_storage, RubberDuckStorage.Repo,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  database: "rubber_duck_dev",
+  show_sensitive_data_on_connection_error: true,
+  pool_size: 10,
+  # Development-specific settings
+  log_level: :debug,
+  stacktrace: true
 
 # For development, we disable any cache and enable
 # debugging and code reloading.
@@ -71,3 +74,45 @@ config :phoenix, :stacktrace_depth, 20
 
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime
+
+# Development-specific configurations for each app
+
+# Core - Enable verbose logging and debugging
+config :rubber_duck_core,
+  debug_mode: true,
+  log_level: :debug,
+  # Shorter retention for dev
+  conversation_retention_days: 7
+
+# Storage - Faster cache expiry for development
+config :rubber_duck_storage,
+  cache_ttl: :timer.minutes(5),
+  # Enable query logging
+  log_queries: true
+
+# Engines - Smaller pools for development
+config :rubber_duck_engines,
+  engine_pool_size: 3,
+  engine_timeout: :timer.seconds(60),
+  # Enable all engines in dev
+  engines: [
+    code_analysis: %{
+      enabled: true,
+      max_file_size: 1_000_000,
+      debug: true
+    },
+    documentation: %{
+      enabled: true,
+      cache_results: false  # Disable caching for dev
+    },
+    testing: %{
+      enabled: true,
+      test_frameworks: [:ex_unit, :espec],
+      verbose: true
+    }
+  ]
+
+# Web - Additional dev tools
+config :rubber_duck_web,
+  debug_websockets: true,
+  websocket_timeout: :timer.minutes(30)

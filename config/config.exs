@@ -2,6 +2,47 @@ import Config
 
 # Configuration for the umbrella project and its applications
 
+# Core application configuration
+config :rubber_duck_core,
+  ecto_repos: [RubberDuckStorage.Repo],
+  # PubSub configuration
+  pubsub: [
+    name: RubberDuckCore.PubSub,
+    adapter: Phoenix.PubSub.PG2
+  ],
+  # Conversation limits
+  max_conversation_messages: 1000,
+  conversation_retention_days: 90
+
+# Storage application configuration
+config :rubber_duck_storage,
+  ecto_repos: [RubberDuckStorage.Repo],
+  # Cache configuration
+  cache_ttl: :timer.hours(1),
+  cache_max_size: 1000
+
+# Engines application configuration
+config :rubber_duck_engines,
+  # Engine pool configuration
+  engine_pool_size: 10,
+  engine_timeout: :timer.seconds(30),
+  max_concurrent_analyses: 5,
+  # Engine-specific settings
+  engines: [
+    code_analysis: %{
+      enabled: true,
+      max_file_size: 1_000_000  # 1MB
+    },
+    documentation: %{
+      enabled: true,
+      cache_results: true
+    },
+    testing: %{
+      enabled: true,
+      test_frameworks: [:ex_unit, :espec]
+    }
+  ]
+
 # Configure Phoenix for the web application
 config :rubber_duck_web,
   generators: [context_app: :rubber_duck_core]

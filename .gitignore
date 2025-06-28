@@ -21,3 +21,8 @@ rubber_duck-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Environment files
+.env
+.env.*
+!.env.example
