@@ -1,5 +1,10 @@
 # RubberDuck
 
+[![CI](https://github.com/pcharbon/rubber_duck/workflows/CI/badge.svg)](https://github.com/pcharbon/rubber_duck/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/pcharbon/rubber_duck/workflows/Code%20Quality/badge.svg)](https://github.com/pcharbon/rubber_duck/actions/workflows/quality.yml)
+[![Security](https://github.com/pcharbon/rubber_duck/workflows/Security/badge.svg)](https://github.com/pcharbon/rubber_duck/actions/workflows/security.yml)
+[![Coverage Status](https://coveralls.io/repos/github/pcharbon/rubber_duck/badge.svg?branch=main)](https://coveralls.io/github/pcharbon/rubber_duck?branch=main)
+
 RubberDuck is an Elixir-based AI coding assistant system built with the Ash Framework. The project aims to create a sophisticated, pluggable platform integrating modern LLM techniques with Elixir's strengths in concurrency, fault tolerance, and real-time communication.
 
 ## Overview
