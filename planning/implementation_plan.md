@@ -1,4 +1,4 @@
-# Elixir-Based Coding Assistant Implementation Plan
+# RubberDuck Implementation Plan
 
 ## Table of Contents
 1. [Phase 1: Foundation & Core Infrastructure](#phase-1-foundation--core-infrastructure)
@@ -19,7 +19,7 @@ This phase establishes the foundational architecture of the coding assistant sys
 This section focuses on initializing the Elixir project with the proper structure and dependencies. We'll configure the development environment, set up essential libraries, and establish coding standards for the project.
 
 #### Tasks:
-1.1.1. [ ] Create new Elixir project with `mix new coding_assistant --sup`
+1.1.1. [ ] Create new Elixir project with `mix new rubber_duck --sup`
 1.1.2. [ ] Set up directory structure (lib/, test/, config/, priv/)
 1.1.3. [ ] Configure `.gitignore` for Elixir projects
 1.1.4. [ ] Add `.formatter.exs` with project-wide formatting rules
@@ -37,7 +37,7 @@ This section focuses on initializing the Elixir project with the proper structur
 1.1.10. [ ] Configure GitHub Actions for CI/CD
 
 #### Unit Tests:
-Create tests in `test/coding_assistant_test.exs` to verify:
+Create tests in `test/rubber_duck_test.exs` to verify:
 1.1.11. [ ] Test that application starts successfully
 1.1.12. [ ] Test that required dependencies are available (Phoenix, Ash, Ecto)
 1.1.13. [ ] Test that configuration files are properly loaded
@@ -65,7 +65,7 @@ Establish the database infrastructure using PostgreSQL and Ecto. This section en
 1.2.10. [ ] Implement database health check endpoint
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/repo_test.exs` to verify:
+Create tests in `test/rubber_duck/repo_test.exs` to verify:
 1.2.11. [ ] Test that repo is properly configured with Postgres adapter
 1.2.12. [ ] Test that required PostgreSQL extensions are enabled
 1.2.13. [ ] Test that database connection pool is configured with minimum size
@@ -77,7 +77,7 @@ Create tests in `test/coding_assistant/repo_test.exs` to verify:
 Implement the fundamental domain models using Ash Framework. These models form the core data structures that represent projects, code files, and analysis results.
 
 #### Tasks:
-1.3.1. [ ] Create Ash Domain module `CodingAssistant.Workspace`
+1.3.1. [ ] Create Ash Domain module `RubberDuck.Workspace`
 1.3.2. [ ] Implement `Project` resource:
    1.3.2.1. [ ] UUID primary key
    1.3.2.2. [ ] Name, description attributes
@@ -104,7 +104,7 @@ Implement the fundamental domain models using Ash Framework. These models form t
 1.3.9. [ ] Create factory modules for testing
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/workspace/` directory:
+Create tests in `test/rubber_duck/workspace/` directory:
 
 **Project Resource Tests** (`project_test.exs`):
 1.3.10. [ ] Test creating project with valid attributes
@@ -144,7 +144,7 @@ Establish comprehensive error handling and logging infrastructure to ensure syst
 1.4.10. [ ] Document error codes and meanings
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/error_handling_test.exs` to verify:
+Create tests in `test/rubber_duck/error_handling_test.exs` to verify:
 1.4.11. [ ] Test error normalization for different error formats
 1.4.12. [ ] Test that stack traces are preserved when available
 1.4.13. [ ] Test circuit breaker opens after threshold failures
@@ -176,7 +176,7 @@ Set up the Spark DSL infrastructure that enables declarative configuration of en
 
 #### Tasks:
 2.1.1. [ ] Add Spark dependency to mix.exs
-2.1.2. [ ] Create `CodingAssistant.EngineSystem` module with Spark DSL
+2.1.2. [ ] Create `RubberDuck.EngineSystem` module with Spark DSL
 2.1.3. [ ] Define DSL structure for engine configuration
 2.1.4. [ ] Implement engine entity with attributes:
    2.1.4.1. [ ] Name (atom, required)
@@ -192,7 +192,7 @@ Set up the Spark DSL infrastructure that enables declarative configuration of en
 2.1.10. [ ] Set up compile-time validations
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/engine_system/dsl_test.exs` to verify:
+Create tests in `test/rubber_duck/engine_system/dsl_test.exs` to verify:
 2.1.11. [ ] Test that valid engine configuration compiles correctly
 2.1.12. [ ] Test that engines are registered with correct attributes
 2.1.13. [ ] Test compile-time validation for missing required fields
@@ -205,7 +205,7 @@ Create tests in `test/coding_assistant/engine_system/dsl_test.exs` to verify:
 Define the common behavior that all engines must implement. This ensures consistency across different engine types and provides a unified interface for the system to interact with engines.
 
 #### Tasks:
-2.2.1. [ ] Create `CodingAssistant.Engine` behavior module
+2.2.1. [ ] Create `RubberDuck.Engine` behavior module
 2.2.2. [ ] Define callback: `init(config)`
 2.2.3. [ ] Define callback: `process(input, context)`
 2.2.4. [ ] Define callback: `validate_input(input)`
@@ -218,7 +218,7 @@ Define the common behavior that all engines must implement. This ensures consist
 2.2.11. [ ] Document behavior requirements
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/engine/behavior_test.exs` to verify:
+Create tests in `test/rubber_duck/engine/behavior_test.exs` to verify:
 2.2.12. [ ] Test that all required callbacks are implemented
 2.2.13. [ ] Test input validation accepts valid input
 2.2.14. [ ] Test input validation rejects invalid input
@@ -231,7 +231,7 @@ Create tests in `test/coding_assistant/engine/behavior_test.exs` to verify:
 Implement the first concrete engine for code completion. This engine uses Fill-in-the-Middle (FIM) context strategy to provide intelligent code suggestions.
 
 #### Tasks:
-2.3.1. [ ] Create `CodingAssistant.Engines.Completion` module
+2.3.1. [ ] Create `RubberDuck.Engines.Completion` module
 2.3.2. [ ] Implement Engine behavior callbacks
 2.3.3. [ ] Add FIM context building logic:
    2.3.3.1. [ ] Extract prefix context (code before cursor)
@@ -246,7 +246,7 @@ Implement the first concrete engine for code completion. This engine uses Fill-i
 2.3.10. [ ] Add telemetry events for completion metrics
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/engines/completion_test.exs` to verify:
+Create tests in `test/rubber_duck/engines/completion_test.exs` to verify:
 2.3.11. [ ] Test FIM context builds correctly with prefix and suffix
 2.3.12. [ ] Test completions are generated for valid input
 2.3.13. [ ] Test completion results include text and scores
@@ -260,7 +260,7 @@ Create tests in `test/coding_assistant/engines/completion_test.exs` to verify:
 Create an engine for generating code from natural language descriptions. This engine uses RAG (Retrieval Augmented Generation) to provide context-aware code generation.
 
 #### Tasks:
-2.4.1. [ ] Create `CodingAssistant.Engines.Generation` module
+2.4.1. [ ] Create `RubberDuck.Engines.Generation` module
 2.4.2. [ ] Implement Engine behavior for generation
 2.4.3. [ ] Build RAG context retrieval:
    2.4.3.1. [ ] Implement semantic search for similar code
@@ -275,7 +275,7 @@ Create an engine for generating code from natural language descriptions. This en
 2.4.10. [ ] Implement user preference learning
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/engines/generation_test.exs` to verify:
+Create tests in `test/rubber_duck/engines/generation_test.exs` to verify:
 2.4.11. [ ] Test code generation from natural language prompts
 2.4.12. [ ] Test generated code includes proper language syntax
 2.4.13. [ ] Test RAG context influences generation patterns
@@ -307,7 +307,7 @@ Build a robust LLM service that manages connections to multiple providers (OpenA
 
 #### Tasks:
 3.1.1. [ ] Add LangChain and HTTP client dependencies
-3.1.2. [ ] Create `CodingAssistant.LLM.Service` GenServer
+3.1.2. [ ] Create `RubberDuck.LLM.Service` GenServer
 3.1.3. [ ] Implement provider configuration structure
 3.1.4. [ ] Create provider adapters:
    3.1.4.1. [ ] OpenAI adapter (GPT-4, GPT-4o)
@@ -322,7 +322,7 @@ Build a robust LLM service that manages connections to multiple providers (OpenA
 3.1.11. [ ] Set up cost tracking per provider
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/llm/service_test.exs` to verify:
+Create tests in `test/rubber_duck/llm/service_test.exs` to verify:
 3.1.12. [ ] Test multiple providers initialize correctly
 3.1.13. [ ] Test appropriate provider selection for models
 3.1.14. [ ] Test fallback to secondary provider on failure
@@ -336,13 +336,13 @@ Create tests in `test/coding_assistant/llm/service_test.exs` to verify:
 Implement specific adapters for each LLM provider, handling their unique APIs and response formats.
 
 #### Tasks:
-3.2.1. [ ] Create `CodingAssistant.LLM.Providers.OpenAI` module
+3.2.1. [ ] Create `RubberDuck.LLM.Providers.OpenAI` module
 3.2.2. [ ] Implement OpenAI API client:
    3.2.2.1. [ ] Chat completions endpoint
    3.2.2.2. [ ] Streaming support
    3.2.2.3. [ ] Function calling support
    3.2.2.4. [ ] Token counting
-3.2.3. [ ] Create `CodingAssistant.LLM.Providers.Anthropic` module
+3.2.3. [ ] Create `RubberDuck.LLM.Providers.Anthropic` module
 3.2.4. [ ] Implement Anthropic API client:
    3.2.4.1. [ ] Messages API
    3.2.4.2. [ ] Streaming responses
@@ -354,7 +354,7 @@ Implement specific adapters for each LLM provider, handling their unique APIs an
 3.2.9. [ ] Create mock provider for testing
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/llm/providers/` directory:
+Create tests in `test/rubber_duck/llm/providers/` directory:
 
 **OpenAI Provider Tests** (`openai_test.exs`):
 3.2.10. [ ] Test request formatting follows OpenAI API spec
@@ -377,7 +377,7 @@ Create tests in `test/coding_assistant/llm/providers/` directory:
 Implement the three-tier memory system (short-term, mid-term, long-term) for maintaining context across interactions.
 
 #### Tasks:
-3.3.1. [ ] Create `CodingAssistant.Memory.Manager` GenServer
+3.3.1. [ ] Create `RubberDuck.Memory.Manager` GenServer
 3.3.2. [ ] Implement short-term memory:
    3.3.2.1. [ ] Session-based storage
    3.3.2.2. [ ] Recent interaction tracking
@@ -397,7 +397,7 @@ Implement the three-tier memory system (short-term, mid-term, long-term) for mai
 3.3.9. [ ] Add privacy controls for memory
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/memory/manager_test.exs` to verify:
+Create tests in `test/rubber_duck/memory/manager_test.exs` to verify:
 3.3.10. [ ] Test storing interactions in short-term memory
 3.3.11. [ ] Test automatic expiration after limit
 3.3.12. [ ] Test pattern promotion to mid-term memory
@@ -411,7 +411,7 @@ Create tests in `test/coding_assistant/memory/manager_test.exs` to verify:
 Create sophisticated context building mechanisms that efficiently combine different memory levels and code context.
 
 #### Tasks:
-3.4.1. [ ] Create `CodingAssistant.Context.Builder` module
+3.4.1. [ ] Create `RubberDuck.Context.Builder` module
 3.4.2. [ ] Implement context strategies:
    3.4.2.1. [ ] FIM (Fill-in-the-Middle) builder
    3.4.2.2. [ ] RAG (Retrieval Augmented Generation) builder
@@ -426,7 +426,7 @@ Create sophisticated context building mechanisms that efficiently combine differ
 3.4.10. [ ] Add context compression techniques
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/context/builder_test.exs` to verify:
+Create tests in `test/rubber_duck/context/builder_test.exs` to verify:
 3.4.11. [ ] Test FIM context with appropriate window sizes
 3.4.12. [ ] Test RAG context includes similar code
 3.4.13. [ ] Test context caching improves performance
@@ -458,7 +458,7 @@ Set up the Reactor framework for defining and executing complex workflows with a
 
 #### Tasks:
 4.1.1. [ ] Add Reactor dependency to project
-4.1.2. [ ] Create `CodingAssistant.Workflows` module structure
+4.1.2. [ ] Create `RubberDuck.Workflows` module structure
 4.1.3. [ ] Implement base workflow behaviors
 4.1.4. [ ] Create workflow registry
 4.1.5. [ ] Set up workflow execution engine
@@ -470,7 +470,7 @@ Set up the Reactor framework for defining and executing complex workflows with a
 4.1.11. [ ] Set up workflow metrics collection
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/workflows/foundation_test.exs` to verify:
+Create tests in `test/rubber_duck/workflows/foundation_test.exs` to verify:
 4.1.12. [ ] Test simple workflow execution
 4.1.13. [ ] Test workflow handles step failures
 4.1.14. [ ] Test parallel step execution
@@ -484,7 +484,7 @@ Create tests in `test/coding_assistant/workflows/foundation_test.exs` to verify:
 Build language-specific AST parsers for deep code analysis. Start with Elixir and expand to other languages.
 
 #### Tasks:
-4.2.1. [ ] Create `CodingAssistant.Analysis.AST` module
+4.2.1. [ ] Create `RubberDuck.Analysis.AST` module
 4.2.2. [ ] Implement Elixir AST parser:
    4.2.2.1. [ ] Parse modules, functions, macros
    4.2.2.2. [ ] Extract function signatures
@@ -504,7 +504,7 @@ Build language-specific AST parsers for deep code analysis. Start with Elixir an
 4.2.8. [ ] Build AST pattern matching
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/analysis/ast_test.exs` to verify:
+Create tests in `test/rubber_duck/analysis/ast_test.exs` to verify:
 
 **Elixir Parser Tests**:
 4.2.9. [ ] Test module structure parsing
@@ -527,17 +527,17 @@ Create tests in `test/coding_assistant/analysis/ast_test.exs` to verify:
 Implement various analysis engines that can be composed into workflows for comprehensive code analysis.
 
 #### Tasks:
-4.3.1. [ ] Create `CodingAssistant.Analysis.Semantic` module:
+4.3.1. [ ] Create `RubberDuck.Analysis.Semantic` module:
    4.3.1.1. [ ] Dead code detection
    4.3.1.2. [ ] Unused variable analysis
    4.3.1.3. [ ] Complexity metrics
    4.3.1.4. [ ] Dependency analysis
-4.3.2. [ ] Create `CodingAssistant.Analysis.Style` module:
+4.3.2. [ ] Create `RubberDuck.Analysis.Style` module:
    4.3.2.1. [ ] Formatting violations
    4.3.2.2. [ ] Naming conventions
    4.3.2.3. [ ] Code smell detection
    4.3.2.4. [ ] Best practice violations
-4.3.3. [ ] Create `CodingAssistant.Analysis.Security` module:
+4.3.3. [ ] Create `RubberDuck.Analysis.Security` module:
    4.3.3.1. [ ] SQL injection detection
    4.3.3.2. [ ] XSS vulnerability scanning
    4.3.3.3. [ ] Hardcoded secrets detection
@@ -548,7 +548,7 @@ Implement various analysis engines that can be composed into workflows for compr
 4.3.7. [ ] Build analysis caching layer
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/analysis/engines_test.exs` to verify:
+Create tests in `test/rubber_duck/analysis/engines_test.exs` to verify:
 
 **Semantic Analysis Tests**:
 4.3.8. [ ] Test unused variable detection
@@ -571,7 +571,7 @@ Create tests in `test/coding_assistant/analysis/engines_test.exs` to verify:
 Create the comprehensive analysis workflow that combines all analysis engines with LLM-powered insights.
 
 #### Tasks:
-4.4.1. [ ] Create `CodingAssistant.Workflows.CompleteAnalysis`
+4.4.1. [ ] Create `RubberDuck.Workflows.CompleteAnalysis`
 4.4.2. [ ] Implement parallel analysis steps:
    4.4.2.1. [ ] File reading and validation
    4.4.2.2. [ ] Language detection
@@ -587,7 +587,7 @@ Create the comprehensive analysis workflow that combines all analysis engines wi
 4.4.8. [ ] Add incremental analysis support
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/workflows/complete_analysis_test.exs` to verify:
+Create tests in `test/rubber_duck/workflows/complete_analysis_test.exs` to verify:
 4.4.9. [ ] Test comprehensive file analysis
 4.4.10. [ ] Test all analysis types execute
 4.4.11. [ ] Test graceful handling of analysis failures
@@ -619,9 +619,9 @@ Implement WebSocket-based real-time communication for streaming code completions
 
 #### Tasks:
 5.1.1. [ ] Configure Phoenix endpoint for WebSocket support
-5.1.2. [ ] Create `CodingAssistantWeb.UserSocket` module
+5.1.2. [ ] Create `RubberDuckWeb.UserSocket` module
 5.1.3. [ ] Implement authentication for socket connections
-5.1.4. [ ] Create `CodingAssistantWeb.CodeChannel`:
+5.1.4. [ ] Create `RubberDuckWeb.CodeChannel`:
    5.1.4.1. [ ] Handle join with project authorization
    5.1.4.2. [ ] Implement completion streaming
    5.1.4.3. [ ] Add presence tracking
@@ -634,7 +634,7 @@ Implement WebSocket-based real-time communication for streaming code completions
 5.1.10. [ ] Document channel protocol
 
 #### Unit Tests:
-Create tests in `test/coding_assistant_web/channels/code_channel_test.exs` to verify:
+Create tests in `test/rubber_duck_web/channels/code_channel_test.exs` to verify:
 5.1.11. [ ] Test channel join with authentication
 5.1.12. [ ] Test completion streaming in chunks
 5.1.13. [ ] Test completion error handling
@@ -648,7 +648,7 @@ Create tests in `test/coding_assistant_web/channels/code_channel_test.exs` to ve
 Build an interactive web interface using Phoenix LiveView for real-time code editing and analysis.
 
 #### Tasks:
-5.2.1. [ ] Create `CodingAssistantWeb.EditorLive` module
+5.2.1. [ ] Create `RubberDuckWeb.EditorLive` module
 5.2.2. [ ] Implement code editor component:
    5.2.2.1. [ ] Syntax highlighting
    5.2.2.2. [ ] Auto-completion integration
@@ -664,7 +664,7 @@ Build an interactive web interface using Phoenix LiveView for real-time code edi
 5.2.10. [ ] Implement undo/redo functionality
 
 #### Unit Tests:
-Create tests in `test/coding_assistant_web/live/editor_live_test.exs` to verify:
+Create tests in `test/rubber_duck_web/live/editor_live_test.exs` to verify:
 5.2.11. [ ] Test editor renders with file content
 5.2.12. [ ] Test code changes with debouncing
 5.2.13. [ ] Test real-time completion display
@@ -678,7 +678,7 @@ Create tests in `test/coding_assistant_web/live/editor_live_test.exs` to verify:
 Create a feature-rich command-line interface for terminal users.
 
 #### Tasks:
-5.3.1. [ ] Create `CodingAssistant.CLI` module with Optimus
+5.3.1. [ ] Create `RubberDuck.CLI` module with Optimus
 5.3.2. [ ] Implement subcommands:
    5.3.2.1. [ ] `analyze` - Analyze files/projects
    5.3.2.2. [ ] `generate` - Generate code from prompts
@@ -694,7 +694,7 @@ Create a feature-rich command-line interface for terminal users.
 5.3.9. [ ] Add batch processing support
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/cli_test.exs` to verify:
+Create tests in `test/rubber_duck/cli_test.exs` to verify:
 5.3.10. [ ] Test analyze command execution
 5.3.11. [ ] Test generate command creates code
 5.3.12. [ ] Test JSON output formatting
@@ -709,7 +709,7 @@ Build a rich terminal user interface for interactive coding sessions.
 
 #### Tasks:
 5.4.1. [ ] Add Ratatouille dependency for TUI
-5.4.2. [ ] Create `CodingAssistant.TUI` application
+5.4.2. [ ] Create `RubberDuck.TUI` application
 5.4.3. [ ] Implement layout components:
    5.4.3.1. [ ] Code editor pane
    5.4.3.2. [ ] File tree sidebar
@@ -724,7 +724,7 @@ Build a rich terminal user interface for interactive coding sessions.
 5.4.10. [ ] Add mouse support where available
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/tui_test.exs` to verify:
+Create tests in `test/rubber_duck/tui_test.exs` to verify:
 5.4.11. [ ] Test initial layout structure
 5.4.12. [ ] Test keyboard navigation between panes
 5.4.13. [ ] Test command palette opening
@@ -775,7 +775,7 @@ Implement asynchronous job processing for resource-intensive operations like pro
 6.1.10. [ ] Set up job telemetry
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/workers/` directory to verify:
+Create tests in `test/rubber_duck/workers/` directory to verify:
 
 **ProjectIndexer Tests** (`project_indexer_test.exs`):
 6.1.11. [ ] Test indexing all project files
@@ -814,7 +814,7 @@ Implement comprehensive security measures including authentication, authorizatio
 6.2.7. [ ] Implement data encryption at rest
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/security/` directory:
+Create tests in `test/rubber_duck/security/` directory:
 
 **Authentication Tests** (`authentication_test.exs`):
 6.2.8. [ ] Test JWT token generation and verification
@@ -871,7 +871,7 @@ Implement comprehensive monitoring, logging, and observability features for prod
 6.3.8. [ ] Create SLO monitoring
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/monitoring/` directory:
+Create tests in `test/rubber_duck/monitoring/` directory:
 
 **Telemetry Tests** (`telemetry_test.exs`):
 6.3.9. [ ] Test completion event emission
@@ -928,7 +928,7 @@ Implement deployment configurations and scaling strategies for production enviro
 6.4.9. [ ] Create backup and restore procedures
 
 #### Unit Tests:
-Create tests in `test/coding_assistant/deployment/` directory:
+Create tests in `test/rubber_duck/deployment/` directory:
 
 **Clustering Tests** (`clustering_test.exs`):
 6.4.10. [ ] Test node discovery and connection
@@ -980,7 +980,7 @@ Create final system tests in `test/integration/complete_system_test.exs` to veri
 
 ## Conclusion
 
-This implementation plan provides a comprehensive roadmap for building a state-of-the-art Elixir-based coding assistant system. Each phase builds upon the previous ones, ensuring a solid foundation while progressively adding more sophisticated features. The extensive test suites ensure reliability and maintainability throughout the development process.
+This implementation plan provides a comprehensive roadmap for building RubberDuck, a state-of-the-art Elixir-based AI coding assistant system. Each phase builds upon the previous ones, ensuring a solid foundation while progressively adding more sophisticated features. The extensive test suites ensure reliability and maintainability throughout the development process.
 
 ### Key Deliverables Summary:
 
@@ -991,4 +991,4 @@ This implementation plan provides a comprehensive roadmap for building a state-o
 5. **Phase 5**: Real-time interfaces (WebSocket, LiveView, CLI/TUI)
 6. **Phase 6**: Production features (jobs, security, monitoring, deployment)
 
-The system leverages Elixir's strengths in concurrency, fault tolerance, and real-time communication to deliver a robust, scalable coding assistant that can handle enterprise-level demands while remaining extensible for future enhancements.
+RubberDuck leverages Elixir's strengths in concurrency, fault tolerance, and real-time communication to deliver a robust, scalable AI coding assistant that can handle enterprise-level demands while remaining extensible for future enhancements.
