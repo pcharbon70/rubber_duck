@@ -38,4 +38,5 @@ config :spark,
     "Ash.Domain": [section_order: [:resources, :policies, :authorization, :domain, :execution]]
   ]
 
+import_config "telemetry.exs"
 import_config "#{config_env()}.exs"
