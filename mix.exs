@@ -22,6 +22,7 @@ defmodule RubberDuck.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:usage_rules, "~> 0.1", only: [:dev]},
       {:sourceror, "~> 1.8", only: [:dev, :test]},
       {:ash_phoenix, "~> 2.0"},
       {:ash, "~> 3.0"},
