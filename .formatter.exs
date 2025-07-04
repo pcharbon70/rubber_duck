@@ -9,24 +9,19 @@
     "priv/*/seeds.exs",
     "priv/repo/migrations/*.exs"
   ],
-  
+
   # Plugins for DSL formatting
-  plugins: [
-    Spark.Formatter
-  ],
-  
+  plugins: [Spark.Formatter],
+
   # Import dependencies for proper formatting of their macros/functions
-  import_deps: [
-    :ash_phoenix,
-    :ash
-  ],
-  
+  import_deps: [:ash_postgres, :reactor, :ash_phoenix, :ash],
+
   # Subdirectories with their own formatter configuration
   subdirectories: ["apps/*"],
-  
+
   # Line length limit
   line_length: 120,
-  
+
   # Custom local functions to not add parentheses to
   locals_without_parens: [
     # Ash DSL
@@ -103,7 +98,7 @@
     upsert?: 1,
     validate: 1,
     validate: 2,
-    
+
     # Phoenix DSL
     plug: 1,
     plug: 2,
@@ -113,7 +108,7 @@
     controller: 1,
     view: 1,
     layout: 1,
-    
+
     # Phoenix LiveView
     live: 2,
     live: 3,
@@ -121,7 +116,7 @@
     live_session: 2,
     live_session: 3,
     on_mount: 1,
-    
+
     # Router helpers
     get: 2,
     get: 3,
@@ -136,7 +131,7 @@
     resources: 2,
     resources: 3,
     resources: 4,
-    
+
     # Ecto
     field: 1,
     field: 2,
@@ -153,14 +148,14 @@
     embeds_one: 3,
     embeds_many: 2,
     embeds_many: 3,
-    
+
     # Tests
     test: 1,
     test: 2,
     describe: 1,
     setup: 1,
     setup: 2,
-    
+
     # Reactor DSL
     step: 1,
     step: 2,
@@ -168,7 +163,7 @@
     return: 1,
     input: 1,
     input: 2,
-    
+
     # Custom RubberDuck DSL (future use)
     engine: 1,
     engine: 2,
@@ -179,7 +174,7 @@
     context_strategy: 1,
     context_strategy: 2
   ],
-  
+
   # Export the locals_without_parens for use in other projects
   export: [
     locals_without_parens: [

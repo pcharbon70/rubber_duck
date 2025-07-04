@@ -1,21 +1,49 @@
 # RubberDuck
 
-**TODO: Add description**
+RubberDuck is an Elixir-based AI coding assistant system built with the Ash Framework. The project aims to create a sophisticated, pluggable platform integrating modern LLM techniques with Elixir's strengths in concurrency, fault tolerance, and real-time communication.
 
-## Installation
+## Overview
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `rubber_duck` to your list of dependencies in `mix.exs`:
+RubberDuck leverages the power of the Ash Framework to provide a declarative, extensible foundation for building AI-powered coding assistance features. The system is designed to be:
 
-```elixir
-def deps do
-  [
-    {:rubber_duck, "~> 0.1.0"}
-  ]
-end
+- **Pluggable**: Modular architecture allowing easy extension and customization
+- **Concurrent**: Built on Elixir/OTP for robust concurrent processing
+- **Fault-tolerant**: Leveraging OTP supervision trees for resilient operation
+- **Real-time**: Supporting live, interactive coding assistance
+
+## Technology Stack
+
+- **Elixir**: Core programming language
+- **Ash Framework**: Declarative application framework
+- **Phoenix**: Web framework integration (via ash_phoenix)
+- **OTP**: For concurrency and fault tolerance
+
+## Implementation Plan
+
+For detailed implementation plans and architecture decisions, see the [Implementation Plan](planning/implementation_plan.md).
+
+## Getting Started
+
+```bash
+# Install dependencies
+mix deps.get
+
+# Run tests
+mix test
+
+# Start the application
+mix phx.server
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/rubber_duck>.
+## Development
 
+This project follows specific conventions and rules documented in `CLAUDE.md`. Key principles include:
+
+- Declarative design using Ash Framework patterns
+- Proper OTP supervision and fault tolerance
+- Idiomatic Elixir code following community standards
+- Comprehensive testing and documentation
+
+## Contributing
+
+Please refer to the project guidelines in `CLAUDE.md` and follow the established patterns when contributing to this codebase.
