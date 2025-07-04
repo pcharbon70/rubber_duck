@@ -28,6 +28,9 @@ For detailed implementation plans and architecture decisions, see the [Implement
 # Install dependencies
 mix deps.get
 
+# Install git hooks (recommended)
+./.githooks/install.sh
+
 # Run tests
 mix test
 
