@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(awk:*)",
+      "Bash(find:*)"
+    ],
+    "deny": []
+  },
+  "includeCoAuthoredBy": "false"
+}
