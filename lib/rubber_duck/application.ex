@@ -5,7 +5,10 @@ defmodule RubberDuck.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [RubberDuck.Repo]
+    children = [
+      RubberDuck.Repo,
+      RubberDuck.Telemetry
+    ]
 
     opts = [strategy: :one_for_one, name: RubberDuck.Supervisor]
     Supervisor.start_link(children, opts)
