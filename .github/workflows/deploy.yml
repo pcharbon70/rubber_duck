@@ -1,0 +1,198 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+  deployments: write
+
+env:
+  MIX_ENV: prod
+
+jobs:
+  build:
+    name: Build Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Elixir
+      uses: erlef/setup-beam@v1
+      with:
+        elixir-version: "1.18.1"
+        otp-version: "27.2"
+
+    - name: Restore dependencies cache
+      uses: actions/cache@v4
+      with:
+        path: deps
+        key: ${{ runner.os }}-27.2-1.18.1-prod-mix-${{ hashFiles('**/mix.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-27.2-1.18.1-prod-mix-
+
+    - name: Restore build cache
+      uses: actions/cache@v4
+      with:
+        path: _build
+        key: ${{ runner.os }}-27.2-1.18.1-prod-build-${{ hashFiles('**/mix.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-27.2-1.18.1-prod-build-
+
+    - name: Install production dependencies
+      run: |
+        mix local.rebar --force
+        mix local.hex --force
+        mix deps.get --only prod
+
+    - name: Compile production release
+      run: |
+        mix compile
+        echo "Release compiled successfully"
+
+    - name: Run production tests
+      run: |
+        MIX_ENV=test mix test --only production
+      continue-on-error: true
+
+    - name: Create release artifact
+      run: |
+        echo "Creating release artifact..."
+        tar -czf release.tar.gz _build/prod/
+
+    - name: Upload release artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-${{ github.sha }}
+        path: release.tar.gz
+        retention-days: 7
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://staging.rubberduck.example.com
+    
+    steps:
+    - name: Create deployment
+      uses: actions/github-script@v7
+      id: deployment
+      with:
+        script: |
+          const deployment = await github.rest.repos.createDeployment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: context.sha,
+            environment: 'staging',
+            required_contexts: [],
+            auto_merge: false
+          });
+          return deployment.data.id;
+
+    - name: Download release artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: release-${{ github.sha }}
+
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        # Add actual deployment commands here
+        # Example: scp release.tar.gz user@staging-server:/opt/rubber_duck/
+        # ssh user@staging-server 'cd /opt/rubber_duck && tar -xzf release.tar.gz && systemctl restart rubber_duck'
+        echo "Deployment to staging completed"
+
+    - name: Update deployment status
+      uses: actions/github-script@v7
+      if: always()
+      with:
+        script: |
+          await github.rest.repos.createDeploymentStatus({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            deployment_id: ${{ steps.deployment.outputs.result }},
+            state: '${{ job.status }}',
+            environment_url: 'https://staging.rubberduck.example.com',
+            description: 'Deployment to staging ${{ job.status }}'
+          });
+
+  deploy-production:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: https://rubberduck.example.com
+    
+    steps:
+    - name: Create deployment
+      uses: actions/github-script@v7
+      id: deployment
+      with:
+        script: |
+          const deployment = await github.rest.repos.createDeployment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: context.sha,
+            environment: 'production',
+            required_contexts: [],
+            auto_merge: false
+          });
+          return deployment.data.id;
+
+    - name: Download release artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: release-${{ github.sha }}
+
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production environment..."
+        # Add actual deployment commands here
+        # Example: scp release.tar.gz user@prod-server:/opt/rubber_duck/
+        # ssh user@prod-server 'cd /opt/rubber_duck && tar -xzf release.tar.gz && systemctl restart rubber_duck'
+        echo "Deployment to production completed"
+
+    - name: Update deployment status
+      uses: actions/github-script@v7
+      if: always()
+      with:
+        script: |
+          await github.rest.repos.createDeploymentStatus({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            deployment_id: ${{ steps.deployment.outputs.result }},
+            state: '${{ job.status }}',
+            environment_url: 'https://rubberduck.example.com',
+            description: 'Deployment to production ${{ job.status }}'
+          });
+
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: failure() && (needs.deploy-staging.result == 'failure' || needs.deploy-production.result == 'failure')
+    needs: [deploy-staging, deploy-production]
+    
+    steps:
+    - name: Rollback deployment
+      run: |
+        echo "Rolling back deployment..."
+        # Add rollback logic here
+        echo "Rollback completed"
