@@ -1,18 +1,21 @@
 defmodule RubberDuck do
   @moduledoc """
-  Documentation for `RubberDuck`.
+  RubberDuck is an Elixir-based AI coding assistant system built with the Ash Framework.
+  
+  This module serves as the main entry point for the RubberDuck application,
+  providing core functionality for code analysis, assistance, and LLM integration.
   """
 
   @doc """
-  Hello world.
+  Returns the application version.
 
   ## Examples
 
-      iex> RubberDuck.hello()
-      :world
+      iex> RubberDuck.version()
+      "0.1.0"
 
   """
-  def hello do
-    :world
+  def version do
+    Application.spec(:rubber_duck, :vsn) |> to_string()
   end
 end
