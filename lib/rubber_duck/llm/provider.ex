@@ -59,7 +59,16 @@ defmodule RubberDuck.LLM.Provider do
   """
   @callback health_check(ProviderConfig.t()) :: {:ok, map()} | {:error, term()}
   
-  @optional_callbacks [health_check: 1]
+  @doc """
+  Executes a streaming completion request.
+  
+  The callback function will be called for each chunk received.
+  Should return `{:ok, ref}` where ref can be used to track the stream.
+  """
+  @callback stream_completion(Request.t(), ProviderConfig.t(), function()) :: 
+    {:ok, reference()} | {:error, term()}
+  
+  @optional_callbacks [health_check: 1, stream_completion: 3]
   
   # Helper functions for providers
   

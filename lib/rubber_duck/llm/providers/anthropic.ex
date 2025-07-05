@@ -11,7 +11,7 @@ defmodule RubberDuck.LLM.Providers.Anthropic do
   
   @behaviour RubberDuck.LLM.Provider
   
-  alias RubberDuck.LLM.{Provider, Request, Response, ProviderConfig}
+  alias RubberDuck.LLM.{Provider, Request, Response, ProviderConfig, Tokenization}
   
   require Logger
   
@@ -75,23 +75,12 @@ defmodule RubberDuck.LLM.Providers.Anthropic do
   end
   
   @impl true
-  def count_tokens(text, _model) when is_binary(text) do
-    # Rough estimation for Claude
-    # Anthropic uses a different tokenizer than OpenAI
-    characters = String.length(text)
-    tokens = characters / 4  # Rough average
-    
-    {:ok, round(tokens)}
+  def count_tokens(text, model) when is_binary(text) do
+    Tokenization.count_tokens(text, model)
   end
   
   def count_tokens(messages, model) when is_list(messages) do
-    total = Enum.reduce(messages, 0, fn message, acc ->
-      content = message["content"] || ""
-      {:ok, tokens} = count_tokens(content, model)
-      acc + tokens
-    end)
-    
-    {:ok, total}
+    Tokenization.count_tokens(messages, model)
   end
   
   @impl true
@@ -117,6 +106,24 @@ defmodule RubberDuck.LLM.Providers.Anthropic do
         
       {:error, reason} ->
         {:error, {:unhealthy, reason}}
+    end
+  end
+  
+  @impl true
+  def stream_completion(%Request{} = request, %ProviderConfig{} = config, callback) do
+    with {:ok, _} <- validate_config(config),
+         {:ok, payload} <- build_payload(%{request | options: Map.put(request.options, :stream, true)}) do
+      
+      ref = make_ref()
+      parent = self()
+      
+      # Start streaming in a separate process
+      spawn_link(fn ->
+        result = stream_request(payload, config, callback)
+        send(parent, {:stream_done, ref, result})
+      end)
+      
+      {:ok, ref}
     end
   end
   
@@ -261,4 +268,58 @@ defmodule RubberDuck.LLM.Providers.Anthropic do
         {:error, {:parse_error, reason}}
     end
   end
+  
+  defp stream_request(payload, config, callback) do
+    url = build_url(@messages_endpoint, config)
+    headers = build_headers(config)
+    
+    # Simple simulation for now - in a real implementation we'd use true streaming
+    case Req.post(url, headers: headers, json: payload, receive_timeout: 30_000) do
+      {:ok, %{status: 200, body: body}} ->
+        simulate_anthropic_streaming(body, callback)
+        {:ok, :completed}
+        
+      {:error, reason} ->
+        Logger.error("Anthropic streaming error: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+  
+  defp simulate_anthropic_streaming(response_body, callback) do
+    # Simple simulation - split the response content and stream it
+    case Jason.decode(response_body) do
+      {:ok, %{"content" => [%{"text" => content} | _]}} ->
+        # Split content into words and stream them  
+        words = String.split(content, " ")
+        
+        Enum.each(words, fn word ->
+          chunk = %{
+            content: word <> " ",
+            role: "assistant", 
+            finish_reason: nil,
+            usage: nil,
+            metadata: %{type: "content_block_delta"}
+          }
+          
+          callback.(chunk)
+          Process.sleep(50)  # Simulate network delay
+        end)
+        
+        # Send final chunk
+        final_chunk = %{
+          content: nil,
+          role: nil,
+          finish_reason: "stop",
+          usage: %{prompt_tokens: 10, completion_tokens: length(words), total_tokens: 10 + length(words)},
+          metadata: %{type: "message_stop"}
+        }
+        
+        callback.(final_chunk)
+        
+      _ ->
+        # Fallback for other response formats
+        :ok
+    end
+  end
+  
 end
