@@ -47,7 +47,15 @@ defmodule RubberDuck.MixProject do
       {:hackney, "~> 1.20"},
       {:poolboy, "~> 1.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:excoveralls, "~> 0.18", only: :test}
+      {:excoveralls, "~> 0.18", only: :test},
+      
+      # LLM Integration dependencies
+      {:req, "~> 0.5"},
+      {:jason, "~> 1.4"},
+      {:tesla, "~> 1.8"},
+      {:finch, "~> 0.18"},
+      {:fuse, "~> 2.5"},  # Circuit breaker library
+      {:ex_rated, "~> 2.1"}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]

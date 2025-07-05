@@ -40,4 +40,5 @@ config :spark,
 
 import_config "telemetry.exs"
 import_config "tower.exs"
+import_config "llm.exs"
 import_config "#{config_env()}.exs"
