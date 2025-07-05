@@ -77,92 +77,92 @@ Create tests in `test/rubber_duck/repo_test.exs` to verify:
 Implement the fundamental domain models using Ash Framework. These models form the core data structures that represent projects, code files, and analysis results.
 
 #### Tasks:
-- [x] 1.3.1 Create Ash Domain module `RubberDuck.Workspace`
-- [x] 1.3.2 Implement `Project` resource:
-  - [x] 1.3.2.1 UUID primary key
-  - [x] 1.3.2.2 Name, description attributes
-  - [x] 1.3.2.3 Configuration JSON field
-  - [x] 1.3.2.4 Timestamps
-  - [x] 1.3.2.5 Default actions (CRUD)
-- [x] 1.3.3 Implement `CodeFile` resource:
-  - [x] 1.3.3.1 UUID primary key
-  - [x] 1.3.3.2 File path, content, language attributes
-  - [x] 1.3.3.3 AST cache field (JSONB)
-  - [x] 1.3.3.4 Embeddings array field
-  - [x] 1.3.3.5 Relationship to Project
-  - [x] 1.3.3.6 Custom semantic search action
-- [x] 1.3.4 Implement `AnalysisResult` resource:
-  - [x] 1.3.4.1 UUID primary key
-  - [x] 1.3.4.2 Analysis type, results attributes
-  - [x] 1.3.4.3 Severity level enum
-  - [x] 1.3.4.4 Relationship to CodeFile
-  - [x] 1.3.4.5 Timestamp tracking
-- [x] 1.3.5 Create Ash Registry module
-- [x] 1.3.6 Configure Ash authorization policies
-- [x] 1.3.7 Set up Ash API module
-- [x] 1.3.8 Generate Ash migrations
-- [x] 1.3.9 Create factory modules for testing
+- [ ] 1.3.1 Create Ash Domain module `RubberDuck.Workspace`
+- [ ] 1.3.2 Implement `Project` resource:
+  - [ ] 1.3.2.1 UUID primary key
+  - [ ] 1.3.2.2 Name, description attributes
+  - [ ] 1.3.2.3 Configuration JSON field
+  - [ ] 1.3.2.4 Timestamps
+  - [ ] 1.3.2.5 Default actions (CRUD)
+- [ ] 1.3.3 Implement `CodeFile` resource:
+  - [ ] 1.3.3.1 UUID primary key
+  - [ ] 1.3.3.2 File path, content, language attributes
+  - [ ] 1.3.3.3 AST cache field (JSONB)
+  - [ ] 1.3.3.4 Embeddings array field
+  - [ ] 1.3.3.5 Relationship to Project
+  - [ ] 1.3.3.6 Custom semantic search action
+- [ ] 1.3.4 Implement `AnalysisResult` resource:
+  - [ ] 1.3.4.1 UUID primary key
+  - [ ] 1.3.4.2 Analysis type, results attributes
+  - [ ] 1.3.4.3 Severity level enum
+  - [ ] 1.3.4.4 Relationship to CodeFile
+  - [ ] 1.3.4.5 Timestamp tracking
+- [ ] 1.3.5 Create Ash Registry module
+- [ ] 1.3.6 Configure Ash authorization policies
+- [ ] 1.3.7 Set up Ash API module
+- [ ] 1.3.8 Generate Ash migrations
+- [ ] 1.3.9 Create factory modules for testing
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/workspace/` directory:
 
 **Project Resource Tests** (`project_test.exs`):
-- [x] 1.3.10 Test creating project with valid attributes
-- [x] 1.3.11 Test that name attribute is required
-- [x] 1.3.12 Test storing configuration as JSON
-- [x] 1.3.13 Test project timestamps are automatically set
-- [x] 1.3.14 Test project soft delete functionality
+- [ ] 1.3.10 Test creating project with valid attributes
+- [ ] 1.3.11 Test that name attribute is required
+- [ ] 1.3.12 Test storing configuration as JSON
+- [ ] 1.3.13 Test project timestamps are automatically set
+- [ ] 1.3.14 Test project soft delete functionality
 
 **CodeFile Resource Tests** (`code_file_test.exs`):
-- [x] 1.3.15 Test creating code file with project association
-- [x] 1.3.16 Test semantic search finds relevant files
-- [x] 1.3.17 Test that file path is unique within project
-- [x] 1.3.18 Test embeddings array storage
-- [x] 1.3.19 Test AST cache JSON storage
+- [ ] 1.3.15 Test creating code file with project association
+- [ ] 1.3.16 Test semantic search finds relevant files
+- [ ] 1.3.17 Test that file path is unique within project
+- [ ] 1.3.18 Test embeddings array storage
+- [ ] 1.3.19 Test AST cache JSON storage
 
 **AnalysisResult Resource Tests** (`analysis_result_test.exs`):
-- [x] 1.3.20 Test creating analysis result with code file association
-- [x] 1.3.21 Test severity level enum validation
-- [x] 1.3.22 Test analysis type validation
-- [x] 1.3.23 Test results JSON structure
-- [x] 1.3.24 Test timestamp tracking
+- [ ] 1.3.20 Test creating analysis result with code file association
+- [ ] 1.3.21 Test severity level enum validation
+- [ ] 1.3.22 Test analysis type validation
+- [ ] 1.3.23 Test results JSON structure
+- [ ] 1.3.24 Test timestamp tracking
 
 ### 1.4 Basic Error Handling and Logging
 
 Establish comprehensive error handling and logging infrastructure to ensure system observability and debugging capabilities.
 
 #### Tasks:
-- [x] 1.4.1 Set up Logger configuration with different levels
-- [x] 1.4.2 Create custom error types module
-- [x] 1.4.3 Implement error normalization functions
-- [x] 1.4.4 Configure Telemetry events for key operations
-- [x] 1.4.5 Set up structured logging with metadata
-- [x] 1.4.6 Create error boundary GenServer
-- [x] 1.4.7 Implement circuit breaker pattern module
-- [x] 1.4.8 Add Sentry or similar error tracking
-- [x] 1.4.9 Create health check plug
-- [x] 1.4.10 Document error codes and meanings
+- [ ] 1.4.1 Set up Logger configuration with different levels
+- [ ] 1.4.2 Create custom error types module
+- [ ] 1.4.3 Implement error normalization functions
+- [ ] 1.4.4 Configure Telemetry events for key operations
+- [ ] 1.4.5 Set up structured logging with metadata
+- [ ] 1.4.6 Create error boundary GenServer
+- [ ] 1.4.7 Implement circuit breaker pattern module
+- [ ] 1.4.8 Add Sentry or similar error tracking
+- [ ] 1.4.9 Create health check plug
+- [ ] 1.4.10 Document error codes and meanings
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/error_handling_test.exs` to verify:
-- [x] 1.4.11 Test error normalization for different error formats
-- [x] 1.4.12 Test that stack traces are preserved when available
-- [x] 1.4.13 Test circuit breaker opens after threshold failures
-- [x] 1.4.14 Test circuit breaker resets after timeout
-- [x] 1.4.15 Test health check endpoint returns proper status
-- [x] 1.4.16 Test structured logging includes correlation IDs
-- [x] 1.4.17 Test error boundary catches and logs crashes
+- [ ] 1.4.11 Test error normalization for different error formats
+- [ ] 1.4.12 Test that stack traces are preserved when available
+- [ ] 1.4.13 Test circuit breaker opens after threshold failures
+- [ ] 1.4.14 Test circuit breaker resets after timeout
+- [ ] 1.4.15 Test health check endpoint returns proper status
+- [ ] 1.4.16 Test structured logging includes correlation IDs
+- [ ] 1.4.17 Test error boundary catches and logs crashes
 
 ### Phase 1 Integration Tests
 
 Create comprehensive integration tests in `test/integration/phase_1_test.exs` to verify:
-- [x] 1.5.1 Test complete workflow of creating project with files and analysis results
-- [x] 1.5.2 Test that relationships between models work correctly
-- [x] 1.5.3 Test error handling throughout the stack
-- [x] 1.5.4 Test that logging and telemetry capture events correctly
-- [x] 1.5.5 Test database transaction rollback on failures
-- [x] 1.5.6 Test concurrent access to resources
-- [x] 1.5.7 Test API endpoints return proper responses
+- [ ] 1.5.1 Test complete workflow of creating project with files and analysis results
+- [ ] 1.5.2 Test that relationships between models work correctly
+- [ ] 1.5.3 Test error handling throughout the stack
+- [ ] 1.5.4 Test that logging and telemetry capture events correctly
+- [ ] 1.5.5 Test database transaction rollback on failures
+- [ ] 1.5.6 Test concurrent access to resources
+- [ ] 1.5.7 Test API endpoints return proper responses
 
 ---
 
