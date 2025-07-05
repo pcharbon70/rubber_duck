@@ -136,7 +136,7 @@ MANDATORY BEFORE ANY IMPLEMENTATION:
 **FINAL REQUIREMENTS**:
 1. Present summary of implementation
 2. Show test results
-3. Write summary of implementation under the notes directory.
+3. Write summary of implementation in `<project_root>/notes/features/<number>-<name>-summary.md`
 
 # REMEMBER
 

@@ -9,7 +9,12 @@ defmodule RubberDuck.Application do
       RubberDuck.Repo,
       RubberDuck.Telemetry,
       # Registry for circuit breakers
-      {Registry, keys: :unique, name: RubberDuck.CircuitBreakerRegistry}
+      {Registry, keys: :unique, name: RubberDuck.CircuitBreakerRegistry},
+      # Registry for engines
+      {Registry, keys: :unique, name: RubberDuck.Engine.Registry, id: RubberDuck.Engine.ProcessRegistry},
+      # Engine system components
+      RubberDuck.Engine.CapabilityRegistry,
+      RubberDuck.Engine.Supervisor
       # Error boundary GenServer - started manually in tests
       # RubberDuck.ErrorBoundary
     ]
