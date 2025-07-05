@@ -1,6 +1,6 @@
 import Config
 
-config :rubber_duck, ecto_repos: [RubberDuck.Repo]
+config :rubber_duck, ecto_repos: [RubberDuck.Repo], ash_domains: [RubberDuck.Workspace]
 
 config :ash,
   allow_forbidden_field_for_relationships_by_default?: true,

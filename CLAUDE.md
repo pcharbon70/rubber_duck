@@ -182,3 +182,8 @@ _
 [ash_phoenix usage rules](deps/ash_phoenix/usage-rules.md)
 <!-- ash_phoenix-end -->
 <!-- usage-rules-end -->
+
+# Memories
+
+## Design Rules
+- IMPORTANT: Follow the feature.md rules when asked to implement a feature
