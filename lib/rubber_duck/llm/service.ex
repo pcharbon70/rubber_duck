@@ -110,6 +110,26 @@ defmodule RubberDuck.LLM.Service do
   end
   
   @doc """
+  Sends a streaming completion request.
+  
+  The callback function will be called for each chunk received.
+  Returns a reference that can be used to track the stream.
+  
+  ## Example
+  
+      {:ok, ref} = LLM.Service.completion_stream(
+        [model: "gpt-4", messages: messages],
+        fn chunk ->
+          IO.write(chunk.content)
+        end
+      )
+  """
+  @spec completion_stream(keyword(), function()) :: {:ok, reference()} | {:error, term()}
+  def completion_stream(opts, callback) when is_function(callback, 1) do
+    GenServer.call(__MODULE__, {:completion_stream, opts, callback})
+  end
+  
+  @doc """
   Lists available models across all providers.
   """
   @spec list_models() :: {:ok, [%{model: String.t(), provider: atom(), available: boolean()}]}
@@ -213,6 +233,39 @@ defmodule RubberDuck.LLM.Service do
   end
   
   @impl true
+  def handle_call({:completion_stream, opts, callback}, from, state) do
+    case validate_request(opts, state) do
+      {:ok, request} ->
+        # Mark request as streaming
+        request = Map.put(request, :stream, true)
+        request = Map.put(request, :stream_callback, callback)
+        
+        # For now, use mock provider for streaming
+        provider_name = if request.model == "mock-fast", do: :mock, else: request.provider
+        
+        case get_provider_for_request(request, state) do
+          {:ok, provider_name, provider_state} ->
+            # Start streaming in a separate process
+            ref = make_ref()
+            parent = self()
+            
+            spawn_link(fn ->
+              result = handle_streaming_request(request, provider_name, provider_state, callback)
+              send(parent, {:stream_complete, ref, from, result})
+            end)
+            
+            {:reply, {:ok, ref}, state}
+            
+          {:error, reason} ->
+            {:reply, {:error, reason}, state}
+        end
+        
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+  
+  @impl true
   def handle_call(:list_models, _from, state) do
     models = for {model, provider_name} <- state.model_mapping do
       provider_state = Map.get(state.providers, provider_name)
@@ -257,6 +310,13 @@ defmodule RubberDuck.LLM.Service do
   def handle_info({:request_complete, request_id, result}, state) do
     new_state = handle_request_completion(request_id, result, state)
     {:noreply, new_state}
+  end
+  
+  @impl true
+  def handle_info({:stream_complete, ref, from, _result}, state) do
+    # Notify the original caller that streaming is complete
+    send(elem(from, 0), {:stream_complete, ref})
+    {:noreply, state}
   end
   
   # Private Functions
@@ -621,5 +681,81 @@ defmodule RubberDuck.LLM.Service do
   
   defp schedule_queue_processing do
     Process.send_after(self(), :process_queue, 100)
+  end
+  
+  defp get_provider_for_request(request, state) do
+    provider_name = request.provider || Map.get(state.model_mapping, request.model)
+    
+    case Map.get(state.providers, provider_name) do
+      nil ->
+        {:error, :provider_not_found}
+        
+      provider_state ->
+        if provider_state.circuit_state == :closed do
+          {:ok, provider_name, provider_state}
+        else
+          # Try fallback
+          case find_fallback_provider(request, state) do
+            {:ok, fallback_name} ->
+              {:ok, fallback_name, Map.get(state.providers, fallback_name)}
+              
+            :error ->
+              {:error, :all_providers_unavailable}
+          end
+        end
+    end
+  end
+  
+  defp handle_streaming_request(request, provider_name, provider_state, callback) do
+    # For mock provider, simulate streaming
+    if provider_name == :mock do
+      simulate_mock_streaming(request, callback)
+    else
+      # Use provider's streaming capability
+      adapter = provider_state.config.adapter
+      
+      if function_exported?(adapter, :stream_completion, 3) do
+        adapter.stream_completion(request, provider_state.config, callback)
+      else
+        {:error, :streaming_not_supported}
+      end
+    end
+  end
+  
+  defp simulate_mock_streaming(request, callback) do
+    # Simulate streaming response for mock provider
+    messages = [
+      "This ", "is ", "a ", "streaming ", "response ", "from ", "the ", "mock ", "provider."
+    ]
+    
+    Enum.each(messages, fn content ->
+      chunk = %{
+        content: content,
+        role: "assistant",
+        finish_reason: nil,
+        usage: nil,
+        metadata: %{}
+      }
+      
+      callback.(chunk)
+      Process.sleep(100)  # Simulate network delay
+    end)
+    
+    # Final chunk with usage info
+    final_chunk = %{
+      content: nil,
+      role: nil,
+      finish_reason: "stop",
+      usage: %{
+        prompt_tokens: 10,
+        completion_tokens: 9,
+        total_tokens: 19
+      },
+      metadata: %{}
+    }
+    
+    callback.(final_chunk)
+    
+    {:ok, :completed}
   end
 end

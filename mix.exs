@@ -55,7 +55,9 @@ defmodule RubberDuck.MixProject do
       {:tesla, "~> 1.8"},
       {:finch, "~> 0.18"},
       {:fuse, "~> 2.5"},  # Circuit breaker library
-      {:ex_rated, "~> 2.1"}
+      {:ex_rated, "~> 2.1"},
+      {:tiktoken, "~> 0.4"},  # OpenAI tokenization
+      {:tokenizers, "~> 0.5"}  # HuggingFace tokenizers for Anthropic
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
