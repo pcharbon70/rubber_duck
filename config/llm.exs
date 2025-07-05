@@ -1,0 +1,80 @@
+import Config
+
+# LLM Service Configuration
+config :rubber_duck, RubberDuck.LLM.Service,
+  providers: [
+    %{
+      name: :openai,
+      adapter: RubberDuck.LLM.Providers.OpenAI,
+      api_key: System.get_env("OPENAI_API_KEY"),
+      models: ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
+      priority: 1,
+      rate_limit: {100, :minute},
+      max_retries: 3,
+      timeout: 30_000
+    },
+    %{
+      name: :anthropic,
+      adapter: RubberDuck.LLM.Providers.Anthropic,
+      api_key: System.get_env("ANTHROPIC_API_KEY"),
+      models: ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"],
+      priority: 2,
+      rate_limit: {50, :minute},
+      max_retries: 3,
+      timeout: 30_000
+    },
+    %{
+      name: :mock,
+      adapter: RubberDuck.LLM.Providers.Mock,
+      models: ["mock-fast", "mock-smart", "mock-vision"],
+      priority: 99,  # Low priority, only used as last resort
+      max_retries: 1,
+      timeout: 5_000,
+      options: [
+        simulate_delay: false,
+        response_template: nil
+      ]
+    }
+  ],
+  # Global settings
+  queue_check_interval: 100,
+  health_check_interval: 30_000,
+  default_timeout: 30_000
+
+# Development overrides
+if config_env() == :dev do
+  config :rubber_duck, RubberDuck.LLM.Service,
+    providers: [
+      %{
+        name: :mock,
+        adapter: RubberDuck.LLM.Providers.Mock,
+        models: ["mock-fast", "mock-smart", "mock-vision"],
+        priority: 1,
+        max_retries: 1,
+        timeout: 1_000,
+        options: [
+          simulate_delay: true
+        ]
+      }
+    ]
+end
+
+# Test overrides  
+if config_env() == :test do
+  config :rubber_duck, RubberDuck.LLM.Service,
+    providers: [
+      %{
+        name: :mock,
+        adapter: RubberDuck.LLM.Providers.Mock,
+        models: ["mock-fast", "mock-smart"],
+        priority: 1,
+        max_retries: 1,
+        timeout: 100,
+        options: [
+          simulate_delay: false
+        ]
+      }
+    ],
+    queue_check_interval: 10,
+    health_check_interval: 60_000
+end

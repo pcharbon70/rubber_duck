@@ -19,7 +19,9 @@ defmodule RubberDuck.Application do
       {Registry, keys: :unique, name: RubberDuck.Plugin.Registry},
       RubberDuck.Plugin.Supervisor,
       RubberDuck.Plugin.MessageBus,
-      RubberDuck.PluginManager
+      RubberDuck.PluginManager,
+      # LLM system components
+      RubberDuck.LLM.Supervisor
       # Error boundary GenServer - started manually in tests
       # RubberDuck.ErrorBoundary
     ]
