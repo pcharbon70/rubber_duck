@@ -1,5 +1,6 @@
 defmodule RubberDuck.GitHooksTest do
   use ExUnit.Case, async: true
+  import Bitwise
 
   @hooks_dir ".githooks"
   @pre_commit_hook Path.join(@hooks_dir, "pre-commit")
@@ -14,19 +15,23 @@ defmodule RubberDuck.GitHooksTest do
       assert File.exists?(@pre_commit_hook), "pre-commit hook should exist"
       
       # Check if file is executable (on Unix-like systems)
-      if :os.type() == {:unix, _} do
+      case :os.type() do
+        {:unix, _} ->
         stat = File.stat!(@pre_commit_hook)
         # Check if any execute bit is set (owner, group, or other)
         assert (stat.mode &&& 0o111) != 0, "pre-commit hook should be executable"
+        _ -> :ok
       end
     end
 
     test "install script exists and is executable" do
       assert File.exists?(@install_script), "install.sh script should exist"
       
-      if :os.type() == {:unix, _} do
+      case :os.type() do
+        {:unix, _} ->
         stat = File.stat!(@install_script)
         assert (stat.mode &&& 0o111) != 0, "install.sh should be executable"
+        _ -> :ok
       end
     end
 
@@ -69,18 +74,20 @@ defmodule RubberDuck.GitHooksTest do
   end
 
   describe "install script" do
-    test "install script creates symlink to git hooks" do
+    test "install script configures git hooks path" do
       content = File.read!(@install_script)
-      assert content =~ "ln -sf", 
-             "install script should create symlink"
-      assert content =~ ".git/hooks/pre-commit", 
-             "install script should link to .git/hooks/pre-commit"
+      assert content =~ "git config core.hooksPath .githooks", 
+             "install script should configure git hooks path"
+      assert content =~ "Making hooks executable", 
+             "install script should make hooks executable"
     end
 
-    test "install script handles existing hooks" do
+    test "install script verifies installation" do
       content = File.read!(@install_script)
-      assert content =~ "backup", 
-             "install script should handle existing hooks by creating backups"
+      assert content =~ "Verify installation", 
+             "install script should verify installation"
+      assert content =~ "Available hooks:",
+             "install script should list available hooks"
     end
   end
 
