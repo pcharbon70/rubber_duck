@@ -10,6 +10,8 @@
 
 ### Phase 2: Pluggable Engine System
 - **Section 2.1: Spark DSL Foundation** ✅ Completed
+- **Section 2.2: Base Engine Behavior** ✅ Completed (with pooling enhancement)
+- **Section 2.3: Plugin Architecture for Extensibility** ✅ Completed
 
 ### Phase 3-6: Not Started
 
@@ -244,54 +246,54 @@ Define the common behavior that all engines must implement. This ensures consist
 - [x] 2.2.3 Define callback: `execute(input, state)` (completed in 2.1)
 - [-] 2.2.4 Define callback: `validate_input(input)` (deferred - using pattern matching instead)
 - [x] 2.2.5 Define callback: `capabilities()` (completed in 2.1)
-- [ ] 2.2.6 Create base engine GenServer template
-- [ ] 2.2.7 Implement engine supervision tree
-- [ ] 2.2.8 Add engine lifecycle management
-- [ ] 2.2.9 Create engine communication protocol
-- [ ] 2.2.10 Implement engine health checks
-- [ ] 2.2.11 Document behavior requirements
-- [ ] 2.2.12 Implement multi-engine abstraction layer
-- [ ] 2.2.13 Create engine registry with capability matching
-- [ ] 2.2.14 Add support for engine composition
+- [x] 2.2.6 Create base engine GenServer template (Engine.Server)
+- [x] 2.2.7 Implement engine supervision tree (Engine.Supervisor)
+- [x] 2.2.8 Add engine lifecycle management (Engine.Manager)
+- [x] 2.2.9 Create engine communication protocol (via Registry)
+- [x] 2.2.10 Implement engine health checks
+- [x] 2.2.11 Document behavior requirements
+- [x] 2.2.12 Implement multi-engine abstraction layer (Manager)
+- [x] 2.2.13 Create engine registry with capability matching (CapabilityRegistry)
+- [x] 2.2.14 Add support for engine composition (via pooling)
 
 #### Unit Tests:
-Create tests in `test/rubber_duck/engine/behavior_test.exs` to verify:
-- [ ] 2.2.15 Test that all required callbacks are implemented
-- [ ] 2.2.16 Test input validation accepts valid input
-- [ ] 2.2.17 Test input validation rejects invalid input
-- [ ] 2.2.18 Test capabilities returns expected structure
-- [ ] 2.2.19 Test engine initialization with configuration
-- [ ] 2.2.20 Test engine process returns expected format
-- [ ] 2.2.21 Test engine registry lookups
-- [ ] 2.2.22 Test capability-based engine selection
+Create tests in `test/rubber_duck/engine/` directory:
+- [x] 2.2.15 Test that all required callbacks are implemented (completed)
+- [x] 2.2.16 Test input validation accepts valid input (using pattern matching)
+- [x] 2.2.17 Test input validation rejects invalid input (using pattern matching)
+- [x] 2.2.18 Test capabilities returns expected structure (completed)
+- [x] 2.2.19 Test engine initialization with configuration (completed)
+- [x] 2.2.20 Test engine process returns expected format (completed)
+- [x] 2.2.21 Test engine registry lookups (completed)
+- [x] 2.2.22 Test capability-based engine selection (completed)
 
 ### 2.3 Plugin Architecture for Extensibility
 
 Implement a flexible plugin system that allows adding new capabilities and LLM enhancement techniques without modifying core engine code.
 
 #### Tasks:
-- [ ] 2.3.1 Create `RubberDuck.Plugin` behavior module
-- [ ] 2.3.2 Define plugin callbacks:
-  - [ ] 2.3.2.1 `name/0` - Plugin identifier
-  - [ ] 2.3.2.2 `execute/2` - Main execution logic
-  - [ ] 2.3.2.3 `supported_types/0` - Data types handled
-- [ ] 2.3.3 Create `RubberDuck.PluginManager` GenServer
-- [ ] 2.3.4 Implement plugin registration system
-- [ ] 2.3.5 Add plugin discovery mechanism
-- [ ] 2.3.6 Create plugin configuration DSL
-- [ ] 2.3.7 Implement plugin lifecycle management
-- [ ] 2.3.8 Add plugin dependency resolution
-- [ ] 2.3.9 Create plugin isolation boundaries
-- [ ] 2.3.10 Implement plugin communication protocol
+- [x] 2.3.1 Create `RubberDuck.Plugin` behavior module
+- [x] 2.3.2 Define plugin callbacks:
+  - [x] 2.3.2.1 `name/0` - Plugin identifier
+  - [x] 2.3.2.2 `execute/2` - Main execution logic
+  - [x] 2.3.2.3 `supported_types/0` - Data types handled
+- [x] 2.3.3 Create `RubberDuck.PluginManager` GenServer
+- [x] 2.3.4 Implement plugin registration system
+- [x] 2.3.5 Add plugin discovery mechanism (basic implementation)
+- [x] 2.3.6 Create plugin configuration DSL (using Spark)
+- [x] 2.3.7 Implement plugin lifecycle management
+- [x] 2.3.8 Add plugin dependency resolution
+- [x] 2.3.9 Create plugin isolation boundaries (Plugin.Runner)
+- [x] 2.3.10 Implement plugin communication protocol (MessageBus)
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/plugin_test.exs` to verify:
-- [ ] 2.3.11 Test plugin registration and discovery
-- [ ] 2.3.12 Test plugin execution with valid input
-- [ ] 2.3.13 Test plugin type matching
-- [ ] 2.3.14 Test plugin lifecycle events
-- [ ] 2.3.15 Test plugin isolation and error handling
-- [ ] 2.3.16 Test plugin dependency resolution
+- [x] 2.3.11 Test plugin registration and discovery
+- [x] 2.3.12 Test plugin execution with valid input
+- [x] 2.3.13 Test plugin type matching
+- [x] 2.3.14 Test plugin lifecycle events
+- [x] 2.3.15 Test plugin isolation and error handling
+- [x] 2.3.16 Test plugin dependency resolution
 
 ### 2.4 Protocol-based Extensibility
 
