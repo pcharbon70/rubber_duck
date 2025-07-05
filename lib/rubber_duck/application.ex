@@ -14,7 +14,12 @@ defmodule RubberDuck.Application do
       {Registry, keys: :unique, name: RubberDuck.Engine.Registry, id: RubberDuck.Engine.ProcessRegistry},
       # Engine system components
       RubberDuck.Engine.CapabilityRegistry,
-      RubberDuck.Engine.Supervisor
+      RubberDuck.Engine.Supervisor,
+      # Plugin system components
+      {Registry, keys: :unique, name: RubberDuck.Plugin.Registry},
+      RubberDuck.Plugin.Supervisor,
+      RubberDuck.Plugin.MessageBus,
+      RubberDuck.PluginManager
       # Error boundary GenServer - started manually in tests
       # RubberDuck.ErrorBoundary
     ]
