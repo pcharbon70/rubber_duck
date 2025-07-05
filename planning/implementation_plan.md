@@ -127,31 +127,47 @@ Create tests in `test/rubber_duck/workspace/` directory:
 - [ ] 1.3.23 Test results JSON structure
 - [ ] 1.3.24 Test timestamp tracking
 
-### 1.4 Basic Error Handling and Logging
+### 1.4 Error Handling and Logging with Tower
 
-Establish comprehensive error handling and logging infrastructure to ensure system observability and debugging capabilities.
+Establish comprehensive error handling and logging infrastructure using the Tower library to ensure system observability and debugging capabilities with flexible error reporting.
 
 #### Tasks:
-- [ ] 1.4.1 Set up Logger configuration with different levels
-- [ ] 1.4.2 Create custom error types module
-- [ ] 1.4.3 Implement error normalization functions
-- [ ] 1.4.4 Configure Telemetry events for key operations
-- [ ] 1.4.5 Set up structured logging with metadata
-- [ ] 1.4.6 Create error boundary GenServer
-- [ ] 1.4.7 Implement circuit breaker pattern module
-- [ ] 1.4.8 Add Sentry or similar error tracking
-- [ ] 1.4.9 Create health check plug
-- [ ] 1.4.10 Document error codes and meanings
+- [ ] 1.4.1 Add Tower dependency to mix.exs
+- [ ] 1.4.2 Configure Tower with multiple reporters:
+  - [ ] 1.4.2.1 Set up development reporter (console/file)
+  - [ ] 1.4.2.2 Configure production reporter (Sentry/Rollbar)
+  - [ ] 1.4.2.3 Add Slack reporter for critical errors
+  - [ ] 1.4.2.4 Configure email reporter for alerts
+- [ ] 1.4.3 Set up Logger configuration with Tower backend
+- [ ] 1.4.4 Configure Tower error filtering:
+  - [ ] 1.4.4.1 Ignore expected errors (e.g., Ecto.NoResultsError)
+  - [ ] 1.4.4.2 Set appropriate log levels
+  - [ ] 1.4.4.3 Configure metadata capture (user_id, request_id)
+- [ ] 1.4.5 Create custom error types module
+- [ ] 1.4.6 Implement error normalization for Tower.Event
+- [ ] 1.4.7 Configure Telemetry events with Tower integration
+- [ ] 1.4.8 Set up structured logging with metadata
+- [ ] 1.4.9 Create error boundary GenServer using Tower.report_exception
+- [ ] 1.4.10 Implement circuit breaker pattern module
+- [ ] 1.4.11 Add Tower Plug for Phoenix error tracking
+- [ ] 1.4.12 Create health check plug
+- [ ] 1.4.13 Document error codes and Tower configuration
+- [ ] 1.4.14 Set up error reporting dashboards
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/error_handling_test.exs` to verify:
-- [ ] 1.4.11 Test error normalization for different error formats
-- [ ] 1.4.12 Test that stack traces are preserved when available
-- [ ] 1.4.13 Test circuit breaker opens after threshold failures
-- [ ] 1.4.14 Test circuit breaker resets after timeout
-- [ ] 1.4.15 Test health check endpoint returns proper status
-- [ ] 1.4.16 Test structured logging includes correlation IDs
-- [ ] 1.4.17 Test error boundary catches and logs crashes
+- [ ] 1.4.15 Test Tower configuration loads correctly
+- [ ] 1.4.16 Test error reporting through Tower.report_exception
+- [ ] 1.4.17 Test that ignored exceptions are not reported
+- [ ] 1.4.18 Test metadata is captured with errors
+- [ ] 1.4.19 Test error normalization to Tower.Event
+- [ ] 1.4.20 Test that stack traces are preserved
+- [ ] 1.4.21 Test circuit breaker opens after threshold failures
+- [ ] 1.4.22 Test circuit breaker resets after timeout
+- [ ] 1.4.23 Test health check endpoint returns proper status
+- [ ] 1.4.24 Test structured logging includes correlation IDs
+- [ ] 1.4.25 Test error boundary catches and reports crashes
+- [ ] 1.4.26 Test multiple reporters receive error events
 
 ### Phase 1 Integration Tests
 
