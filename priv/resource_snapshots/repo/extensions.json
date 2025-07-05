@@ -1,6 +1,11 @@
 {
   "ash_functions_version": 5,
   "installed": [
-    "ash-functions"
+    "ash-functions",
+    "uuid-ossp",
+    "pgcrypto",
+    "pg_trgm",
+    "btree_gin",
+    "vector"
   ]
 }

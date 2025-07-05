@@ -13,6 +13,18 @@ defmodule RubberDuck.Repo do
 
   def installed_extensions do
     # Add extensions here, and the migration generator will install them.
-    ["ash-functions"]
+    [
+      "ash-functions",
+      # UUID generation
+      "uuid-ossp",
+      # Encryption support
+      "pgcrypto",
+      # Trigram similarity search
+      "pg_trgm",
+      # GIN index support
+      "btree_gin",
+      # pgvector for embeddings
+      "vector"
+    ]
   end
 end
