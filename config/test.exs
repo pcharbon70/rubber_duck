@@ -10,3 +10,8 @@ config :rubber_duck, RubberDuck.Repo,
   database: "rubber_duck_test#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: 10
+
+# Tower configuration for testing
+# Minimal configuration to avoid noise during tests
+config :tower,
+  reporters: []
