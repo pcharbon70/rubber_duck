@@ -155,7 +155,7 @@ defmodule RubberDuck.ProtocolTestHelpers do
       data = generator.()
       result = RubberDuck.Processor.process(data)
       
-      assert match?({:ok, _} | {:error, _}, result),
+      assert match?({:ok, _}, result) or match?({:error, _}, result),
              "Process should always return {:ok, _} or {:error, _}"
     end
     
@@ -299,7 +299,8 @@ defmodule RubberDuck.ProtocolTestHelpers do
     valid1 = protocol.validate(data1)
     valid2 = protocol.validate(data2)
     
-    assert match?({^valid1, ^valid2}, {valid1, valid2}) when valid1 in [:ok, {:error, _}],
+    assert (valid1 == :ok and valid2 == :ok) or 
+           (match?({:error, _}, valid1) and match?({:error, _}, valid2)),
            "Validation should be consistent for similar data"
   end
   

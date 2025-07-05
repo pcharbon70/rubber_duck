@@ -322,34 +322,34 @@ Create tests in `test/rubber_duck/protocols_test.exs` to verify:
 - [ ] 2.4.11 Test protocol consolidation
 - [ ] 2.4.12 Test custom implementations
 
-### 2.5 Code Completion Engine
+### 2.5 Code Completion Engine ✅
 
 Implement the first concrete engine for code completion. This engine uses Fill-in-the-Middle (FIM) context strategy to provide intelligent code suggestions.
 
 #### Tasks:
-- [ ] 2.5.1 Create `RubberDuck.Engines.Completion` module
-- [ ] 2.5.2 Implement Engine behavior callbacks
-- [ ] 2.5.3 Add FIM context building logic:
-  - [ ] 2.5.3.1 Extract prefix context (code before cursor)
-  - [ ] 2.5.3.2 Extract suffix context (code after cursor)
-  - [ ] 2.5.3.3 Build prompt with special tokens
-- [ ] 2.5.4 Implement completion ranking algorithm
-- [ ] 2.5.5 Add caching for recent completions
-- [ ] 2.5.6 Support multiple completion suggestions
-- [ ] 2.5.7 Implement incremental completion updates
-- [ ] 2.5.8 Add language-specific completion rules
-- [ ] 2.5.9 Create completion filtering logic
-- [ ] 2.5.10 Add telemetry events for completion metrics
+- [x] 2.5.1 Create `RubberDuck.Engines.Completion` module
+- [x] 2.5.2 Implement Engine behavior callbacks
+- [x] 2.5.3 Add FIM context building logic:
+  - [x] 2.5.3.1 Extract prefix context (code before cursor)
+  - [x] 2.5.3.2 Extract suffix context (code after cursor)
+  - [x] 2.5.3.3 Build prompt with special tokens
+- [x] 2.5.4 Implement completion ranking algorithm
+- [x] 2.5.5 Add caching for recent completions
+- [x] 2.5.6 Support multiple completion suggestions
+- [x] 2.5.7 Implement incremental completion updates
+- [x] 2.5.8 Add language-specific completion rules
+- [x] 2.5.9 Create completion filtering logic
+- [x] 2.5.10 Add telemetry events for completion metrics
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/engines/completion_test.exs` to verify:
-- [ ] 2.5.11 Test FIM context builds correctly with prefix and suffix
-- [ ] 2.5.12 Test completions are generated for valid input
-- [ ] 2.5.13 Test completion results include text and scores
-- [ ] 2.5.14 Test caching returns same results for identical input
-- [ ] 2.5.15 Test language-specific rules are applied
-- [ ] 2.5.16 Test telemetry events are emitted
-- [ ] 2.5.17 Test incremental updates work correctly
+- [x] 2.5.11 Test FIM context builds correctly with prefix and suffix
+- [x] 2.5.12 Test completions are generated for valid input
+- [x] 2.5.13 Test completion results include text and scores
+- [x] 2.5.14 Test caching returns same results for identical input
+- [x] 2.5.15 Test language-specific rules are applied
+- [x] 2.5.16 Test telemetry events are emitted
+- [x] 2.5.17 Test incremental updates work correctly
 
 ### 2.6 Code Generation Engine
 
