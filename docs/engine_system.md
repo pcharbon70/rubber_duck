@@ -46,6 +46,9 @@ Each engine has the following configurable attributes:
 - `priority` - Execution priority (0-1000, higher runs first)
 - `timeout` - Maximum execution time in milliseconds
 - `config` - Engine-specific configuration
+- `pool_size` - Number of worker instances (default: 1)
+- `max_overflow` - Extra workers allowed under load (default: 0)
+- `checkout_timeout` - Max time to wait for worker (default: 5000ms)
 
 ## Usage Examples
 
@@ -72,6 +75,8 @@ defmodule MyApp.Engines do
       module MyApp.Engines.SyntaxCheck
       description "Checks code syntax"
       priority 90
+      pool_size 5        # Run 5 concurrent workers
+      max_overflow 10    # Allow up to 10 extra workers
     end
   end
 end

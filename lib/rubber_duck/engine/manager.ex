@@ -89,12 +89,32 @@ defmodule RubberDuck.Engine.Manager do
   Executes a request on a specific engine.
   """
   def execute(engine_name, input, timeout \\ 5000) do
-    case Elixir.Registry.lookup(RubberDuck.Engine.Registry, engine_name) do
-      [{pid, _}] ->
-        Server.execute(pid, input, timeout)
-        
-      [] ->
+    # First check if engine is configured
+    engine_config = CapabilityRegistry.get_engine(engine_name)
+    
+    case engine_config do
+      nil ->
         {:error, :engine_not_found}
+        
+      %{pool_size: pool_size} when pool_size > 1 ->
+        # Use pool transaction for pooled engines
+        RubberDuck.Engine.Pool.transaction(
+          engine_name,
+          fn worker ->
+            RubberDuck.Engine.Pool.Worker.execute(worker, input, timeout)
+          end,
+          engine_config.checkout_timeout
+        )
+        
+      _ ->
+        # Use direct call for single instance engines
+        case Elixir.Registry.lookup(RubberDuck.Engine.Registry, engine_name) do
+          [{pid, _}] ->
+            Server.execute(pid, input, timeout)
+            
+          [] ->
+            {:error, :engine_not_found}
+        end
     end
   end
   
@@ -123,12 +143,25 @@ defmodule RubberDuck.Engine.Manager do
   Gets the status of an engine.
   """
   def status(engine_name) do
-    case Elixir.Registry.lookup(RubberDuck.Engine.Registry, engine_name) do
-      [{pid, _}] ->
-        Server.status(pid)
-        
-      [] ->
+    engine_config = CapabilityRegistry.get_engine(engine_name)
+    
+    case engine_config do
+      nil ->
         {:error, :engine_not_found}
+        
+      %{pool_size: pool_size} when pool_size > 1 ->
+        # Return pool status for pooled engines
+        RubberDuck.Engine.Pool.status(engine_name)
+        
+      _ ->
+        # Return server status for single instance
+        case Elixir.Registry.lookup(RubberDuck.Engine.Registry, engine_name) do
+          [{pid, _}] ->
+            Server.status(pid)
+            
+          [] ->
+            {:error, :engine_not_found}
+        end
     end
   end
   
@@ -136,12 +169,29 @@ defmodule RubberDuck.Engine.Manager do
   Gets the health status of an engine.
   """
   def health_status(engine_name) do
-    case Elixir.Registry.lookup(RubberDuck.Engine.Registry, engine_name) do
-      [{pid, _}] ->
-        Server.health_check(pid)
-        
-      [] ->
+    engine_config = CapabilityRegistry.get_engine(engine_name)
+    
+    case engine_config do
+      nil ->
         :not_found
+        
+      %{pool_size: pool_size} when pool_size > 1 ->
+        # For pools, check if pool is running
+        case RubberDuck.Engine.Pool.status(engine_name) do
+          :not_found -> :not_found
+          %{available_workers: available} when available > 0 -> :healthy
+          _ -> :unhealthy
+        end
+        
+      _ ->
+        # Check single instance
+        case Elixir.Registry.lookup(RubberDuck.Engine.Registry, engine_name) do
+          [{pid, _}] ->
+            Server.health_check(pid)
+            
+          [] ->
+            :not_found
+        end
     end
   end
   

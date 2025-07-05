@@ -45,6 +45,7 @@ defmodule RubberDuck.MixProject do
       {:tower_email, "~> 0.6"},
       {:tower_slack, "~> 0.6"},
       {:hackney, "~> 1.20"},
+      {:poolboy, "~> 1.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test}
       # {:dep_from_hexpm, "~> 0.3.0"},

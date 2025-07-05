@@ -13,6 +13,7 @@ defmodule RubberDuck.ExampleEngines do
       description "Simple echo engine for testing"
       priority 10
       timeout 1_000
+      pool_size 1  # Single instance
       
       config [
         prefix: "[ECHO]"
@@ -24,6 +25,9 @@ defmodule RubberDuck.ExampleEngines do
       description "Reverses input text"
       priority 20
       timeout 2_000
+      pool_size 3          # Pool of 3 workers
+      max_overflow 2       # Allow 2 extra workers under load
+      checkout_timeout 5_000
     end
   end
 end

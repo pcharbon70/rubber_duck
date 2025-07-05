@@ -157,6 +157,48 @@ The system provides comprehensive error handling:
 4. **Monitor telemetry** - Track performance and errors
 5. **Test fault scenarios** - Ensure system handles failures well
 
+## Engine Pooling
+
+The engine system supports pooling for improved concurrency:
+
+### Pool Configuration
+
+```elixir
+engine :my_engine do
+  module MyEngine
+  pool_size 5          # 5 worker instances
+  max_overflow 10      # Up to 10 extra workers under load
+  checkout_timeout 5000 # Wait up to 5s for a worker
+end
+```
+
+### Pool Behavior
+
+- When `pool_size = 1` (default), a single GenServer instance is used
+- When `pool_size > 1`, a poolboy pool manages multiple workers
+- Workers are checked out for each request and returned after
+- Overflow workers are created when the main pool is exhausted
+- Requests wait up to `checkout_timeout` for an available worker
+
+### Pool Monitoring
+
+```elixir
+# Get pool status
+status = Manager.status(:pooled_engine)
+# Returns: %{
+#   pool_size: 5,
+#   available_workers: 3,
+#   checked_out: 2,
+#   overflow: 0,
+#   total_workers: 5
+# }
+
+# Pool telemetry events
+[:rubber_duck, :engine, :pool]
+# Measurements: available_workers, checked_out, overflow, total_workers
+# Metadata: engine, pool_size, max_overflow
+```
+
 ## Limitations
 
 - Restarting an engine requires re-registering its configuration

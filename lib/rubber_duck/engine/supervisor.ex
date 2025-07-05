@@ -21,12 +21,17 @@ defmodule RubberDuck.Engine.Supervisor do
   Starts an engine under supervision.
   """
   def start_engine(engine_config, opts \\ []) do
-    child_spec = %{
-      id: engine_config.name,
-      start: {RubberDuck.Engine.Server, :start_link, [engine_config, opts]},
-      restart: :permanent,
-      type: :worker
-    }
+    # Use pool if pool_size > 1, otherwise use single server
+    child_spec = if engine_config.pool_size > 1 do
+      RubberDuck.Engine.Pool.child_spec(engine_config)
+    else
+      %{
+        id: engine_config.name,
+        start: {RubberDuck.Engine.Server, :start_link, [engine_config, opts]},
+        restart: :permanent,
+        type: :worker
+      }
+    end
     
     case DynamicSupervisor.start_child(__MODULE__, child_spec) do
       {:ok, pid} ->
@@ -47,13 +52,22 @@ defmodule RubberDuck.Engine.Supervisor do
   Stops an engine.
   """
   def stop_engine(engine_name) when is_atom(engine_name) do
+    # First try to stop as a pool
+    pool_result = RubberDuck.Engine.Pool.stop(engine_name)
+    
+    # Then try registry lookup for single instances
     case Elixir.Registry.lookup(RubberDuck.Engine.Registry, engine_name) do
       [{pid, _}] ->
         Logger.info("Stopping engine #{engine_name}")
         DynamicSupervisor.terminate_child(__MODULE__, pid)
         
       [] ->
-        {:error, :not_found}
+        # If pool was stopped, that's ok
+        if pool_result == :ok do
+          :ok
+        else
+          {:error, :not_found}
+        end
     end
   end
   

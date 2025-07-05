@@ -48,6 +48,24 @@ defmodule RubberDuck.EngineSystem.Dsl do
         required: false,
         default: [],
         doc: "Engine-specific configuration"
+      ],
+      pool_size: [
+        type: :pos_integer,
+        required: false,
+        default: 1,
+        doc: "Number of engine instances in the pool"
+      ],
+      max_overflow: [
+        type: :non_neg_integer,
+        required: false,
+        default: 0,
+        doc: "Maximum number of additional workers when pool is full"
+      ],
+      checkout_timeout: [
+        type: :timeout,
+        required: false,
+        default: 5_000,
+        doc: "Maximum time to wait for a worker from the pool"
       ]
     ]
   }

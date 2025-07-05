@@ -12,6 +12,9 @@ defmodule RubberDuck.EngineSystem.Engine do
     :priority,
     :timeout,
     :config,
+    :pool_size,
+    :max_overflow,
+    :checkout_timeout,
     :__identifier__
   ]
   
@@ -22,6 +25,9 @@ defmodule RubberDuck.EngineSystem.Engine do
     priority: integer(),
     timeout: timeout(),
     config: keyword(),
+    pool_size: pos_integer(),
+    max_overflow: non_neg_integer(),
+    checkout_timeout: timeout(),
     __identifier__: term()
   }
 end
