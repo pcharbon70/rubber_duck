@@ -7,7 +7,11 @@ defmodule RubberDuck.Application do
   def start(_type, _args) do
     children = [
       RubberDuck.Repo,
-      RubberDuck.Telemetry
+      RubberDuck.Telemetry,
+      # Registry for circuit breakers
+      {Registry, keys: :unique, name: RubberDuck.CircuitBreakerRegistry}
+      # Error boundary GenServer - started manually in tests
+      # RubberDuck.ErrorBoundary
     ]
 
     opts = [strategy: :one_for_one, name: RubberDuck.Supervisor]
