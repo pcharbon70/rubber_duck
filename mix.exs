@@ -48,16 +48,21 @@ defmodule RubberDuck.MixProject do
       {:poolboy, "~> 1.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test},
-      
+
       # LLM Integration dependencies
       {:req, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:tesla, "~> 1.8"},
       {:finch, "~> 0.18"},
-      {:fuse, "~> 2.5"},  # Circuit breaker library
+      # Circuit breaker library
+      {:fuse, "~> 2.5"},
       {:ex_rated, "~> 2.1"},
-      {:tiktoken, "~> 0.4"},  # OpenAI tokenization
-      {:tokenizers, "~> 0.5"}  # HuggingFace tokenizers for Anthropic
+      # OpenAI tokenization
+      {:tiktoken, "~> 0.4"},
+      # HuggingFace tokenizers for Anthropic
+      {:tokenizers, "~> 0.5"},
+      # Vector support for semantic search
+      {:pgvector, "~> 0.3"}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]

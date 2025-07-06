@@ -65,7 +65,9 @@ defmodule RubberDuck.Plugin.MessageBusTest do
     test "cleans up when subscriber process dies" do
       pid = spawn(fn ->
         MessageBus.subscribe(:cleanup_topic)
-        receive do: (:block, :infinity)
+        receive do
+          :block -> :infinity
+        end
       end)
       
       # Ensure subscription is registered
