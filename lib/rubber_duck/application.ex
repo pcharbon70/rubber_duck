@@ -21,7 +21,9 @@ defmodule RubberDuck.Application do
       RubberDuck.Plugin.MessageBus,
       RubberDuck.PluginManager,
       # LLM system components
-      RubberDuck.LLM.Supervisor
+      RubberDuck.LLM.Supervisor,
+      # Memory system components
+      RubberDuck.Memory.Manager
       # Error boundary GenServer - started manually in tests
       # RubberDuck.ErrorBoundary
     ]
