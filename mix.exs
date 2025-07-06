@@ -62,7 +62,10 @@ defmodule RubberDuck.MixProject do
       # HuggingFace tokenizers for Anthropic
       {:tokenizers, "~> 0.5"},
       # Vector support for semantic search
-      {:pgvector, "~> 0.3"}
+      {:pgvector, "~> 0.3"},
+      
+      # Workflow orchestration
+      {:reactor, "~> 0.15.6"}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
