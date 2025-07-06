@@ -33,7 +33,9 @@ defmodule RubberDuck.Application do
       # RAG (Retrieval Augmented Generation) system
       RubberDuck.RAG.Supervisor,
       # Self-Correction system
-      RubberDuck.SelfCorrection.Supervisor
+      RubberDuck.SelfCorrection.Supervisor,
+      # Enhancement Integration system
+      RubberDuck.Enhancement.Supervisor
       # Error boundary GenServer - started manually in tests
       # RubberDuck.ErrorBoundary
     ]
