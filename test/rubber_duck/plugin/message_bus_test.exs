@@ -59,7 +59,8 @@ defmodule RubberDuck.Plugin.MessageBusTest do
       assert {:unsub_topic, 1} in MessageBus.list_topics()
       
       MessageBus.unsubscribe(:unsub_topic)
-      refute {:unsub_topic, _} in MessageBus.list_topics()
+      topics = MessageBus.list_topics()
+      refute Enum.any?(topics, fn {topic, _count} -> topic == :unsub_topic end)
     end
     
     test "cleans up when subscriber process dies" do
@@ -79,7 +80,8 @@ defmodule RubberDuck.Plugin.MessageBusTest do
       Process.sleep(50)
       
       # Topic should be cleaned up
-      refute {:cleanup_topic, _} in MessageBus.list_topics()
+      topics = MessageBus.list_topics()
+      refute Enum.any?(topics, fn {topic, _count} -> topic == :cleanup_topic end)
     end
   end
   

@@ -523,34 +523,36 @@ Create tests in `test/rubber_duck/memory/manager_test.exs` to verify:
 
 **Note**: Implemented using Ash framework with ETS for short/mid-term memory and PostgreSQL for long-term memory. Includes pgvector support for future semantic similarity features.
 
-### 3.4 Context Building and Caching
+### 3.4 Context Building and Caching ✅ Completed
 
 Create sophisticated context building mechanisms that efficiently combine different memory levels and code context.
 
 #### Tasks:
-- [ ] 3.4.1 Create `RubberDuck.Context.Builder` module
-- [ ] 3.4.2 Implement context strategies:
-  - [ ] 3.4.2.1 FIM (Fill-in-the-Middle) builder
-  - [ ] 3.4.2.2 RAG (Retrieval Augmented Generation) builder
-  - [ ] 3.4.2.3 Long context window builder
-- [ ] 3.4.3 Add context size optimization
-- [ ] 3.4.4 Create embedding generation service
-- [ ] 3.4.5 Implement similarity search with pgvector
-- [ ] 3.4.6 Set up context caching with ETS
-- [ ] 3.4.7 Add cache invalidation logic
-- [ ] 3.4.8 Create context quality scoring
-- [ ] 3.4.9 Implement adaptive context selection
-- [ ] 3.4.10 Add context compression techniques
+- [x] 3.4.1 Create `RubberDuck.Context.Builder` module
+- [x] 3.4.2 Implement context strategies:
+  - [x] 3.4.2.1 FIM (Fill-in-the-Middle) builder
+  - [x] 3.4.2.2 RAG (Retrieval Augmented Generation) builder
+  - [x] 3.4.2.3 Long context window builder
+- [x] 3.4.3 Add context size optimization
+- [x] 3.4.4 Create embedding generation service
+- [-] 3.4.5 Implement similarity search with pgvector (using mock embeddings for now)
+- [x] 3.4.6 Set up context caching with ETS
+- [x] 3.4.7 Add cache invalidation logic
+- [x] 3.4.8 Create context quality scoring
+- [x] 3.4.9 Implement adaptive context selection
+- [-] 3.4.10 Add context compression techniques (deferred)
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/context/builder_test.exs` to verify:
-- [ ] 3.4.11 Test FIM context with appropriate window sizes
-- [ ] 3.4.12 Test RAG context includes similar code
-- [ ] 3.4.13 Test context caching improves performance
-- [ ] 3.4.14 Test context optimization stays within token limits
-- [ ] 3.4.15 Test similarity search returns relevant results
-- [ ] 3.4.16 Test cache invalidation on changes
-- [ ] 3.4.17 Test adaptive selection based on query type
+- [x] 3.4.11 Test FIM context with appropriate window sizes
+- [x] 3.4.12 Test RAG context includes similar code
+- [x] 3.4.13 Test context caching improves performance
+- [x] 3.4.14 Test context optimization stays within token limits
+- [x] 3.4.15 Test similarity search returns relevant results (with mock embeddings)
+- [x] 3.4.16 Test cache invalidation on changes
+- [x] 3.4.17 Test adaptive selection based on query type
+
+**Note**: Implemented with mock embeddings for now - will integrate with actual LLM embedding service when available. All core functionality is complete and tested. See `notes/features/034-context-building-caching.md` for implementation details.
 
 ### 3.5 Chain-of-Thought (CoT) Implementation
 

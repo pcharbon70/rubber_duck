@@ -121,14 +121,16 @@ defmodule RubberDuck.Memory.CodePattern do
       
       filter expr(user_id == ^arg(:user_id))
       
-      prepare fn query, context ->
-        embedding = context.arguments.query_embedding
+      prepare fn query, _context ->
+        # Get arguments from the query
+        _embedding = Ash.Query.get_argument(query, :query_embedding)
+        limit = Ash.Query.get_argument(query, :limit) || 10
         
         # TODO: Implement pgvector similarity search
         # For now, return regular results
         query
         |> Ash.Query.sort(usage_count: :desc)
-        |> Ash.Query.limit(context.arguments.limit)
+        |> Ash.Query.limit(limit)
       end
     end
 
@@ -140,25 +142,34 @@ defmodule RubberDuck.Memory.CodePattern do
       
       filter expr(user_id == ^arg(:user_id))
       
-      prepare fn query, context ->
-        search_term = String.downcase(context.arguments.query)
+      prepare fn query, _context ->
+        # Get arguments from the query itself
+        search_term = String.downcase(Ash.Query.get_argument(query, :query) || "")
         pattern = "%#{search_term}%"
         
-        query = Ash.Query.filter(query, expr(
-          fragment("LOWER(?) LIKE ?", pattern_name, ^pattern) or
-          fragment("LOWER(?) LIKE ?", description, ^pattern) or
-          fragment("LOWER(?) LIKE ?", pattern_code, ^pattern)
-        ))
-        
-        query = if context.arguments[:language] do
-          Ash.Query.filter(query, expr(language == ^context.arguments.language))
+        query = if search_term != "" do
+          Ash.Query.filter(query, expr(
+            fragment("LOWER(?) LIKE ?", pattern_name, ^pattern) or
+            fragment("LOWER(?) LIKE ?", description, ^pattern) or
+            fragment("LOWER(?) LIKE ?", pattern_code, ^pattern)
+          ))
         else
           query
         end
         
+        # Filter by language if provided
+        language_arg = Ash.Query.get_argument(query, :language)
+        query = if language_arg do
+          Ash.Query.filter(query, expr(language == ^language_arg))
+        else
+          query
+        end
+        
+        limit = Ash.Query.get_argument(query, :limit) || 10
+        
         query
-        |> Ash.Query.sort(usage_count: :desc)
-        |> Ash.Query.limit(context.arguments.limit)
+        |> Ash.Query.sort(usage_count: :desc, last_used_at: :desc)
+        |> Ash.Query.limit(limit)
       end
     end
   end

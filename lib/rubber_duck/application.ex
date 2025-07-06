@@ -23,7 +23,11 @@ defmodule RubberDuck.Application do
       # LLM system components
       RubberDuck.LLM.Supervisor,
       # Memory system components
-      RubberDuck.Memory.Manager
+      RubberDuck.Memory.Manager,
+      # Context building components
+      RubberDuck.Context.Cache,
+      RubberDuck.Context.AdaptiveSelector,
+      RubberDuck.Embeddings.Service
       # Error boundary GenServer - started manually in tests
       # RubberDuck.ErrorBoundary
     ]
