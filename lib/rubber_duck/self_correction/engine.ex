@@ -9,8 +9,7 @@ defmodule RubberDuck.SelfCorrection.Engine do
   use GenServer
   require Logger
   
-  alias RubberDuck.SelfCorrection.{Strategy, Evaluator, Corrector, History, Learner}
-  alias RubberDuck.CoT.Validator
+  alias RubberDuck.SelfCorrection.{Strategy, Evaluator, Corrector, History}
   alias RubberDuck.RAG.Metrics
   
   @type correction_request :: %{
@@ -87,6 +86,24 @@ defmodule RubberDuck.SelfCorrection.Engine do
     GenServer.call(__MODULE__, :get_insights)
   end
   
+  @doc """
+  Gets the current status of the correction engine.
+  """
+  @spec get_status() :: map()
+  def get_status() do
+    GenServer.call(__MODULE__, :get_status)
+  end
+  
+  @doc """
+  Analyzes content without applying corrections.
+  
+  Returns analysis with issues found and recommendations.
+  """
+  @spec analyze(correction_request()) :: {:ok, map()} | {:error, term()}
+  def analyze(request) do
+    GenServer.call(__MODULE__, {:analyze, request})
+  end
+  
   # Server callbacks
   
   @impl true
@@ -96,8 +113,6 @@ defmodule RubberDuck.SelfCorrection.Engine do
     
     state = %{
       strategies: strategies,
-      history: History.new(),
-      learner: Learner.new(),
       cache: %{},
       stats: %{
         total_corrections: 0,
@@ -115,7 +130,16 @@ defmodule RubberDuck.SelfCorrection.Engine do
     start_time = System.monotonic_time(:millisecond)
     
     # Merge default options with request options
-    options = Keyword.merge(@default_options, request.options)
+    request_options = Map.get(request, :options, [])
+    
+    # Also check for options directly on request (for backward compatibility)
+    direct_options = request
+    |> Map.take([:max_iterations, :target_score, :strategies, :early_stopping, :convergence_threshold, :cache_results])
+    |> Enum.map(fn {k, v} -> {k, v} end)
+    
+    options = @default_options
+    |> Keyword.merge(request_options)
+    |> Keyword.merge(direct_options)
     
     # Check cache if enabled
     cache_key = generate_cache_key(request)
@@ -142,14 +166,45 @@ defmodule RubberDuck.SelfCorrection.Engine do
   
   @impl true
   def handle_call({:get_history, opts}, _from, state) do
-    history = History.get_recent(state.history, opts)
+    # Get history from the History process
+    limit = Keyword.get(opts, :limit, 100)
+    history = History.get_history(:all, limit: limit)
     {:reply, {:ok, history}, state}
   end
   
   @impl true
   def handle_call(:get_insights, _from, state) do
-    insights = Learner.get_insights(state.learner, state.history)
+    # Get insights from the Learner process
+    # Note: This is a placeholder - the actual implementation would need proper parameters
+    insights = %{
+      strategies: state.strategies,
+      stats: state.stats
+    }
     {:reply, {:ok, insights}, state}
+  end
+  
+  @impl true
+  def handle_call(:get_status, _from, state) do
+    status = %{
+      state: if(Map.get(state, :current_correction), do: :correcting, else: :idle),
+      stats: state.stats,
+      loaded_strategies: Map.keys(state.strategies)
+    }
+    {:reply, status, state}
+  end
+  
+  @impl true
+  def handle_call({:analyze, request}, _from, state) do
+    # Validate request
+    case validate_request(request) do
+      :ok ->
+        # Perform analysis without correction
+        analysis = perform_analysis(request, state)
+        {:reply, {:ok, analysis}, state}
+      
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
   end
   
   # Private functions
@@ -268,16 +323,14 @@ defmodule RubberDuck.SelfCorrection.Engine do
     end
   end
   
-  defp apply_best_correction(content, corrections, state) do
-    # Use learner to select best correction based on historical effectiveness
-    best_correction = Learner.select_best_correction(
-      state.learner,
-      corrections,
-      state.history
-    )
+  defp apply_best_correction(content, corrections, _state) do
+    # Select best correction based on confidence and priority
+    best_correction = corrections
+    |> Enum.sort_by(fn c -> {c.confidence, c.priority} end, :desc)
+    |> List.first()
     
     if best_correction do
-      corrected_content = Corrector.apply(content, best_correction)
+      corrected_content = Corrector.apply_correction(content, best_correction)
       
       improvement_data = %{
         strategy: best_correction.strategy,
@@ -315,23 +368,15 @@ defmodule RubberDuck.SelfCorrection.Engine do
   end
   
   defp update_state_with_results(state, request, result) do
-    # Update history
-    history_entry = %{
-      request: request,
-      result: result,
-      timestamp: DateTime.utc_now()
-    }
-    
-    new_history = History.add(state.history, history_entry)
-    
-    # Update learner with correction effectiveness
-    new_learner = Learner.update(state.learner, history_entry)
+    # Record correction in history process
+    history_entry = build_history_entry(request, result)
+    History.record_correction(history_entry)
     
     # Update statistics
     new_stats = update_statistics(state.stats, result)
     
     # Update cache if enabled
-    new_cache = if request.options[:cache_results] do
+    new_cache = if Map.get(request, :options, %{})[:cache_results] do
       cache_key = generate_cache_key(request)
       Map.put(state.cache, cache_key, result)
     else
@@ -339,11 +384,67 @@ defmodule RubberDuck.SelfCorrection.Engine do
     end
     
     %{state | 
-      history: new_history,
-      learner: new_learner,
       stats: new_stats,
       cache: new_cache
     }
+  end
+  
+  defp build_history_entry(request, result) do
+    case result do
+      {:ok, correction_result} ->
+        %{
+          correction_type: request.type,
+          strategy: get_primary_strategy(correction_result),
+          content_type: request.type,
+          issues_found: get_issues_found(correction_result),
+          corrections_applied: get_corrections_applied(correction_result),
+          success: correction_result.success,
+          improvement_score: calculate_improvement_score(correction_result),
+          iterations: correction_result.iterations,
+          convergence_time: Map.get(correction_result, :convergence_time, 0),
+          metadata: Map.get(request, :context, %{})
+        }
+      _ ->
+        %{
+          correction_type: request.type,
+          strategy: :unknown,
+          content_type: request.type,
+          issues_found: [],
+          corrections_applied: [],
+          success: false,
+          improvement_score: 0,
+          iterations: 0,
+          convergence_time: 0,
+          metadata: %{}
+        }
+    end
+  end
+  
+  defp get_primary_strategy(result) do
+    result.corrections_applied
+    |> List.first()
+    |> case do
+      %{strategy: strategy} -> strategy
+      _ -> :unknown
+    end
+  end
+  
+  defp get_issues_found(result) do
+    result
+    |> Map.get(:issues_found, [])
+    |> Enum.map(& &1.type)
+    |> Enum.uniq()
+  end
+  
+  defp get_corrections_applied(result) do
+    result.corrections_applied
+    |> Enum.map(& &1.type)
+  end
+  
+  defp calculate_improvement_score(result) do
+    initial = result.initial_evaluation.overall_score
+    final = result.final_evaluation.overall_score
+    final - initial
   end
   
   defp update_statistics(stats, result) do
@@ -379,6 +480,66 @@ defmodule RubberDuck.SelfCorrection.Engine do
       syntax: RubberDuck.SelfCorrection.Strategies.Syntax,
       semantic: RubberDuck.SelfCorrection.Strategies.Semantic,
       logic: RubberDuck.SelfCorrection.Strategies.Logic
+    }
+  end
+  
+  defp validate_request(request) do
+    cond do
+      !Map.has_key?(request, :content) ->
+        {:error, "Missing required field: content"}
+      
+      !Map.has_key?(request, :type) ->
+        {:error, "Missing required field: type"}
+      
+      request.type not in [:code, :text, :mixed] ->
+        {:error, "Unsupported content type: #{request.type}"}
+      
+      true ->
+        :ok
+    end
+  end
+  
+  defp perform_analysis(request, state) do
+    # Evaluate current content
+    initial_evaluation = Evaluator.evaluate(
+      request.content,
+      request.type,
+      Map.get(request, :context, %{}),
+      state.strategies
+    )
+    
+    # Run all applicable strategies to find issues
+    strategy_analyses = state.strategies
+    |> Map.values()
+    |> Enum.filter(fn strategy -> 
+      request.type in apply(strategy, :supported_types, [])
+    end)
+    |> Enum.map(fn strategy ->
+      apply(strategy, :analyze, [
+        request.content,
+        request.type,
+        Map.get(request, :context, %{}),
+        initial_evaluation
+      ])
+    end)
+    
+    # Collect all issues and recommendations
+    all_issues = strategy_analyses
+    |> Enum.flat_map(& &1.issues)
+    |> Enum.uniq_by(& &1.type)
+    
+    recommended_corrections = strategy_analyses
+    |> Enum.flat_map(& &1.corrections)
+    |> Enum.take(5)
+    
+    %{
+      initial_evaluation: initial_evaluation,
+      issues_found: all_issues,
+      strategy_analyses: strategy_analyses,
+      recommended_corrections: recommended_corrections,
+      metadata: %{
+        analyzed_at: DateTime.utc_now()
+      }
     }
   end
   

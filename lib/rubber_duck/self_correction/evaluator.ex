@@ -6,8 +6,6 @@ defmodule RubberDuck.SelfCorrection.Evaluator do
   the self-correction process.
   """
   
-  alias RubberDuck.Context.Scorer
-  alias RubberDuck.CoT.Validator
   
   @type evaluation_result :: %{
     overall_score: float(),
@@ -87,7 +85,7 @@ defmodule RubberDuck.SelfCorrection.Evaluator do
   
   defp evaluate_syntax_quality(content) do
     # Basic syntax quality evaluation
-    issues = []
+    _issues = []
     
     # Check for balanced delimiters
     delimiter_pairs = [{"(", ")"}, {"{", "}"}, {"[", "]"}, {"\"", "\""}, {"'", "'"}]
@@ -282,15 +280,11 @@ defmodule RubberDuck.SelfCorrection.Evaluator do
   
   defp enhance_with_code_evaluation(eval, content, context) do
     # Add code-specific evaluations
-    language = context[:language] || detect_language(content)
+    _language = context[:language] || detect_language(content)
     
-    # Use existing Context.Scorer for code
-    code_score = if function_exported?(Scorer, :score_context, 2) do
-      score_result = Scorer.score_context(%{content: content}, "code")
-      score_result.total_score
-    else
-      eval.overall_score
-    end
+    # For now, calculate a simple code score based on dimensions
+    # In production, this would integrate with the Context.Scorer
+    code_score = (eval.dimensions.syntax + eval.dimensions.semantics + eval.dimensions.logic) / 3.0
     
     put_in(eval, [:metadata, :code_score], code_score)
   end
@@ -320,9 +314,9 @@ defmodule RubberDuck.SelfCorrection.Evaluator do
     |> put_in([:dimensions, :readability], readability)
   end
   
-  defp enhance_with_mixed_evaluation(eval, content, context) do
+  defp enhance_with_mixed_evaluation(eval, content, _context) do
     # For mixed content, evaluate both aspects
-    {code_parts, text_parts} = split_mixed_content(content)
+    {code_parts, _text_parts} = split_mixed_content(content)
     
     # Weight scores based on content proportion
     total_length = String.length(content)
@@ -414,33 +408,38 @@ defmodule RubberDuck.SelfCorrection.Evaluator do
     # Simple split - in production use more sophisticated parsing
     lines = String.split(content, "\n")
     
-    {code_parts, text_parts, _current, _mode} = 
-      Enum.reduce(lines, {[], [], [], :text}, fn line, {code, text, current, mode} ->
+    {code_parts, text_parts} = 
+      lines
+      |> Enum.reduce({[], [], [], :text}, fn line, {code, text, current, mode} ->
         cond do
           String.starts_with?(line, "```") && mode == :text ->
             text_content = Enum.join(current, "\n")
-            {code, if(text_content != "", do: [text_content | text], else: text), [], :code}
+            new_text = if text_content != "", do: [text_content | text], else: text
+            {code, new_text, [], :code}
           
           String.starts_with?(line, "```") && mode == :code ->
             code_content = Enum.join(current, "\n")
-            {if(code_content != "", do: [code_content | code], else: code), text, [], :text}
+            new_code = if code_content != "", do: [code_content | code], else: code
+            {new_code, text, [], :text}
           
           true ->
             {code, text, current ++ [line], mode}
         end
       end)
+      |> finalize_split()
     
-    # Don't forget the last section
-    final_content = Enum.join(elem({code_parts, text_parts, [], :text}, 2), "\n")
-    final_parts = if final_content != "" do
-      case elem({code_parts, text_parts, [], :text}, 3) do
-        :code -> {[final_content | code_parts], text_parts}
-        :text -> {code_parts, [final_content | text_parts]}
+    {Enum.reverse(code_parts), Enum.reverse(text_parts)}
+  end
+  
+  defp finalize_split({code, text, current, mode}) do
+    if current != [] do
+      final_content = Enum.join(current, "\n")
+      case mode do
+        :code -> {[final_content | code], text}
+        :text -> {code, [final_content | text]}
       end
     else
-      {code_parts, text_parts}
+      {code, text}
     end
-    
-    {Enum.reverse(elem(final_parts, 0)), Enum.reverse(elem(final_parts, 1))}
   end
 end

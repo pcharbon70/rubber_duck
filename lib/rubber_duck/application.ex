@@ -31,7 +31,9 @@ defmodule RubberDuck.Application do
       # Chain-of-Thought system
       RubberDuck.CoT.ConversationManager,
       # RAG (Retrieval Augmented Generation) system
-      RubberDuck.RAG.Supervisor
+      RubberDuck.RAG.Supervisor,
+      # Self-Correction system
+      RubberDuck.SelfCorrection.Supervisor
       # Error boundary GenServer - started manually in tests
       # RubberDuck.ErrorBoundary
     ]

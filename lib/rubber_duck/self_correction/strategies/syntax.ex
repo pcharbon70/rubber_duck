@@ -94,7 +94,12 @@ defmodule RubberDuck.SelfCorrection.Strategies.Syntax do
       {:ok, _ast} ->
         issues  # Only formatting/style issues
       
-      {:error, {line, error_desc, _}} ->
+      {:error, {metadata, error_desc, _token}} when is_list(metadata) ->
+        line = Keyword.get(metadata, :line, 1)
+        [issue(:syntax_error, :error, "Syntax error at line #{line}: #{error_desc}", 
+          %{line: line}, %{parser_error: metadata}) | issues]
+      
+      {:error, {line, error_desc, _token}} when is_integer(line) ->
         [issue(:syntax_error, :error, "Syntax error at line #{line}: #{error_desc}", 
           %{line: line}, %{parser_error: error_desc}) | issues]
       
@@ -445,4 +450,15 @@ defmodule RubberDuck.SelfCorrection.Strategies.Syntax do
   end
   
   defp valid_syntax?(_content, _language), do: true  # Assume valid for other languages
+  
+  defp format_error_description(error_desc) when is_list(error_desc) do
+    # Format keyword list error description
+    case Keyword.get(error_desc, :opening_delimiter) do
+      nil -> inspect(error_desc)
+      opening -> "missing '#{Keyword.get(error_desc, :expected_delimiter, "end")}' for '#{opening}'"
+    end
+  end
+  
+  defp format_error_description(error_desc) when is_binary(error_desc), do: error_desc
+  defp format_error_description(error_desc), do: inspect(error_desc)
 end

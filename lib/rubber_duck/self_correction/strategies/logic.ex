@@ -9,7 +9,6 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
   @behaviour RubberDuck.SelfCorrection.Strategy
   
   import RubberDuck.SelfCorrection.Strategy
-  alias RubberDuck.CoT.Validator
   
   @impl true
   def name(), do: :logic
@@ -369,27 +368,9 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
     issues
   end
   
-  defp analyze_reasoning_chain(chain) do
-    # Use CoT Validator to analyze reasoning
-    validation_result = Validator.validate(chain)
-    
-    issues = []
-    
-    if validation_result.scores.logical_flow < 0.7 do
-      issues = [issue(:poor_logical_flow, :warning,
-        "Reasoning chain has poor logical flow", %{},
-        %{score: validation_result.scores.logical_flow}) | issues]
-    end
-    
-    if validation_result.scores.consistency < 0.7 do
-      issues = [issue(:reasoning_inconsistency, :warning,
-        "Reasoning contains inconsistencies", %{},
-        %{score: validation_result.scores.consistency}) | issues]
-    end
-    
-    issues ++ Enum.map(validation_result.issues, fn val_issue ->
-      issue(:reasoning_issue, :warning, val_issue, %{})
-    end)
+  defp analyze_reasoning_chain(_chain) do
+    # TODO: Integrate with CoT Validator when available
+    []
   end
   
   defp generate_logic_corrections(content, issues, type, context) do
@@ -453,12 +434,7 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
     end)
     
     # Consider validation scores if available
-    validation_boost = if evaluation[:reasoning_chain] do
-      validation_result = Validator.validate(evaluation.reasoning_chain)
-      validation_result.scores.logical_flow * 0.2
-    else
-      0
-    end
+    validation_boost = 0  # TODO: Integrate with CoT Validator
     
     max(0.0, min(1.0, base_score - issue_penalty + validation_boost))
   end
