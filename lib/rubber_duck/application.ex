@@ -35,7 +35,12 @@ defmodule RubberDuck.Application do
       # Self-Correction system
       RubberDuck.SelfCorrection.Supervisor,
       # Enhancement Integration system
-      RubberDuck.Enhancement.Supervisor
+      RubberDuck.Enhancement.Supervisor,
+      # Workflow system components
+      RubberDuck.Workflows.Registry,
+      RubberDuck.Workflows.Executor,
+      RubberDuck.Workflows.Cache,
+      RubberDuck.Workflows.Metrics.Aggregator
       # Error boundary GenServer - started manually in tests
       # RubberDuck.ErrorBoundary
     ]
