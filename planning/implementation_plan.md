@@ -17,7 +17,13 @@
 - **Section 2.6: Code Generation Engine with RAG** ✅ Completed
 - **Section 2.7: Phase 2 Integration Tests** ✅ Completed
 
-### Phase 3-6: Not Started
+### Phase 3: LLM Integration & Memory System
+- **Section 3.1: LLM Service Architecture** ✅ Completed
+- **Section 3.2: Provider Adapters** ✅ Completed
+- **Section 3.3: Hierarchical Memory System** ✅ Completed
+- **Section 3.4-3.8: Context Building & Enhancement Techniques** ⏳ Not Started
+
+### Phase 4-6: Not Started
 
 ## Table of Contents
 1. [Phase 1: Foundation & Core Infrastructure](#phase-1-foundation--core-infrastructure)
@@ -438,80 +444,84 @@ Create tests in `test/rubber_duck/llm/service_test.exs` to verify:
 
 **Note**: While some tests have failures due to minor implementation issues, the core architecture is complete and functional. See `docs/features/3.1-llm-service-architecture.md` for implementation details.
 
-### 3.2 Provider Adapters
+### 3.2 Provider Adapters ✅ Completed
 
 Implement specific adapters for each LLM provider, handling their unique APIs and response formats.
 
 #### Tasks:
-- [ ] 3.2.1 Create `RubberDuck.LLM.Providers.OpenAI` module
-- [ ] 3.2.2 Implement OpenAI API client:
-  - [ ] 3.2.2.1 Chat completions endpoint
-  - [ ] 3.2.2.2 Streaming support
-  - [ ] 3.2.2.3 Function calling support
-  - [ ] 3.2.2.4 Token counting
-- [ ] 3.2.3 Create `RubberDuck.LLM.Providers.Anthropic` module
-- [ ] 3.2.4 Implement Anthropic API client:
-  - [ ] 3.2.4.1 Messages API
-  - [ ] 3.2.4.2 Streaming responses
-  - [ ] 3.2.4.3 System prompts
-- [ ] 3.2.5 Create unified response format
-- [ ] 3.2.6 Add response parsing and validation
-- [ ] 3.2.7 Implement token usage tracking
-- [ ] 3.2.8 Add provider-specific error handling
-- [ ] 3.2.9 Create mock provider for testing
+- [x] 3.2.1 Create `RubberDuck.LLM.Providers.OpenAI` module
+- [x] 3.2.2 Implement OpenAI API client:
+  - [x] 3.2.2.1 Chat completions endpoint
+  - [x] 3.2.2.2 Streaming support
+  - [x] 3.2.2.3 Function calling support
+  - [x] 3.2.2.4 Token counting
+- [x] 3.2.3 Create `RubberDuck.LLM.Providers.Anthropic` module
+- [x] 3.2.4 Implement Anthropic API client:
+  - [x] 3.2.4.1 Messages API
+  - [x] 3.2.4.2 Streaming responses
+  - [x] 3.2.4.3 System prompts
+- [x] 3.2.5 Create unified response format
+- [x] 3.2.6 Add response parsing and validation
+- [x] 3.2.7 Implement token usage tracking
+- [x] 3.2.8 Add provider-specific error handling
+- [x] 3.2.9 Create mock provider for testing
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/llm/providers/` directory:
 
 **OpenAI Provider Tests** (`openai_test.exs`):
-- [ ] 3.2.10 Test request formatting follows OpenAI API spec
-- [ ] 3.2.11 Test response parsing to unified format
-- [ ] 3.2.12 Test streaming response chunk handling
-- [ ] 3.2.13 Test token counting accuracy
-- [ ] 3.2.14 Test function calling format
-- [ ] 3.2.15 Test error response handling
+- [x] 3.2.10 Test request formatting follows OpenAI API spec
+- [x] 3.2.11 Test response parsing to unified format
+- [x] 3.2.12 Test streaming response chunk handling
+- [x] 3.2.13 Test token counting accuracy
+- [x] 3.2.14 Test function calling format
+- [x] 3.2.15 Test error response handling
 
 **Anthropic Provider Tests** (`anthropic_test.exs`):
-- [ ] 3.2.16 Test request formatting follows Anthropic API spec
-- [ ] 3.2.17 Test response parsing to unified format
-- [ ] 3.2.18 Test streaming response handling
-- [ ] 3.2.19 Test system prompt inclusion
-- [ ] 3.2.20 Test error response handling
-- [ ] 3.2.21 Test token usage extraction
+- [x] 3.2.16 Test request formatting follows Anthropic API spec
+- [x] 3.2.17 Test response parsing to unified format
+- [x] 3.2.18 Test streaming response handling
+- [x] 3.2.19 Test system prompt inclusion
+- [x] 3.2.20 Test error response handling
+- [x] 3.2.21 Test token usage extraction
 
-### 3.3 Hierarchical Memory System
+**Note**: Provider adapters were implemented as part of the LLM Service Architecture in section 3.1.
+
+### 3.3 Hierarchical Memory System ✅ Completed
 
 Implement the three-tier memory system (short-term, mid-term, long-term) for maintaining context across interactions.
 
 #### Tasks:
-- [ ] 3.3.1 Create `RubberDuck.Memory.Manager` GenServer
-- [ ] 3.3.2 Implement short-term memory:
-  - [ ] 3.3.2.1 Session-based storage
-  - [ ] 3.3.2.2 Recent interaction tracking
-  - [ ] 3.3.2.3 Automatic expiration (20 interactions)
-- [ ] 3.3.3 Implement mid-term memory:
-  - [ ] 3.3.3.1 Pattern extraction from short-term
-  - [ ] 3.3.3.2 Session summarization
-  - [ ] 3.3.3.3 Relevance scoring
-- [ ] 3.3.4 Implement long-term memory:
-  - [ ] 3.3.4.1 Persistent pattern storage
-  - [ ] 3.3.4.2 User preference learning
-  - [ ] 3.3.4.3 Code style patterns
-- [ ] 3.3.5 Create memory consolidation process
-- [ ] 3.3.6 Add memory search and retrieval
-- [ ] 3.3.7 Implement memory compression
-- [ ] 3.3.8 Set up memory persistence with Mnesia
-- [ ] 3.3.9 Add privacy controls for memory
+- [x] 3.3.1 Create `RubberDuck.Memory.Manager` GenServer
+- [x] 3.3.2 Implement short-term memory:
+  - [x] 3.3.2.1 Session-based storage (ETS with FIFO)
+  - [x] 3.3.2.2 Recent interaction tracking
+  - [x] 3.3.2.3 Automatic expiration (20 interactions)
+- [x] 3.3.3 Implement mid-term memory:
+  - [x] 3.3.3.1 Pattern extraction from short-term
+  - [x] 3.3.3.2 Session summarization
+  - [x] 3.3.3.3 Relevance scoring (heat score)
+- [x] 3.3.4 Implement long-term memory:
+  - [x] 3.3.4.1 Persistent pattern storage (PostgreSQL)
+  - [x] 3.3.4.2 User preference learning (UserProfile)
+  - [x] 3.3.4.3 Code style patterns (CodePattern)
+- [x] 3.3.5 Create memory consolidation process (Updater module)
+- [x] 3.3.6 Add memory search and retrieval (Retriever module)
+- [-] 3.3.7 Implement memory compression (deferred)
+- [x] 3.3.8 Set up memory persistence with ETS/PostgreSQL (not Mnesia)
+- [-] 3.3.9 Add privacy controls for memory (deferred to Phase 6)
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/memory/manager_test.exs` to verify:
-- [ ] 3.3.10 Test storing interactions in short-term memory
-- [ ] 3.3.11 Test automatic expiration after limit
-- [ ] 3.3.12 Test pattern promotion to mid-term memory
-- [ ] 3.3.13 Test relevance scoring for retrieval
-- [ ] 3.3.14 Test hierarchical context retrieval
-- [ ] 3.3.15 Test memory consolidation process
-- [ ] 3.3.16 Test privacy controls filter sensitive data
+- [x] 3.3.10 Test storing interactions in short-term memory
+- [x] 3.3.11 Test automatic expiration after limit
+- [x] 3.3.12 Test pattern promotion to mid-term memory
+- [x] 3.3.13 Test relevance scoring for retrieval
+- [x] 3.3.14 Test hierarchical context retrieval
+- [-] 3.3.15 Test memory consolidation process (covered by unit tests)
+- [-] 3.3.16 Test privacy controls filter sensitive data (deferred)
+
+**Note**: Implemented using Ash framework with ETS for short/mid-term memory and PostgreSQL for long-term memory. Includes pgvector support for future semantic similarity features.
 
 ### 3.4 Context Building and Caching
 
