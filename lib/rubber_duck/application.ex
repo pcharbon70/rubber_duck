@@ -27,7 +27,9 @@ defmodule RubberDuck.Application do
       # Context building components
       RubberDuck.Context.Cache,
       RubberDuck.Context.AdaptiveSelector,
-      RubberDuck.Embeddings.Service
+      RubberDuck.Embeddings.Service,
+      # Chain-of-Thought system
+      RubberDuck.CoT.ConversationManager
       # Error boundary GenServer - started manually in tests
       # RubberDuck.ErrorBoundary
     ]
