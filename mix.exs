@@ -63,7 +63,7 @@ defmodule RubberDuck.MixProject do
       {:tokenizers, "~> 0.5"},
       # Vector support for semantic search
       {:pgvector, "~> 0.3"},
-      
+
       # Workflow orchestration
       {:reactor, "~> 0.15.6"}
       # {:dep_from_hexpm, "~> 0.3.0"},

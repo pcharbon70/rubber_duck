@@ -9,6 +9,37 @@ defmodule RubberDuck.Workspace.CodeFile do
     repo RubberDuck.Repo
   end
 
+  actions do
+    defaults [:read, :destroy]
+
+    create :create do
+      accept [:file_path, :content, :language, :ast_cache, :embeddings, :project_id]
+    end
+
+    update :update do
+      accept [:file_path, :content, :language, :ast_cache, :embeddings]
+    end
+
+    # Custom semantic search action
+    read :semantic_search do
+      argument :embedding, {:array, :float} do
+        allow_nil? false
+      end
+
+      argument :limit, :integer do
+        allow_nil? true
+        default 10
+      end
+
+      # This will need to be implemented with a preparation
+      # that uses pgvector for similarity search
+      prepare fn query, _context ->
+        # TODO: Implement pgvector similarity search
+        query
+      end
+    end
+  end
+
   attributes do
     uuid_primary_key :id
 
@@ -52,36 +83,5 @@ defmodule RubberDuck.Workspace.CodeFile do
     end
 
     has_many :analysis_results, RubberDuck.Workspace.AnalysisResult
-  end
-
-  actions do
-    defaults [:read, :destroy]
-    
-    create :create do
-      accept [:file_path, :content, :language, :ast_cache, :embeddings, :project_id]
-    end
-    
-    update :update do
-      accept [:file_path, :content, :language, :ast_cache, :embeddings]
-    end
-
-    # Custom semantic search action
-    read :semantic_search do
-      argument :embedding, {:array, :float} do
-        allow_nil? false
-      end
-
-      argument :limit, :integer do
-        allow_nil? true
-        default 10
-      end
-
-      # This will need to be implemented with a preparation
-      # that uses pgvector for similarity search
-      prepare fn query, _context ->
-        # TODO: Implement pgvector similarity search
-        query
-      end
-    end
   end
 end

@@ -6,7 +6,7 @@ defmodule RubberDuck.Workspace.CodeFileTest do
   describe "code_files" do
     setup do
       # Create a project first
-      {:ok, project} = 
+      {:ok, project} =
         Workspace.create_project(%{
           name: "Test Project",
           description: "Project for testing code files"
@@ -16,13 +16,13 @@ defmodule RubberDuck.Workspace.CodeFileTest do
     end
 
     test "can create a code file with project association", %{project: project} do
-      assert {:ok, code_file} = 
-        Workspace.create_code_file(%{
-          file_path: "lib/example.ex",
-          content: "defmodule Example do\nend",
-          language: "elixir",
-          project_id: project.id
-        })
+      assert {:ok, code_file} =
+               Workspace.create_code_file(%{
+                 file_path: "lib/example.ex",
+                 content: "defmodule Example do\nend",
+                 language: "elixir",
+                 project_id: project.id
+               })
 
       assert code_file.file_path == "lib/example.ex"
       assert code_file.content == "defmodule Example do\nend"
@@ -33,36 +33,36 @@ defmodule RubberDuck.Workspace.CodeFileTest do
     end
 
     test "file path is required", %{project: project} do
-      assert {:error, error} = 
-        Workspace.create_code_file(%{
-          content: "some content",
-          project_id: project.id
-        })
+      assert {:error, error} =
+               Workspace.create_code_file(%{
+                 content: "some content",
+                 project_id: project.id
+               })
 
       assert %Ash.Error.Invalid{} = error
     end
 
     test "project association is required" do
-      assert {:error, error} = 
-        Workspace.create_code_file(%{
-          file_path: "lib/example.ex",
-          content: "some content"
-        })
+      assert {:error, error} =
+               Workspace.create_code_file(%{
+                 file_path: "lib/example.ex",
+                 content: "some content"
+               })
 
       assert %Ash.Error.Invalid{} = error
     end
 
     test "can store embeddings array", %{project: project} do
       embeddings = [0.1, 0.2, 0.3, 0.4, 0.5]
-      
-      assert {:ok, code_file} = 
-        Workspace.create_code_file(%{
-          file_path: "lib/example.ex",
-          content: "defmodule Example do\nend",
-          language: "elixir",
-          project_id: project.id,
-          embeddings: embeddings
-        })
+
+      assert {:ok, code_file} =
+               Workspace.create_code_file(%{
+                 file_path: "lib/example.ex",
+                 content: "defmodule Example do\nend",
+                 language: "elixir",
+                 project_id: project.id,
+                 embeddings: embeddings
+               })
 
       assert code_file.embeddings == embeddings
     end
@@ -73,15 +73,15 @@ defmodule RubberDuck.Workspace.CodeFileTest do
         "name" => "Example",
         "functions" => []
       }
-      
-      assert {:ok, code_file} = 
-        Workspace.create_code_file(%{
-          file_path: "lib/example.ex",
-          content: "defmodule Example do\nend",
-          language: "elixir",
-          project_id: project.id,
-          ast_cache: ast_cache
-        })
+
+      assert {:ok, code_file} =
+               Workspace.create_code_file(%{
+                 file_path: "lib/example.ex",
+                 content: "defmodule Example do\nend",
+                 language: "elixir",
+                 project_id: project.id,
+                 ast_cache: ast_cache
+               })
 
       assert code_file.ast_cache == ast_cache
     end

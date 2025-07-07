@@ -11,9 +11,7 @@ defmodule RubberDuck.Telemetry do
       {Telemetry.Metrics.ConsoleReporter, metrics: metrics()},
       {
         :telemetry_poller,
-        measurements: periodic_measurements(),
-        period: 10_000,
-        name: :rubber_duck_poller
+        measurements: periodic_measurements(), period: 10_000, name: :rubber_duck_poller
       }
     ]
 

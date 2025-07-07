@@ -1,16 +1,16 @@
 defmodule RubberDuckWeb.Plugs.HealthCheck do
   @moduledoc """
   A Plug that provides health check endpoints for monitoring.
-  
+
   This plug exposes:
   - `/health` - Basic health check
   - `/health/ready` - Readiness check (are all services ready?)
   - `/health/live` - Liveness check (is the app running?)
-  
+
   ## Usage
-  
+
   Add to your endpoint or router:
-  
+
       plug RubberDuckWeb.Plugs.HealthCheck, path: "/health"
   """
 
@@ -24,6 +24,7 @@ defmodule RubberDuckWeb.Plugs.HealthCheck do
   @impl true
   def init(opts) do
     path = Keyword.get(opts, :path, @default_path)
+
     %{
       path: path,
       ready_path: "#{path}/ready",
@@ -50,11 +51,11 @@ defmodule RubberDuckWeb.Plugs.HealthCheck do
 
   defp handle_health_check(conn, type) do
     start_time = System.monotonic_time(:microsecond)
-    
+
     {status, body} = perform_health_check(type)
-    
+
     duration = System.monotonic_time(:microsecond) - start_time
-    
+
     conn
     |> put_resp_content_type("application/json")
     |> put_resp_header("x-health-check-duration-us", to_string(duration))
@@ -64,11 +65,12 @@ defmodule RubberDuckWeb.Plugs.HealthCheck do
 
   defp perform_health_check(:basic) do
     # Basic health check - just verify the app is running
-    {200, %{
-      status: "ok",
-      service: "rubber_duck",
-      timestamp: DateTime.utc_now()
-    }}
+    {200,
+     %{
+       status: "ok",
+       service: "rubber_duck",
+       timestamp: DateTime.utc_now()
+     }}
   end
 
   defp perform_health_check(:ready) do
@@ -77,17 +79,17 @@ defmodule RubberDuckWeb.Plugs.HealthCheck do
       database: check_database(),
       error_boundary: check_error_boundary()
     }
-    
+
     all_healthy = Enum.all?(checks, fn {_, %{healthy: healthy}} -> healthy end)
     status = if all_healthy, do: 200, else: 503
-    
+
     body = %{
       status: if(all_healthy, do: "ready", else: "not_ready"),
       service: "rubber_duck",
       timestamp: DateTime.utc_now(),
       checks: checks
     }
-    
+
     {status, body}
   end
 
@@ -97,22 +99,24 @@ defmodule RubberDuckWeb.Plugs.HealthCheck do
     try do
       # Simple memory check
       memory = :erlang.memory(:total)
-      
-      {200, %{
-        status: "alive",
-        service: "rubber_duck",
-        timestamp: DateTime.utc_now(),
-        memory_bytes: memory,
-        uptime_seconds: uptime_seconds()
-      }}
+
+      {200,
+       %{
+         status: "alive",
+         service: "rubber_duck",
+         timestamp: DateTime.utc_now(),
+         memory_bytes: memory,
+         uptime_seconds: uptime_seconds()
+       }}
     rescue
       error ->
-        {500, %{
-          status: "error",
-          service: "rubber_duck",
-          timestamp: DateTime.utc_now(),
-          error: Exception.message(error)
-        }}
+        {500,
+         %{
+           status: "error",
+           service: "rubber_duck",
+           timestamp: DateTime.utc_now(),
+           error: Exception.message(error)
+         }}
     end
   end
 
@@ -125,7 +129,7 @@ defmodule RubberDuckWeb.Plugs.HealthCheck do
             healthy: true,
             message: "Database connection successful"
           }
-          
+
         {:error, error} ->
           %{
             healthy: false,
@@ -146,13 +150,14 @@ defmodule RubberDuckWeb.Plugs.HealthCheck do
   defp check_error_boundary do
     try do
       stats = ErrorBoundary.stats()
-      
+
       # Consider unhealthy if error rate is too high
       total_calls = stats.success_count + stats.error_count
       error_rate = if total_calls > 0, do: stats.error_count / total_calls, else: 0
-      
-      healthy = error_rate < 0.5  # Less than 50% error rate
-      
+
+      # Less than 50% error rate
+      healthy = error_rate < 0.5
+
       %{
         healthy: healthy,
         message: "Error boundary operational",

@@ -2,21 +2,21 @@ defmodule RubberDuck.LLM.ProviderConfig do
   @moduledoc """
   Configuration for an LLM provider.
   """
-  
+
   @type t :: %__MODULE__{
-    name: atom(),
-    adapter: module(),
-    api_key: String.t() | nil,
-    base_url: String.t() | nil,
-    models: list(String.t()),
-    priority: non_neg_integer(),
-    rate_limit: {non_neg_integer(), :second | :minute | :hour} | nil,
-    max_retries: non_neg_integer(),
-    timeout: non_neg_integer(),
-    headers: map(),
-    options: keyword()
-  }
-  
+          name: atom(),
+          adapter: module(),
+          api_key: String.t() | nil,
+          base_url: String.t() | nil,
+          models: list(String.t()),
+          priority: non_neg_integer(),
+          rate_limit: {non_neg_integer(), :second | :minute | :hour} | nil,
+          max_retries: non_neg_integer(),
+          timeout: non_neg_integer(),
+          headers: map(),
+          options: keyword()
+        }
+
   defstruct [
     :name,
     :adapter,
@@ -30,7 +30,7 @@ defmodule RubberDuck.LLM.ProviderConfig do
     headers: %{},
     options: []
   ]
-  
+
   @doc """
   Validates a provider configuration.
   """
@@ -42,7 +42,7 @@ defmodule RubberDuck.LLM.ProviderConfig do
       {:ok, config}
     end
   end
-  
+
   defp validate_required_fields(config) do
     cond do
       is_nil(config.name) -> {:error, :name_required}
@@ -50,12 +50,13 @@ defmodule RubberDuck.LLM.ProviderConfig do
       true -> :ok
     end
   end
-  
+
   defp validate_adapter(config) do
     if Code.ensure_loaded?(config.adapter) do
-      behaviours = config.adapter.module_info(:attributes)
-      |> Keyword.get(:behaviour, [])
-      
+      behaviours =
+        config.adapter.module_info(:attributes)
+        |> Keyword.get(:behaviour, [])
+
       if RubberDuck.LLM.Provider in behaviours do
         :ok
       else
@@ -65,7 +66,7 @@ defmodule RubberDuck.LLM.ProviderConfig do
       {:error, {:adapter_not_found, config.adapter}}
     end
   end
-  
+
   defp validate_models(config) do
     if Enum.all?(config.models, &is_binary/1) do
       :ok
@@ -73,11 +74,13 @@ defmodule RubberDuck.LLM.ProviderConfig do
       {:error, :invalid_models}
     end
   end
-  
+
   defp validate_rate_limit(%{rate_limit: nil}), do: :ok
-  defp validate_rate_limit(%{rate_limit: {limit, unit}}) 
+
+  defp validate_rate_limit(%{rate_limit: {limit, unit}})
        when is_integer(limit) and limit > 0 and unit in [:second, :minute, :hour] do
     :ok
   end
+
   defp validate_rate_limit(_), do: {:error, :invalid_rate_limit}
 end

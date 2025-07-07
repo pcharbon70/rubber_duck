@@ -6,13 +6,13 @@ defmodule RubberDuck.Workspace.AnalysisResultTest do
   describe "analysis_results" do
     setup do
       # Create a project and code file first
-      {:ok, project} = 
+      {:ok, project} =
         Workspace.create_project(%{
           name: "Test Project",
           description: "Project for testing analysis results"
         })
 
-      {:ok, code_file} = 
+      {:ok, code_file} =
         Workspace.create_code_file(%{
           file_path: "lib/example.ex",
           content: "defmodule Example do\n  def hello, do: :world\nend",
@@ -24,16 +24,16 @@ defmodule RubberDuck.Workspace.AnalysisResultTest do
     end
 
     test "can create an analysis result with code file association", %{code_file: code_file} do
-      assert {:ok, analysis_result} = 
-        Workspace.create_analysis_result(%{
-          analysis_type: "complexity",
-          results: %{
-            "cyclomatic_complexity" => 1,
-            "cognitive_complexity" => 0
-          },
-          severity: :low,
-          code_file_id: code_file.id
-        })
+      assert {:ok, analysis_result} =
+               Workspace.create_analysis_result(%{
+                 analysis_type: "complexity",
+                 results: %{
+                   "cyclomatic_complexity" => 1,
+                   "cognitive_complexity" => 0
+                 },
+                 severity: :low,
+                 code_file_id: code_file.id
+               })
 
       assert analysis_result.analysis_type == "complexity"
       assert analysis_result.results["cyclomatic_complexity"] == 1
@@ -43,31 +43,31 @@ defmodule RubberDuck.Workspace.AnalysisResultTest do
     end
 
     test "analysis_type is required", %{code_file: code_file} do
-      assert {:error, error} = 
-        Workspace.create_analysis_result(%{
-          results: %{"some" => "data"},
-          code_file_id: code_file.id
-        })
+      assert {:error, error} =
+               Workspace.create_analysis_result(%{
+                 results: %{"some" => "data"},
+                 code_file_id: code_file.id
+               })
 
       assert %Ash.Error.Invalid{} = error
     end
 
     test "code_file association is required" do
-      assert {:error, error} = 
-        Workspace.create_analysis_result(%{
-          analysis_type: "complexity",
-          results: %{"some" => "data"}
-        })
+      assert {:error, error} =
+               Workspace.create_analysis_result(%{
+                 analysis_type: "complexity",
+                 results: %{"some" => "data"}
+               })
 
       assert %Ash.Error.Invalid{} = error
     end
 
     test "results defaults to empty map if not provided", %{code_file: code_file} do
-      assert {:ok, analysis_result} = 
-        Workspace.create_analysis_result(%{
-          analysis_type: "linting",
-          code_file_id: code_file.id
-        })
+      assert {:ok, analysis_result} =
+               Workspace.create_analysis_result(%{
+                 analysis_type: "linting",
+                 code_file_id: code_file.id
+               })
 
       assert analysis_result.results == %{}
     end
@@ -90,40 +90,40 @@ defmodule RubberDuck.Workspace.AnalysisResultTest do
           }
         ]
       }
-      
-      assert {:ok, analysis_result} = 
-        Workspace.create_analysis_result(%{
-          analysis_type: "linting",
-          results: complex_results,
-          severity: :medium,
-          code_file_id: code_file.id
-        })
+
+      assert {:ok, analysis_result} =
+               Workspace.create_analysis_result(%{
+                 analysis_type: "linting",
+                 results: complex_results,
+                 severity: :medium,
+                 code_file_id: code_file.id
+               })
 
       assert analysis_result.results == complex_results
       assert length(analysis_result.results["errors"]) == 1
     end
 
     test "severity field is optional", %{code_file: code_file} do
-      assert {:ok, analysis_result} = 
-        Workspace.create_analysis_result(%{
-          analysis_type: "security",
-          results: %{"vulnerabilities" => []},
-          code_file_id: code_file.id
-        })
+      assert {:ok, analysis_result} =
+               Workspace.create_analysis_result(%{
+                 analysis_type: "security",
+                 results: %{"vulnerabilities" => []},
+                 code_file_id: code_file.id
+               })
 
       assert analysis_result.severity == nil
     end
 
     test "can list analysis results", %{code_file: code_file} do
       # Create multiple analysis results
-      {:ok, _} = 
+      {:ok, _} =
         Workspace.create_analysis_result(%{
           analysis_type: "complexity",
           results: %{},
           code_file_id: code_file.id
         })
 
-      {:ok, _} = 
+      {:ok, _} =
         Workspace.create_analysis_result(%{
           analysis_type: "security",
           results: %{},

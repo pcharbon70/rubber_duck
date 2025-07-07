@@ -1,11 +1,12 @@
 defmodule RubberDuck.SelfCorrection.CorrectorTest do
   use ExUnit.Case, async: true
-  
+
   alias RubberDuck.SelfCorrection.Corrector
-  
+
   describe "apply_correction/2" do
     test "applies simple replacement correction" do
       content = "Hello wrold!"
+
       correction = %{
         type: :spelling,
         description: "Fix spelling error",
@@ -20,13 +21,14 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
         confidence: 0.9,
         impact: :low
       }
-      
+
       result = Corrector.apply_correction(content, correction)
       assert result == "Hello world!"
     end
-    
+
     test "applies insertion correction" do
       content = "def hello do\n  'world'\nend"
+
       correction = %{
         type: :documentation,
         description: "Add documentation",
@@ -41,13 +43,14 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
         confidence: 0.8,
         impact: :medium
       }
-      
+
       result = Corrector.apply_correction(content, correction)
       assert result =~ "@doc"
     end
-    
+
     test "applies deletion correction" do
       content = "Hello  world!"
+
       correction = %{
         type: :formatting,
         description: "Remove extra space",
@@ -62,13 +65,14 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
         confidence: 0.95,
         impact: :low
       }
-      
+
       result = Corrector.apply_correction(content, correction)
       assert result == "Hello world!"
     end
-    
+
     test "handles multiple changes in correct order" do
       content = "abc def ghi"
+
       correction = %{
         type: :multi_fix,
         description: "Multiple fixes",
@@ -80,13 +84,14 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
         confidence: 0.8,
         impact: :medium
       }
-      
+
       result = Corrector.apply_correction(content, correction)
       assert result == "123 456 789"
     end
-    
+
     test "validates result and reverts on corruption" do
       content = "Valid content"
+
       correction = %{
         type: :dangerous,
         description: "Dangerous change",
@@ -94,20 +99,23 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
           %{
             action: :replace,
             target: "Valid content",
-            replacement: "",  # Would empty the content
+            # Would empty the content
+            replacement: "",
             location: %{}
           }
         ],
         confidence: 0.5,
         impact: :high
       }
-      
+
       result = Corrector.apply_correction(content, correction)
-      assert result == content  # Should revert
+      # Should revert
+      assert result == content
     end
-    
+
     test "handles errors gracefully" do
       content = "Test content"
+
       correction = %{
         type: :error_prone,
         description: "Error prone change",
@@ -122,15 +130,17 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
         confidence: 0.7,
         impact: :medium
       }
-      
+
       result = Corrector.apply_correction(content, correction)
-      assert result == content  # Should return original on error
+      # Should return original on error
+      assert result == content
     end
   end
-  
+
   describe "apply_multiple/2" do
     test "applies multiple corrections in priority order" do
       content = "helo wrold!"
+
       corrections = [
         %{
           type: :spelling,
@@ -147,13 +157,14 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
           impact: :high
         }
       ]
-      
+
       result = Corrector.apply_multiple(content, corrections)
       assert result == "hello world!"
     end
-    
+
     test "skips corrections that don't improve content" do
       content = "Good content"
+
       corrections = [
         %{
           type: :no_op,
@@ -163,15 +174,16 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
           impact: :low
         }
       ]
-      
+
       result = Corrector.apply_multiple(content, corrections)
       assert result == content
     end
   end
-  
+
   describe "preview/2" do
     test "previews correction without applying" do
       content = "Hello wrold!"
+
       correction = %{
         type: :spelling,
         description: "Fix spelling",
@@ -179,9 +191,9 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
         confidence: 0.9,
         impact: :low
       }
-      
+
       preview = Corrector.preview(content, correction)
-      
+
       assert preview.original == content
       assert preview.corrected == "Hello world!"
       assert preview.correction_type == :spelling
@@ -189,7 +201,7 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
       assert Map.has_key?(preview, :changes_made)
     end
   end
-  
+
   describe "merge_corrections/1" do
     test "groups corrections by type" do
       corrections = [
@@ -197,17 +209,18 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
         %{type: :spelling, changes: [], confidence: 0.8, impact: :low},
         %{type: :formatting, changes: [], confidence: 0.7, impact: :medium}
       ]
-      
+
       merged = Corrector.merge_corrections(corrections)
-      
+
       # For now, merge_corrections keeps them separate
       assert length(merged) == 3
     end
   end
-  
+
   describe "edge cases" do
     test "handles empty content" do
       content = ""
+
       correction = %{
         type: :add_content,
         description: "Add content",
@@ -215,13 +228,14 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
         confidence: 0.8,
         impact: :high
       }
-      
+
       result = Corrector.apply_correction(content, correction)
       assert result == "Hello"
     end
-    
+
     test "handles corrections at end of content" do
       content = "Hello"
+
       correction = %{
         type: :punctuation,
         description: "Add punctuation",
@@ -229,13 +243,14 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
         confidence: 0.9,
         impact: :low
       }
-      
+
       result = Corrector.apply_correction(content, correction)
       assert result == "Hello!"
     end
-    
+
     test "handles line-based locations" do
       content = "Line 1\nLine 2\nLine 3"
+
       correction = %{
         type: :insert_line,
         description: "Insert between lines",
@@ -243,7 +258,7 @@ defmodule RubberDuck.SelfCorrection.CorrectorTest do
         confidence: 0.8,
         impact: :medium
       }
-      
+
       result = Corrector.apply_correction(content, correction)
       assert result =~ "New Line"
       lines = String.split(result, "\n")

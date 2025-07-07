@@ -1,15 +1,15 @@
 defmodule RubberDuck.EngineSystem.Dsl do
   @moduledoc """
   The DSL extension for RubberDuck.EngineSystem.
-  
+
   Defines the structure and entities available in the engine system DSL.
   """
-  
+
   @engine %Spark.Dsl.Entity{
     name: :engine,
     describe: """
     Define an engine with its configuration.
-    
+
     Each engine must have a unique name and a module that implements
     the `RubberDuck.Engine` behavior.
     """,
@@ -69,19 +69,19 @@ defmodule RubberDuck.EngineSystem.Dsl do
       ]
     ]
   }
-  
+
   @engines %Spark.Dsl.Section{
     name: :engines,
     describe: """
     Configure engines for the system.
-    
+
     Engines are pluggable components that handle specific tasks.
     """,
     entities: [
       @engine
     ]
   }
-  
+
   use Spark.Dsl.Extension,
     sections: [@engines],
     transformers: [

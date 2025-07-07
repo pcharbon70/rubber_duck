@@ -1,19 +1,19 @@
 defimpl RubberDuck.Processor, for: BitString do
   @moduledoc """
   Processor implementation for String/BitString data type.
-  
+
   Handles processing of text data, including:
   - Text normalization
   - Format conversion
   - Content extraction
   - Language detection
   """
-  
+
   @doc """
   Process a string with various transformation options.
-  
+
   ## Options
-  
+
   - `:normalize` - Normalize whitespace and line endings (default: true)
   - `:trim` - Trim leading/trailing whitespace (default: true)
   - `:downcase` - Convert to lowercase
@@ -23,30 +23,31 @@ defimpl RubberDuck.Processor, for: BitString do
   - `:format` - Convert to specific format (:plain, :markdown, :code)
   """
   def process(string, opts) when is_binary(string) do
-    result = string
-    |> maybe_normalize(opts)
-    |> maybe_trim(opts)
-    |> maybe_change_case(opts)
-    |> maybe_split(opts)
-    |> maybe_truncate(opts)
-    |> maybe_format(opts)
-    
+    result =
+      string
+      |> maybe_normalize(opts)
+      |> maybe_trim(opts)
+      |> maybe_change_case(opts)
+      |> maybe_split(opts)
+      |> maybe_truncate(opts)
+      |> maybe_format(opts)
+
     {:ok, result}
   rescue
     e -> {:error, e}
   end
-  
+
   def process(_not_string, _opts) do
     {:error, :not_a_string}
   end
-  
+
   @doc """
   Extract metadata from the string.
   """
   def metadata(string) when is_binary(string) do
     lines = String.split(string, ~r/\r?\n/)
     words = String.split(string, ~r/\s+/) |> Enum.reject(&(&1 == ""))
-    
+
     %{
       type: :string,
       encoding: :utf8,
@@ -59,7 +60,7 @@ defimpl RubberDuck.Processor, for: BitString do
       timestamp: DateTime.utc_now()
     }
   end
-  
+
   @doc """
   Validate the string format.
   """
@@ -70,11 +71,11 @@ defimpl RubberDuck.Processor, for: BitString do
       {:error, :invalid_utf8}
     end
   end
-  
+
   def validate(_not_string) do
     {:error, :not_a_string}
   end
-  
+
   @doc """
   Normalize the string to a consistent format.
   """
@@ -85,9 +86,9 @@ defimpl RubberDuck.Processor, for: BitString do
     |> String.replace(~r/\r/, "\n")
     |> String.replace(~r/[[:space:]]+/, " ")
   end
-  
+
   # Private functions
-  
+
   defp maybe_normalize(string, opts) do
     if Keyword.get(opts, :normalize, true) do
       string
@@ -98,7 +99,7 @@ defimpl RubberDuck.Processor, for: BitString do
       string
     end
   end
-  
+
   defp maybe_trim(string, opts) do
     if Keyword.get(opts, :trim, true) do
       String.trim(string)
@@ -106,7 +107,7 @@ defimpl RubberDuck.Processor, for: BitString do
       string
     end
   end
-  
+
   defp maybe_change_case(string, opts) do
     cond do
       Keyword.get(opts, :downcase) -> String.downcase(string)
@@ -114,7 +115,7 @@ defimpl RubberDuck.Processor, for: BitString do
       true -> string
     end
   end
-  
+
   defp maybe_split(string, opts) do
     case Keyword.get(opts, :split) do
       nil -> string
@@ -124,10 +125,12 @@ defimpl RubberDuck.Processor, for: BitString do
       _ -> string
     end
   end
-  
+
   defp maybe_truncate(string, opts) when is_binary(string) do
     case Keyword.get(opts, :max_length) do
-      nil -> string
+      nil ->
+        string
+
       max when is_integer(max) and max > 0 ->
         if String.length(string) > max do
           String.slice(string, 0, max - 3) <> "..."
@@ -136,7 +139,7 @@ defimpl RubberDuck.Processor, for: BitString do
         end
     end
   end
-  
+
   defp maybe_truncate(list, opts) when is_list(list) do
     # If string was split, apply truncation to the list
     case Keyword.get(opts, :max_length) do
@@ -144,7 +147,7 @@ defimpl RubberDuck.Processor, for: BitString do
       max when is_integer(max) and max > 0 -> Enum.take(list, max)
     end
   end
-  
+
   defp maybe_format(string, opts) when is_binary(string) do
     case Keyword.get(opts, :format) do
       nil -> string
@@ -154,7 +157,7 @@ defimpl RubberDuck.Processor, for: BitString do
       _ -> string
     end
   end
-  
+
   defp maybe_format(list, opts) when is_list(list) do
     # If string was split, apply formatting to each element
     case Keyword.get(opts, :format) do
@@ -162,23 +165,26 @@ defimpl RubberDuck.Processor, for: BitString do
       format -> Enum.map(list, &maybe_format(&1, format: format))
     end
   end
-  
+
   defp strip_formatting(string) do
     string
-    |> String.replace(~r/\*{1,2}([^*]+)\*{1,2}/, "\\1")  # Remove markdown bold/italic
-    |> String.replace(~r/`([^`]+)`/, "\\1")              # Remove inline code
-    |> String.replace(~r/^#+\s+/, "")                    # Remove headers
+    # Remove markdown bold/italic
+    |> String.replace(~r/\*{1,2}([^*]+)\*{1,2}/, "\\1")
+    # Remove inline code
+    |> String.replace(~r/`([^`]+)`/, "\\1")
+    # Remove headers
+    |> String.replace(~r/^#+\s+/, "")
   end
-  
+
   defp ensure_markdown_format(string) do
     # Basic markdown formatting - could be enhanced
     string
   end
-  
+
   defp format_as_code(string) do
     "```\n#{string}\n```"
   end
-  
+
   defp detect_language_hint(string) do
     cond do
       # Simple heuristics - could be enhanced with actual language detection

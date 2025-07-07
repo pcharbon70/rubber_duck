@@ -1,11 +1,11 @@
 defmodule RubberDuck.CoT.Chain do
   @moduledoc """
   Base module for Chain-of-Thought reasoning chains.
-  
+
   Use this module to define a reasoning chain with the CoT DSL.
-  
+
   ## Example
-  
+
       defmodule MyChain do
         use RubberDuck.CoT.Chain
         
@@ -24,11 +24,11 @@ defmodule RubberDuck.CoT.Chain do
         end
       end
   """
-  
+
   defmacro __using__(_opts) do
     quote do
       use Spark.Dsl, default_extensions: [extensions: [RubberDuck.CoT.Dsl]]
-      
+
       @doc """
       Gets the reasoning chain configuration for this module.
       """
@@ -37,14 +37,14 @@ defmodule RubberDuck.CoT.Chain do
       end
     end
   end
-  
+
   @doc """
   Gets the reasoning chain configuration for a given module.
   """
   def reasoning_chain(module) do
     # Get the reasoning chain configuration
     steps = Spark.Dsl.Extension.get_entities(module, [:reasoning_chain, :step]) || []
-    
+
     # Build the configuration map from individual options
     config = %{
       name: Spark.Dsl.Extension.get_opt(module, [:reasoning_chain], :name, :unnamed),
@@ -55,7 +55,7 @@ defmodule RubberDuck.CoT.Chain do
       cache_ttl: Spark.Dsl.Extension.get_opt(module, [:reasoning_chain], :cache_ttl, 900),
       entities: %{step: steps}
     }
-    
+
     # Return as a list with the configuration
     [config]
   end

@@ -9,6 +9,18 @@ defmodule RubberDuck.Workspace.AnalysisResult do
     repo RubberDuck.Repo
   end
 
+  actions do
+    defaults [:read, :destroy]
+
+    create :create do
+      accept [:analysis_type, :results, :severity, :code_file_id]
+    end
+
+    update :update do
+      accept [:analysis_type, :results, :severity]
+    end
+  end
+
   attributes do
     uuid_primary_key :id
 
@@ -39,18 +51,6 @@ defmodule RubberDuck.Workspace.AnalysisResult do
       allow_nil? false
       attribute_type :uuid
       attribute_writable? true
-    end
-  end
-
-  actions do
-    defaults [:read, :destroy]
-    
-    create :create do
-      accept [:analysis_type, :results, :severity, :code_file_id]
-    end
-    
-    update :update do
-      accept [:analysis_type, :results, :severity]
     end
   end
 end

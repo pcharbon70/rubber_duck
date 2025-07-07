@@ -12,8 +12,8 @@
 - **Section 2.1: Spark DSL Foundation** ✅ Completed
 - **Section 2.2: Base Engine Behavior** ✅ Completed (with pooling enhancement)
 - **Section 2.3: Plugin Architecture for Extensibility** ✅ Completed
-- **Section 2.4: Engine Registry and Management** ✅ Completed
-- **Section 2.5: Protocol-Based Processing** ✅ Completed
+- **Section 2.4: Protocol-Based Extensibility** ✅ Completed
+- **Section 2.5: Code Completion Engine** ✅ Completed
 - **Section 2.6: Code Generation Engine with RAG** ✅ Completed
 - **Section 2.7: Phase 2 Integration Tests** ✅ Completed
 
@@ -29,6 +29,12 @@
 
 ### Phase 4: Workflow Orchestration & Analysis
 - **Section 4.1: Reactor Workflow Foundation** ✅ Completed
+- **Section 4.2: AST Parser Implementation** ⏳ Next Up
+- **Section 4.3: Code Analysis Engines** 🔄 Not Started
+- **Section 4.4: Complete Analysis Workflow** 🔄 Not Started
+- **Section 4.5: Agentic Workflows Implementation** 🔄 Not Started
+- **Section 4.6: Dynamic Workflow Generation** 🔄 Not Started
+- **Section 4.7: Hybrid Workflow Architecture** 🔄 Not Started
 
 ### Phase 5-6: Not Started
 
@@ -312,32 +318,34 @@ Create tests in `test/rubber_duck/plugin_test.exs` to verify:
 - [x] 2.3.15 Test plugin isolation and error handling
 - [x] 2.3.16 Test plugin dependency resolution
 
-### 2.4 Protocol-based Extensibility
+### 2.4 Protocol-based Extensibility ✅ Completed
 
 Implement Elixir protocols to provide flexible extension points for different data types and processing strategies.
 
 #### Tasks:
-- [ ] 2.4.1 Create `RubberDuck.Processor` protocol
-- [ ] 2.4.2 Implement protocol for common data types:
-  - [ ] 2.4.2.1 Map implementation for structured data
-  - [ ] 2.4.2.2 String implementation for text
-  - [ ] 2.4.2.3 List implementation for collections
-- [ ] 2.4.3 Create `RubberDuck.Enhancer` protocol
-- [ ] 2.4.4 Implement enhancement strategies:
-  - [ ] 2.4.4.1 Context enhancement
-  - [ ] 2.4.4.2 Result refinement
-  - [ ] 2.4.4.3 Error correction
-- [ ] 2.4.5 Add protocol consolidation
-- [ ] 2.4.6 Create protocol documentation
-- [ ] 2.4.7 Implement protocol testing utilities
+- [x] 2.4.1 Create `RubberDuck.Processor` protocol
+- [x] 2.4.2 Implement protocol for common data types:
+  - [x] 2.4.2.1 Map implementation for structured data
+  - [x] 2.4.2.2 String implementation for text
+  - [x] 2.4.2.3 List implementation for collections
+- [x] 2.4.3 Create `RubberDuck.Enhancer` protocol
+- [x] 2.4.4 Implement enhancement strategies:
+  - [x] 2.4.4.1 Context enhancement
+  - [x] 2.4.4.2 Result refinement
+  - [x] 2.4.4.3 Error correction
+- [x] 2.4.5 Add protocol consolidation
+- [x] 2.4.6 Create protocol documentation
+- [x] 2.4.7 Implement protocol testing utilities
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/protocols_test.exs` to verify:
-- [ ] 2.4.8 Test processor protocol for all types
-- [ ] 2.4.9 Test enhancer protocol implementations
-- [ ] 2.4.10 Test protocol dispatch correctness
-- [ ] 2.4.11 Test protocol consolidation
-- [ ] 2.4.12 Test custom implementations
+- [x] 2.4.8 Test processor protocol for all types
+- [x] 2.4.9 Test enhancer protocol implementations
+- [x] 2.4.10 Test protocol dispatch correctness
+- [x] 2.4.11 Test protocol consolidation
+- [x] 2.4.12 Test custom implementations
+
+**Note**: Renamed from sections 2.4 to 2.5 during implementation. Implemented with Processor and Enhancer protocols supporting Map, String, List, Binary, and Tuple types. See `notes/features/007-protocol-extensibility.md` for implementation details.
 
 ### 2.5 Code Completion Engine ✅
 
@@ -368,34 +376,34 @@ Create tests in `test/rubber_duck/engines/completion_test.exs` to verify:
 - [x] 2.5.16 Test telemetry events are emitted
 - [x] 2.5.17 Test incremental updates work correctly
 
-### 2.6 Code Generation Engine
+### 2.6 Code Generation Engine ✅ Completed
 
 Create an engine for generating code from natural language descriptions. This engine uses RAG (Retrieval Augmented Generation) to provide context-aware code generation.
 
 #### Tasks:
-- [ ] 2.6.1 Create `RubberDuck.Engines.Generation` module
-- [ ] 2.6.2 Implement Engine behavior for generation
-- [ ] 2.6.3 Build RAG context retrieval:
-  - [ ] 2.6.3.1 Implement semantic search for similar code
-  - [ ] 2.6.3.2 Extract relevant project patterns
-  - [ ] 2.6.3.3 Build context from multiple sources
-- [ ] 2.6.4 Create prompt templates for different languages
-- [ ] 2.6.5 Add code validation post-generation
-- [ ] 2.6.6 Implement iterative refinement capability
-- [ ] 2.6.7 Support partial code generation
-- [ ] 2.6.8 Add import/dependency detection
-- [ ] 2.6.9 Create generation history tracking
-- [ ] 2.6.10 Implement user preference learning
+- [x] 2.6.1 Create `RubberDuck.Engines.Generation` module
+- [x] 2.6.2 Implement Engine behavior for generation
+- [x] 2.6.3 Build RAG context retrieval:
+  - [x] 2.6.3.1 Implement semantic search for similar code
+  - [x] 2.6.3.2 Extract relevant project patterns
+  - [x] 2.6.3.3 Build context from multiple sources
+- [x] 2.6.4 Create prompt templates for different languages
+- [x] 2.6.5 Add code validation post-generation
+- [x] 2.6.6 Implement iterative refinement capability
+- [x] 2.6.7 Support partial code generation
+- [x] 2.6.8 Add import/dependency detection
+- [x] 2.6.9 Create generation history tracking
+- [x] 2.6.10 Implement user preference learning
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/engines/generation_test.exs` to verify:
-- [ ] 2.6.11 Test code generation from natural language prompts
-- [ ] 2.6.12 Test generated code includes proper language syntax
-- [ ] 2.6.13 Test RAG context influences generation patterns
-- [ ] 2.6.14 Test generated code syntax is valid
-- [ ] 2.6.15 Test import detection works correctly
-- [ ] 2.6.16 Test user preferences are applied
-- [ ] 2.6.17 Test partial generation completes existing code
+- [x] 2.6.11 Test code generation from natural language prompts
+- [x] 2.6.12 Test generated code includes proper language syntax
+- [x] 2.6.13 Test RAG context influences generation patterns
+- [x] 2.6.14 Test generated code syntax is valid
+- [x] 2.6.15 Test import detection works correctly
+- [x] 2.6.16 Test user preferences are applied
+- [x] 2.6.17 Test partial generation completes existing code
 
 ### Phase 2 Integration Tests ✅ Completed
 
@@ -561,128 +569,134 @@ Create tests in `test/rubber_duck/context/builder_test.exs` to verify:
 
 **Note**: Implemented with mock embeddings for now - will integrate with actual LLM embedding service when available. All core functionality is complete and tested. See `notes/features/034-context-building-caching.md` for implementation details.
 
-### 3.5 Chain-of-Thought (CoT) Implementation
+### 3.5 Chain-of-Thought (CoT) Implementation ✅ Completed
 
 Implement Chain-of-Thought as the foundational LLM enhancement technique, providing structured reasoning capabilities across all engines.
 
 #### Tasks:
-- [ ] 3.5.1 Create `RubberDuck.CoT.Dsl` module using Spark DSL
-- [ ] 3.5.2 Define CoT DSL sections:
-  - [ ] 3.5.2.1 Reasoning chain configuration
-  - [ ] 3.5.2.2 Step definitions
-  - [ ] 3.5.2.3 Engine bindings
-- [ ] 3.5.3 Implement `RubberDuck.CoT.ConversationManager` GenServer
-- [ ] 3.5.4 Create reasoning chain execution logic:
-  - [ ] 3.5.4.1 Step-by-step processing
-  - [ ] 3.5.4.2 Intermediate result tracking
-  - [ ] 3.5.4.3 Chain history management
-- [ ] 3.5.5 Build CoT prompt templates:
-  - [ ] 3.5.5.1 Default reasoning template
-  - [ ] 3.5.5.2 Domain-specific templates
-  - [ ] 3.5.5.3 Custom template support
-- [ ] 3.5.6 Implement logical consistency validation
-- [ ] 3.5.7 Add reasoning quality metrics
-- [ ] 3.5.8 Create CoT result formatting
-- [ ] 3.5.9 Implement CoT caching strategy
-- [ ] 3.5.10 Add telemetry for CoT effectiveness
+- [x] 3.5.1 Create `RubberDuck.CoT.Dsl` module using Spark DSL
+- [x] 3.5.2 Define CoT DSL sections:
+  - [x] 3.5.2.1 Reasoning chain configuration
+  - [x] 3.5.2.2 Step definitions
+  - [x] 3.5.2.3 Engine bindings
+- [x] 3.5.3 Implement `RubberDuck.CoT.ConversationManager` GenServer
+- [x] 3.5.4 Create reasoning chain execution logic:
+  - [x] 3.5.4.1 Step-by-step processing
+  - [x] 3.5.4.2 Intermediate result tracking
+  - [x] 3.5.4.3 Chain history management
+- [x] 3.5.5 Build CoT prompt templates:
+  - [x] 3.5.5.1 Default reasoning template
+  - [x] 3.5.5.2 Domain-specific templates
+  - [x] 3.5.5.3 Custom template support
+- [x] 3.5.6 Implement logical consistency validation
+- [x] 3.5.7 Add reasoning quality metrics
+- [x] 3.5.8 Create CoT result formatting
+- [x] 3.5.9 Implement CoT caching strategy
+- [x] 3.5.10 Add telemetry for CoT effectiveness
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/cot/` directory:
 
 **CoT DSL Tests** (`dsl_test.exs`):
-- [ ] 3.5.11 Test valid reasoning chain compilation
-- [ ] 3.5.12 Test step validation and ordering
-- [ ] 3.5.13 Test template application
-- [ ] 3.5.14 Test compile-time validations
+- [x] 3.5.11 Test valid reasoning chain compilation
+- [x] 3.5.12 Test step validation and ordering
+- [x] 3.5.13 Test template application
+- [x] 3.5.14 Test compile-time validations
 
 **CoT Execution Tests** (`execution_test.exs`):
-- [ ] 3.5.15 Test step-by-step execution
-- [ ] 3.5.16 Test logical consistency scoring
-- [ ] 3.5.17 Test chain interruption and recovery
-- [ ] 3.5.18 Test result aggregation
-- [ ] 3.5.19 Test caching effectiveness
+- [x] 3.5.15 Test step-by-step execution
+- [x] 3.5.16 Test logical consistency scoring
+- [x] 3.5.17 Test chain interruption and recovery
+- [x] 3.5.18 Test result aggregation
+- [x] 3.5.19 Test caching effectiveness
 
-### 3.6 Enhanced RAG Implementation
+**Note**: Implemented with Spark DSL for declarative configuration, GenServer for session management, ETS-based caching, and comprehensive telemetry integration. See `notes/features/035-chain-of-thought.md` for implementation details.
+
+### 3.6 Enhanced RAG Implementation ✅ Completed
 
 Build a sophisticated RAG system leveraging Elixir's concurrent processing for efficient retrieval and generation.
 
 #### Tasks:
-- [ ] 3.6.1 Create `RubberDuck.RAG.Pipeline` module
-- [ ] 3.6.2 Implement document processing pipeline:
-  - [ ] 3.6.2.1 Document chunking strategies
-  - [ ] 3.6.2.2 Metadata extraction
-  - [ ] 3.6.2.3 Embedding generation
-- [ ] 3.6.3 Build vector store abstraction:
-  - [ ] 3.6.3.1 pgvector integration
-  - [ ] 3.6.3.2 Partitioned search support
-  - [ ] 3.6.3.3 Index optimization
-- [ ] 3.6.4 Implement retrieval strategies:
-  - [ ] 3.6.4.1 Semantic similarity search
-  - [ ] 3.6.4.2 Hybrid search (keyword + semantic)
-  - [ ] 3.6.4.3 Contextual retrieval
-- [ ] 3.6.5 Create document reranking system:
-  - [ ] 3.6.5.1 Cross-encoder reranking
-  - [ ] 3.6.5.2 Relevance scoring
-  - [ ] 3.6.5.3 Diversity optimization
-- [ ] 3.6.6 Build context preparation:
-  - [ ] 3.6.6.1 Document summarization
-  - [ ] 3.6.6.2 Context window optimization
-  - [ ] 3.6.6.3 Citation tracking
-- [ ] 3.6.7 Implement parallel retrieval with Task.async_stream
-- [ ] 3.6.8 Add retrieval quality metrics
-- [ ] 3.6.9 Create RAG-specific caching layer
-- [ ] 3.6.10 Implement incremental index updates
+- [x] 3.6.1 Create `RubberDuck.RAG.Pipeline` module
+- [x] 3.6.2 Implement document processing pipeline:
+  - [x] 3.6.2.1 Document chunking strategies
+  - [x] 3.6.2.2 Metadata extraction
+  - [x] 3.6.2.3 Embedding generation
+- [x] 3.6.3 Build vector store abstraction:
+  - [x] 3.6.3.1 pgvector integration
+  - [x] 3.6.3.2 Partitioned search support
+  - [x] 3.6.3.3 Index optimization
+- [x] 3.6.4 Implement retrieval strategies:
+  - [x] 3.6.4.1 Semantic similarity search
+  - [x] 3.6.4.2 Hybrid search (keyword + semantic)
+  - [x] 3.6.4.3 Contextual retrieval
+- [x] 3.6.5 Create document reranking system:
+  - [x] 3.6.5.1 Cross-encoder reranking
+  - [x] 3.6.5.2 Relevance scoring
+  - [x] 3.6.5.3 Diversity optimization
+- [x] 3.6.6 Build context preparation:
+  - [x] 3.6.6.1 Document summarization
+  - [x] 3.6.6.2 Context window optimization
+  - [x] 3.6.6.3 Citation tracking
+- [x] 3.6.7 Implement parallel retrieval with Task.async_stream
+- [x] 3.6.8 Add retrieval quality metrics
+- [x] 3.6.9 Create RAG-specific caching layer
+- [x] 3.6.10 Implement incremental index updates
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/rag/` directory:
 
 **RAG Pipeline Tests** (`pipeline_test.exs`):
-- [ ] 3.6.11 Test document processing and chunking
-- [ ] 3.6.12 Test embedding generation accuracy
-- [ ] 3.6.13 Test retrieval precision and recall
-- [ ] 3.6.14 Test reranking effectiveness
-- [ ] 3.6.15 Test context preparation quality
-- [ ] 3.6.16 Test parallel retrieval performance
-- [ ] 3.6.17 Test incremental updates
+- [x] 3.6.11 Test document processing and chunking
+- [x] 3.6.12 Test embedding generation accuracy
+- [x] 3.6.13 Test retrieval precision and recall
+- [x] 3.6.14 Test reranking effectiveness
+- [x] 3.6.15 Test context preparation quality
+- [x] 3.6.16 Test parallel retrieval performance
+- [x] 3.6.17 Test incremental updates
 
-### 3.7 Iterative Self-Correction Engine
+**Note**: Implemented with advanced document processing pipeline, multiple retrieval strategies, sophisticated reranking system, and parallel processing capabilities. Builds on existing RAG infrastructure. See `notes/features/036-enhanced-rag-implementation.md` for implementation details.
+
+### 3.7 Iterative Self-Correction Engine ✅ Completed
 
 Implement self-correction mechanisms with feedback loops for improving LLM outputs.
 
 #### Tasks:
-- [ ] 3.7.1 Create `RubberDuck.SelfCorrection.Engine` module
-- [ ] 3.7.2 Implement correction strategies:
-  - [ ] 3.7.2.1 Syntax validation
-  - [ ] 3.7.2.2 Semantic consistency checking
-  - [ ] 3.7.2.3 Logic verification
-- [ ] 3.7.3 Build evaluation framework:
-  - [ ] 3.7.3.1 Response quality metrics
-  - [ ] 3.7.3.2 Error detection rules
-  - [ ] 3.7.3.3 Improvement suggestions
-- [ ] 3.7.4 Create correction application logic:
-  - [ ] 3.7.4.1 Targeted corrections
-  - [ ] 3.7.4.2 Full regeneration triggers
-  - [ ] 3.7.4.3 Partial updates
-- [ ] 3.7.5 Implement iteration control:
-  - [ ] 3.7.5.1 Maximum iteration limits
-  - [ ] 3.7.5.2 Convergence detection
-  - [ ] 3.7.5.3 Early stopping criteria
-- [ ] 3.7.6 Add correction history tracking
-- [ ] 3.7.7 Create feedback aggregation
-- [ ] 3.7.8 Implement learning from corrections
-- [ ] 3.7.9 Build correction effectiveness metrics
-- [ ] 3.7.10 Add correction result caching
+- [x] 3.7.1 Create `RubberDuck.SelfCorrection.Engine` module
+- [x] 3.7.2 Implement correction strategies:
+  - [x] 3.7.2.1 Syntax validation
+  - [x] 3.7.2.2 Semantic consistency checking
+  - [x] 3.7.2.3 Logic verification
+- [x] 3.7.3 Build evaluation framework:
+  - [x] 3.7.3.1 Response quality metrics
+  - [x] 3.7.3.2 Error detection rules
+  - [x] 3.7.3.3 Improvement suggestions
+- [x] 3.7.4 Create correction application logic:
+  - [x] 3.7.4.1 Targeted corrections
+  - [x] 3.7.4.2 Full regeneration triggers
+  - [x] 3.7.4.3 Partial updates
+- [x] 3.7.5 Implement iteration control:
+  - [x] 3.7.5.1 Maximum iteration limits
+  - [x] 3.7.5.2 Convergence detection
+  - [x] 3.7.5.3 Early stopping criteria
+- [x] 3.7.6 Add correction history tracking
+- [x] 3.7.7 Create feedback aggregation
+- [x] 3.7.8 Implement learning from corrections
+- [x] 3.7.9 Build correction effectiveness metrics
+- [x] 3.7.10 Add correction result caching
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/self_correction/` directory:
 
 **Self-Correction Tests** (`engine_test.exs`):
-- [ ] 3.7.11 Test error detection accuracy
-- [ ] 3.7.12 Test correction application
-- [ ] 3.7.13 Test iteration convergence
-- [ ] 3.7.14 Test improvement measurement
-- [ ] 3.7.15 Test edge case handling
-- [ ] 3.7.16 Test performance under iterations
+- [x] 3.7.11 Test error detection accuracy
+- [x] 3.7.12 Test correction application
+- [x] 3.7.13 Test iteration convergence
+- [x] 3.7.14 Test improvement measurement
+- [x] 3.7.15 Test edge case handling
+- [x] 3.7.16 Test performance under iterations
+
+**Note**: Implemented leveraging existing validation components from CoT, Code Refinement, Context Scoring, and Adaptive Selection systems. Includes comprehensive strategy system, quality evaluation, and learning capabilities. See `notes/features/037-iterative-self-correction-engine.md` for implementation details.
 
 ### 3.8 LLM Enhancement Integration ✅ Completed
 
@@ -742,32 +756,34 @@ Create comprehensive integration tests in `test/integration/phase_3_test.exs` to
 
 This phase implements the Reactor-based workflow system for complex, multi-step operations. It includes sophisticated code analysis capabilities, AST parsing, and integration of various analysis engines into cohesive workflows.
 
-### 4.1 Reactor Workflow Foundation
+### 4.1 Reactor Workflow Foundation ✅ Completed
 
 Set up the Reactor framework for defining and executing complex workflows with automatic parallelization and error handling.
 
 #### Tasks:
-- [ ] 4.1.1 Add Reactor dependency to project
-- [ ] 4.1.2 Create `RubberDuck.Workflows` module structure
-- [ ] 4.1.3 Implement base workflow behaviors
-- [ ] 4.1.4 Create workflow registry
-- [ ] 4.1.5 Set up workflow execution engine
-- [ ] 4.1.6 Implement step result caching
-- [ ] 4.1.7 Add workflow status tracking
-- [ ] 4.1.8 Create workflow cancellation support
-- [ ] 4.1.9 Implement workflow composition
-- [ ] 4.1.10 Add workflow versioning
-- [ ] 4.1.11 Set up workflow metrics collection
+- [x] 4.1.1 Add Reactor dependency to project
+- [x] 4.1.2 Create `RubberDuck.Workflows` module structure
+- [x] 4.1.3 Implement base workflow behaviors
+- [x] 4.1.4 Create workflow registry
+- [x] 4.1.5 Set up workflow execution engine
+- [x] 4.1.6 Implement step result caching
+- [x] 4.1.7 Add workflow status tracking
+- [x] 4.1.8 Create workflow cancellation support
+- [x] 4.1.9 Implement workflow composition
+- [x] 4.1.10 Add workflow versioning
+- [x] 4.1.11 Set up workflow metrics collection
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/workflows/foundation_test.exs` to verify:
-- [ ] 4.1.12 Test simple workflow execution
-- [ ] 4.1.13 Test workflow handles step failures
-- [ ] 4.1.14 Test parallel step execution
-- [ ] 4.1.15 Test workflow cancellation
-- [ ] 4.1.16 Test step result caching
-- [ ] 4.1.17 Test workflow composition
-- [ ] 4.1.18 Test metrics collection
+- [x] 4.1.12 Test simple workflow execution
+- [x] 4.1.13 Test workflow handles step failures
+- [x] 4.1.14 Test parallel step execution
+- [x] 4.1.15 Test workflow cancellation
+- [x] 4.1.16 Test step result caching
+- [x] 4.1.17 Test workflow composition
+- [x] 4.1.18 Test metrics collection
+
+**Note**: Implemented as a dynamic, concurrent, dependency-resolving saga orchestrator with transaction semantics, automatic parallelization, and compensation/rollback support. See `notes/features/041-reactor-workflow-foundation.md` for implementation details.
 
 ### 4.2 AST Parser Implementation
 

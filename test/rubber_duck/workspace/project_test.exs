@@ -5,11 +5,11 @@ defmodule RubberDuck.Workspace.ProjectTest do
 
   describe "projects" do
     test "can create a project with valid attributes" do
-      assert {:ok, project} = 
-        Workspace.create_project(%{
-          name: "Test Project",
-          description: "A test project for RubberDuck"
-        })
+      assert {:ok, project} =
+               Workspace.create_project(%{
+                 name: "Test Project",
+                 description: "A test project for RubberDuck"
+               })
 
       assert project.name == "Test Project"
       assert project.description == "A test project for RubberDuck"
@@ -19,10 +19,10 @@ defmodule RubberDuck.Workspace.ProjectTest do
     end
 
     test "name attribute is required" do
-      assert {:error, error} = 
-        Workspace.create_project(%{
-          description: "Missing name"
-        })
+      assert {:error, error} =
+               Workspace.create_project(%{
+                 description: "Missing name"
+               })
 
       assert %Ash.Error.Invalid{} = error
     end

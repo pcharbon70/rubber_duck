@@ -14,14 +14,16 @@ defmodule RubberDuck.CircuitBreakerTest do
   setup do
     # Stop if already running
     case Registry.lookup(RubberDuck.CircuitBreakerRegistry, :test_breaker) do
-      [{pid, _}] -> 
+      [{pid, _}] ->
         if Process.alive?(pid) do
           GenServer.stop(pid, :normal)
           Process.sleep(10)
         end
-      [] -> :ok
+
+      [] ->
+        :ok
     end
-    
+
     {:ok, _pid} = TestBreaker.start_link()
     :ok
   end
@@ -36,7 +38,7 @@ defmodule RubberDuck.CircuitBreakerTest do
     test "successful calls in closed state" do
       assert {:ok, :success} = TestBreaker.call(fn -> :success end)
       assert {:ok, 42} = TestBreaker.call(fn -> 42 end)
-      
+
       state = TestBreaker.state()
       assert state.state == :closed
       assert state.failure_count == 0
@@ -46,14 +48,14 @@ defmodule RubberDuck.CircuitBreakerTest do
       # First two failures don't open the circuit
       assert {:error, %RuntimeError{message: "fail"}} = TestBreaker.call(fn -> raise "fail" end)
       assert {:error, %RuntimeError{message: "fail"}} = TestBreaker.call(fn -> raise "fail" end)
-      
+
       state = TestBreaker.state()
       assert state.state == :closed
       assert state.failure_count == 2
-      
+
       # Third failure opens the circuit
       assert {:error, %RuntimeError{message: "fail"}} = TestBreaker.call(fn -> raise "fail" end)
-      
+
       state = TestBreaker.state()
       assert state.state == :open
       assert state.failure_count == 3
@@ -64,7 +66,7 @@ defmodule RubberDuck.CircuitBreakerTest do
       Enum.each(1..3, fn _ ->
         TestBreaker.call(fn -> raise "fail" end)
       end)
-      
+
       # Subsequent calls are rejected
       assert {:error, :circuit_open} = TestBreaker.call(fn -> :should_not_run end)
       assert {:error, :circuit_open} = TestBreaker.call(fn -> :should_not_run end)
@@ -75,13 +77,13 @@ defmodule RubberDuck.CircuitBreakerTest do
       Enum.each(1..3, fn _ ->
         TestBreaker.call(fn -> raise "fail" end)
       end)
-      
+
       # Wait for reset timeout
       Process.sleep(250)
-      
+
       # Next call should be allowed (half-open state)
       assert {:ok, :recovered} = TestBreaker.call(fn -> :recovered end)
-      
+
       state = TestBreaker.state()
       assert state.state == :half_open
     end
@@ -91,16 +93,16 @@ defmodule RubberDuck.CircuitBreakerTest do
       Enum.each(1..3, fn _ ->
         TestBreaker.call(fn -> raise "fail" end)
       end)
-      
+
       # Wait for reset timeout
       Process.sleep(250)
-      
+
       # First success in half-open
       assert {:ok, :success1} = TestBreaker.call(fn -> :success1 end)
       state = TestBreaker.state()
       assert state.state == :half_open
       assert state.success_count == 1
-      
+
       # Second success closes the circuit
       assert {:ok, :success2} = TestBreaker.call(fn -> :success2 end)
       state = TestBreaker.state()
@@ -113,13 +115,13 @@ defmodule RubberDuck.CircuitBreakerTest do
       Enum.each(1..3, fn _ ->
         TestBreaker.call(fn -> raise "fail" end)
       end)
-      
+
       # Wait for reset timeout
       Process.sleep(250)
-      
+
       # Failure in half-open reopens immediately
       assert {:error, %RuntimeError{message: "fail again"}} = TestBreaker.call(fn -> raise "fail again" end)
-      
+
       state = TestBreaker.state()
       assert state.state == :open
       assert state.failure_count == 4
@@ -127,11 +129,12 @@ defmodule RubberDuck.CircuitBreakerTest do
 
     test "handles timeout" do
       # Timeouts count as failures
-      assert {:error, :timeout} = TestBreaker.call(
-        fn -> Process.sleep(200) end,
-        timeout: 50
-      )
-      
+      assert {:error, :timeout} =
+               TestBreaker.call(
+                 fn -> Process.sleep(200) end,
+                 timeout: 50
+               )
+
       state = TestBreaker.state()
       assert state.failure_count == 1
     end
@@ -141,16 +144,16 @@ defmodule RubberDuck.CircuitBreakerTest do
       Enum.each(1..3, fn _ ->
         TestBreaker.call(fn -> raise "fail" end)
       end)
-      
+
       assert TestBreaker.state().state == :open
-      
+
       # Manual reset
       assert :ok = TestBreaker.reset()
-      
+
       state = TestBreaker.state()
       assert state.state == :closed
       assert state.failure_count == 0
-      
+
       # Can call again
       assert {:ok, :success} = TestBreaker.call(fn -> :success end)
     end
@@ -159,19 +162,22 @@ defmodule RubberDuck.CircuitBreakerTest do
   describe "error handling" do
     test "handles different error types" do
       # Exception
-      assert {:error, %RuntimeError{}} = TestBreaker.call(fn -> 
-        raise "runtime error"
-      end)
-      
+      assert {:error, %RuntimeError{}} =
+               TestBreaker.call(fn ->
+                 raise "runtime error"
+               end)
+
       # Throw
-      assert {:error, {:throw, :something}} = TestBreaker.call(fn -> 
-        throw(:something)
-      end)
-      
+      assert {:error, {:throw, :something}} =
+               TestBreaker.call(fn ->
+                 throw(:something)
+               end)
+
       # Exit
-      assert {:error, {:exit, :normal}} = TestBreaker.call(fn -> 
-        exit(:normal)
-      end)
+      assert {:error, {:exit, :normal}} =
+               TestBreaker.call(fn ->
+                 exit(:normal)
+               end)
     end
   end
 end

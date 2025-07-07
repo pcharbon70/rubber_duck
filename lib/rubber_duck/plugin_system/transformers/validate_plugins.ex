@@ -2,11 +2,11 @@ defmodule RubberDuck.PluginSystem.Transformers.ValidatePlugins do
   @moduledoc """
   Validates plugin configurations at compile time.
   """
-  
+
   use Spark.Dsl.Transformer
   alias Spark.Dsl.Transformer
   alias RubberDuck.Plugin
-  
+
   def transform(dsl_state) do
     dsl_state
     |> Transformer.get_entities([:plugins])
@@ -17,7 +17,7 @@ defmodule RubberDuck.PluginSystem.Transformers.ValidatePlugins do
       end
     end)
   end
-  
+
   defp validate_plugin(plugin, dsl_state) do
     with :ok <- validate_priority(plugin),
          :ok <- validate_module_exists(plugin),
@@ -26,7 +26,7 @@ defmodule RubberDuck.PluginSystem.Transformers.ValidatePlugins do
       {:ok, dsl_state}
     end
   end
-  
+
   defp validate_priority(%{priority: priority} = plugin) when priority < 0 or priority > 100 do
     {:error,
      Spark.Error.DslError.exception(
@@ -34,9 +34,9 @@ defmodule RubberDuck.PluginSystem.Transformers.ValidatePlugins do
        path: [:plugins, plugin.name]
      )}
   end
-  
+
   defp validate_priority(_), do: :ok
-  
+
   defp validate_module_exists(%{module: module} = plugin) do
     if Code.ensure_loaded?(module) do
       :ok
@@ -48,7 +48,7 @@ defmodule RubberDuck.PluginSystem.Transformers.ValidatePlugins do
        )}
     end
   end
-  
+
   defp validate_plugin_behavior(%{module: module} = plugin) do
     if Plugin.is_plugin?(module) do
       :ok
@@ -60,15 +60,15 @@ defmodule RubberDuck.PluginSystem.Transformers.ValidatePlugins do
        )}
     end
   end
-  
+
   defp validate_unique_name(plugin, dsl_state) do
     all_plugins = Transformer.get_entities(dsl_state, [:plugins])
-    
-    duplicate_count = 
+
+    duplicate_count =
       all_plugins
       |> Enum.filter(&(&1.name == plugin.name))
       |> length()
-    
+
     if duplicate_count > 1 do
       {:error,
        Spark.Error.DslError.exception(

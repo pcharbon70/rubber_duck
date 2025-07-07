@@ -4,13 +4,13 @@ import Config
 config :rubber_duck, :telemetry,
   # Enable/disable telemetry
   enabled: true,
-  
+
   # Console reporter configuration
   console_reporter: [
     enabled: Mix.env() == :dev,
     level: :info
   ],
-  
+
   # Polling configuration
   poller: [
     period: :timer.seconds(10),
@@ -20,7 +20,7 @@ config :rubber_duck, :telemetry,
       {:process_info, :reductions}
     ]
   ],
-  
+
   # Custom metric tags
   default_tags: %{
     environment: to_string(Mix.env()),
@@ -33,5 +33,4 @@ config :rubber_duck, RubberDuck.Repo,
   telemetry_event_prefix: [:rubber_duck, :repo]
 
 # Configure Phoenix telemetry
-config :rubber_duck, RubberDuckWeb.Endpoint,
-  instrumenters: [RubberDuck.Telemetry.PhoenixInstrumenter]
+config :rubber_duck, RubberDuckWeb.Endpoint, instrumenters: [RubberDuck.Telemetry.PhoenixInstrumenter]

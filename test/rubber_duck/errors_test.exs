@@ -1,7 +1,8 @@
 defmodule RubberDuck.ErrorsTest do
   use ExUnit.Case, async: true
-  
+
   alias RubberDuck.Errors
+
   alias RubberDuck.Errors.{
     RubberDuckError,
     EngineError,
@@ -19,12 +20,13 @@ defmodule RubberDuck.ErrorsTest do
     end
 
     test "creates error with all fields" do
-      error = RubberDuckError.exception(
-        message: "Custom error",
-        code: :custom_code,
-        details: %{foo: "bar"}
-      )
-      
+      error =
+        RubberDuckError.exception(
+          message: "Custom error",
+          code: :custom_code,
+          details: %{foo: "bar"}
+        )
+
       assert error.message == "Custom error"
       assert error.code == :custom_code
       assert error.details == %{foo: "bar"}
@@ -40,13 +42,14 @@ defmodule RubberDuck.ErrorsTest do
     end
 
     test "creates error with custom message" do
-      error = EngineError.exception(
-        message: "Custom engine error",
-        engine: "llm",
-        input: %{prompt: "test"},
-        reason: "timeout"
-      )
-      
+      error =
+        EngineError.exception(
+          message: "Custom engine error",
+          engine: "llm",
+          input: %{prompt: "test"},
+          reason: "timeout"
+        )
+
       assert error.message == "Custom engine error"
       assert error.engine == "llm"
       assert error.input == %{prompt: "test"}
@@ -67,13 +70,14 @@ defmodule RubberDuck.ErrorsTest do
     end
 
     test "creates error with all fields" do
-      error = LLMError.exception(
-        message: "Rate limited",
-        provider: "openai",
-        status_code: 429,
-        response: %{"error" => "rate_limit_exceeded"}
-      )
-      
+      error =
+        LLMError.exception(
+          message: "Rate limited",
+          provider: "openai",
+          status_code: 429,
+          response: %{"error" => "rate_limit_exceeded"}
+        )
+
       assert error.message == "Rate limited"
       assert error.provider == "openai"
       assert error.status_code == 429
@@ -88,12 +92,13 @@ defmodule RubberDuck.ErrorsTest do
     end
 
     test "creates error with expected and actual" do
-      error = ConfigurationError.exception(
-        key: :timeout,
-        expected: "integer",
-        actual: "string"
-      )
-      
+      error =
+        ConfigurationError.exception(
+          key: :timeout,
+          expected: "integer",
+          actual: "string"
+        )
+
       assert error.message == "Invalid configuration for :timeout"
       assert error.expected == "integer"
       assert error.actual == "string"
@@ -107,11 +112,12 @@ defmodule RubberDuck.ErrorsTest do
     end
 
     test "creates error with retry_after" do
-      error = ServiceUnavailableError.exception(
-        service: "llm_api",
-        retry_after: 60
-      )
-      
+      error =
+        ServiceUnavailableError.exception(
+          service: "llm_api",
+          retry_after: 60
+        )
+
       assert error.message == "Service llm_api is unavailable, retry after 60s"
       assert error.retry_after == 60
     end
@@ -121,19 +127,20 @@ defmodule RubberDuck.ErrorsTest do
     test "normalizes exception" do
       error = EngineError.exception(engine: "test", reason: "failed")
       normalized = Errors.normalize_error(error)
-      
+
       assert normalized.type == EngineError
       assert normalized.message == "Engine test error: failed"
+
       assert normalized.details == %{
-        engine: "test",
-        input: nil,
-        reason: "failed"
-      }
+               engine: "test",
+               input: nil,
+               reason: "failed"
+             }
     end
 
     test "normalizes string error" do
       normalized = Errors.normalize_error("Something went wrong")
-      
+
       assert normalized.type == :string_error
       assert normalized.message == "Something went wrong"
       assert normalized.details == %{}
@@ -141,7 +148,7 @@ defmodule RubberDuck.ErrorsTest do
 
     test "normalizes unknown error" do
       normalized = Errors.normalize_error({:error, :timeout})
-      
+
       assert normalized.type == :unknown_error
       assert normalized.message == "{:error, :timeout}"
       assert normalized.details == %{raw: {:error, :timeout}}
@@ -153,10 +160,10 @@ defmodule RubberDuck.ErrorsTest do
       # Since we have Tower configured with no reporters in test,
       # we can't easily test the actual reporting. 
       # In a real scenario, you might mock Tower or use a test reporter.
-      
+
       error = LLMError.exception(provider: "test", status_code: 500)
       metadata = %{user_id: "123", action: "generate"}
-      
+
       # This should not raise
       assert :ok == Errors.report_exception(error, [], metadata)
     end

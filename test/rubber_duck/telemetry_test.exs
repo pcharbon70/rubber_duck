@@ -12,35 +12,35 @@ defmodule RubberDuck.TelemetryTest do
 
     test "telemetry supervisor has correct children" do
       children = Supervisor.which_children(RubberDuck.Telemetry)
-      
+
       # Should have at least the console reporter and poller
       assert length(children) >= 2
-      
+
       # Check for specific children
       child_ids = Enum.map(children, fn {id, _, _, _} -> id end)
-      
+
       assert :console_reporter in child_ids
       assert :telemetry_poller in child_ids
     end
 
     test "telemetry metrics are defined" do
       metrics = Telemetry.metrics()
-      
+
       assert is_list(metrics)
       assert length(metrics) > 0
-      
+
       # Verify we have the expected metric types
       metric_names = Enum.map(metrics, & &1.name)
-      
+
       # VM metrics
       assert [:vm, :memory, :total] in metric_names
       assert [:vm, :memory, :processes] in metric_names
       assert [:vm, :memory, :binary] in metric_names
       assert [:vm, :memory, :ets] in metric_names
-      
+
       # HTTP metrics (when Phoenix is added)
       assert [:phoenix, :router_dispatch, :stop, :duration] in metric_names
-      
+
       # Database metrics
       assert [:rubber_duck, :repo, :query, :total_time] in metric_names
     end
@@ -51,7 +51,7 @@ defmodule RubberDuck.TelemetryTest do
       # Set up a test handler to capture events
       test_pid = self()
       handler_id = :test_vm_handler
-      
+
       :telemetry.attach(
         handler_id,
         [:vm, :memory],
@@ -60,20 +60,20 @@ defmodule RubberDuck.TelemetryTest do
         end,
         nil
       )
-      
+
       # Trigger measurements
       RubberDuck.Telemetry.Measurements.dispatch_vm_measurements()
-      
+
       # Should receive the event
       assert_receive {:telemetry_event, [:vm, :memory], measurements, _metadata}, 1000
-      
+
       # Verify measurements
       assert is_integer(measurements.total)
       assert measurements.total > 0
       assert is_integer(measurements.processes)
       assert is_integer(measurements.binary)
       assert is_integer(measurements.ets)
-      
+
       # Clean up
       :telemetry.detach(handler_id)
     end
@@ -82,7 +82,7 @@ defmodule RubberDuck.TelemetryTest do
       # Set up a test handler
       test_pid = self()
       handler_id = :test_run_queue_handler
-      
+
       :telemetry.attach(
         handler_id,
         [:vm, :run_queue],
@@ -91,17 +91,17 @@ defmodule RubberDuck.TelemetryTest do
         end,
         nil
       )
-      
+
       # Trigger measurements
       RubberDuck.Telemetry.Measurements.dispatch_run_queue_measurements()
-      
+
       # Should receive the event
       assert_receive {:telemetry_event, [:vm, :run_queue], measurements, _metadata}, 1000
-      
+
       # Verify measurements
       assert is_integer(measurements.length)
       assert measurements.length >= 0
-      
+
       # Clean up
       :telemetry.detach(handler_id)
     end

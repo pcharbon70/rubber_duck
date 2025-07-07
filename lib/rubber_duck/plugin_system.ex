@@ -1,12 +1,12 @@
 defmodule RubberDuck.PluginSystem do
   @moduledoc """
   DSL for defining plugin configurations using Spark.
-  
+
   This module provides a declarative way to configure plugins
   in the RubberDuck system.
-  
+
   ## Example
-  
+
       defmodule MyApp.Plugins do
         use RubberDuck.PluginSystem
         
@@ -33,16 +33,16 @@ defmodule RubberDuck.PluginSystem do
         end
       end
   """
-  
+
   use Spark.Dsl, default_extensions: [extensions: [RubberDuck.PluginSystem.Dsl]]
-  
+
   @doc """
   Returns all configured plugins.
   """
   def plugins(module) do
     Spark.Dsl.Extension.get_entities(module, [:plugins])
   end
-  
+
   @doc """
   Returns a specific plugin by name.
   """
@@ -51,7 +51,7 @@ defmodule RubberDuck.PluginSystem do
     |> plugins()
     |> Enum.find(&(&1.name == name))
   end
-  
+
   @doc """
   Returns enabled plugins sorted by priority.
   """
@@ -61,7 +61,7 @@ defmodule RubberDuck.PluginSystem do
     |> Enum.filter(& &1.enabled)
     |> Enum.sort_by(& &1.priority, :desc)
   end
-  
+
   @doc """
   Returns plugins that depend on a specific plugin.
   """
@@ -72,7 +72,7 @@ defmodule RubberDuck.PluginSystem do
       plugin_name in (plugin.dependencies || [])
     end)
   end
-  
+
   @doc """
   Loads all enabled plugins into the PluginManager.
   """
@@ -85,7 +85,9 @@ defmodule RubberDuck.PluginSystem do
           if plugin.auto_start do
             RubberDuck.PluginManager.start_plugin(name)
           end
+
           {:ok, name}
+
         error ->
           error
       end
