@@ -244,19 +244,23 @@ defmodule RubberDuck.Context.Scorer do
       end
 
     # Technical aspects
-    if String.contains?(query, ["implement", "create", "build"]) do
-      aspects = Map.put(aspects, :implementation, true)
+    aspects1 = if String.contains?(query, ["implement", "create", "build"]) do
+      Map.put(aspects, :implementation, true)
+    else
+      aspects
     end
 
-    if String.contains?(query, ["error", "bug", "issue", "problem"]) do
-      aspects = Map.put(aspects, :troubleshooting, true)
+    aspects2 = if String.contains?(query, ["error", "bug", "issue", "problem"]) do
+      Map.put(aspects1, :troubleshooting, true)
+    else
+      aspects1
     end
 
     if String.contains?(query, ["performance", "optimize", "speed"]) do
-      aspects = Map.put(aspects, :performance, true)
+      Map.put(aspects2, :performance, true)
+    else
+      aspects2
     end
-
-    aspects
   end
 
   defp check_covered_aspects(content, aspects) do

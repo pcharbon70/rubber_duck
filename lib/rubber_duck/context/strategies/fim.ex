@@ -135,19 +135,21 @@ defmodule RubberDuck.Context.Strategies.FIM do
     parts = []
 
     # Add recent context if available
-    if recent_context != "" do
-      parts = ["# Recent context:\n#{recent_context}\n\n" | parts]
+    parts1 = if recent_context != "" do
+      ["# Recent context:\n#{recent_context}\n\n" | parts]
+    else
+      parts
     end
 
     # Add FIM markers
-    parts =
-      parts ++
+    parts2 =
+      parts1 ++
         [
           "<fim_prefix>#{prefix}",
           "<fim_suffix>#{suffix}<fim_middle>"
         ]
 
-    Enum.join(parts, "")
+    Enum.join(parts2, "")
   end
 
   defp estimate_tokens(text) do

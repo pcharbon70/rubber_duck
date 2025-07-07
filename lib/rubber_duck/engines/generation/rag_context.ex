@@ -123,30 +123,36 @@ defmodule RubberDuck.Engines.Generation.RagContext do
     all_items = []
 
     # Add similar code
-    if Map.has_key?(sources, :similar_code) do
-      all_items = all_items ++ sources.similar_code
+    all_items1 = if Map.has_key?(sources, :similar_code) do
+      all_items ++ sources.similar_code
+    else
+      all_items
     end
 
     # Add project patterns
-    if Map.has_key?(sources, :project_patterns) do
-      all_items = all_items ++ sources.project_patterns
+    all_items2 = if Map.has_key?(sources, :project_patterns) do
+      all_items1 ++ sources.project_patterns
+    else
+      all_items1
     end
 
     # Add user examples
-    if Map.has_key?(sources, :examples) do
+    all_items3 = if Map.has_key?(sources, :examples) do
       examples = Enum.map(sources.examples, &format_example/1)
-      all_items = all_items ++ examples
+      all_items2 ++ examples
+    else
+      all_items2
     end
 
     # Remove duplicates and rank
-    unique_items = deduplicate_context_items(all_items)
+    unique_items = deduplicate_context_items(all_items3)
     ranked_items = rank_context_items(unique_items, query)
 
     %{
       items: ranked_items,
       summary: summarize_context(ranked_items),
       metadata: %{
-        total_items: length(all_items),
+        total_items: length(all_items3),
         unique_items: length(unique_items),
         sources: Map.keys(sources)
       }

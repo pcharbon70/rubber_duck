@@ -132,11 +132,13 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
     issues = []
 
     # Check for infinite loops
-    if Regex.match?(~r/def.*do\s*\w+\(\)/s, content) do
+    issues1 = if Regex.match?(~r/def.*do\s*\w+\(\)/s, content) do
       # Simple recursive call without base case
-      issues = [
+      [
         issue(:possible_infinite_recursion, :warning, "Recursive function may lack proper base case", %{}) | issues
       ]
+    else
+      issues
     end
 
     # Check for unreachable case clauses
@@ -148,7 +150,7 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
       else
         []
       end
-    end) ++ issues
+    end) ++ issues1
   end
 
   defp check_control_flow(content, _language) do
@@ -165,10 +167,10 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
 
     # Empty control blocks
     if Regex.match?(~r/(if|while|for).*\{\s*\}/, content) do
-      issues = [issue(:empty_control_block, :warning, "Empty control flow block detected", %{}) | issues]
+      [issue(:empty_control_block, :warning, "Empty control flow block detected", %{}) | issues]
+    else
+      issues
     end
-
-    issues
   end
 
   defp check_condition_logic(content, _language) do
@@ -183,16 +185,18 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
       end
 
     # Check for impossible conditions
-    if Regex.match?(~r/(\w+)\s*&&\s*!\1/, content) do
-      issues = [issue(:impossible_condition, :error, "Condition can never be true (x && !x)", %{}) | issues]
+    issues1 = if Regex.match?(~r/(\w+)\s*&&\s*!\1/, content) do
+      [issue(:impossible_condition, :error, "Condition can never be true (x && !x)", %{}) | issues]
+    else
+      issues
     end
 
     # Check for always-true conditions
     if Regex.match?(~r/(\w+)\s*\|\|\s*!\1/, content) do
-      issues = [issue(:tautology, :warning, "Condition is always true (x || !x)", %{}) | issues]
+      [issue(:tautology, :warning, "Condition is always true (x || !x)", %{}) | issues1]
+    else
+      issues1
     end
-
-    issues
   end
 
   defp check_return_consistency(content, "elixir") do
@@ -236,10 +240,10 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
     bare_raises = Regex.scan(~r/raise\s+"[^"]*"$/, content, multiline: true)
 
     if length(bare_raises) > 0 do
-      issues = [issue(:uninformative_errors, :info, "Error messages lack context information", %{}) | issues]
+      [issue(:uninformative_errors, :info, "Error messages lack context information", %{}) | issues]
+    else
+      issues
     end
-
-    issues
   end
 
   defp check_error_handling(content, _language) do
@@ -266,10 +270,10 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
 
     # Check for modifying collection during iteration
     if Regex.match?(~r/for.*in\s+(\w+).*\1\s*=|each.*do.*delete|each.*do.*push/, content) do
-      issues = [issue(:collection_modification, :error, "Modifying collection during iteration", %{}) | issues]
+      [issue(:collection_modification, :error, "Modifying collection during iteration", %{}) | issues]
+    else
+      issues
     end
-
-    issues
   end
 
   defp check_argument_flow(content) do
@@ -374,10 +378,10 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
       end)
 
     if claims_without_evidence > 2 do
-      issues = [issue(:unsupported_claims, :info, "Multiple claims made without supporting evidence", %{}) | issues]
+      [issue(:unsupported_claims, :info, "Multiple claims made without supporting evidence", %{}) | issues]
+    else
+      issues
     end
-
-    issues
   end
 
   defp analyze_reasoning_chain(_chain) do

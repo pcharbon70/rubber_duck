@@ -176,48 +176,58 @@ defmodule RubberDuck.Context.Strategies.LongContext do
     sections = []
 
     # System context
-    if user_profile do
-      sections = [
+    sections1 = if user_profile do
+      [
         {:system, format_system_context(user_profile), :high} | sections
       ]
+    else
+      sections
     end
 
     # Conversation history
-    if length(history) > 0 do
-      sections = [
-        {:history, format_conversation_history(history), :high} | sections
+    sections2 = if length(history) > 0 do
+      [
+        {:history, format_conversation_history(history), :high} | sections1
       ]
+    else
+      sections1
     end
 
     # Project knowledge
-    if length(project_context.knowledge) > 0 do
-      sections = [
-        {:knowledge, format_project_knowledge(project_context.knowledge), :medium} | sections
+    sections3 = if length(project_context.knowledge) > 0 do
+      [
+        {:knowledge, format_project_knowledge(project_context.knowledge), :medium} | sections2
       ]
+    else
+      sections2
     end
 
     # Code patterns
-    if length(project_context.patterns) > 0 do
-      sections = [
-        {:patterns, format_code_patterns(project_context.patterns), :medium} | sections
+    sections4 = if length(project_context.patterns) > 0 do
+      [
+        {:patterns, format_code_patterns(project_context.patterns), :medium} | sections3
       ]
+    else
+      sections3
     end
 
     # File contents
-    if length(files) > 0 do
+    sections5 = if length(files) > 0 do
       file_sections =
         files
         |> Enum.map(fn file ->
           {:file, format_file_content(file), :high}
         end)
 
-      sections = file_sections ++ sections
+      file_sections ++ sections4
+    else
+      sections4
     end
 
     # Query (always included)
-    sections = [{:query, format_query(query), :critical} | sections]
+    sections6 = [{:query, format_query(query), :critical} | sections5]
 
-    Enum.reverse(sections)
+    Enum.reverse(sections6)
   end
 
   defp format_system_context(profile) do
@@ -361,23 +371,29 @@ defmodule RubberDuck.Context.Strategies.LongContext do
   defp build_sources(history, project_context, files) do
     sources = []
 
-    if length(history) > 0 do
-      sources = [%{type: :conversation_history, count: length(history)} | sources]
+    sources1 = if length(history) > 0 do
+      [%{type: :conversation_history, count: length(history)} | sources]
+    else
+      sources
     end
 
-    if length(project_context.knowledge) > 0 do
-      sources = [%{type: :project_knowledge, count: length(project_context.knowledge)} | sources]
+    sources2 = if length(project_context.knowledge) > 0 do
+      [%{type: :project_knowledge, count: length(project_context.knowledge)} | sources1]
+    else
+      sources1
     end
 
-    if length(project_context.patterns) > 0 do
-      sources = [%{type: :code_patterns, count: length(project_context.patterns)} | sources]
+    sources3 = if length(project_context.patterns) > 0 do
+      [%{type: :code_patterns, count: length(project_context.patterns)} | sources2]
+    else
+      sources2
     end
 
     if length(files) > 0 do
-      sources = [%{type: :files, paths: Enum.map(files, & &1.path)} | sources]
+      [%{type: :files, paths: Enum.map(files, & &1.path)} | sources3]
+    else
+      sources3
     end
-
-    sources
   end
 
   defp estimate_tokens(text) do

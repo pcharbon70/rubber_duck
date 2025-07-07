@@ -193,8 +193,10 @@ defmodule RubberDuck.Context.Strategies.RAG do
     sections = []
 
     # Add recent context if available
-    if recent_context != "" do
-      sections = [{:recent, "## Recent Context\n#{recent_context}\n"} | sections]
+    sections1 = if recent_context != "" do
+      [{:recent, "## Recent Context\n#{recent_context}\n"} | sections]
+    else
+      sections
     end
 
     # Add retrieved content by type
@@ -202,26 +204,32 @@ defmodule RubberDuck.Context.Strategies.RAG do
     knowledge_items = Enum.filter(retrieved_content, &(&1.type == :knowledge))
     summaries = Enum.filter(retrieved_content, &(&1.type == :summary))
 
-    if length(code_patterns) > 0 do
+    sections2 = if length(code_patterns) > 0 do
       pattern_text = format_code_patterns_section(code_patterns)
-      sections = [{:patterns, pattern_text} | sections]
+      [{:patterns, pattern_text} | sections1]
+    else
+      sections1
     end
 
-    if length(knowledge_items) > 0 do
+    sections3 = if length(knowledge_items) > 0 do
       knowledge_text = format_knowledge_section(knowledge_items)
-      sections = [{:knowledge, knowledge_text} | sections]
+      [{:knowledge, knowledge_text} | sections2]
+    else
+      sections2
     end
 
-    if length(summaries) > 0 do
+    sections4 = if length(summaries) > 0 do
       summary_text = format_summaries_section(summaries)
-      sections = [{:summaries, summary_text} | sections]
+      [{:summaries, summary_text} | sections3]
+    else
+      sections3
     end
 
     # Add query
-    sections = [{:query, "## Query\n#{query}\n"} | sections]
+    sections5 = [{:query, "## Query\n#{query}\n"} | sections4]
 
     # Optimize sections to fit token limit
-    optimized_content = optimize_sections(sections, available_tokens)
+    optimized_content = optimize_sections(sections5, available_tokens)
 
     %{
       content: optimized_content,
