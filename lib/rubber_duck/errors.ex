@@ -1,7 +1,7 @@
 defmodule RubberDuck.Errors do
   @moduledoc """
   Custom error types and error handling utilities for RubberDuck.
-  
+
   This module provides:
   - Domain-specific error types
   - Error normalization functions
@@ -38,7 +38,7 @@ defmodule RubberDuck.Errors do
     def exception(opts) do
       engine = Keyword.get(opts, :engine, "unknown")
       reason = Keyword.get(opts, :reason, "processing failed")
-      
+
       message = Keyword.get(opts, :message, "Engine #{engine} error: #{reason}")
       input = Keyword.get(opts, :input)
 
@@ -62,10 +62,10 @@ defmodule RubberDuck.Errors do
       provider = Keyword.get(opts, :provider, "unknown")
       status_code = Keyword.get(opts, :status_code)
       response = Keyword.get(opts, :response)
-      
-      message = 
+
+      message =
         Keyword.get(opts, :message) ||
-        "LLM provider #{provider} returned error#{if status_code, do: " (#{status_code})", else: ""}"
+          "LLM provider #{provider} returned error#{if status_code, do: " (#{status_code})", else: ""}"
 
       %__MODULE__{
         message: message,
@@ -87,10 +87,10 @@ defmodule RubberDuck.Errors do
       key = Keyword.get(opts, :key)
       expected = Keyword.get(opts, :expected)
       actual = Keyword.get(opts, :actual)
-      
-      message = 
+
+      message =
         Keyword.get(opts, :message) ||
-        "Invalid configuration#{if key, do: " for #{inspect(key)}", else: ""}"
+          "Invalid configuration#{if key, do: " for #{inspect(key)}", else: ""}"
 
       %__MODULE__{
         message: message,
@@ -111,10 +111,10 @@ defmodule RubberDuck.Errors do
     def exception(opts) do
       service = Keyword.get(opts, :service, "unknown")
       retry_after = Keyword.get(opts, :retry_after)
-      
-      message = 
+
+      message =
         Keyword.get(opts, :message) ||
-        "Service #{service} is unavailable#{if retry_after, do: ", retry after #{retry_after}s", else: ""}"
+          "Service #{service} is unavailable#{if retry_after, do: ", retry after #{retry_after}s", else: ""}"
 
       %__MODULE__{
         message: message,
@@ -126,12 +126,12 @@ defmodule RubberDuck.Errors do
 
   @doc """
   Reports an exception to Tower with additional context.
-  
+
   This is a convenience wrapper around Tower.report_exception/3 that
   adds common metadata and normalizes error information.
-  
+
   ## Examples
-  
+
       try do
         # some operation
       rescue
@@ -143,7 +143,7 @@ defmodule RubberDuck.Errors do
       end
   """
   def report_exception(exception, stacktrace, metadata \\ %{}) do
-    metadata = 
+    metadata =
       metadata
       |> normalize_metadata()
       |> Map.put(:application, :rubber_duck)
@@ -155,19 +155,19 @@ defmodule RubberDuck.Errors do
 
   @doc """
   Reports a message to Tower as an error event.
-  
+
   Useful for reporting errors that aren't exceptions, such as
   validation failures or business logic errors.
-  
+
   ## Examples
-  
+
       RubberDuck.Errors.report_message(:error, "Invalid input",
         user_id: user.id,
         input: params
       )
   """
   def report_message(level, message, metadata \\ %{}) do
-    metadata = 
+    metadata =
       metadata
       |> normalize_metadata()
       |> Map.put(:application, :rubber_duck)

@@ -1,66 +1,67 @@
 defmodule RubberDuck.Engine.Supervisor do
   @moduledoc """
   Supervisor for engine processes.
-  
+
   Uses a DynamicSupervisor to manage engine instances, allowing engines
   to be started and stopped at runtime.
   """
-  
+
   use DynamicSupervisor
-  
+
   require Logger
-  
+
   @doc """
   Starts the engine supervisor.
   """
   def start_link(init_arg \\ []) do
     DynamicSupervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
   end
-  
+
   @doc """
   Starts an engine under supervision.
   """
   def start_engine(engine_config, opts \\ []) do
     # Use pool if pool_size > 1, otherwise use single server
-    child_spec = if engine_config.pool_size > 1 do
-      RubberDuck.Engine.Pool.child_spec(engine_config)
-    else
-      %{
-        id: engine_config.name,
-        start: {RubberDuck.Engine.Server, :start_link, [engine_config, opts]},
-        restart: :permanent,
-        type: :worker
-      }
-    end
-    
+    child_spec =
+      if engine_config.pool_size > 1 do
+        RubberDuck.Engine.Pool.child_spec(engine_config)
+      else
+        %{
+          id: engine_config.name,
+          start: {RubberDuck.Engine.Server, :start_link, [engine_config, opts]},
+          restart: :permanent,
+          type: :worker
+        }
+      end
+
     case DynamicSupervisor.start_child(__MODULE__, child_spec) do
       {:ok, pid} ->
         Logger.info("Started engine #{engine_config.name} with pid #{inspect(pid)}")
         {:ok, pid}
-        
+
       {:error, {:already_started, pid}} ->
         Logger.warning("Engine #{engine_config.name} already started with pid #{inspect(pid)}")
         {:error, :already_started}
-        
+
       {:error, reason} ->
         Logger.error("Failed to start engine #{engine_config.name}: #{inspect(reason)}")
         {:error, reason}
     end
   end
-  
+
   @doc """
   Stops an engine.
   """
   def stop_engine(engine_name) when is_atom(engine_name) do
     # First try to stop as a pool
     pool_result = RubberDuck.Engine.Pool.stop(engine_name)
-    
+
     # Then try registry lookup for single instances
     case Elixir.Registry.lookup(RubberDuck.Engine.Registry, engine_name) do
       [{pid, _}] ->
         Logger.info("Stopping engine #{engine_name}")
         DynamicSupervisor.terminate_child(__MODULE__, pid)
-        
+
       [] ->
         # If pool was stopped, that's ok
         if pool_result == :ok do
@@ -70,18 +71,18 @@ defmodule RubberDuck.Engine.Supervisor do
         end
     end
   end
-  
+
   def stop_engine(pid) when is_pid(pid) do
     DynamicSupervisor.terminate_child(__MODULE__, pid)
   end
-  
+
   @doc """
   Lists all running engines.
   """
   def list_engines do
     __MODULE__
     |> DynamicSupervisor.which_children()
-    |> Enum.map(fn {_, pid, _, _} -> 
+    |> Enum.map(fn {_, pid, _, _} ->
       case Elixir.Registry.keys(RubberDuck.Engine.Registry, pid) do
         [name] -> {name, pid}
         _ -> nil
@@ -89,14 +90,14 @@ defmodule RubberDuck.Engine.Supervisor do
     end)
     |> Enum.filter(& &1)
   end
-  
+
   @doc """
   Counts running engines.
   """
   def count_engines do
     DynamicSupervisor.count_children(__MODULE__)
   end
-  
+
   @doc """
   Restarts an engine.
   """
@@ -108,9 +109,9 @@ defmodule RubberDuck.Engine.Supervisor do
       {:ok, pid}
     end
   end
-  
+
   # Callbacks
-  
+
   @impl true
   def init(_init_arg) do
     DynamicSupervisor.init(

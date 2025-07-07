@@ -1,11 +1,11 @@
 defmodule RubberDuck.PluginSystem.Dsl do
   @moduledoc """
   DSL extension for the PluginSystem.
-  
+
   Provides the `plugins` section and `plugin` entity for
   declarative plugin configuration.
   """
-  
+
   @plugin_schema [
     name: [
       type: :atom,
@@ -59,7 +59,7 @@ defmodule RubberDuck.PluginSystem.Dsl do
       doc: "Tags for categorizing plugins"
     ]
   ]
-  
+
   @section %Spark.Dsl.Section{
     name: :plugins,
     top_level?: true,
@@ -73,7 +73,7 @@ defmodule RubberDuck.PluginSystem.Dsl do
       }
     ]
   }
-  
+
   use Spark.Dsl.Extension,
     sections: [@section],
     transformers: [

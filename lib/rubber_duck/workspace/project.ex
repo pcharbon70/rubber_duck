@@ -9,6 +9,10 @@ defmodule RubberDuck.Workspace.Project do
     repo RubberDuck.Repo
   end
 
+  actions do
+    defaults [:read, :destroy, create: :*, update: :*]
+  end
+
   attributes do
     uuid_primary_key :id
 
@@ -34,9 +38,5 @@ defmodule RubberDuck.Workspace.Project do
 
   relationships do
     has_many :code_files, RubberDuck.Workspace.CodeFile
-  end
-
-  actions do
-    defaults [:read, :destroy, create: :*, update: :*]
   end
 end

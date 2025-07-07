@@ -3,7 +3,7 @@ defmodule RubberDuck.Memory.CodePattern do
     otp_app: :rubber_duck,
     domain: RubberDuck.Memory,
     data_layer: AshPostgres.DataLayer
-  
+
   require Ash.Query
 
   @moduledoc """
@@ -14,6 +14,115 @@ defmodule RubberDuck.Memory.CodePattern do
   postgres do
     table "memory_code_patterns"
     repo RubberDuck.Repo
+  end
+
+  postgres do
+    custom_indexes do
+      index [:user_id, :language]
+      index [:pattern_type]
+    end
+  end
+
+  actions do
+    defaults [:read, :destroy]
+
+    create :create do
+      primary? true
+      accept [:user_id, :language, :pattern_name, :pattern_code, :description, :pattern_type, :metadata]
+
+      # Generate embedding after creation
+      change after_action(fn changeset, record, _context ->
+               # TODO: Generate embedding using LLM service
+               {:ok, record}
+             end)
+    end
+
+    update :update do
+      primary? true
+      accept [:pattern_name, :pattern_code, :description, :metadata]
+
+      change set_attribute(:last_used_at, &DateTime.utc_now/0)
+    end
+
+    update :increment_usage do
+      accept []
+
+      change increment(:usage_count)
+      change set_attribute(:last_used_at, &DateTime.utc_now/0)
+    end
+
+    read :by_user_and_language do
+      argument :user_id, :string, allow_nil?: false
+      argument :language, :string, allow_nil?: false
+
+      filter expr(user_id == ^arg(:user_id) and language == ^arg(:language))
+      prepare build(sort: [usage_count: :desc, last_used_at: :desc])
+    end
+
+    read :search_semantic do
+      argument :user_id, :string, allow_nil?: false
+      argument :query_embedding, {:array, :float}, allow_nil?: false
+      argument :limit, :integer, default: 10
+
+      filter expr(user_id == ^arg(:user_id))
+
+      prepare fn query, _context ->
+        # Get arguments from the query
+        _embedding = Ash.Query.get_argument(query, :query_embedding)
+        limit = Ash.Query.get_argument(query, :limit) || 10
+
+        # TODO: Implement pgvector similarity search
+        # For now, return regular results
+        query
+        |> Ash.Query.sort(usage_count: :desc)
+        |> Ash.Query.limit(limit)
+      end
+    end
+
+    read :search_keyword do
+      argument :user_id, :string, allow_nil?: false
+      argument :query, :string, allow_nil?: false
+      argument :language, :string
+      argument :limit, :integer, default: 10
+
+      filter expr(user_id == ^arg(:user_id))
+
+      prepare fn query, _context ->
+        # Get arguments from the query itself
+        search_term = String.downcase(Ash.Query.get_argument(query, :query) || "")
+        pattern = "%#{search_term}%"
+
+        query =
+          if search_term != "" do
+            Ash.Query.filter(
+              query,
+              expr(
+                fragment("LOWER(?) LIKE ?", pattern_name, ^pattern) or
+                  fragment("LOWER(?) LIKE ?", description, ^pattern) or
+                  fragment("LOWER(?) LIKE ?", pattern_code, ^pattern)
+              )
+            )
+          else
+            query
+          end
+
+        # Filter by language if provided
+        language_arg = Ash.Query.get_argument(query, :language)
+
+        query =
+          if language_arg do
+            Ash.Query.filter(query, expr(language == ^language_arg))
+          else
+            query
+          end
+
+        limit = Ash.Query.get_argument(query, :limit) || 10
+
+        query
+        |> Ash.Query.sort(usage_count: :desc, last_used_at: :desc)
+        |> Ash.Query.limit(limit)
+      end
+    end
   end
 
   attributes do
@@ -69,108 +178,5 @@ defmodule RubberDuck.Memory.CodePattern do
 
     create_timestamp :created_at
     update_timestamp :last_used_at
-  end
-
-  postgres do
-    custom_indexes do
-      index [:user_id, :language]
-      index [:pattern_type]
-    end
-  end
-
-  actions do
-    defaults [:read, :destroy]
-
-    create :create do
-      primary? true
-      accept [:user_id, :language, :pattern_name, :pattern_code, :description, :pattern_type, :metadata]
-      
-      # Generate embedding after creation
-      change after_action(fn changeset, record, _context ->
-        # TODO: Generate embedding using LLM service
-        {:ok, record}
-      end)
-    end
-
-    update :update do
-      primary? true
-      accept [:pattern_name, :pattern_code, :description, :metadata]
-      
-      change set_attribute(:last_used_at, &DateTime.utc_now/0)
-    end
-
-    update :increment_usage do
-      accept []
-      
-      change increment(:usage_count)
-      change set_attribute(:last_used_at, &DateTime.utc_now/0)
-    end
-
-    read :by_user_and_language do
-      argument :user_id, :string, allow_nil?: false
-      argument :language, :string, allow_nil?: false
-      
-      filter expr(user_id == ^arg(:user_id) and language == ^arg(:language))
-      prepare build(sort: [usage_count: :desc, last_used_at: :desc])
-    end
-
-    read :search_semantic do
-      argument :user_id, :string, allow_nil?: false
-      argument :query_embedding, {:array, :float}, allow_nil?: false
-      argument :limit, :integer, default: 10
-      
-      filter expr(user_id == ^arg(:user_id))
-      
-      prepare fn query, _context ->
-        # Get arguments from the query
-        _embedding = Ash.Query.get_argument(query, :query_embedding)
-        limit = Ash.Query.get_argument(query, :limit) || 10
-        
-        # TODO: Implement pgvector similarity search
-        # For now, return regular results
-        query
-        |> Ash.Query.sort(usage_count: :desc)
-        |> Ash.Query.limit(limit)
-      end
-    end
-
-    read :search_keyword do
-      argument :user_id, :string, allow_nil?: false
-      argument :query, :string, allow_nil?: false
-      argument :language, :string
-      argument :limit, :integer, default: 10
-      
-      filter expr(user_id == ^arg(:user_id))
-      
-      prepare fn query, _context ->
-        # Get arguments from the query itself
-        search_term = String.downcase(Ash.Query.get_argument(query, :query) || "")
-        pattern = "%#{search_term}%"
-        
-        query = if search_term != "" do
-          Ash.Query.filter(query, expr(
-            fragment("LOWER(?) LIKE ?", pattern_name, ^pattern) or
-            fragment("LOWER(?) LIKE ?", description, ^pattern) or
-            fragment("LOWER(?) LIKE ?", pattern_code, ^pattern)
-          ))
-        else
-          query
-        end
-        
-        # Filter by language if provided
-        language_arg = Ash.Query.get_argument(query, :language)
-        query = if language_arg do
-          Ash.Query.filter(query, expr(language == ^language_arg))
-        else
-          query
-        end
-        
-        limit = Ash.Query.get_argument(query, :limit) || 10
-        
-        query
-        |> Ash.Query.sort(usage_count: :desc, last_used_at: :desc)
-        |> Ash.Query.limit(limit)
-      end
-    end
   end
 end

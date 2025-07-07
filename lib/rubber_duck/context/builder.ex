@@ -1,33 +1,33 @@
 defmodule RubberDuck.Context.Builder do
   @moduledoc """
   Behavior for context building strategies.
-  
+
   Each strategy implements a different approach to building context for LLM requests,
   such as Fill-in-the-Middle (FIM), Retrieval Augmented Generation (RAG), or
   long context windows.
   """
 
   @type context :: %{
-    content: String.t(),
-    metadata: map(),
-    token_count: non_neg_integer(),
-    strategy: atom(),
-    sources: list(map())
-  }
+          content: String.t(),
+          metadata: map(),
+          token_count: non_neg_integer(),
+          strategy: atom(),
+          sources: list(map())
+        }
 
   @type options :: keyword()
 
   @doc """
   Builds context using the strategy's specific approach.
-  
+
   ## Options
   - `:max_tokens` - Maximum tokens allowed in context
   - `:user_id` - User ID for personalization
   - `:session_id` - Session ID for recent context
   - `:query_type` - Type of query (e.g., :completion, :generation, :analysis)
   """
-  @callback build(query :: String.t(), options :: options()) :: 
-    {:ok, context()} | {:error, term()}
+  @callback build(query :: String.t(), options :: options()) ::
+              {:ok, context()} | {:error, term()}
 
   @doc """
   Returns the strategy name for identification.

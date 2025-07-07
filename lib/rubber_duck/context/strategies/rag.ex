@@ -1,7 +1,7 @@
 defmodule RubberDuck.Context.Strategies.RAG do
   @moduledoc """
   Retrieval Augmented Generation (RAG) context building strategy.
-  
+
   Retrieves relevant code snippets, patterns, and knowledge from the
   memory system to augment the context for better generation.
   """
@@ -26,7 +26,7 @@ defmodule RubberDuck.Context.Strategies.RAG do
     session_id = Keyword.get(opts, :session_id)
     project_id = Keyword.get(opts, :project_id)
     max_tokens = Keyword.get(opts, :max_tokens, 4000)
-    
+
     # Generate embedding for the query
     with {:ok, query_embedding} <- Embeddings.Service.generate(query),
          # Retrieve relevant content from all memory tiers
@@ -47,7 +47,8 @@ defmodule RubberDuck.Context.Strategies.RAG do
     cond do
       Keyword.has_key?(opts, :project_id) -> 0.9
       String.contains?(query, ["how", "what", "why", "explain", "generate", "create"]) -> 0.8
-      String.length(query) > 50 -> 0.7  # Longer queries benefit from RAG
+      # Longer queries benefit from RAG
+      String.length(query) > 50 -> 0.7
       true -> 0.5
     end
   end
@@ -61,19 +62,19 @@ defmodule RubberDuck.Context.Strategies.RAG do
       Task.async(fn -> retrieve_knowledge(query_embedding, user_id, project_id) end),
       Task.async(fn -> retrieve_summaries(user_id) end)
     ]
-    
+
     results = Task.await_many(tasks, 5000)
-    
+
     # Combine and rank results
-    all_content = 
+    all_content =
       results
-      |> Enum.flat_map(fn 
+      |> Enum.flat_map(fn
         {:ok, items} -> items
         _ -> []
       end)
       |> rank_by_relevance()
       |> Enum.take(@default_retrieval_limit)
-    
+
     {:ok, all_content}
   end
 
@@ -83,6 +84,7 @@ defmodule RubberDuck.Context.Strategies.RAG do
     case Memory.search_patterns_keyword(user_id, "") do
       {:ok, patterns} ->
         {:ok, patterns |> Enum.take(5) |> Enum.map(&format_code_pattern/1)}
+
       _ ->
         {:ok, []}
     end
@@ -95,6 +97,7 @@ defmodule RubberDuck.Context.Strategies.RAG do
       case Memory.search_knowledge_keyword(user_id, project_id, "") do
         {:ok, knowledge_items} ->
           {:ok, knowledge_items |> Enum.take(5) |> Enum.map(&format_knowledge/1)}
+
         _ ->
           {:ok, []}
       end
@@ -108,10 +111,12 @@ defmodule RubberDuck.Context.Strategies.RAG do
     case Memory.get_user_summaries(user_id) do
       {:ok, summaries} ->
         summaries
-        |> Enum.filter(& &1.heat_score > 0.5)  # Only relevant summaries
+        # Only relevant summaries
+        |> Enum.filter(&(&1.heat_score > 0.5))
         |> Enum.take(3)
         |> Enum.map(&format_summary/1)
         |> then(&{:ok, &1})
+
       _ ->
         {:ok, []}
     end
@@ -120,16 +125,19 @@ defmodule RubberDuck.Context.Strategies.RAG do
   defp get_recent_context(user_id, session_id) when is_binary(user_id) and is_binary(session_id) do
     case Memory.get_recent_interactions(user_id, session_id) do
       {:ok, interactions} ->
-        context = 
+        context =
           interactions
           |> Enum.take(3)
           |> Enum.map(& &1.content)
           |> Enum.join("\n")
+
         {:ok, context}
+
       _ ->
         {:ok, ""}
     end
   end
+
   defp get_recent_context(_, _), do: {:ok, ""}
 
   defp format_code_pattern(pattern) do
@@ -141,7 +149,8 @@ defmodule RubberDuck.Context.Strategies.RAG do
         pattern_type: pattern.pattern_type,
         description: pattern.description
       },
-      relevance_score: 0.8  # TODO: Calculate actual similarity
+      # TODO: Calculate actual similarity
+      relevance_score: 0.8
     }
   end
 
@@ -179,41 +188,41 @@ defmodule RubberDuck.Context.Strategies.RAG do
   defp build_rag_context(query, retrieved_content, recent_context, max_tokens) do
     # Reserve tokens for query and response
     available_tokens = max_tokens - 1000
-    
+
     # Build context sections
     sections = []
-    
+
     # Add recent context if available
     if recent_context != "" do
       sections = [{:recent, "## Recent Context\n#{recent_context}\n"} | sections]
     end
-    
+
     # Add retrieved content by type
-    code_patterns = Enum.filter(retrieved_content, & &1.type == :code_pattern)
-    knowledge_items = Enum.filter(retrieved_content, & &1.type == :knowledge)
-    summaries = Enum.filter(retrieved_content, & &1.type == :summary)
-    
+    code_patterns = Enum.filter(retrieved_content, &(&1.type == :code_pattern))
+    knowledge_items = Enum.filter(retrieved_content, &(&1.type == :knowledge))
+    summaries = Enum.filter(retrieved_content, &(&1.type == :summary))
+
     if length(code_patterns) > 0 do
       pattern_text = format_code_patterns_section(code_patterns)
       sections = [{:patterns, pattern_text} | sections]
     end
-    
+
     if length(knowledge_items) > 0 do
       knowledge_text = format_knowledge_section(knowledge_items)
       sections = [{:knowledge, knowledge_text} | sections]
     end
-    
+
     if length(summaries) > 0 do
       summary_text = format_summaries_section(summaries)
       sections = [{:summaries, summary_text} | sections]
     end
-    
+
     # Add query
     sections = [{:query, "## Query\n#{query}\n"} | sections]
-    
+
     # Optimize sections to fit token limit
     optimized_content = optimize_sections(sections, available_tokens)
-    
+
     %{
       content: optimized_content,
       metadata: %{
@@ -223,65 +232,60 @@ defmodule RubberDuck.Context.Strategies.RAG do
       },
       token_count: estimate_tokens(optimized_content),
       strategy: :rag,
-      sources: Enum.map(retrieved_content, fn item ->
-        %{
-          type: item.type,
-          content: item.content,
-          metadata: item.metadata
-        }
-      end)
+      sources:
+        Enum.map(retrieved_content, fn item ->
+          %{
+            type: item.type,
+            content: item.content,
+            metadata: item.metadata
+          }
+        end)
     }
   end
 
   defp format_code_patterns_section(patterns) do
     """
     ## Relevant Code Patterns
-    #{Enum.map_join(patterns, "\n\n", fn p ->
-      """
+    #{Enum.map_join(patterns, "\n\n", fn p -> """
       ### #{p.metadata.pattern_type} (#{p.metadata.language})
       #{p.metadata.description || ""}
       ```#{p.metadata.language}
       #{p.content}
       ```
-      """
-    end)}
+      """ end)}
     """
   end
 
   defp format_knowledge_section(items) do
     """
     ## Relevant Knowledge
-    #{Enum.map_join(items, "\n\n", fn k ->
-      """
+    #{Enum.map_join(items, "\n\n", fn k -> """
       ### #{k.metadata.title}
       Type: #{k.metadata.knowledge_type}
       Tags: #{Enum.join(k.metadata.tags, ", ")}
-      
+
       #{k.content}
-      """
-    end)}
+      """ end)}
     """
   end
 
   defp format_summaries_section(summaries) do
     """
     ## Pattern Summaries
-    #{Enum.map_join(summaries, "\n", fn s ->
-      "- **#{s.metadata.topic}**: #{s.content} (frequency: #{s.metadata.frequency})"
-    end)}
+    #{Enum.map_join(summaries, "\n", fn s -> "- **#{s.metadata.topic}**: #{s.content} (frequency: #{s.metadata.frequency})" end)}
     """
   end
 
   defp optimize_sections(sections, max_tokens) do
     # Calculate token usage for each section
-    sections_with_tokens = 
+    sections_with_tokens =
       Enum.map(sections, fn {type, content} ->
         {type, content, estimate_tokens(content)}
       end)
-    
+
     # If within limit, return all
     total_tokens = Enum.sum(Enum.map(sections_with_tokens, &elem(&1, 2)))
-    
+
     if total_tokens <= max_tokens do
       sections_with_tokens
       |> Enum.map(fn {_type, content, _tokens} -> content end)
@@ -295,11 +299,13 @@ defmodule RubberDuck.Context.Strategies.RAG do
   defp prioritize_and_truncate(sections, max_tokens) do
     # Priority order: query > patterns > recent > knowledge > summaries
     priority_order = [:query, :patterns, :recent, :knowledge, :summaries]
-    
-    {included, _remaining_tokens} = 
+
+    {included, _remaining_tokens} =
       Enum.reduce(priority_order, {[], max_tokens}, fn type, {acc, tokens_left} ->
         case Enum.find(sections, fn {t, _, _} -> t == type end) do
-          nil -> {acc, tokens_left}
+          nil ->
+            {acc, tokens_left}
+
           {^type, content, token_count} ->
             if token_count <= tokens_left do
               {[content | acc], tokens_left - token_count}
@@ -310,7 +316,7 @@ defmodule RubberDuck.Context.Strategies.RAG do
             end
         end
       end)
-    
+
     included
     |> Enum.reverse()
     |> Enum.join("\n")
@@ -319,11 +325,12 @@ defmodule RubberDuck.Context.Strategies.RAG do
   defp get_included_types(sections) do
     sections
     |> Enum.map(&elem(&1, 0))
-    |> Enum.filter(& &1 != :query)
+    |> Enum.filter(&(&1 != :query))
   end
 
   defp truncate_to_tokens(text, max_tokens, :end) do
     max_chars = max_tokens * 4
+
     if String.length(text) <= max_chars do
       text
     else

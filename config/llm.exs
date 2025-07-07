@@ -27,7 +27,8 @@ config :rubber_duck, RubberDuck.LLM.Service,
       name: :mock,
       adapter: RubberDuck.LLM.Providers.Mock,
       models: ["mock-fast", "mock-smart", "mock-vision"],
-      priority: 99,  # Low priority, only used as last resort
+      # Low priority, only used as last resort
+      priority: 99,
       max_retries: 1,
       timeout: 5_000,
       options: [

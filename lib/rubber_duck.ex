@@ -1,7 +1,7 @@
 defmodule RubberDuck do
   @moduledoc """
   RubberDuck is an Elixir-based AI coding assistant system built with the Ash Framework.
-  
+
   This module serves as the main entry point for the RubberDuck application,
   providing core functionality for code analysis, assistance, and LLM integration.
   """

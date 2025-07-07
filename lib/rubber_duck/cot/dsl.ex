@@ -2,7 +2,7 @@ defmodule RubberDuck.CoT.Dsl do
   @moduledoc """
   DSL for defining Chain-of-Thought reasoning chains.
   """
-  
+
   @step %Spark.Dsl.Entity{
     name: :step,
     describe: "Define a reasoning step",
@@ -50,7 +50,7 @@ defmodule RubberDuck.CoT.Dsl do
       ]
     ]
   }
-  
+
   @reasoning_chain %Spark.Dsl.Section{
     name: :reasoning_chain,
     describe: "Configure the chain-of-thought reasoning process",
@@ -87,9 +87,9 @@ defmodule RubberDuck.CoT.Dsl do
       ]
     ]
   }
-  
+
   @sections [@reasoning_chain]
-  
-  use Spark.Dsl.Extension, 
+
+  use Spark.Dsl.Extension,
     sections: @sections
 end

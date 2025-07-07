@@ -3,7 +3,7 @@ defmodule RubberDuck.Memory.Interaction do
     otp_app: :rubber_duck,
     domain: RubberDuck.Memory,
     data_layer: Ash.DataLayer.Ets
-  
+
   require Ash.Query
 
   @moduledoc """
@@ -13,7 +13,54 @@ defmodule RubberDuck.Memory.Interaction do
 
   ets do
     table :memory_interactions
-    private? false  # Allow access across processes
+    # Allow access across processes
+    private? false
+  end
+
+  actions do
+    defaults [:read, :destroy]
+
+    create :create do
+      primary? true
+      accept [:user_id, :session_id, :type, :content, :metadata]
+
+      # Implement FIFO logic
+      change fn changeset, _context ->
+        user_id = Ash.Changeset.get_attribute(changeset, :user_id)
+        session_id = Ash.Changeset.get_attribute(changeset, :session_id)
+
+        # Count existing interactions for this session
+        case count_session_interactions(user_id, session_id) do
+          {:ok, count} when count >= 20 ->
+            # Remove oldest interaction
+            remove_oldest_interaction(user_id, session_id)
+            # Get the highest position and increment it
+            highest_position = get_highest_position(user_id, session_id)
+            Ash.Changeset.change_attribute(changeset, :position, highest_position + 1)
+
+          {:ok, count} ->
+            Ash.Changeset.change_attribute(changeset, :position, count + 1)
+
+          _ ->
+            changeset
+        end
+      end
+    end
+
+    read :by_session do
+      argument :user_id, :string, allow_nil?: false
+      argument :session_id, :string, allow_nil?: false
+
+      filter expr(user_id == ^arg(:user_id) and session_id == ^arg(:session_id))
+      prepare build(sort: [position: :desc])
+    end
+
+    read :by_user do
+      argument :user_id, :string, allow_nil?: false
+
+      filter expr(user_id == ^arg(:user_id))
+      prepare build(sort: [inserted_at: :desc])
+    end
   end
 
   attributes do
@@ -55,52 +102,6 @@ defmodule RubberDuck.Memory.Interaction do
     create_timestamp :inserted_at
   end
 
-  actions do
-    defaults [:read, :destroy]
-
-    create :create do
-      primary? true
-      accept [:user_id, :session_id, :type, :content, :metadata]
-      
-      # Implement FIFO logic
-      change fn changeset, _context ->
-        user_id = Ash.Changeset.get_attribute(changeset, :user_id)
-        session_id = Ash.Changeset.get_attribute(changeset, :session_id)
-        
-        # Count existing interactions for this session
-        case count_session_interactions(user_id, session_id) do
-          {:ok, count} when count >= 20 ->
-            # Remove oldest interaction
-            remove_oldest_interaction(user_id, session_id)
-            # Get the highest position and increment it
-            highest_position = get_highest_position(user_id, session_id)
-            Ash.Changeset.change_attribute(changeset, :position, highest_position + 1)
-            
-          {:ok, count} ->
-            Ash.Changeset.change_attribute(changeset, :position, count + 1)
-            
-          _ ->
-            changeset
-        end
-      end
-    end
-
-    read :by_session do
-      argument :user_id, :string, allow_nil?: false
-      argument :session_id, :string, allow_nil?: false
-      
-      filter expr(user_id == ^arg(:user_id) and session_id == ^arg(:session_id))
-      prepare build(sort: [position: :desc])
-    end
-    
-    read :by_user do
-      argument :user_id, :string, allow_nil?: false
-      
-      filter expr(user_id == ^arg(:user_id))
-      prepare build(sort: [inserted_at: :desc])
-    end
-  end
-
   # Private helper functions
   defp count_session_interactions(user_id, session_id) do
     __MODULE__
@@ -119,7 +120,7 @@ defmodule RubberDuck.Memory.Interaction do
       _ -> :ok
     end
   end
-  
+
   defp get_highest_position(user_id, session_id) do
     __MODULE__
     |> Ash.Query.for_read(:by_session, %{user_id: user_id, session_id: session_id})

@@ -1,8 +1,8 @@
 defmodule RubberDuck.Engines.Generation.RefinementTest do
   use ExUnit.Case, async: true
-  
+
   alias RubberDuck.Engines.Generation.Refinement
-  
+
   describe "refine_code/1" do
     test "refines code based on error feedback" do
       request = %{
@@ -29,15 +29,15 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, result} = Refinement.refine_code(request)
-      
+
       assert result.refined_code =~ "process(arg)"
       assert length(result.changes_made) > 0
       assert result.iteration == 1
       refute result.converged
     end
-    
+
     test "stops refinement at max iterations" do
       request = %{
         code: "def test do :ok end",
@@ -47,24 +47,25 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         },
         language: :elixir,
         original_prompt: "Test function",
-        iteration: 5,  # Already at max
+        # Already at max
+        iteration: 5,
         context: %{}
       }
-      
+
       assert {:ok, result} = Refinement.refine_code(request)
-      
+
       assert result.iteration == 5
       refute result.converged
       assert result.refined_code == request.code
     end
-    
+
     test "detects convergence when no changes made" do
       code = """
       def well_formed_function(arg) do
         {:ok, arg}
       end
       """
-      
+
       request = %{
         code: code,
         feedback: %{
@@ -76,16 +77,16 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 1,
         context: %{}
       }
-      
+
       assert {:ok, result} = Refinement.refine_code(request)
-      
+
       # If no significant changes, should converge
       if result.refined_code == code do
         assert result.converged
       end
     end
   end
-  
+
   describe "apply_refinement/1" do
     test "fixes syntax errors" do
       request = %{
@@ -110,14 +111,14 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, changes} = Refinement.apply_refinement(request)
-      
+
       assert refined_code =~ "def undefined_func"
       assert length(changes) > 0
       assert hd(changes).type == :fix
     end
-    
+
     test "applies style improvements" do
       request = %{
         code: """
@@ -134,15 +135,15 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, changes} = Refinement.apply_refinement(request)
-      
+
       # Should fix indentation and possibly naming
       refute refined_code =~ "badlyNamedFunction"
       assert length(changes) > 0
       assert Enum.any?(changes, &(&1.type == :style))
     end
-    
+
     test "applies performance optimizations" do
       request = %{
         code: """
@@ -161,13 +162,13 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, changes} = Refinement.apply_refinement(request)
-      
+
       assert length(changes) > 0
       # May combine operations or suggest more efficient approach
     end
-    
+
     test "improves code clarity" do
       request = %{
         code: """
@@ -184,50 +185,51 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, changes} = Refinement.apply_refinement(request)
-      
+
       # Should improve variable names and possibly add type specs
       refute refined_code =~ "def f("
       assert length(changes) > 0
     end
   end
-  
+
   describe "converged?/3" do
     test "returns true for identical code" do
       code = "def test do :ok end"
-      
+
       assert Refinement.converged?(code, code, [])
     end
-    
+
     test "returns false for significant changes" do
       original = "def test do :ok end"
+
       refined = """
       def test do
         result = process()
         {:ok, result}
       end
       """
-      
+
       changes = [
         %{type: :enhancement, description: "Added processing"}
       ]
-      
+
       refute Refinement.converged?(original, refined, changes)
     end
-    
+
     test "returns true for minor style changes only" do
       original = "def test do\n:ok\nend"
       refined = "def test do\n  :ok\nend"
-      
+
       changes = [
         %{type: :style, description: "Fixed indentation"}
       ]
-      
+
       assert Refinement.converged?(original, refined, changes)
     end
   end
-  
+
   describe "error fixing" do
     test "fixes unbalanced delimiters" do
       request = %{
@@ -248,16 +250,16 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, _changes} = Refinement.apply_refinement(request)
-      
+
       # Count parentheses
       opens = String.graphemes(refined_code) |> Enum.count(&(&1 == "("))
       closes = String.graphemes(refined_code) |> Enum.count(&(&1 == ")"))
-      
+
       assert opens == closes
     end
-    
+
     test "adds missing function definitions" do
       request = %{
         code: """
@@ -281,14 +283,14 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, changes} = Refinement.apply_refinement(request)
-      
+
       assert refined_code =~ "def missing_function"
       assert Enum.any?(changes, &(&1.type == :fix))
     end
   end
-  
+
   describe "style improvements" do
     test "fixes indentation" do
       request = %{
@@ -307,14 +309,14 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, _} = Refinement.apply_refinement(request)
-      
+
       lines = String.split(refined_code, "\n")
       # Body should be indented
       assert Enum.any?(lines, &String.starts_with?(&1, "  "))
     end
-    
+
     test "adds moduledoc if missing" do
       request = %{
         code: """
@@ -331,12 +333,12 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, _} = Refinement.apply_refinement(request)
-      
+
       assert refined_code =~ "@moduledoc"
     end
-    
+
     test "fixes naming conventions" do
       request = %{
         code: """
@@ -353,13 +355,13 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, _} = Refinement.apply_refinement(request)
-      
+
       refute refined_code =~ "CamelCaseFunction"
     end
   end
-  
+
   describe "performance optimizations" do
     test "optimizes multiple enum operations" do
       request = %{
@@ -379,13 +381,13 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, changes} = Refinement.apply_refinement(request)
-      
+
       assert length(changes) > 0
       # May suggest filter_map or other optimization
     end
-    
+
     test "optimizes string concatenation" do
       request = %{
         code: """
@@ -404,14 +406,14 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, _} = Refinement.apply_refinement(request)
-      
+
       # Should suggest Enum.join or IO lists
       assert refined_code =~ "Enum.join" or refined_code =~ "Enum.map"
     end
   end
-  
+
   describe "clarity improvements" do
     test "improves variable names" do
       request = %{
@@ -430,14 +432,14 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, _} = Refinement.apply_refinement(request)
-      
+
       # Should have better names
       refute refined_code =~ "def calc("
       refute refined_code =~ " z ="
     end
-    
+
     test "adds type specs" do
       request = %{
         code: """
@@ -454,13 +456,13 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, _} = Refinement.apply_refinement(request)
-      
+
       assert refined_code =~ "@spec"
     end
   end
-  
+
   describe "general refinements" do
     test "prefers pattern matching over conditionals" do
       request = %{
@@ -482,13 +484,13 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, changes} = Refinement.apply_refinement(request)
-      
+
       assert refined_code =~ "case" or refined_code =~ "def check(nil)"
       assert length(changes) > 0
     end
-    
+
     test "extracts magic numbers to constants" do
       request = %{
         code: """
@@ -507,13 +509,13 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, refined_code, _} = Refinement.apply_refinement(request)
-      
+
       assert refined_code =~ "@default_"
     end
   end
-  
+
   describe "confidence calculation" do
     test "high confidence for no changes" do
       request = %{
@@ -527,14 +529,14 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 0,
         context: %{}
       }
-      
+
       assert {:ok, result} = Refinement.refine_code(request)
-      
+
       if result.refined_code == request.code do
         assert result.confidence >= 0.8
       end
     end
-    
+
     test "lower confidence with more changes and iterations" do
       request = %{
         code: "def bad do nil end",
@@ -551,9 +553,9 @@ defmodule RubberDuck.Engines.Generation.RefinementTest do
         iteration: 3,
         context: %{}
       }
-      
+
       assert {:ok, result} = Refinement.refine_code(request)
-      
+
       # More iterations and changes should reduce confidence
       assert result.confidence < 0.8
     end

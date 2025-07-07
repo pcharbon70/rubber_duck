@@ -1,7 +1,7 @@
 defmodule RubberDuck.Embeddings.Service do
   @moduledoc """
   Service for generating and managing embeddings for semantic search.
-  
+
   Supports multiple embedding models and includes caching for efficiency.
   """
 
@@ -43,13 +43,13 @@ defmodule RubberDuck.Embeddings.Service do
     if length(embedding1) != length(embedding2) do
       {:error, :dimension_mismatch}
     else
-      dot_product = 
+      dot_product =
         Enum.zip(embedding1, embedding2)
         |> Enum.reduce(0.0, fn {a, b}, acc -> acc + a * b end)
-      
+
       magnitude1 = :math.sqrt(Enum.reduce(embedding1, 0.0, fn x, acc -> acc + x * x end))
       magnitude2 = :math.sqrt(Enum.reduce(embedding2, 0.0, fn x, acc -> acc + x * x end))
-      
+
       if magnitude1 == 0.0 or magnitude2 == 0.0 do
         0.0
       else
@@ -76,7 +76,7 @@ defmodule RubberDuck.Embeddings.Service do
   def init(_opts) do
     # Initialize ETS cache for embeddings
     :ets.new(:embeddings_cache, [:set, :public, :named_table])
-    
+
     state = %{
       model_dimensions: %{
         "text-embedding-ada-002" => 1536,
@@ -84,7 +84,7 @@ defmodule RubberDuck.Embeddings.Service do
         "text-embedding-3-large" => 3072
       }
     }
-    
+
     {:ok, state}
   end
 
@@ -93,13 +93,13 @@ defmodule RubberDuck.Embeddings.Service do
     case get_cached_embedding(text, model) do
       {:ok, embedding} ->
         {:reply, {:ok, embedding}, state}
-      
+
       :miss ->
         case generate_embedding(text, model, state) do
           {:ok, embedding} ->
             cache_embedding(text, model, embedding)
             {:reply, {:ok, embedding}, state}
-          
+
           error ->
             {:reply, error, state}
         end
@@ -110,9 +110,9 @@ defmodule RubberDuck.Embeddings.Service do
   def handle_call({:generate_batch, texts, model}, _from, state) do
     # Check cache first
     {cached, uncached} = partition_by_cache(texts, model)
-    
+
     # Generate embeddings for uncached texts
-    new_embeddings = 
+    new_embeddings =
       if length(uncached) > 0 do
         case generate_batch_embeddings(uncached, model, state) do
           {:ok, embeddings} ->
@@ -121,18 +121,19 @@ defmodule RubberDuck.Embeddings.Service do
             |> Enum.each(fn {text, embedding} ->
               cache_embedding(text, model, embedding)
             end)
+
             embeddings
-          
+
           {:error, _} ->
             []
         end
       else
         []
       end
-    
+
     # Combine cached and new embeddings in original order
     all_embeddings = merge_embeddings(texts, cached, uncached, new_embeddings)
-    
+
     {:reply, {:ok, all_embeddings}, state}
   end
 
@@ -142,19 +143,19 @@ defmodule RubberDuck.Embeddings.Service do
     # TODO: Integrate with actual LLM service when embedding endpoint is available
     # For now, generate mock embeddings
     Logger.debug("Generating mock embedding for text: #{String.slice(text, 0, 50)}...")
-    
+
     # Generate deterministic mock embedding based on text
     dimensions = Map.get(state.model_dimensions, model, 1536)
     embedding = generate_mock_embedding(text, dimensions)
-    
+
     {:ok, embedding}
   end
-  
+
   defp generate_mock_embedding(text, dimensions) do
     # Create a deterministic but varied embedding based on text
     hash = :crypto.hash(:sha256, text)
     hash_bytes = :binary.bin_to_list(hash)
-    
+
     # Generate embedding values
     Enum.map(1..dimensions, fn i ->
       # Use hash bytes cyclically to generate values between -1 and 1
@@ -166,17 +167,18 @@ defmodule RubberDuck.Embeddings.Service do
   defp generate_batch_embeddings(texts, model, state) do
     # For now, generate mock embeddings for each text
     dimensions = Map.get(state.model_dimensions, model, 1536)
-    
-    embeddings = Enum.map(texts, fn text ->
-      generate_mock_embedding(text, dimensions)
-    end)
-    
+
+    embeddings =
+      Enum.map(texts, fn text ->
+        generate_mock_embedding(text, dimensions)
+      end)
+
     {:ok, embeddings}
   end
 
   defp get_cached_embedding(text, model) do
     key = cache_key(text, model)
-    
+
     case :ets.lookup(:embeddings_cache, key) do
       [{^key, embedding, expiry}] ->
         if DateTime.compare(DateTime.utc_now(), expiry) == :lt do
@@ -186,7 +188,7 @@ defmodule RubberDuck.Embeddings.Service do
           :ets.delete(:embeddings_cache, key)
           :miss
         end
-      
+
       [] ->
         :miss
     end
@@ -208,6 +210,7 @@ defmodule RubberDuck.Embeddings.Service do
       case get_cached_embedding(text, model) do
         {:ok, embedding} ->
           {[{text, embedding} | cached], uncached}
+
         :miss ->
           {cached, [text | uncached]}
       end
@@ -220,10 +223,11 @@ defmodule RubberDuck.Embeddings.Service do
   defp merge_embeddings(original_texts, cached, uncached_texts, new_embeddings) do
     # Create a map of text -> embedding
     cached_map = Map.new(cached)
-    uncached_map = 
+
+    uncached_map =
       Enum.zip(uncached_texts, new_embeddings)
       |> Map.new()
-    
+
     # Return embeddings in original order
     Enum.map(original_texts, fn text ->
       Map.get(cached_map, text) || Map.get(uncached_map, text)

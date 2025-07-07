@@ -5,7 +5,7 @@ import Config
 config :tower,
   # Capture errors at :error level and above
   log_level: :error,
-  
+
   # Common metadata to capture with all errors
   logger_metadata: [
     :request_id,
@@ -15,16 +15,16 @@ config :tower,
     :engine,
     :action
   ],
-  
+
   # Exceptions to ignore across all environments
   ignored_exceptions: [
     # Ecto errors that are expected in normal operation
     Ecto.NoResultsError,
     Ecto.StaleEntryError,
-    
+
     # Phoenix routing errors for 404s
     Phoenix.Router.NoRouteError,
-    
+
     # Expected websocket disconnections
     Phoenix.Socket.InvalidMessageError
   ]

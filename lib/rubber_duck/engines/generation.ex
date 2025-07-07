@@ -1,12 +1,12 @@
 defmodule RubberDuck.Engines.Generation do
   @moduledoc """
   Code generation engine using RAG (Retrieval Augmented Generation).
-  
+
   This engine generates code from natural language descriptions by leveraging
   context from the project, similar code patterns, and language-specific templates.
-  
+
   ## Features
-  
+
   - Natural language to code generation
   - RAG-based context retrieval for relevant patterns
   - Multi-language support with specialized templates
@@ -14,18 +14,18 @@ defmodule RubberDuck.Engines.Generation do
   - Iterative refinement based on feedback
   - Import and dependency detection
   - User preference learning
-  
+
   ## Configuration Options
-  
+
   - `:max_context_items` - Maximum number of context items to retrieve (default: 10)
   - `:similarity_threshold` - Minimum similarity score for context (default: 0.7)
   - `:max_iterations` - Maximum refinement iterations (default: 3)
   - `:validate_syntax` - Whether to validate generated code (default: true)
   - `:history_size` - Number of generations to track (default: 100)
   - `:template_style` - Code style preference (default: :idiomatic)
-  
+
   ## Example
-  
+
       config = [
         max_context_items: 5,
         similarity_threshold: 0.8,
@@ -34,62 +34,62 @@ defmodule RubberDuck.Engines.Generation do
       
       {:ok, state} = RubberDuck.Engines.Generation.init(config)
   """
-  
+
   @behaviour RubberDuck.Engine
-  
+
   require Logger
-  
+
   alias RubberDuck.Processor
   alias RubberDuck.Enhancer
-  
+
   # Default configuration
   @default_max_context_items 10
   @default_similarity_threshold 0.7
   @default_max_iterations 3
   @default_history_size 100
-  
+
   @type state :: %{
-    config: keyword(),
-    history: list(generation_record()),
-    user_preferences: map(),
-    template_cache: map()
-  }
-  
+          config: keyword(),
+          history: list(generation_record()),
+          user_preferences: map(),
+          template_cache: map()
+        }
+
   @type generation_input :: %{
-    required(:prompt) => String.t(),
-    required(:language) => atom(),
-    required(:context) => generation_context(),
-    optional(:partial_code) => String.t(),
-    optional(:style) => atom(),
-    optional(:constraints) => map()
-  }
-  
+          required(:prompt) => String.t(),
+          required(:language) => atom(),
+          required(:context) => generation_context(),
+          optional(:partial_code) => String.t(),
+          optional(:style) => atom(),
+          optional(:constraints) => map()
+        }
+
   @type generation_context :: %{
-    optional(:project_files) => [String.t()],
-    optional(:current_file) => String.t(),
-    optional(:imports) => [String.t()],
-    optional(:dependencies) => [String.t()],
-    optional(:examples) => [map()]
-  }
-  
+          optional(:project_files) => [String.t()],
+          optional(:current_file) => String.t(),
+          optional(:imports) => [String.t()],
+          optional(:dependencies) => [String.t()],
+          optional(:examples) => [map()]
+        }
+
   @type generation_result :: %{
-    required(:code) => String.t(),
-    required(:language) => atom(),
-    required(:imports) => [String.t()],
-    required(:explanation) => String.t(),
-    required(:confidence) => float(),
-    required(:alternatives) => [String.t()],
-    required(:metadata) => map()
-  }
-  
+          required(:code) => String.t(),
+          required(:language) => atom(),
+          required(:imports) => [String.t()],
+          required(:explanation) => String.t(),
+          required(:confidence) => float(),
+          required(:alternatives) => [String.t()],
+          required(:metadata) => map()
+        }
+
   @type generation_record :: %{
-    required(:prompt) => String.t(),
-    required(:generated_code) => String.t(),
-    required(:timestamp) => DateTime.t(),
-    required(:accepted) => boolean(),
-    required(:refinements) => integer()
-  }
-  
+          required(:prompt) => String.t(),
+          required(:generated_code) => String.t(),
+          required(:timestamp) => DateTime.t(),
+          required(:accepted) => boolean(),
+          required(:refinements) => integer()
+        }
+
   @impl true
   def init(config) do
     state = %{
@@ -98,10 +98,10 @@ defmodule RubberDuck.Engines.Generation do
       user_preferences: load_user_preferences(config),
       template_cache: load_templates()
     }
-    
+
     {:ok, state}
   end
-  
+
   @impl true
   def execute(input, state) do
     with {:ok, validated_input} <- validate_input(input),
@@ -110,28 +110,27 @@ defmodule RubberDuck.Engines.Generation do
          {:ok, generated} <- generate_code(prompt, validated_input, state),
          {:ok, validated} <- validate_generated_code(generated, validated_input, state),
          {:ok, enhanced} <- enhance_with_imports(validated, validated_input, state) do
-      
       # Update history
       updated_state = update_history(state, validated_input.prompt, enhanced.code)
-      
+
       # Emit telemetry
       :telemetry.execute(
         [:rubber_duck, :generation, :completed],
         %{confidence: enhanced.confidence},
         %{language: validated_input.language}
       )
-      
+
       {:ok, %{result: enhanced, state: updated_state}}
     end
   end
-  
+
   @impl true
   def capabilities do
     [:code_generation, :rag_context, :iterative_refinement, :multi_language]
   end
-  
+
   # Private functions
-  
+
   defp default_config do
     [
       max_context_items: @default_max_context_items,
@@ -142,10 +141,9 @@ defmodule RubberDuck.Engines.Generation do
       template_style: :idiomatic
     ]
   end
-  
-  defp validate_input(%{prompt: prompt, language: language} = input) 
+
+  defp validate_input(%{prompt: prompt, language: language} = input)
        when is_binary(prompt) and is_atom(language) do
-    
     validated = %{
       prompt: prompt,
       language: language,
@@ -154,84 +152,89 @@ defmodule RubberDuck.Engines.Generation do
       style: Map.get(input, :style, :default),
       constraints: Map.get(input, :constraints, %{})
     }
-    
+
     {:ok, validated}
   end
-  
+
   defp validate_input(_) do
     {:error, :invalid_input}
   end
-  
+
   defp retrieve_context(input, state) do
     # RAG context retrieval
     context_items = []
-    
+
     # 1. Search for similar code patterns
     similar_code = search_similar_code(input.prompt, input.language, state)
     context_items = context_items ++ similar_code
-    
+
     # 2. Extract relevant project patterns
     project_patterns = extract_project_patterns(input.context, state)
     context_items = context_items ++ project_patterns
-    
+
     # 3. Include user-provided examples
-    examples = Map.get(input.context, :examples, [])
-    |> Enum.map(fn example ->
-      %{
-        type: :example,
-        code: example[:code] || example.code,
-        description: example[:description] || "",
-        similarity: 0.8
-      }
-    end)
+    examples =
+      Map.get(input.context, :examples, [])
+      |> Enum.map(fn example ->
+        %{
+          type: :example,
+          code: example[:code] || example.code,
+          description: example[:description] || "",
+          similarity: 0.8
+        }
+      end)
+
     context_items = context_items ++ examples
-    
+
     # 4. Add language-specific idioms
     idioms = get_language_idioms(input.language, input.style, state)
     context_items = context_items ++ idioms
-    
+
     # Rank and filter context items
-    ranked_context = context_items
-    |> rank_context_items(input.prompt)
-    |> Enum.take(state.config[:max_context_items])
-    
-    {:ok, %{
-      items: ranked_context,
-      metadata: %{
-        total_items: length(context_items),
-        selected_items: length(ranked_context)
-      }
-    }}
+    ranked_context =
+      context_items
+      |> rank_context_items(input.prompt)
+      |> Enum.take(state.config[:max_context_items])
+
+    {:ok,
+     %{
+       items: ranked_context,
+       metadata: %{
+         total_items: length(context_items),
+         selected_items: length(ranked_context)
+       }
+     }}
   end
-  
+
   defp search_similar_code(prompt, language, state) do
     # In a real implementation, this would use embeddings and vector search
     # For now, we'll use keyword matching
-    
+
     keywords = extract_keywords(prompt)
-    
+
     # Search through history for similar prompts
-    similar_from_history = state.history
-    |> Enum.filter(fn record ->
-      record_keywords = extract_keywords(record.prompt)
-      keyword_overlap(keywords, record_keywords) > 0.5
-    end)
-    |> Enum.map(fn record ->
-      %{
-        type: :historical,
-        code: record.generated_code,
-        prompt: record.prompt,
-        similarity: calculate_similarity(prompt, record.prompt)
-      }
-    end)
-    |> Enum.take(3)
-    
+    similar_from_history =
+      state.history
+      |> Enum.filter(fn record ->
+        record_keywords = extract_keywords(record.prompt)
+        keyword_overlap(keywords, record_keywords) > 0.5
+      end)
+      |> Enum.map(fn record ->
+        %{
+          type: :historical,
+          code: record.generated_code,
+          prompt: record.prompt,
+          similarity: calculate_similarity(prompt, record.prompt)
+        }
+      end)
+      |> Enum.take(3)
+
     # Add common patterns based on keywords
     pattern_matches = match_code_patterns(keywords, language)
-    
+
     similar_from_history ++ pattern_matches
   end
-  
+
   defp extract_keywords(text) do
     text
     |> String.downcase()
@@ -239,41 +242,41 @@ defmodule RubberDuck.Engines.Generation do
     |> Enum.filter(&(String.length(&1) > 3))
     |> Enum.uniq()
   end
-  
+
   defp keyword_overlap(keywords1, keywords2) do
     set1 = MapSet.new(keywords1)
     set2 = MapSet.new(keywords2)
     intersection = MapSet.intersection(set1, set2)
-    
+
     if MapSet.size(set1) == 0 do
       0.0
     else
       MapSet.size(intersection) / MapSet.size(set1)
     end
   end
-  
+
   defp calculate_similarity(text1, text2) do
     # Simple Jaccard similarity
     words1 = MapSet.new(String.split(String.downcase(text1)))
     words2 = MapSet.new(String.split(String.downcase(text2)))
-    
+
     intersection = MapSet.intersection(words1, words2)
     union = MapSet.union(words1, words2)
-    
+
     if MapSet.size(union) == 0 do
       0.0
     else
       MapSet.size(intersection) / MapSet.size(union)
     end
   end
-  
+
   defp match_code_patterns(keywords, language) do
     patterns = get_language_patterns(language)
-    
+
     patterns
     |> Enum.filter(fn pattern ->
-      Enum.any?(keywords, fn keyword -> 
-        Enum.any?(pattern.keywords, fn pattern_keyword -> 
+      Enum.any?(keywords, fn keyword ->
+        Enum.any?(pattern.keywords, fn pattern_keyword ->
           String.contains?(pattern_keyword, keyword)
         end)
       end)
@@ -287,7 +290,7 @@ defmodule RubberDuck.Engines.Generation do
       }
     end)
   end
-  
+
   defp get_language_patterns(:elixir) do
     [
       %{
@@ -331,36 +334,36 @@ defmodule RubberDuck.Engines.Generation do
       }
     ]
   end
-  
+
   defp get_language_patterns(_language) do
     # Default patterns for other languages
     []
   end
-  
-  defp extract_project_patterns(context, state) do
+
+  defp extract_project_patterns(context, _state) do
     # Extract patterns from the current project context
     current_file = Map.get(context, :current_file)
-    
+
     patterns = []
-    
+
     # If we have a current file, extract its structure
     if current_file do
-      patterns = patterns ++ extract_file_patterns(current_file)
+      _patterns = patterns ++ extract_file_patterns(current_file)
     end
-    
+
     # Extract patterns from imports
     imports = Map.get(context, :imports, [])
     patterns = patterns ++ extract_import_patterns(imports)
-    
+
     patterns
   end
-  
-  defp extract_file_patterns(file_path) do
+
+  defp extract_file_patterns(_file_path) do
     # In a real implementation, this would parse the file
     # For now, return empty list
     []
   end
-  
+
   defp extract_import_patterns(imports) do
     imports
     |> Enum.map(fn import_stmt ->
@@ -372,8 +375,8 @@ defmodule RubberDuck.Engines.Generation do
       }
     end)
   end
-  
-  defp get_language_idioms(language, style, state) do
+
+  defp get_language_idioms(language, style, _state) do
     # Get idiomatic patterns for the language and style
     case language do
       :elixir -> elixir_idioms(style)
@@ -382,7 +385,7 @@ defmodule RubberDuck.Engines.Generation do
       _ -> []
     end
   end
-  
+
   defp elixir_idioms(:functional) do
     [
       %{
@@ -393,14 +396,14 @@ defmodule RubberDuck.Engines.Generation do
       }
     ]
   end
-  
+
   defp elixir_idioms(_style) do
     []
   end
-  
+
   defp javascript_idioms(_style), do: []
   defp python_idioms(_style), do: []
-  
+
   defp rank_context_items(items, prompt) do
     # Rank items by relevance to the prompt
     items
@@ -410,87 +413,91 @@ defmodule RubberDuck.Engines.Generation do
     end)
     |> Enum.sort_by(& &1.relevance_score, :desc)
   end
-  
-  defp calculate_relevance_score(item, prompt) do
+
+  defp calculate_relevance_score(item, _prompt) do
     base_score = Map.get(item, :similarity, 0.5)
-    
+
     # Boost score based on type
-    type_boost = case item.type do
-      :historical -> 1.2
-      :pattern -> 1.1
-      :import -> 0.9
-      :idiom -> 1.0
-      _ -> 1.0
-    end
-    
+    type_boost =
+      case item.type do
+        :historical -> 1.2
+        :pattern -> 1.1
+        :import -> 0.9
+        :idiom -> 1.0
+        _ -> 1.0
+      end
+
     base_score * type_boost
   end
-  
+
   defp build_generation_prompt(input, rag_context, state) do
     template = get_prompt_template(input.language, state)
-    
+
     # Build the prompt with context
-    prompt = template
-    |> String.replace("{{DESCRIPTION}}", input.prompt)
-    |> String.replace("{{LANGUAGE}}", to_string(input.language))
-    |> String.replace("{{STYLE}}", to_string(input.style))
-    |> add_context_to_prompt(rag_context)
-    |> add_constraints_to_prompt(input.constraints)
-    |> add_partial_code_to_prompt(input.partial_code)
-    
+    prompt =
+      template
+      |> String.replace("{{DESCRIPTION}}", input.prompt)
+      |> String.replace("{{LANGUAGE}}", to_string(input.language))
+      |> String.replace("{{STYLE}}", to_string(input.style))
+      |> add_context_to_prompt(rag_context)
+      |> add_constraints_to_prompt(input.constraints)
+      |> add_partial_code_to_prompt(input.partial_code)
+
     {:ok, prompt}
   end
-  
+
   defp get_prompt_template(language, state) do
     # Get cached template or default
     Map.get(state.template_cache, language, default_prompt_template())
   end
-  
+
   defp default_prompt_template do
     """
     Generate {{LANGUAGE}} code based on the following description:
     {{DESCRIPTION}}
-    
+
     Style preference: {{STYLE}}
-    
+
     Context and examples:
     {{CONTEXT}}
-    
+
     Constraints:
     {{CONSTRAINTS}}
-    
+
     {{PARTIAL_CODE_SECTION}}
-    
+
     Please generate clean, idiomatic code that follows best practices.
     Include necessary imports and handle errors appropriately.
     """
   end
-  
+
   defp add_context_to_prompt(prompt, rag_context) do
-    context_text = rag_context.items
-    |> Enum.map(fn item ->
-      """
-      Example (#{item.type}):
-      #{item.code}
-      """
-    end)
-    |> Enum.join("\n")
-    
+    context_text =
+      rag_context.items
+      |> Enum.map(fn item ->
+        """
+        Example (#{item.type}):
+        #{item.code}
+        """
+      end)
+      |> Enum.join("\n")
+
     String.replace(prompt, "{{CONTEXT}}", context_text)
   end
-  
+
   defp add_constraints_to_prompt(prompt, constraints) do
-    constraints_text = constraints
-    |> Enum.map(fn {key, value} -> "- #{key}: #{value}" end)
-    |> Enum.join("\n")
-    
+    constraints_text =
+      constraints
+      |> Enum.map(fn {key, value} -> "- #{key}: #{value}" end)
+      |> Enum.join("\n")
+
     String.replace(prompt, "{{CONSTRAINTS}}", constraints_text)
   end
-  
+
   defp add_partial_code_to_prompt(prompt, nil) do
     String.replace(prompt, "{{PARTIAL_CODE_SECTION}}", "")
   end
-  
+
   defp add_partial_code_to_prompt(prompt, partial_code) do
     section = """
     Complete the following partial code:
@@ -498,21 +505,22 @@ defmodule RubberDuck.Engines.Generation do
     #{partial_code}
     ```
     """
-    
+
     String.replace(prompt, "{{PARTIAL_CODE_SECTION}}", section)
   end
-  
+
   defp generate_code(prompt, input, state) do
     # In a real implementation, this would call an LLM
     # For now, we'll generate based on templates and patterns
-    
-    code = case input.language do
-      :elixir -> generate_elixir_code(input, state)
-      :javascript -> generate_javascript_code(input, state)
-      :python -> generate_python_code(input, state)
-      _ -> generate_generic_code(input, state)
-    end
-    
+
+    code =
+      case input.language do
+        :elixir -> generate_elixir_code(input, state)
+        :javascript -> generate_javascript_code(input, state)
+        :python -> generate_python_code(input, state)
+        _ -> generate_generic_code(input, state)
+      end
+
     result = %{
       code: code,
       language: input.language,
@@ -525,10 +533,10 @@ defmodule RubberDuck.Engines.Generation do
         generation_time: DateTime.utc_now()
       }
     }
-    
+
     {:ok, result}
   end
-  
+
   defp generate_elixir_code(input, _state) do
     # Generate code based on prompt keywords
     cond do
@@ -536,7 +544,7 @@ defmodule RubberDuck.Engines.Generation do
       input.partial_code != nil and input.partial_code != "" ->
         # Complete partial code
         complete_partial_elixir(input.partial_code)
-        
+
       String.contains?(input.prompt, "genserver") ->
         """
         defmodule #{module_name_from_prompt(input.prompt)} do
@@ -571,7 +579,7 @@ defmodule RubberDuck.Engines.Generation do
           end
         end
         """
-        
+
       String.contains?(input.prompt, "api") or String.contains?(input.prompt, "endpoint") ->
         """
         defmodule MyAppWeb.#{controller_name_from_prompt(input.prompt)} do
@@ -598,12 +606,12 @@ defmodule RubberDuck.Engines.Generation do
           end
         end
         """
-        
+
       String.contains?(input.prompt, "function") ->
         function_name = extract_function_name(input.prompt)
         # Check if there are constraints on line count
         max_lines = get_in(input, [:constraints, "max_lines"])
-        
+
         if max_lines && max_lines <= 10 do
           # Short version for constraint
           """
@@ -627,19 +635,19 @@ defmodule RubberDuck.Engines.Generation do
                 {:error, reason}
             end
           end
-          
+
           defp validate_params(params) do
             # Add validation logic
             {:ok, params}
           end
-          
+
           defp process(params) do
             # Main processing logic
             params
           end
           """
         end
-        
+
       true ->
         """
         # Generated code for: #{input.prompt}
@@ -650,7 +658,7 @@ defmodule RubberDuck.Engines.Generation do
         """
     end
   end
-  
+
   defp generate_javascript_code(input, _state) do
     """
     // Generated code for: #{input.prompt}
@@ -660,7 +668,7 @@ defmodule RubberDuck.Engines.Generation do
     }
     """
   end
-  
+
   defp generate_python_code(input, _state) do
     """
     # Generated code for: #{input.prompt}
@@ -669,7 +677,7 @@ defmodule RubberDuck.Engines.Generation do
         pass
     """
   end
-  
+
   defp generate_generic_code(input, _state) do
     """
     // Generated code for: #{input.prompt}
@@ -677,7 +685,7 @@ defmodule RubberDuck.Engines.Generation do
     // TODO: Implement
     """
   end
-  
+
   defp module_name_from_prompt(prompt) do
     prompt
     |> extract_keywords()
@@ -685,7 +693,7 @@ defmodule RubberDuck.Engines.Generation do
     |> Enum.join()
     |> then(&"#{&1}Server")
   end
-  
+
   defp controller_name_from_prompt(prompt) do
     prompt
     |> extract_keywords()
@@ -693,10 +701,10 @@ defmodule RubberDuck.Engines.Generation do
     |> Enum.join()
     |> then(&"#{&1}Controller")
   end
-  
+
   defp extract_function_name(prompt) do
     keywords = extract_keywords(prompt)
-    
+
     if length(keywords) > 0 do
       keywords
       |> Enum.take(3)
@@ -705,7 +713,7 @@ defmodule RubberDuck.Engines.Generation do
       "generated_function"
     end
   end
-  
+
   defp complete_partial_elixir(partial_code) do
     # Simple completion based on patterns
     cond do
@@ -716,99 +724,103 @@ defmodule RubberDuck.Engines.Generation do
         else
           partial_code <> "\n  # TODO: Complete implementation\n  :ok\nend"
         end
-        
+
       String.contains?(partial_code, "case") and not String.contains?(partial_code, "end") ->
         partial_code <> "\n  _ -> {:error, :unknown}\nend"
-        
+
       true ->
         partial_code <> "\n# TODO: Complete implementation"
     end
   end
-  
+
   defp detect_imports(code, language) do
     case language do
       :elixir ->
         ~r/(?:import|alias|require|use)\s+([\w.]+)/
         |> Regex.scan(code)
         |> Enum.map(&List.last/1)
-        
+
       :javascript ->
         ~r/import\s+.*\s+from\s+['"](.+)['"]/
         |> Regex.scan(code)
         |> Enum.map(&List.last/1)
-        
+
       :python ->
         ~r/(?:import|from)\s+([\w.]+)/
         |> Regex.scan(code)
         |> Enum.map(&List.last/1)
-        
+
       _ ->
         []
     end
   end
-  
+
   defp generate_explanation(prompt, code) do
     "Generated #{count_lines(code)} lines of code based on: #{prompt}"
   end
-  
+
   defp count_lines(code) do
     code
     |> String.split("\n")
     |> Enum.reject(&(String.trim(&1) == ""))
     |> length()
   end
-  
+
   defp calculate_confidence(code, input) do
     # Simple confidence calculation
     factors = []
-    
+
     # Factor 1: Code length appropriateness
     lines = count_lines(code)
-    length_score = cond do
-      lines < 3 -> 0.5
-      lines > 100 -> 0.7
-      true -> 0.9
-    end
+
+    length_score =
+      cond do
+        lines < 3 -> 0.5
+        lines > 100 -> 0.7
+        true -> 0.9
+      end
+
     factors = [length_score | factors]
-    
+
     # Factor 2: Contains TODO markers
     todo_score = if String.contains?(code, "TODO"), do: 0.6, else: 1.0
     factors = [todo_score | factors]
-    
+
     # Factor 3: Matches language syntax patterns
     syntax_score = if valid_syntax_pattern?(code, input.language), do: 0.9, else: 0.5
     factors = [syntax_score | factors]
-    
+
     # Average all factors
     Enum.sum(factors) / length(factors)
   end
-  
+
   defp valid_syntax_pattern?(code, :elixir) do
-    String.contains?(code, "def") or 
-    String.contains?(code, "defmodule") or
-    String.contains?(code, "defp")
+    String.contains?(code, "def") or
+      String.contains?(code, "defmodule") or
+      String.contains?(code, "defp")
   end
-  
+
   defp valid_syntax_pattern?(code, :javascript) do
     String.contains?(code, "function") or
-    String.contains?(code, "const") or
-    String.contains?(code, "=>")
+      String.contains?(code, "const") or
+      String.contains?(code, "=>")
   end
-  
+
   defp valid_syntax_pattern?(code, :python) do
     String.contains?(code, "def") or
-    String.contains?(code, "class")
+      String.contains?(code, "class")
   end
-  
+
   defp valid_syntax_pattern?(_code, _language), do: true
-  
+
   defp generate_alternatives(input, state) do
     # Generate 1-2 alternative approaches
     alternatives = []
-    
+
     # Alternative 1: Different style
     if input.style != :functional do
       alt_input = %{input | style: :functional}
+
       case generate_code("", alt_input, state) do
         {:ok, alt_result} -> [alt_result.code | alternatives]
         _ -> alternatives
@@ -817,25 +829,22 @@ defmodule RubberDuck.Engines.Generation do
       alternatives
     end
   end
-  
-  defp validate_generated_code(result, input, state) do
+
+  defp validate_generated_code(result, _input, state) do
     if state.config[:validate_syntax] do
       case validate_syntax(result.code, result.language) do
         :ok ->
           {:ok, result}
-          
+
         {:error, errors} ->
           # Try to fix syntax errors
-          case fix_syntax_errors(result, errors, state) do
-            {:ok, fixed_result} -> {:ok, fixed_result}
-            {:error, _} -> {:ok, result}  # Return original if can't fix
-          end
+          fix_syntax_errors(result, errors, state)
       end
     else
       {:ok, result}
     end
   end
-  
+
   defp validate_syntax(code, :elixir) do
     # Simple validation - in real implementation would use Code.string_to_quoted
     cond do
@@ -843,41 +852,43 @@ defmodule RubberDuck.Engines.Generation do
       true -> :ok
     end
   end
-  
+
   defp validate_syntax(_code, _language) do
     # Placeholder for other languages
     :ok
   end
-  
+
   defp unbalanced_delimiters?(code) do
     # Simple delimiter check
     opens = String.graphemes(code) |> Enum.count(&(&1 in ["(", "[", "{"]))
     closes = String.graphemes(code) |> Enum.count(&(&1 in [")", "]", "}"]))
     opens != closes
   end
-  
+
   defp fix_syntax_errors(result, _errors, _state) do
     # Simple fixes - in real implementation would be more sophisticated
-    fixed_code = result.code
-    |> ensure_balanced_delimiters()
-    |> ensure_ends_with_newline()
-    
+    fixed_code =
+      result.code
+      |> ensure_balanced_delimiters()
+      |> ensure_ends_with_newline()
+
     {:ok, %{result | code: fixed_code}}
   end
-  
+
   defp ensure_balanced_delimiters(code) do
     # Very simple balancing - just add missing closes at the end
     opens = String.graphemes(code) |> Enum.count(&(&1 == "("))
     closes = String.graphemes(code) |> Enum.count(&(&1 == ")"))
-    
+
     missing_closes = opens - closes
+
     if missing_closes > 0 do
       code <> String.duplicate(")", missing_closes)
     else
       code
     end
   end
-  
+
   defp ensure_ends_with_newline(code) do
     if String.ends_with?(code, "\n") do
       code
@@ -885,57 +896,55 @@ defmodule RubberDuck.Engines.Generation do
       code <> "\n"
     end
   end
-  
-  defp enhance_with_imports(result, input, state) do
+
+  defp enhance_with_imports(result, input, _state) do
     # Add any missing imports based on code analysis
     detected_imports = detect_required_imports(result.code, input.language)
     existing_imports = result.imports
-    
+
     missing_imports = detected_imports -- existing_imports
-    
+
     if length(missing_imports) > 0 do
       enhanced_code = add_imports_to_code(result.code, missing_imports, input.language)
-      enhanced_result = %{result | 
-        code: enhanced_code,
-        imports: existing_imports ++ missing_imports
-      }
+      enhanced_result = %{result | code: enhanced_code, imports: existing_imports ++ missing_imports}
       {:ok, enhanced_result}
     else
       {:ok, result}
     end
   end
-  
+
   defp detect_required_imports(code, :elixir) do
     # Detect modules that need imports
     imports = []
-    
+
     if String.contains?(code, "GenServer") do
       ["GenServer" | imports]
     else
       imports
     end
   end
-  
+
   defp detect_required_imports(_code, _language) do
     []
   end
-  
+
   defp add_imports_to_code(code, imports, :elixir) do
-    import_statements = imports
-    |> Enum.map(&"use #{&1}")
-    |> Enum.join("\n")
-    
+    import_statements =
+      imports
+      |> Enum.map(&"use #{&1}")
+      |> Enum.join("\n")
+
     if import_statements != "" do
       import_statements <> "\n\n" <> code
     else
       code
     end
   end
-  
+
   defp add_imports_to_code(code, _imports, _language) do
     code
   end
-  
+
   defp update_history(state, prompt, generated_code) do
     record = %{
       prompt: prompt,
@@ -944,13 +953,14 @@ defmodule RubberDuck.Engines.Generation do
       accepted: false,
       refinements: 0
     }
-    
-    history = [record | state.history]
-    |> Enum.take(state.config[:history_size])
-    
+
+    history =
+      [record | state.history]
+      |> Enum.take(state.config[:history_size])
+
     %{state | history: history}
   end
-  
+
   defp load_user_preferences(config) do
     # Load from config or defaults
     Keyword.get(config, :user_preferences, %{
@@ -959,7 +969,7 @@ defmodule RubberDuck.Engines.Generation do
       prefer_documentation: true
     })
   end
-  
+
   defp load_templates do
     # Load language-specific templates
     %{
@@ -968,33 +978,33 @@ defmodule RubberDuck.Engines.Generation do
       python: load_python_templates()
     }
   end
-  
+
   defp load_elixir_templates do
     """
     Generate Elixir code based on the following description:
     {{DESCRIPTION}}
-    
+
     Requirements:
     - Use idiomatic Elixir patterns
     - Handle errors with tagged tuples {:ok, result} or {:error, reason}
     - Include @doc documentation for public functions
     - Follow Elixir naming conventions
-    
+
     Style: {{STYLE}}
-    
+
     Context:
     {{CONTEXT}}
-    
+
     {{CONSTRAINTS}}
-    
+
     {{PARTIAL_CODE_SECTION}}
     """
   end
-  
+
   defp load_javascript_templates do
     default_prompt_template()
   end
-  
+
   defp load_python_templates do
     default_prompt_template()
   end

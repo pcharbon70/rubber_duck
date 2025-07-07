@@ -1,18 +1,18 @@
 defmodule RubberDuck.CircuitBreaker do
   @moduledoc """
   Implements a circuit breaker pattern for external service calls.
-  
+
   The circuit breaker prevents cascading failures by monitoring
   service health and temporarily blocking calls to failing services.
-  
+
   ## States
-  
+
   - **Closed**: Normal operation, requests pass through
   - **Open**: Service is failing, requests are blocked
   - **Half-Open**: Testing if service has recovered
-  
+
   ## Usage
-  
+
       # Define a circuit breaker for an LLM service
       defmodule MyApp.LLMBreaker do
         use RubberDuck.CircuitBreaker,
@@ -60,7 +60,7 @@ defmodule RubberDuck.CircuitBreaker do
   defmacro __using__(opts) do
     quote do
       @circuit_breaker_opts unquote(opts)
-      
+
       def child_spec(opts) do
         opts = Keyword.merge(@circuit_breaker_opts, opts)
         RubberDuck.CircuitBreaker.child_spec(opts)
@@ -97,7 +97,7 @@ defmodule RubberDuck.CircuitBreaker do
 
   @doc """
   Executes a function through the circuit breaker.
-  
+
   Returns:
   - `{:ok, result}` if the function succeeds
   - `{:error, :circuit_open}` if the circuit is open
@@ -174,14 +174,15 @@ defmodule RubberDuck.CircuitBreaker do
 
   @impl true
   def handle_call(:reset, _from, state) do
-    new_state = %{state | 
-      state: :closed,
-      failure_count: 0,
-      success_count: 0,
-      last_failure_time: nil,
-      half_open_calls: 0
+    new_state = %{
+      state
+      | state: :closed,
+        failure_count: 0,
+        success_count: 0,
+        last_failure_time: nil,
+        half_open_calls: 0
     }
-    
+
     Logger.info("Circuit breaker #{state.name} manually reset")
     {:reply, :ok, new_state}
   end
@@ -193,25 +194,26 @@ defmodule RubberDuck.CircuitBreaker do
   end
 
   defp execute_call(fun, timeout, state) do
-    task = Task.async(fn ->
-      try do
-        {:ok, fun.()}
-      rescue
-        error -> {:error, error}
-      catch
-        kind, reason -> {:error, {kind, reason}}
-      end
-    end)
+    task =
+      Task.async(fn ->
+        try do
+          {:ok, fun.()}
+        rescue
+          error -> {:error, error}
+        catch
+          kind, reason -> {:error, {kind, reason}}
+        end
+      end)
 
     case Task.yield(task, timeout) || Task.shutdown(task) do
       {:ok, {:ok, result}} ->
         state = handle_success(state)
         {:reply, {:ok, result}, state}
-        
+
       {:ok, {:error, error}} ->
         state = handle_failure(state, error)
         {:reply, {:error, error}, state}
-        
+
       nil ->
         state = handle_failure(state, :timeout)
         {:reply, {:error, :timeout}, state}
@@ -220,7 +222,7 @@ defmodule RubberDuck.CircuitBreaker do
 
   defp handle_success(%State{state: :half_open} = state) do
     state = %{state | success_count: state.success_count + 1}
-    
+
     if state.success_count >= state.success_threshold do
       Logger.info("Circuit breaker #{state.name} closed after successful recovery")
       %{state | state: :closed, failure_count: 0, success_count: 0}
@@ -236,20 +238,18 @@ defmodule RubberDuck.CircuitBreaker do
   defp handle_failure(%State{state: :half_open} = state, error) do
     Logger.warning("Circuit breaker #{state.name} failed in half-open state, reopening")
     report_failure(state, error)
-    
-    %{state | 
-      state: :open,
-      last_failure_time: System.monotonic_time(:millisecond),
-      failure_count: state.failure_count + 1
+
+    %{
+      state
+      | state: :open,
+        last_failure_time: System.monotonic_time(:millisecond),
+        failure_count: state.failure_count + 1
     }
   end
 
   defp handle_failure(state, error) do
-    state = %{state | 
-      failure_count: state.failure_count + 1,
-      last_failure_time: System.monotonic_time(:millisecond)
-    }
-    
+    state = %{state | failure_count: state.failure_count + 1, last_failure_time: System.monotonic_time(:millisecond)}
+
     if state.failure_count >= state.failure_threshold do
       Logger.error("Circuit breaker #{state.name} opened after #{state.failure_count} failures")
       report_failure(state, error)
@@ -273,10 +273,11 @@ defmodule RubberDuck.CircuitBreaker do
   end
 
   defp report_failure(state, error) do
-    error_info = case error do
-      %{__struct__: _} = ex -> Errors.normalize_error(ex)
-      other -> %{type: :unknown, message: inspect(other)}
-    end
+    error_info =
+      case error do
+        %{__struct__: _} = ex -> Errors.normalize_error(ex)
+        other -> %{type: :unknown, message: inspect(other)}
+      end
 
     Errors.report_message(:error, "Circuit breaker failure", %{
       circuit_breaker: state.name,

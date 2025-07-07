@@ -10,7 +10,7 @@ config :tower,
     #   dsn: System.get_env("SENTRY_DSN"),
     #   environment: "production"
     # ],
-    
+
     # Email reporter for critical errors
     [
       module: TowerEmail,
@@ -18,8 +18,8 @@ config :tower,
       from: System.get_env("ERROR_EMAIL_FROM", "errors@rubberduck.ai"),
       # Only email on critical errors
       level: :critical
-    ],
-    
+    ]
+
     # Slack reporter for errors
     # [
     #   module: TowerSlack,

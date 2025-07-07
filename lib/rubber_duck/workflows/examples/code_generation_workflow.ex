@@ -1,38 +1,38 @@
 defmodule RubberDuck.Workflows.Examples.CodeGenerationWorkflow do
   @moduledoc """
   Example workflow for code generation with multiple enhancement steps.
-  
+
   This workflow demonstrates:
   - Sequential and parallel step execution
   - Integration with existing engines
   - Error handling and retries
   - Result caching
   """
-  
+
   use RubberDuck.Workflows.Workflow
-  
+
   alias RubberDuck.{LLM, Context, Enhancement, SelfCorrection}
-  
+
   @impl true
   def name, do: :code_generation_workflow
-  
+
   @impl true
   def description, do: "Enhanced code generation workflow with multiple improvement steps"
-  
+
   workflow do
     # Step 1: Build context from user request
     step :build_context do
       run BuildContextStep
       max_retries 1
     end
-    
+
     # Step 2: Generate initial code
     step :generate_code do
       run GenerateCodeStep
       argument :context, result(:build_context)
       max_retries 2
     end
-    
+
     # Step 3a: Apply CoT reasoning (parallel)
     step :apply_cot do
       run ApplyCoTStep
@@ -40,7 +40,7 @@ defmodule RubberDuck.Workflows.Examples.CodeGenerationWorkflow do
       argument :context, result(:build_context)
       async? true
     end
-    
+
     # Step 3b: Check with RAG (parallel)
     step :check_rag do
       run CheckRAGStep
@@ -48,7 +48,7 @@ defmodule RubberDuck.Workflows.Examples.CodeGenerationWorkflow do
       argument :context, result(:build_context)
       async? true
     end
-    
+
     # Step 4: Self-correction
     step :self_correct do
       run SelfCorrectStep
@@ -57,7 +57,7 @@ defmodule RubberDuck.Workflows.Examples.CodeGenerationWorkflow do
       argument :rag_suggestions, result(:check_rag)
       max_retries 1
     end
-    
+
     # Step 5: Final validation
     step :validate do
       run ValidateStep
@@ -65,26 +65,26 @@ defmodule RubberDuck.Workflows.Examples.CodeGenerationWorkflow do
       compensate CleanupStep
     end
   end
-  
+
   # Step implementations
-  
+
   defmodule BuildContextStep do
     use RubberDuck.Workflows.Step
-    
+
     @impl true
     def run(%{prompt: prompt, user_id: user_id} = input, _context) do
       opts = Map.get(input, :context_opts, [])
-      
+
       case Context.Manager.build_context(prompt, Map.put(opts, :user_id, user_id)) do
         {:ok, context} -> {:ok, context}
         {:error, reason} -> {:error, {:context_build_failed, reason}}
       end
     end
   end
-  
+
   defmodule GenerateCodeStep do
     use RubberDuck.Workflows.Step
-    
+
     @impl true
     def run(%{context: context} = input, _workflow_context) do
       request = %{
@@ -93,35 +93,37 @@ defmodule RubberDuck.Workflows.Examples.CodeGenerationWorkflow do
         model: Map.get(input, :model, "gpt-4"),
         language: Map.get(input, :language, :elixir)
       }
-      
-      case generate_initial_code(request) do
-        {:ok, code} -> {:ok, %{code: code, metadata: %{model: request.model}}}
-        {:error, reason} -> {:error, {:generation_failed, reason}}
-      end
+
+      # NOTE: In this example, code generation always succeeds.
+      # A real implementation would handle API errors, rate limits, etc.
+      # and return {:error, {:generation_failed, reason}} on failure.
+      {:ok, code} = generate_initial_code(request)
+      {:ok, %{code: code, metadata: %{model: request.model}}}
     end
-    
+
     defp generate_initial_code(_request) do
       # Placeholder - would integrate with actual generation engine
-      {:ok, """
-      defmodule Example do
-        def hello(name) do
-          "Hello, \#{name}!"
-        end
-      end
-      """}
+      {:ok,
+       """
+       defmodule Example do
+         def hello(name) do
+           "Hello, \#{name}!"
+         end
+       end
+       """}
     end
   end
-  
+
   defmodule ApplyCoTStep do
     use RubberDuck.Workflows.Step
-    
+
     @impl true
     def run(%{code: code, context: context}, _workflow_context) do
       # Apply Chain-of-Thought reasoning to improve code
       insights = analyze_with_cot(code, context)
       {:ok, insights}
     end
-    
+
     defp analyze_with_cot(_code, _context) do
       # Placeholder - would use actual CoT system
       %{
@@ -130,17 +132,17 @@ defmodule RubberDuck.Workflows.Examples.CodeGenerationWorkflow do
       }
     end
   end
-  
+
   defmodule CheckRAGStep do
     use RubberDuck.Workflows.Step
-    
+
     @impl true
     def run(%{code: code, context: context}, _workflow_context) do
       # Check against RAG for similar patterns
       suggestions = retrieve_similar_patterns(code, context)
       {:ok, suggestions}
     end
-    
+
     defp retrieve_similar_patterns(_code, _context) do
       # Placeholder - would use actual RAG system
       %{
@@ -149,10 +151,10 @@ defmodule RubberDuck.Workflows.Examples.CodeGenerationWorkflow do
       }
     end
   end
-  
+
   defmodule SelfCorrectStep do
     use RubberDuck.Workflows.Step
-    
+
     @impl true
     def run(inputs, _workflow_context) do
       %{
@@ -160,14 +162,14 @@ defmodule RubberDuck.Workflows.Examples.CodeGenerationWorkflow do
         cot_insights: cot_insights,
         rag_suggestions: rag_suggestions
       } = inputs
-      
+
       # Apply self-correction based on all inputs
       corrected_code = apply_corrections(original_code, cot_insights, rag_suggestions)
-      
+
       {:ok, %{code: corrected_code, corrections_applied: 3}}
     end
-    
-    defp apply_corrections(code, _cot, _rag) do
+
+    defp apply_corrections(_code, _cot, _rag) do
       # Placeholder - would use actual self-correction engine
       """
       defmodule Example do
@@ -185,19 +187,20 @@ defmodule RubberDuck.Workflows.Examples.CodeGenerationWorkflow do
       """
     end
   end
-  
+
   defmodule ValidateStep do
     use RubberDuck.Workflows.Step
-    
+
     @impl true
     def run(%{code: %{code: code}}, _context) do
       # Final validation
-      case validate_code(code) do
-        :ok -> {:ok, %{code: code, valid: true}}
-        {:error, errors} -> {:error, {:validation_failed, errors}}
-      end
+      # NOTE: In this example, validation always succeeds.
+      # A real implementation would check syntax, security, standards, etc.
+      # and return {:error, {:validation_failed, errors}} when validation fails.
+      :ok = validate_code(code)
+      {:ok, %{code: code, valid: true}}
     end
-    
+
     @impl true
     def validate(input) do
       if Map.has_key?(input, :code) do
@@ -206,16 +209,21 @@ defmodule RubberDuck.Workflows.Examples.CodeGenerationWorkflow do
         {:error, "Missing code input"}
       end
     end
-    
+
     defp validate_code(_code) do
-      # Placeholder - would perform actual validation
+      # Placeholder - always returns :ok in this example
+      # A real implementation would perform actual validation:
+      # - Syntax checking
+      # - Compilation verification  
+      # - Security analysis
+      # - Code style validation
       :ok
     end
   end
-  
+
   defmodule CleanupStep do
     use RubberDuck.Workflows.Step
-    
+
     @impl true
     def run(_input, _context) do
       # Cleanup any temporary resources
