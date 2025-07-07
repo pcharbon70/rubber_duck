@@ -202,7 +202,7 @@ defmodule RubberDuck.Analysis.Semantic do
     # Check if module has too many responsibilities
     function_count = length(ast_info.functions)
 
-    large_module_issues = 
+    large_module_issues =
       if function_count > config.max_module_length do
         [
           Engine.create_issue(
@@ -223,7 +223,7 @@ defmodule RubberDuck.Analysis.Semantic do
     public_functions = Enum.count(ast_info.functions, &(!&1.private))
     private_functions = function_count - public_functions
 
-    cohesion_issues = 
+    cohesion_issues =
       if public_functions > 0 && private_functions / public_functions > 3 do
         [
           Engine.create_issue(
@@ -368,4 +368,3 @@ defmodule RubberDuck.Analysis.Semantic do
     end)
   end
 end
-
