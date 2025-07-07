@@ -5,7 +5,7 @@ defmodule RubberDuck.Telemetry.Measurements do
 
   def dispatch_vm_metrics do
     memory = :erlang.memory()
-    
+
     :telemetry.execute(
       [:vm, :memory],
       %{
@@ -20,7 +20,7 @@ defmodule RubberDuck.Telemetry.Measurements do
     )
 
     _cpu_info = :erlang.statistics(:scheduler_wall_time)
-    
+
     :telemetry.execute(
       [:vm, :total_run_queue_lengths],
       %{

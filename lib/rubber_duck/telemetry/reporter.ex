@@ -13,14 +13,14 @@ defmodule RubberDuck.Telemetry.Reporter do
 
   def init(opts) do
     metrics = Keyword.get(opts, :metrics, [])
-    
+
     groups = Enum.group_by(metrics, & &1.event_name)
-    
+
     for {event, metrics} <- groups do
       id = {__MODULE__, event, self()}
       :telemetry.attach(id, event, &handle_event/4, metrics)
     end
-    
+
     {:ok, %{metrics: metrics}}
   end
 
@@ -30,7 +30,7 @@ defmodule RubberDuck.Telemetry.Reporter do
         %{__struct__: module} = metric ->
           measurement = extract_measurement(metric, measurements)
           tags = extract_tags(metric, metadata)
-          
+
           log_metric(module, metric.name, measurement, tags)
       end
     end)
@@ -48,13 +48,13 @@ defmodule RubberDuck.Telemetry.Reporter do
       for tag <- metric.tags do
         {tag, Map.get(metadata, tag)}
       end
-    
+
     Map.new(tag_values)
   end
 
   defp log_metric(module, name, value, tags) when is_number(value) do
     type = metric_type(module)
-    
+
     Logger.info(
       "[METRIC] #{inspect(name)} #{type}=#{value}",
       metric_type: type,
