@@ -197,7 +197,7 @@ defmodule RubberDuck.Engines.Generation.RagContext do
         type: :code,
         content: "def example_function(params) do\n  # Project code\nend",
         source: "lib/example.ex",
-        metadata: %{language: language}
+        metadata: %{language: "elixir"}
       }
     ]
   end
