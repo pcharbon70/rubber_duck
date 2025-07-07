@@ -166,4 +166,3 @@ defmodule RubberDuck.Analysis.AST.Traversal do
   defp module_match?(%{to: {module, _, _}}, module), do: true
   defp module_match?(_, _), do: false
 end
-

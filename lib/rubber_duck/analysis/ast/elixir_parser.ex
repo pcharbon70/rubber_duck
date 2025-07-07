@@ -213,4 +213,3 @@ defmodule RubberDuck.Analysis.AST.ElixirParser do
   defp get_arity(args) when is_list(args), do: length(args)
   defp get_arity(_), do: 0
 end
-

@@ -86,4 +86,3 @@ defmodule RubberDuck.Analysis.ASTTest do
     end
   end
 end
-
