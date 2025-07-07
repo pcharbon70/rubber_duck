@@ -63,7 +63,7 @@ defmodule RubberDuck.CoT.Executor do
     result =
       Enum.reduce_while(Map.keys(graph), {:ok, sorted}, fn node, {:ok, acc} ->
         case visit_node(node, graph, visited, temp_visited, acc, step_map) do
-          {:ok, new_visited, new_acc} ->
+          {:ok, _new_visited, new_acc} ->
             {:cont, {:ok, new_acc}}
 
           {:error, :circular_dependency} ->
@@ -326,7 +326,7 @@ defmodule RubberDuck.CoT.Executor do
     end
   end
 
-  defp apply_validator(validator, result) do
+  defp apply_validator(validator, _result) do
     Logger.warning("Unknown validator: #{validator}")
     :ok
   end

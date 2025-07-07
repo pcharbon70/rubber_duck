@@ -52,7 +52,7 @@ defmodule RubberDuck.Context.Scorer do
   @doc """
   Suggests improvements for a context based on its scores.
   """
-  def suggest_improvements(_context, query, score_result) do
+  def suggest_improvements(_context, _query, score_result) do
     suggestions = []
 
     # Check each metric

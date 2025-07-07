@@ -118,7 +118,7 @@ defmodule RubberDuck.Engines.Generation.RagContext do
   - Language idioms
   """
   @spec build_context(String.t(), atom(), map()) :: map()
-  def build_context(query, language, sources) do
+  def build_context(query, _language, sources) do
     # Aggregate all context items
     all_items = []
 
@@ -189,7 +189,7 @@ defmodule RubberDuck.Engines.Generation.RagContext do
     |> Enum.frequencies()
   end
 
-  defp search_project_files(query_embedding, language, options) do
+  defp search_project_files(_query_embedding, _language, _options) do
     # In a real implementation, this would search actual project files
     # For now, return mock results
     [

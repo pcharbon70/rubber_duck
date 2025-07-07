@@ -238,7 +238,7 @@ defmodule RubberDuck.LLM.Service do
         request = Map.put(request, :stream_callback, callback)
 
         # For now, use mock provider for streaming
-        provider_name = if request.model == "mock-fast", do: :mock, else: request.provider
+        _provider_name = if request.model == "mock-fast", do: :mock, else: request.provider
 
         case get_provider_for_request(request, state) do
           {:ok, provider_name, provider_state} ->
@@ -507,7 +507,7 @@ defmodule RubberDuck.LLM.Service do
     end
   end
 
-  defp execute_request(request, provider_state, state) do
+  defp execute_request(request, provider_state, _state) do
     adapter = provider_state.config.adapter
 
     try do
@@ -525,7 +525,7 @@ defmodule RubberDuck.LLM.Service do
       {:ok, response} ->
         {:ok, response}
 
-      {:error, reason} when attempt < config.max_retries ->
+      {:error, _reason} when attempt < config.max_retries ->
         # Exponential backoff
         delay = (:math.pow(2, attempt) * 1000) |> round()
         Process.sleep(delay)
@@ -727,7 +727,7 @@ defmodule RubberDuck.LLM.Service do
     end
   end
 
-  defp simulate_mock_streaming(request, callback) do
+  defp simulate_mock_streaming(_request, callback) do
     # Simulate streaming response for mock provider
     messages = [
       "This ",

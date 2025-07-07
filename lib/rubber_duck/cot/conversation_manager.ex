@@ -139,7 +139,7 @@ defmodule RubberDuck.CoT.ConversationManager do
     |> List.first()
   end
 
-  defp execute_reasoning_chain(session, chain_config, state) do
+  defp execute_reasoning_chain(session, chain_config, _state) do
     # Check cache first
     cache_key = generate_cache_key(session.query, chain_config)
 
@@ -193,7 +193,7 @@ defmodule RubberDuck.CoT.ConversationManager do
   end
 
   defp check_cache(key, chain_config) do
-    ttl = Map.get(chain_config, :cache_ttl, 900)
+    _ttl = Map.get(chain_config, :cache_ttl, 900)
 
     case :ets.lookup(:cot_cache, key) do
       [{^key, result, expiry}] ->

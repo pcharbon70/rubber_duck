@@ -85,7 +85,7 @@ defmodule RubberDuck.Context.Manager do
   @doc """
   Invalidates cached contexts for a user or session.
   """
-  def invalidate_cache(%{user_id: user_id} = pattern) do
+  def invalidate_cache(%{user_id: _user_id} = pattern) do
     Cache.invalidate_pattern(pattern)
   end
 

@@ -405,7 +405,7 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
     |> Enum.filter(& &1)
   end
 
-  defp generate_correction_for_logic_issue(content, issue, _type, _context) do
+  defp generate_correction_for_logic_issue(_content, issue, _type, _context) do
     case issue.type do
       :impossible_condition ->
         correction(
@@ -449,7 +449,7 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
     end
   end
 
-  defp calculate_logic_confidence(issues, evaluation) do
+  defp calculate_logic_confidence(issues, _evaluation) do
     # Base confidence on issue severity
     base_score = 1.0
 
