@@ -787,7 +787,7 @@ Create tests in `test/rubber_duck/workflows/foundation_test.exs` to verify:
 
 ### 4.2 AST Parser Implementation
 
-Build language-specific AST parsers for deep code analysis. Start with Elixir and expand to other languages.
+Build language-specific AST parsers for deep code analysis. Start with Elixir and JavaScript/TypeScript.
 
 #### Tasks:
 - [ ] 4.2.1 Create `RubberDuck.Analysis.AST` module
@@ -800,33 +800,29 @@ Build language-specific AST parsers for deep code analysis. Start with Elixir an
   - [ ] 4.2.3.1 Use tree-sitter bindings
   - [ ] 4.2.3.2 Parse ES6+ syntax
   - [ ] 4.2.3.3 Handle JSX/TSX
-- [ ] 4.2.4 Create Python parser:
-  - [ ] 4.2.4.1 Parse classes and functions
-  - [ ] 4.2.4.2 Extract type hints
-  - [ ] 4.2.4.3 Handle decorators
-- [ ] 4.2.5 Implement AST traversal utilities
-- [ ] 4.2.6 Add AST diffing capabilities
-- [ ] 4.2.7 Create AST to code generation
-- [ ] 4.2.8 Build AST pattern matching
+- [ ] 4.2.4 Implement AST traversal utilities
+- [ ] 4.2.5 Add AST diffing capabilities
+- [ ] 4.2.6 Create AST to code generation
+- [ ] 4.2.7 Build AST pattern matching
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/analysis/ast_test.exs` to verify:
 
 **Elixir Parser Tests**:
-- [ ] 4.2.9 Test module structure parsing
-- [ ] 4.2.10 Test function extraction with arity
-- [ ] 4.2.11 Test macro identification
-- [ ] 4.2.12 Test call graph building
-- [ ] 4.2.13 Test type spec extraction
-- [ ] 4.2.14 Test dependency detection
+- [ ] 4.2.8 Test module structure parsing
+- [ ] 4.2.9 Test function extraction with arity
+- [ ] 4.2.10 Test macro identification
+- [ ] 4.2.11 Test call graph building
+- [ ] 4.2.12 Test type spec extraction
+- [ ] 4.2.13 Test dependency detection
 
 **JavaScript Parser Tests**:
-- [ ] 4.2.15 Test ES6 class parsing
-- [ ] 4.2.16 Test async function detection
-- [ ] 4.2.17 Test JSX element parsing
-- [ ] 4.2.18 Test import/export tracking
-- [ ] 4.2.19 Test method static detection
-- [ ] 4.2.20 Test arrow function parsing
+- [ ] 4.2.14 Test ES6 class parsing
+- [ ] 4.2.15 Test async function detection
+- [ ] 4.2.16 Test JSX element parsing
+- [ ] 4.2.17 Test import/export tracking
+- [ ] 4.2.18 Test method static detection
+- [ ] 4.2.19 Test arrow function parsing
 
 ### 4.3 Code Analysis Engines
 
