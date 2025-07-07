@@ -95,11 +95,9 @@ defmodule RubberDuck.Analysis.Style do
 
   # Naming convention analysis
   defp analyze_naming_conventions(ast_info, config) do
-    if !config.check_naming_conventions do
-      []
-    else
+    if config.check_naming_conventions do
       # Check module naming
-      module_issues = 
+      module_issues =
         if ast_info.name && !Common.valid_module_name?(ast_info.name) do
           [
             Engine.create_issue(
@@ -117,58 +115,59 @@ defmodule RubberDuck.Analysis.Style do
         end
 
       # Check function naming
-      function_issues = Enum.flat_map(ast_info.functions, fn func ->
-        name_issues = 
-          unless Common.valid_function_name?(func.name) do
-            [
-              Engine.create_issue(
-                :invalid_function_name,
-                :low,
-                "Function name '#{func.name}' does not follow snake_case convention",
-                %{file: "", line: func.line, column: nil, end_line: nil, end_column: nil},
-                "style/invalid_function_name",
-                :style,
-                %{function_name: func.name}
-              )
-            ]
-          else
-            []
-          end
+      function_issues =
+        Enum.flat_map(ast_info.functions, fn func ->
+          name_issues =
+            if Common.valid_function_name?(func.name) do
+              []
+            else
+              [
+                Engine.create_issue(
+                  :invalid_function_name,
+                  :low,
+                  "Function name '#{func.name}' does not follow snake_case convention",
+                  %{file: "", line: func.line, column: nil, end_line: nil, end_column: nil},
+                  "style/invalid_function_name",
+                  :style,
+                  %{function_name: func.name}
+                )
+              ]
+            end
 
-        length_issues = 
-          if String.length(Atom.to_string(func.name)) > config.max_function_name_length do
-            [
-              Engine.create_issue(
-                :long_function_name,
-                :info,
-                "Function name '#{func.name}' is too long",
-                %{file: "", line: func.line, column: nil, end_line: nil, end_column: nil},
-                "style/long_function_name",
-                :style,
-                %{function_name: func.name, length: String.length(Atom.to_string(func.name))}
-              )
-            ]
-          else
-            []
-          end
+          length_issues =
+            if String.length(Atom.to_string(func.name)) > config.max_function_name_length do
+              [
+                Engine.create_issue(
+                  :long_function_name,
+                  :info,
+                  "Function name '#{func.name}' is too long",
+                  %{file: "", line: func.line, column: nil, end_line: nil, end_column: nil},
+                  "style/long_function_name",
+                  :style,
+                  %{function_name: func.name, length: String.length(Atom.to_string(func.name))}
+                )
+              ]
+            else
+              []
+            end
 
-        name_issues ++ length_issues
-      end)
+          name_issues ++ length_issues
+        end)
 
       module_issues ++ function_issues
+    else
+      []
     end
   end
 
   # Elixir-specific code smell detection
   defp analyze_elixir_code_smells(ast_info, config) do
-    if !config.check_code_smells do
-      []
-    else
+    if config.check_code_smells do
       # Check for GenServer envy (using Task/Agent inappropriately)
       # This requires deeper analysis of the actual function implementations
 
       # Check for primitive obsession
-      primitive_obsession_issues = 
+      primitive_obsession_issues =
         if config.detect_primitive_obsession do
           detect_primitive_obsession(ast_info)
         else
@@ -176,7 +175,7 @@ defmodule RubberDuck.Analysis.Style do
         end
 
       # Check for complex branching patterns
-      complex_branching_issues = 
+      complex_branching_issues =
         if config.detect_complex_branching do
           detect_complex_branching(ast_info)
         else
@@ -187,6 +186,8 @@ defmodule RubberDuck.Analysis.Style do
       large_message_issues = detect_large_messages(ast_info)
 
       primitive_obsession_issues ++ complex_branching_issues ++ large_message_issues
+    else
+      []
     end
   end
 
@@ -345,11 +346,11 @@ defmodule RubberDuck.Analysis.Style do
       |> Enum.uniq()
       |> length()
 
-    case unique_modules do
-      0..5 -> 100.0
-      6..10 -> 80.0
-      11..15 -> 60.0
-      _ -> 40.0
+    cond do
+      unique_modules in 0..5 -> 100.0
+      unique_modules in 6..10 -> 80.0
+      unique_modules in 11..15 -> 60.0
+      true -> 40.0
     end
   end
 
@@ -459,4 +460,3 @@ defmodule RubberDuck.Analysis.Style do
     end)
   end
 end
-

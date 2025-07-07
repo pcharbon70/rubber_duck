@@ -241,24 +241,14 @@ defmodule RubberDuck.Enhancement.Coordinator do
     # Apply Chain-of-Thought reasoning
     # For now, using a simplified approach since we need a chain module
     # In production, this would select or generate appropriate chain
-    case apply_cot_reasoning(data.content, config) do
-      {:ok, result} ->
-        %{data | content: result.output, context: Map.put(data.context, :cot_chain, result.chain)}
-
-      {:error, _reason} ->
-        data
-    end
+    {:ok, result} = apply_cot_reasoning(data.content, config)
+    %{data | content: result.output, context: Map.put(data.context, :cot_chain, result.chain)}
   end
 
   defp apply_technique({:rag, config}, data, _opts) do
     # Apply RAG enhancement
-    case apply_rag_enhancement(data.content, data.context, config) do
-      {:ok, enhanced} ->
-        %{data | content: enhanced.content, context: Map.put(data.context, :rag_sources, enhanced.sources)}
-
-      {:error, _reason} ->
-        data
-    end
+    {:ok, enhanced} = apply_rag_enhancement(data.content, data.context, config)
+    %{data | content: enhanced.content, context: Map.put(data.context, :rag_sources, enhanced.sources)}
   end
 
   defp apply_technique({:self_correction, config}, data, opts) do

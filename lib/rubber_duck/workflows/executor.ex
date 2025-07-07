@@ -239,8 +239,8 @@ defmodule RubberDuck.Workflows.Executor do
       # Get workflow steps
       steps = workflow_module.steps()
 
-      # Build Reactor
-      reactor = Reactor.new(steps)
+      # Build Reactor using Builder API
+      reactor = build_reactor(steps, input)
 
       # Check cache if enabled
       result =
@@ -315,4 +315,46 @@ defmodule RubberDuck.Workflows.Executor do
 
   defp get_status_from_result({:ok, _}), do: :completed
   defp get_status_from_result({:error, _}), do: :failed
+
+  # Build a reactor using the correct Builder API
+  defp build_reactor(steps, input) do
+    # Start with empty reactor
+    reactor = Reactor.Builder.new()
+
+    # Add input arguments if provided
+    reactor = 
+      if is_map(input) do
+        Enum.reduce(input, reactor, fn {key, _value}, acc ->
+          case Reactor.Builder.add_input(acc, key) do
+            {:ok, updated_reactor} -> updated_reactor
+            {:error, _} -> acc  # Skip invalid inputs
+          end
+        end)
+      else
+        case Reactor.Builder.add_input(reactor, :input) do
+          {:ok, updated_reactor} -> updated_reactor
+          {:error, _} -> reactor
+        end
+      end
+
+    # Add steps to the reactor
+    reactor = 
+      Enum.reduce(steps, reactor, fn step, acc ->
+        case Reactor.Builder.add_step(acc, step.name, step.impl, step.arguments || []) do
+          {:ok, updated_reactor} -> updated_reactor
+          {:error, _} -> acc  # Skip invalid steps
+        end
+      end)
+
+    # Set return value to the last step if steps exist
+    if length(steps) > 0 do
+      last_step = List.last(steps)
+      case Reactor.Builder.return(reactor, last_step.name) do
+        {:ok, final_reactor} -> final_reactor
+        {:error, _} -> reactor
+      end
+    else
+      reactor
+    end
+  end
 end
