@@ -478,5 +478,4 @@ defmodule RubberDuck.SelfCorrection.Strategies.Syntax do
 
   # Assume valid for other languages
   defp valid_syntax?(_content, _language), do: true
-
 end

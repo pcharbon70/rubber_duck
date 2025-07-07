@@ -9,9 +9,7 @@ defmodule RubberDuck.CoT.ConversationManager do
   use GenServer
   require Logger
 
-  alias RubberDuck.Context
-  alias RubberDuck.LLM.Service, as: LLMService
-  alias RubberDuck.CoT.{Executor, Validator, Templates, Formatter}
+  alias RubberDuck.CoT.{Executor, Validator, Formatter}
 
   @default_timeout 30_000
 

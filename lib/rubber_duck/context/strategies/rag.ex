@@ -12,7 +12,6 @@ defmodule RubberDuck.Context.Strategies.RAG do
   alias RubberDuck.Embeddings
 
   @default_retrieval_limit 10
-  @min_similarity_score 0.7
 
   @impl true
   def name(), do: :rag
@@ -193,37 +192,41 @@ defmodule RubberDuck.Context.Strategies.RAG do
     sections = []
 
     # Add recent context if available
-    sections1 = if recent_context != "" do
-      [{:recent, "## Recent Context\n#{recent_context}\n"} | sections]
-    else
-      sections
-    end
+    sections1 =
+      if recent_context != "" do
+        [{:recent, "## Recent Context\n#{recent_context}\n"} | sections]
+      else
+        sections
+      end
 
     # Add retrieved content by type
     code_patterns = Enum.filter(retrieved_content, &(&1.type == :code_pattern))
     knowledge_items = Enum.filter(retrieved_content, &(&1.type == :knowledge))
     summaries = Enum.filter(retrieved_content, &(&1.type == :summary))
 
-    sections2 = if length(code_patterns) > 0 do
-      pattern_text = format_code_patterns_section(code_patterns)
-      [{:patterns, pattern_text} | sections1]
-    else
-      sections1
-    end
+    sections2 =
+      if length(code_patterns) > 0 do
+        pattern_text = format_code_patterns_section(code_patterns)
+        [{:patterns, pattern_text} | sections1]
+      else
+        sections1
+      end
 
-    sections3 = if length(knowledge_items) > 0 do
-      knowledge_text = format_knowledge_section(knowledge_items)
-      [{:knowledge, knowledge_text} | sections2]
-    else
-      sections2
-    end
+    sections3 =
+      if length(knowledge_items) > 0 do
+        knowledge_text = format_knowledge_section(knowledge_items)
+        [{:knowledge, knowledge_text} | sections2]
+      else
+        sections2
+      end
 
-    sections4 = if length(summaries) > 0 do
-      summary_text = format_summaries_section(summaries)
-      [{:summaries, summary_text} | sections3]
-    else
-      sections3
-    end
+    sections4 =
+      if length(summaries) > 0 do
+        summary_text = format_summaries_section(summaries)
+        [{:summaries, summary_text} | sections3]
+      else
+        sections3
+      end
 
     # Add query
     sections5 = [{:query, "## Query\n#{query}\n"} | sections4]

@@ -65,7 +65,7 @@ defmodule RubberDuck.Context.Optimizer do
   Counts tokens in text more accurately using the model's tokenizer.
   Falls back to approximation if exact counting fails.
   """
-  def count_tokens(text, model \\ "gpt-3.5-turbo") do
+  def count_tokens(text, _model \\ "gpt-3.5-turbo") do
     # TODO: Integrate with tiktoken or model-specific tokenizers
     # For now, use approximation
     estimate_tokens(text)
@@ -167,7 +167,7 @@ defmodule RubberDuck.Context.Optimizer do
     end
   end
 
-  defp optimize_rag_content(content, sources, available_tokens) do
+  defp optimize_rag_content(content, _sources, available_tokens) do
     # For RAG, identify sections and prioritize
     sections = parse_sections(content)
 

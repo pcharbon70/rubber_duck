@@ -59,7 +59,7 @@ defmodule RubberDuck.CoT.Validator do
 
   # Private validation functions
 
-  defp validate_completeness(result, session) do
+  defp validate_completeness(_result, session) do
     # Check that all required steps were executed
     expected_steps = get_expected_steps(session)
     executed_steps = Enum.map(session.steps, & &1.name)
@@ -73,7 +73,7 @@ defmodule RubberDuck.CoT.Validator do
     end
   end
 
-  defp validate_consistency(result, session) do
+  defp validate_consistency(_result, session) do
     # Check for contradictions between steps
     contradictions = find_contradictions(session.steps)
 
@@ -84,7 +84,7 @@ defmodule RubberDuck.CoT.Validator do
     end
   end
 
-  defp validate_logical_flow(result, session) do
+  defp validate_logical_flow(_result, session) do
     # Check that reasoning follows logically from step to step
     flow_issues = check_logical_flow(session.steps)
 
@@ -168,7 +168,7 @@ defmodule RubberDuck.CoT.Validator do
 
   # Helper functions
 
-  defp get_expected_steps(session) do
+  defp get_expected_steps(_session) do
     # In a real implementation, this would get the expected steps
     # from the chain configuration
     [:understand, :analyze, :solve]
@@ -176,7 +176,6 @@ defmodule RubberDuck.CoT.Validator do
 
   defp find_contradictions(steps) do
     # Simple contradiction detection
-    contradictions = []
 
     # Check for conflicting statements
     for {step1, idx1} <- Enum.with_index(steps),
@@ -214,7 +213,6 @@ defmodule RubberDuck.CoT.Validator do
 
   defp check_logical_flow(steps) do
     # Check that each step builds on previous ones
-    issues = []
 
     for {step, idx} <- Enum.with_index(steps), idx > 0 do
       prev_step = Enum.at(steps, idx - 1)

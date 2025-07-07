@@ -8,10 +8,7 @@ defmodule RubberDuck.Embeddings.Service do
   use GenServer
   require Logger
 
-  alias RubberDuck.LLM.Service, as: LLMService
-
   @default_model "text-embedding-ada-002"
-  @batch_size 100
   @cache_ttl_hours 24
 
   # Client API

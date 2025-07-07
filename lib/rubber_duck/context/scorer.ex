@@ -52,7 +52,7 @@ defmodule RubberDuck.Context.Scorer do
   @doc """
   Suggests improvements for a context based on its scores.
   """
-  def suggest_improvements(context, query, score_result) do
+  def suggest_improvements(_context, query, score_result) do
     suggestions = []
 
     # Check each metric
@@ -244,17 +244,19 @@ defmodule RubberDuck.Context.Scorer do
       end
 
     # Technical aspects
-    aspects1 = if String.contains?(query, ["implement", "create", "build"]) do
-      Map.put(aspects, :implementation, true)
-    else
-      aspects
-    end
+    aspects1 =
+      if String.contains?(query, ["implement", "create", "build"]) do
+        Map.put(aspects, :implementation, true)
+      else
+        aspects
+      end
 
-    aspects2 = if String.contains?(query, ["error", "bug", "issue", "problem"]) do
-      Map.put(aspects1, :troubleshooting, true)
-    else
-      aspects1
-    end
+    aspects2 =
+      if String.contains?(query, ["error", "bug", "issue", "problem"]) do
+        Map.put(aspects1, :troubleshooting, true)
+      else
+        aspects1
+      end
 
     if String.contains?(query, ["performance", "optimize", "speed"]) do
       Map.put(aspects2, :performance, true)

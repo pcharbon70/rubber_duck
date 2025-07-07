@@ -596,22 +596,20 @@ defimpl RubberDuck.Enhancer, for: List do
 
   defp extract_temporal_elements(list) do
     # Try to extract DateTime or date-like elements
-    Enum.filter_map(
-      list,
-      fn elem ->
-        case elem do
-          %DateTime{} -> true
-          s when is_binary(s) -> String.match?(s, ~r/\d{4}-\d{2}-\d{2}/)
-          _ -> false
-        end
-      end,
-      fn elem ->
-        case elem do
-          %DateTime{} = dt -> dt
-          s when is_binary(s) -> parse_date_string(s)
-        end
+    list
+    |> Enum.filter(fn elem ->
+      case elem do
+        %DateTime{} -> true
+        s when is_binary(s) -> String.match?(s, ~r/\d{4}-\d{2}-\d{2}/)
+        _ -> false
       end
-    )
+    end)
+    |> Enum.map(fn elem ->
+      case elem do
+        %DateTime{} = dt -> dt
+        s when is_binary(s) -> parse_date_string(s)
+      end
+    end)
   end
 
   defp parse_date_string(s) do

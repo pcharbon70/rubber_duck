@@ -7,7 +7,6 @@ defmodule RubberDuck.CoT.Executor do
 
   require Logger
 
-  alias RubberDuck.Context
   alias RubberDuck.LLM.Service, as: LLMService
   alias RubberDuck.CoT.Templates
 

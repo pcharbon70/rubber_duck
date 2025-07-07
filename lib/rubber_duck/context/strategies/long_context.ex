@@ -176,53 +176,58 @@ defmodule RubberDuck.Context.Strategies.LongContext do
     sections = []
 
     # System context
-    sections1 = if user_profile do
-      [
-        {:system, format_system_context(user_profile), :high} | sections
-      ]
-    else
-      sections
-    end
+    sections1 =
+      if user_profile do
+        [
+          {:system, format_system_context(user_profile), :high} | sections
+        ]
+      else
+        sections
+      end
 
     # Conversation history
-    sections2 = if length(history) > 0 do
-      [
-        {:history, format_conversation_history(history), :high} | sections1
-      ]
-    else
-      sections1
-    end
+    sections2 =
+      if length(history) > 0 do
+        [
+          {:history, format_conversation_history(history), :high} | sections1
+        ]
+      else
+        sections1
+      end
 
     # Project knowledge
-    sections3 = if length(project_context.knowledge) > 0 do
-      [
-        {:knowledge, format_project_knowledge(project_context.knowledge), :medium} | sections2
-      ]
-    else
-      sections2
-    end
+    sections3 =
+      if length(project_context.knowledge) > 0 do
+        [
+          {:knowledge, format_project_knowledge(project_context.knowledge), :medium} | sections2
+        ]
+      else
+        sections2
+      end
 
     # Code patterns
-    sections4 = if length(project_context.patterns) > 0 do
-      [
-        {:patterns, format_code_patterns(project_context.patterns), :medium} | sections3
-      ]
-    else
-      sections3
-    end
+    sections4 =
+      if length(project_context.patterns) > 0 do
+        [
+          {:patterns, format_code_patterns(project_context.patterns), :medium} | sections3
+        ]
+      else
+        sections3
+      end
 
     # File contents
-    sections5 = if length(files) > 0 do
-      file_sections =
-        files
-        |> Enum.map(fn file ->
-          {:file, format_file_content(file), :high}
-        end)
+    sections5 =
+      if length(files) > 0 do
+        file_sections =
+          files
+          |> Enum.map(fn file ->
+            {:file, format_file_content(file), :high}
+          end)
 
-      file_sections ++ sections4
-    else
-      sections4
-    end
+        file_sections ++ sections4
+      else
+        sections4
+      end
 
     # Query (always included)
     sections6 = [{:query, format_query(query), :critical} | sections5]
@@ -371,23 +376,26 @@ defmodule RubberDuck.Context.Strategies.LongContext do
   defp build_sources(history, project_context, files) do
     sources = []
 
-    sources1 = if length(history) > 0 do
-      [%{type: :conversation_history, count: length(history)} | sources]
-    else
-      sources
-    end
+    sources1 =
+      if length(history) > 0 do
+        [%{type: :conversation_history, count: length(history)} | sources]
+      else
+        sources
+      end
 
-    sources2 = if length(project_context.knowledge) > 0 do
-      [%{type: :project_knowledge, count: length(project_context.knowledge)} | sources1]
-    else
-      sources1
-    end
+    sources2 =
+      if length(project_context.knowledge) > 0 do
+        [%{type: :project_knowledge, count: length(project_context.knowledge)} | sources1]
+      else
+        sources1
+      end
 
-    sources3 = if length(project_context.patterns) > 0 do
-      [%{type: :code_patterns, count: length(project_context.patterns)} | sources2]
-    else
-      sources2
-    end
+    sources3 =
+      if length(project_context.patterns) > 0 do
+        [%{type: :code_patterns, count: length(project_context.patterns)} | sources2]
+      else
+        sources2
+      end
 
     if length(files) > 0 do
       [%{type: :files, paths: Enum.map(files, & &1.path)} | sources3]

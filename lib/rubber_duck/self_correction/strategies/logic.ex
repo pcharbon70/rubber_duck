@@ -132,14 +132,15 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
     issues = []
 
     # Check for infinite loops
-    issues1 = if Regex.match?(~r/def.*do\s*\w+\(\)/s, content) do
-      # Simple recursive call without base case
-      [
-        issue(:possible_infinite_recursion, :warning, "Recursive function may lack proper base case", %{}) | issues
-      ]
-    else
-      issues
-    end
+    issues1 =
+      if Regex.match?(~r/def.*do\s*\w+\(\)/s, content) do
+        # Simple recursive call without base case
+        [
+          issue(:possible_infinite_recursion, :warning, "Recursive function may lack proper base case", %{}) | issues
+        ]
+      else
+        issues
+      end
 
     # Check for unreachable case clauses
     case_blocks = Regex.scan(~r/case.*do(.*?)end/s, content)
@@ -185,11 +186,12 @@ defmodule RubberDuck.SelfCorrection.Strategies.Logic do
       end
 
     # Check for impossible conditions
-    issues1 = if Regex.match?(~r/(\w+)\s*&&\s*!\1/, content) do
-      [issue(:impossible_condition, :error, "Condition can never be true (x && !x)", %{}) | issues]
-    else
-      issues
-    end
+    issues1 =
+      if Regex.match?(~r/(\w+)\s*&&\s*!\1/, content) do
+        [issue(:impossible_condition, :error, "Condition can never be true (x && !x)", %{}) | issues]
+      else
+        issues
+      end
 
     # Check for always-true conditions
     if Regex.match?(~r/(\w+)\s*\|\|\s*!\1/, content) do

@@ -12,7 +12,6 @@ defmodule RubberDuck.Context.Strategies.FIM do
 
   @default_prefix_tokens 1500
   @default_suffix_tokens 500
-  @fim_tokens ~w(<fim_prefix> <fim_suffix> <fim_middle>)
 
   @impl true
   def name(), do: :fim
@@ -21,7 +20,7 @@ defmodule RubberDuck.Context.Strategies.FIM do
   def supported_query_types(), do: [:completion, :code_completion]
 
   @impl true
-  def build(query, opts) do
+  def build(_query, opts) do
     user_id = Keyword.get(opts, :user_id)
     session_id = Keyword.get(opts, :session_id)
     max_tokens = Keyword.get(opts, :max_tokens, 4000)
@@ -135,11 +134,12 @@ defmodule RubberDuck.Context.Strategies.FIM do
     parts = []
 
     # Add recent context if available
-    parts1 = if recent_context != "" do
-      ["# Recent context:\n#{recent_context}\n\n" | parts]
-    else
-      parts
-    end
+    parts1 =
+      if recent_context != "" do
+        ["# Recent context:\n#{recent_context}\n\n" | parts]
+      else
+        parts
+      end
 
     # Add FIM markers
     parts2 =

@@ -209,7 +209,7 @@ defmodule RubberDuck.LLM.Providers.OpenAI do
     base <> endpoint
   end
 
-  defp parse_response(response_body, request) do
+  defp parse_response(response_body, _request) do
     case Jason.decode(response_body) do
       {:ok, decoded} ->
         response = Response.from_provider(:openai, decoded)

@@ -9,7 +9,6 @@ defmodule RubberDuck.Context.AdaptiveSelector do
   require Logger
 
   alias RubberDuck.Context.Strategies.{FIM, RAG, LongContext}
-  alias RubberDuck.Context.Scorer
 
   @strategies [FIM, RAG, LongContext]
   @learning_rate 0.1
@@ -300,7 +299,7 @@ defmodule RubberDuck.Context.AdaptiveSelector do
     %{state | performance_history: Map.put(state.performance_history, key, updated)}
   end
 
-  defp adjust_weights(state, features, strategy, score) do
+  defp adjust_weights(state, features, _strategy, score) do
     # Simple gradient update based on performance
     # Target performance
     performance_delta = score - 0.7

@@ -39,9 +39,6 @@ defmodule RubberDuck.Engines.Generation do
 
   require Logger
 
-  alias RubberDuck.Processor
-  alias RubberDuck.Enhancer
-
   # Default configuration
   @default_max_context_items 10
   @default_similarity_threshold 0.7
