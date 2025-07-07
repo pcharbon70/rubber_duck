@@ -34,4 +34,3 @@ defmodule RubberDuck.Analysis.AST.Parser do
 
   @optional_callbacks parse: 2
 end
-
