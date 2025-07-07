@@ -111,19 +111,14 @@ defmodule RubberDuck.Embeddings.Service do
     # Generate embeddings for uncached texts
     new_embeddings =
       if length(uncached) > 0 do
-        case generate_batch_embeddings(uncached, model, state) do
-          {:ok, embeddings} ->
-            # Cache the new embeddings
-            Enum.zip(uncached, embeddings)
-            |> Enum.each(fn {text, embedding} ->
-              cache_embedding(text, model, embedding)
-            end)
+        {:ok, embeddings} = generate_batch_embeddings(uncached, model, state)
+        # Cache the new embeddings
+        Enum.zip(uncached, embeddings)
+        |> Enum.each(fn {text, embedding} ->
+          cache_embedding(text, model, embedding)
+        end)
 
-            embeddings
-
-          {:error, _} ->
-            []
-        end
+        embeddings
       else
         []
       end

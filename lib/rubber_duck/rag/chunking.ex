@@ -91,7 +91,7 @@ defmodule RubberDuck.RAG.Chunking do
   Splits on natural boundaries like paragraphs, sentences, or sections.
   """
   @spec semantic_chunks(String.t(), map(), keyword()) :: [chunk()]
-  def semantic_chunks(content, metadata \\ %{}, opts \\ []) do
+  def semantic_chunks(content, _metadata \\ %{}, opts \\ []) do
     max_chunk_size = Keyword.get(opts, :max_chunk_size, @default_chunk_size * 2)
 
     # Split by paragraphs first

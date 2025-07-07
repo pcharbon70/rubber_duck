@@ -157,15 +157,9 @@ defmodule RubberDuck.PluginManager do
         {:reply, {:error, :already_started}, state}
 
       plugin_info ->
-        case start_plugin_process(plugin_info) do
-          {:ok, updated_info} ->
-            new_plugins = Map.put(state.plugins, plugin_name, updated_info)
-            {:reply, :ok, %{state | plugins: new_plugins}}
-
-          {:error, reason} = error ->
-            Logger.error("Failed to start plugin #{plugin_name}: #{inspect(reason)}")
-            {:reply, error, state}
-        end
+        {:ok, updated_info} = start_plugin_process(plugin_info)
+        new_plugins = Map.put(state.plugins, plugin_name, updated_info)
+        {:reply, :ok, %{state | plugins: new_plugins}}
     end
   end
 

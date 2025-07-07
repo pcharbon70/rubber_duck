@@ -71,9 +71,6 @@ defmodule RubberDuck.Enhancement.PipelineBuilder do
       Enum.empty?(pipeline) ->
         {:error, "Pipeline cannot be empty"}
 
-      has_circular_dependencies?(pipeline) ->
-        {:error, "Pipeline contains circular dependencies"}
-
       exceeds_resource_limits?(pipeline) ->
         {:error, "Pipeline exceeds resource limits"}
 
@@ -232,20 +229,16 @@ defmodule RubberDuck.Enhancement.PipelineBuilder do
     }
 
     Enum.sort_by(pipeline, fn
-      {technique, _} -> Map.get(priority_map, technique, 99)
       # Parallel steps go between RAG and CoT
       {:parallel, _} -> 1.5
       # Conditionals after main processing
       {:conditional, _, _, _} -> 2.5
+      # Regular technique steps
+      {technique, _} -> Map.get(priority_map, technique, 99)
       _ -> 99
     end)
   end
 
-  defp has_circular_dependencies?(_pipeline) do
-    # In this simplified version, we don't have explicit dependencies
-    # In production, check for circular references in conditional branches
-    false
-  end
 
   defp exceeds_resource_limits?(pipeline) do
     max_steps = 10
