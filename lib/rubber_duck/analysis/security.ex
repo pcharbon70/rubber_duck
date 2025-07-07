@@ -535,4 +535,3 @@ defmodule RubberDuck.Analysis.Security do
 
   defp suggest_security_fixes(_, _), do: []
 end
-

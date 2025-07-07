@@ -108,7 +108,7 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
       options = arguments[:options] || %{}
 
       # Validate files exist and are readable
-      validated_files = 
+      validated_files =
         files
         |> Enum.filter(&File.exists?/1)
         |> Enum.filter(&File.regular?/1)
@@ -142,7 +142,7 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
       %{files: files} = arguments[:files]
 
       # Read files and detect language
-      file_data = 
+      file_data =
         files
         |> Enum.map(&read_file_with_metadata/1)
         |> Enum.filter(fn
@@ -161,14 +161,15 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
     defp read_file_with_metadata(file_path) do
       case File.read(file_path) do
         {:ok, content} ->
-          {:ok, %{
-            path: file_path,
-            content: content,
-            language: detect_language(file_path),
-            size: byte_size(content),
-            hash: :crypto.hash(:sha256, content) |> Base.encode16()
-          }}
-        
+          {:ok,
+           %{
+             path: file_path,
+             content: content,
+             language: detect_language(file_path),
+             size: byte_size(content),
+             hash: :crypto.hash(:sha256, content) |> Base.encode16()
+           }}
+
         {:error, reason} ->
           {:error, {file_path, reason}}
       end
@@ -195,7 +196,7 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
       file_data = arguments[:file_data] || []
 
       # Parse AST for each file
-      ast_results = 
+      ast_results =
         file_data
         |> Enum.map(&parse_file_ast/1)
 
@@ -203,10 +204,11 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
     end
 
     defp parse_file_ast(%{content: content, language: language, path: _path} = file_data) do
-      ast_result = 
+      ast_result =
         case AST.parse(content, language) do
-          {:ok, ast_info} -> 
+          {:ok, ast_info} ->
             {:ok, ast_info}
+
           {:error, _reason} ->
             # Fall back to source analysis
             {:source_only, nil}
@@ -226,7 +228,7 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
       %{options: options} = arguments[:options]
 
       # Run analysis for each file
-      analysis_results = 
+      analysis_results =
         ast_data
         |> run_analysis_batch(options)
 
@@ -242,13 +244,18 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
       end)
     end
 
-    defp analyze_file(%{ast_result: {:ok, _ast_info}, path: path, content: content, language: language} = file_data, options) do
+    defp analyze_file(
+           %{ast_result: {:ok, _ast_info}, path: path, content: content, language: language} = file_data,
+           options
+         ) do
       # Use the public API for analysis
       case Analyzer.analyze_source(content, language,
-                                  engines: options.engines,
-                                  config: options.engine_config) do
+             engines: options.engines,
+             config: options.engine_config
+           ) do
         {:ok, results} ->
           {:ok, Map.put(file_data, :analysis_results, results)}
+
         {:error, reason} ->
           {:error, {path, reason}}
       end
@@ -257,10 +264,12 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
     defp analyze_file(%{content: content, language: language, path: path} = file_data, options) do
       # Use source-based analysis
       case Analyzer.analyze_source(content, language,
-                                  engines: options.engines,
-                                  config: options.engine_config) do
+             engines: options.engines,
+             config: options.engine_config
+           ) do
         {:ok, results} ->
           {:ok, Map.put(file_data, :analysis_results, results)}
+
         {:error, reason} ->
           {:error, {path, reason}}
       end
@@ -270,7 +279,7 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
       successful = Enum.filter(results, &match?({:ok, _}, &1))
       failed = Enum.filter(results, &match?({:error, _}, &1))
 
-      all_issues = 
+      all_issues =
         successful
         |> Enum.flat_map(fn {:ok, %{analysis_results: results}} ->
           results.all_issues || []
@@ -294,19 +303,20 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
     @impl true
     def run(arguments, _context, _options) do
       %{options: %{include_llm_review: include_llm}} = arguments[:options]
-      
+
       if include_llm do
         analysis_results = arguments[:analysis_results]
         options = arguments[:options]
         file_data = arguments[:file_data]
 
         # Select high-priority issues for LLM review
-        high_priority_issues = 
+        high_priority_issues =
           analysis_results.all_issues
-          |> Enum.filter(fn issue -> 
+          |> Enum.filter(fn issue ->
             issue.severity in [:high, :critical]
           end)
-          |> Enum.take(10)  # Limit to avoid token limits
+          # Limit to avoid token limits
+          |> Enum.take(10)
 
         if Enum.empty?(high_priority_issues) do
           {:ok, %{insights: [], suggestions: []}}
@@ -321,19 +331,19 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
     defp request_llm_review(issues, file_data, options) do
       # Build context for LLM
       _context = build_llm_context(issues, file_data)
-      
+
       prompt = """
       You are a senior software engineer reviewing code analysis results.
-      
+
       The following issues were found in the codebase:
       #{format_issues_for_llm(issues)}
-      
+
       Please provide:
       1. Additional insights about these issues
       2. Prioritization recommendations
       3. Specific fix suggestions with code examples
       4. Any architectural concerns
-      
+
       Format your response as JSON with the following structure:
       {
         "insights": [...],
@@ -354,6 +364,7 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
       case LLMService.completion(completion_opts) do
         {:ok, response} ->
           parse_llm_response(response)
+
         {:error, _reason} ->
           # Fallback gracefully
           {:ok, %{insights: [], suggestions: []}}
@@ -385,16 +396,18 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
     defp parse_llm_response(response) do
       # Extract content from the Response struct
       content = RubberDuck.LLM.Response.get_content(response)
-      
+
       # Parse LLM response (assuming JSON format)
       case safe_json_decode(content) do
         {:ok, parsed} ->
-          {:ok, %{
-            insights: parsed["insights"] || [],
-            suggestions: parsed["fix_suggestions"] || [],
-            prioritization: parsed["prioritization"] || %{},
-            architectural_concerns: parsed["architectural_concerns"] || []
-          }}
+          {:ok,
+           %{
+             insights: parsed["insights"] || [],
+             suggestions: parsed["fix_suggestions"] || [],
+             prioritization: parsed["prioritization"] || %{},
+             architectural_concerns: parsed["architectural_concerns"] || []
+           }}
+
         {:error, _} ->
           {:ok, %{insights: [], suggestions: []}}
       end
@@ -404,12 +417,13 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
       # Simple JSON parsing - in production would use Jason
       try do
         # For now, just return a mock response
-        {:ok, %{
-          "insights" => ["Consider refactoring for better modularity"],
-          "fix_suggestions" => [],
-          "prioritization" => %{},
-          "architectural_concerns" => []
-        }}
+        {:ok,
+         %{
+           "insights" => ["Consider refactoring for better modularity"],
+           "fix_suggestions" => [],
+           "prioritization" => %{},
+           "architectural_concerns" => []
+         }}
       rescue
         _ -> {:error, :invalid_json}
       end
@@ -487,19 +501,20 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
 
     defp calculate_statistics(results) do
       %{
-        avg_issues_per_file: 
+        avg_issues_per_file:
           if results.successful_files > 0 do
             Float.round(length(results.all_issues) / results.successful_files, 2)
           else
             0.0
           end,
         most_common_issue_type: find_most_common_type(results.all_issues),
-        critical_issues_count: Enum.count(results.all_issues, & &1.severity == :critical),
-        high_issues_count: Enum.count(results.all_issues, & &1.severity == :high)
+        critical_issues_count: Enum.count(results.all_issues, &(&1.severity == :critical)),
+        high_issues_count: Enum.count(results.all_issues, &(&1.severity == :high))
       }
     end
 
     defp find_most_common_type([]), do: nil
+
     defp find_most_common_type(issues) do
       issues
       |> Enum.frequencies_by(& &1.type)
@@ -509,7 +524,7 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
 
     defp enhance_with_llm(analysis_results, llm_results) do
       # Add LLM suggestions to relevant issues
-      enhanced_issues = 
+      enhanced_issues =
         analysis_results.all_issues
         |> Enum.map(fn issue ->
           relevant_suggestions = find_relevant_suggestions(issue, llm_results.suggestions)
@@ -537,7 +552,7 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
       aggregated_results = arguments[:aggregated_results]
       %{options: %{report_format: format}} = arguments[:options]
 
-      report = 
+      report =
         case format do
           :json -> generate_json_report(aggregated_results)
           :markdown -> generate_markdown_report(aggregated_results)
@@ -591,7 +606,7 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
     defp generate_html_report(results) do
       # Simple HTML report - could be enhanced with templates
       markdown = generate_markdown_report(results)
-      
+
       """
       <!DOCTYPE html>
       <html>
@@ -677,7 +692,7 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
       ## AI-Powered Insights
 
       #{if length(llm_results.insights) > 0 do
-        llm_results.insights |> Enum.map(& "- #{&1}") |> Enum.join("\n")
+        llm_results.insights |> Enum.map(&"- #{&1}") |> Enum.join("\n")
       else
         "No additional insights available."
       end}
@@ -691,7 +706,7 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
   Analyze all Elixir files in a directory.
   """
   def analyze_directory(path, opts \\ []) do
-    files = 
+    files =
       Path.wildcard(Path.join(path, "**/*.{ex,exs}"))
       |> Enum.filter(&File.regular?/1)
 

@@ -183,4 +183,3 @@ defmodule RubberDuck.Analysis.AnalyzerTest do
     end
   end
 end
-

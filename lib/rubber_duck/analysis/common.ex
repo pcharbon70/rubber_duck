@@ -6,7 +6,6 @@ defmodule RubberDuck.Analysis.Common do
   and result formatting across all analysis engines.
   """
 
-
   # Severity levels from least to most severe
   @severities [:info, :low, :medium, :high, :critical]
 
@@ -283,4 +282,3 @@ defmodule RubberDuck.Analysis.Common do
 
   def potential_secret?(_), do: false
 end
-

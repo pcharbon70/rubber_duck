@@ -322,12 +322,13 @@ defmodule RubberDuck.Workflows.Executor do
     reactor = Reactor.Builder.new()
 
     # Add input arguments if provided
-    reactor = 
+    reactor =
       if is_map(input) do
         Enum.reduce(input, reactor, fn {key, _value}, acc ->
           case Reactor.Builder.add_input(acc, key) do
             {:ok, updated_reactor} -> updated_reactor
-            {:error, _} -> acc  # Skip invalid inputs
+            # Skip invalid inputs
+            {:error, _} -> acc
           end
         end)
       else
@@ -338,17 +339,19 @@ defmodule RubberDuck.Workflows.Executor do
       end
 
     # Add steps to the reactor
-    reactor = 
+    reactor =
       Enum.reduce(steps, reactor, fn step, acc ->
         case Reactor.Builder.add_step(acc, step.name, step.impl, step.arguments || []) do
           {:ok, updated_reactor} -> updated_reactor
-          {:error, _} -> acc  # Skip invalid steps
+          # Skip invalid steps
+          {:error, _} -> acc
         end
       end)
 
     # Set return value to the last step if steps exist
     if length(steps) > 0 do
       last_step = List.last(steps)
+
       case Reactor.Builder.return(reactor, last_step.name) do
         {:ok, final_reactor} -> final_reactor
         {:error, _} -> reactor

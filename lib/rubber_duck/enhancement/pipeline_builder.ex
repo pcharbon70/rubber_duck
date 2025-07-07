@@ -239,7 +239,6 @@ defmodule RubberDuck.Enhancement.PipelineBuilder do
     end)
   end
 
-
   defp exceeds_resource_limits?(pipeline) do
     max_steps = 10
     step_count = count_total_steps(pipeline)
