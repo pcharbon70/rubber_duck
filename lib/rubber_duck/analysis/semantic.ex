@@ -12,7 +12,7 @@ defmodule RubberDuck.Analysis.Semantic do
 
   @behaviour RubberDuck.Analysis.Engine
 
-  alias RubberDuck.Analysis.{AST, Common, Engine}
+  alias RubberDuck.Analysis.Engine
 
   @impl true
   def name, do: :semantic
@@ -130,20 +130,16 @@ defmodule RubberDuck.Analysis.Semantic do
   end
 
   # Complexity analysis
-  defp analyze_complexity(ast_info, config) do
-    issues = []
-
+  defp analyze_complexity(ast_info, _config) do
     # Analyze each function for complexity
     Enum.flat_map(ast_info.functions, fn func ->
-      func_issues = []
-
       # Function length check
       # Note: We need the actual AST to count lines accurately
       # For now, we'll skip this check without the full AST
 
       # Check parameter count
       if func.arity > 4 do
-        func_issues = [
+        [
           Engine.create_issue(
             :long_parameter_list,
             :low,
@@ -153,11 +149,10 @@ defmodule RubberDuck.Analysis.Semantic do
             :complexity,
             %{function: func, parameter_count: func.arity}
           )
-          | func_issues
         ]
+      else
+        []
       end
-
-      func_issues
     end)
   end
 
@@ -166,13 +161,11 @@ defmodule RubberDuck.Analysis.Semantic do
     if !config.detect_circular_dependencies do
       []
     else
-      issues = []
-
       # Check for suspicious dependency patterns
       dependency_count = length(ast_info.aliases) + length(ast_info.imports)
 
       if dependency_count > 10 do
-        issues = [
+        [
           Engine.create_issue(
             :too_many_dependencies,
             :medium,
@@ -186,16 +179,15 @@ defmodule RubberDuck.Analysis.Semantic do
               total: dependency_count
             }
           )
-          | issues
         ]
+      else
+        []
       end
-
-      issues
     end
   end
 
   # Unused variable detection
-  defp analyze_unused_variables(ast_info, config) do
+  defp analyze_unused_variables(_ast_info, config) do
     if !config.detect_unused_variables do
       []
     else
@@ -207,50 +199,52 @@ defmodule RubberDuck.Analysis.Semantic do
 
   # Module cohesion analysis
   defp analyze_module_cohesion(ast_info, config) do
-    issues = []
-
     # Check if module has too many responsibilities
     function_count = length(ast_info.functions)
 
-    if function_count > config.max_module_length do
-      issues = [
-        Engine.create_issue(
-          :large_module,
-          :medium,
-          "Module has too many functions (#{function_count} > #{config.max_module_length})",
-          %{file: "", line: 1, column: nil, end_line: nil, end_column: nil},
-          "semantic/large_module",
-          :design,
-          %{function_count: function_count}
-        )
-        | issues
-      ]
-    end
+    large_module_issues = 
+      if function_count > config.max_module_length do
+        [
+          Engine.create_issue(
+            :large_module,
+            :medium,
+            "Module has too many functions (#{function_count} > #{config.max_module_length})",
+            %{file: "", line: 1, column: nil, end_line: nil, end_column: nil},
+            "semantic/large_module",
+            :design,
+            %{function_count: function_count}
+          )
+        ]
+      else
+        []
+      end
 
     # Check for low cohesion indicators
     public_functions = Enum.count(ast_info.functions, &(!&1.private))
     private_functions = function_count - public_functions
 
-    if public_functions > 0 && private_functions / public_functions > 3 do
-      issues = [
-        Engine.create_issue(
-          :low_cohesion,
-          :low,
-          "Module has too many private functions relative to public ones",
-          %{file: "", line: 1, column: nil, end_line: nil, end_column: nil},
-          "semantic/low_cohesion",
-          :design,
-          %{
-            public_functions: public_functions,
-            private_functions: private_functions,
-            ratio: Float.round(private_functions / public_functions, 2)
-          }
-        )
-        | issues
-      ]
-    end
+    cohesion_issues = 
+      if public_functions > 0 && private_functions / public_functions > 3 do
+        [
+          Engine.create_issue(
+            :low_cohesion,
+            :low,
+            "Module has too many private functions relative to public ones",
+            %{file: "", line: 1, column: nil, end_line: nil, end_column: nil},
+            "semantic/low_cohesion",
+            :design,
+            %{
+              public_functions: public_functions,
+              private_functions: private_functions,
+              ratio: Float.round(private_functions / public_functions, 2)
+            }
+          )
+        ]
+      else
+        []
+      end
 
-    issues
+    large_module_issues ++ cohesion_issues
   end
 
   # Calculate semantic metrics

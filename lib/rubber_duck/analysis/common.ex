@@ -6,7 +6,6 @@ defmodule RubberDuck.Analysis.Common do
   and result formatting across all analysis engines.
   """
 
-  alias RubberDuck.Analysis.AST
 
   # Severity levels from least to most severe
   @severities [:info, :low, :medium, :high, :critical]

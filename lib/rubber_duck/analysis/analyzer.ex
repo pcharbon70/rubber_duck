@@ -183,7 +183,7 @@ defmodule RubberDuck.Analysis.Analyzer do
     end
   end
 
-  defp run_engines(ast_info, file_path, opts) do
+  defp run_engines(ast_info, _file_path, opts) do
     engines = Keyword.get(opts, :engines, @default_engines)
     config = Keyword.get(opts, :config, %{})
 

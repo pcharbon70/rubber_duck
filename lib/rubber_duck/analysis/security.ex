@@ -13,7 +13,7 @@ defmodule RubberDuck.Analysis.Security do
 
   @behaviour RubberDuck.Analysis.Engine
 
-  alias RubberDuck.Analysis.{AST, Common, Engine}
+  alias RubberDuck.Analysis.Engine
 
   @impl true
   def name, do: :security
