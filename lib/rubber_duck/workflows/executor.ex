@@ -65,19 +65,20 @@ defmodule RubberDuck.Workflows.Executor do
 
   @doc """
   Executes a workflow directly without going through GenServer.
-  
+
   This is used by the hybrid workflow architecture for direct execution.
   """
   def execute_workflow(workflow_name, input, context, opts) do
     workflow_id = "hybrid_#{Ash.UUID.generate()}"
-    
+
     # Build a merged context
-    full_context = Map.merge(context, %{
-      workflow_id: workflow_id,
-      trace_id: opts[:trace_id] || Ash.UUID.generate(),
-      metadata: opts[:metadata] || %{}
-    })
-    
+    full_context =
+      Map.merge(context, %{
+        workflow_id: workflow_id,
+        trace_id: opts[:trace_id] || Ash.UUID.generate(),
+        metadata: opts[:metadata] || %{}
+      })
+
     # Execute the workflow privately
     execute_workflow_internal(workflow_id, workflow_name, input, Keyword.put(opts, :context, full_context))
   end
@@ -98,6 +99,20 @@ defmodule RubberDuck.Workflows.Executor do
   """
   def run_dynamic_async(task, opts \\ []) do
     GenServer.cast(__MODULE__, {:run_dynamic_async, task, opts})
+  end
+
+  @doc """
+  Executes a workflow with monitoring and detailed metrics collection.
+
+  Returns both the result and detailed execution metrics including:
+  - Step timings
+  - Resource adjustments
+  - Memory usage
+  - Performance data
+  """
+  def run_with_monitoring(workflow, input \\ %{}, opts \\ []) do
+    timeout = opts[:timeout] || @default_timeout
+    GenServer.call(__MODULE__, {:run_with_monitoring, workflow, input, opts}, timeout)
   end
 
   # Server callbacks
@@ -167,6 +182,40 @@ defmodule RubberDuck.Workflows.Executor do
       status: :running,
       from: from,
       type: :dynamic
+    }
+
+    new_state = %{
+      state
+      | running_workflows: Map.put(state.running_workflows, workflow_id, workflow_info),
+        workflow_counter: state.workflow_counter + 1
+    }
+
+    # We'll reply when the task completes
+    {:noreply, new_state}
+  end
+
+  @impl true
+  def handle_call({:run_with_monitoring, workflow, input, opts}, from, state) do
+    workflow_id = generate_workflow_id(state)
+
+    # Start workflow execution with monitoring
+    execution_task =
+      Task.async(fn ->
+        execute_workflow_with_monitoring(workflow_id, workflow, input, opts)
+      end)
+
+    # Track running workflow
+    workflow_info = %{
+      id: workflow_id,
+      workflow: workflow,
+      input: input,
+      opts: opts,
+      task: execution_task,
+      started_at: DateTime.utc_now(),
+      status: :running,
+      from: from,
+      type: :monitored,
+      monitoring: true
     }
 
     new_state = %{
@@ -452,6 +501,101 @@ defmodule RubberDuck.Workflows.Executor do
   end
 
   # Dynamic workflow execution
+  defp execute_workflow_with_monitoring(workflow_id, workflow, input, opts) do
+    start_time = System.monotonic_time(:millisecond)
+    initial_memory = :erlang.memory(:total)
+
+    # Track step timings
+    _step_timings = []
+    _resource_adjustments = []
+
+    # Enhanced context with monitoring hooks
+    monitoring_context = %{
+      on_step_start: fn step_name ->
+        send(self(), {:step_start, step_name, System.monotonic_time(:millisecond)})
+      end,
+      on_step_complete: fn step_name, duration ->
+        send(self(), {:step_complete, step_name, duration})
+      end,
+      on_resource_adjustment: fn adjustment ->
+        send(self(), {:resource_adjustment, adjustment})
+      end
+    }
+
+    # Merge monitoring context with options
+    enhanced_opts = Keyword.update(opts, :context, monitoring_context, &Map.merge(&1, monitoring_context))
+
+    # Execute workflow with monitoring
+    {result, monitoring_data} =
+      Task.async(fn ->
+        # Run in a separate process to collect monitoring data
+        parent = self()
+
+        Task.async(fn ->
+          # Execute the workflow
+          workflow_result = execute_workflow_internal(workflow_id, workflow, input, enhanced_opts)
+          send(parent, {:workflow_result, workflow_result})
+        end)
+
+        # Collect monitoring data
+        collect_monitoring_data([], [], start_time)
+      end)
+      |> Task.await(opts[:timeout] || @default_timeout)
+
+    end_time = System.monotonic_time(:millisecond)
+    final_memory = :erlang.memory(:total)
+
+    # Build comprehensive result
+    case result do
+      {:ok, workflow_result} ->
+        {:ok,
+         %{
+           result: workflow_result,
+           step_timings: monitoring_data.step_timings,
+           resource_adjustments: monitoring_data.resource_adjustments,
+           metadata: %{
+             workflow_id: workflow_id,
+             total_duration: end_time - start_time,
+             memory_delta: final_memory - initial_memory,
+             monitored: true
+           }
+         }}
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  defp collect_monitoring_data(step_timings, resource_adjustments, start_time) do
+    receive do
+      {:step_start, step_name, timestamp} ->
+        updated_timings = [{step_name, timestamp - start_time} | step_timings]
+        collect_monitoring_data(updated_timings, resource_adjustments, start_time)
+
+      {:step_complete, step_name, duration} ->
+        updated_timings = [{step_name, duration} | step_timings]
+        collect_monitoring_data(updated_timings, resource_adjustments, start_time)
+
+      {:resource_adjustment, adjustment} ->
+        updated_adjustments = [adjustment | resource_adjustments]
+        collect_monitoring_data(step_timings, updated_adjustments, start_time)
+
+      {:workflow_result, result} ->
+        {result,
+         %{
+           step_timings: Enum.reverse(step_timings),
+           resource_adjustments: Enum.reverse(resource_adjustments)
+         }}
+    after
+      60_000 ->
+        {{:error, :timeout},
+         %{
+           step_timings: Enum.reverse(step_timings),
+           resource_adjustments: Enum.reverse(resource_adjustments)
+         }}
+    end
+  end
+
   defp execute_dynamic_workflow(workflow_id, task, opts) do
     start_time = System.monotonic_time(:millisecond)
 
