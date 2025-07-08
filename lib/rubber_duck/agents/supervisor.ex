@@ -74,7 +74,7 @@ defmodule RubberDuck.Agents.Supervisor do
   @spec start_agent(atom(), map(), keyword()) :: DynamicSupervisor.on_start_child()
   def start_agent(agent_type, agent_config, opts \\ []) do
     agent_id = generate_agent_id(agent_type)
-    
+
     child_spec = {
       Agent,
       [
@@ -88,7 +88,7 @@ defmodule RubberDuck.Agents.Supervisor do
     case DynamicSupervisor.start_child(__MODULE__, child_spec) do
       {:ok, pid} = result ->
         Logger.info("Started #{agent_type} agent #{agent_id} with PID #{inspect(pid)}")
-        
+
         # Register agent for discovery
         Registry.register_agent(@registry_name, agent_id, %{
           type: agent_type,
@@ -97,7 +97,7 @@ defmodule RubberDuck.Agents.Supervisor do
           started_at: DateTime.utc_now(),
           status: :running
         })
-        
+
         result
 
       {:error, reason} = error ->
@@ -124,7 +124,7 @@ defmodule RubberDuck.Agents.Supervisor do
       :ok ->
         Logger.info("Stopped agent with PID #{inspect(agent_ref)}")
         :ok
-      
+
       {:error, reason} = error ->
         Logger.error("Failed to stop agent #{inspect(agent_ref)}: #{inspect(reason)}")
         error
@@ -135,7 +135,7 @@ defmodule RubberDuck.Agents.Supervisor do
     case Registry.lookup_agent(@registry_name, agent_id) do
       {:ok, %{pid: pid}} ->
         stop_agent(pid)
-      
+
       {:error, :not_found} ->
         {:error, :agent_not_found}
     end
@@ -162,7 +162,7 @@ defmodule RubberDuck.Agents.Supervisor do
       case Registry.find_agent_by_pid(@registry_name, pid) do
         {:ok, agent_id, metadata} ->
           Map.put(metadata, :agent_id, agent_id)
-        
+
         {:error, :not_found} ->
           %{
             agent_id: "unknown",
@@ -213,7 +213,7 @@ defmodule RubberDuck.Agents.Supervisor do
   @spec health_check() :: map()
   def health_check do
     children = DynamicSupervisor.which_children(__MODULE__)
-    
+
     %{
       total_agents: length(children),
       agents_by_type: agent_counts(),
@@ -252,7 +252,9 @@ defmodule RubberDuck.Agents.Supervisor do
 
   defp get_supervisor_uptime do
     case Process.info(Process.whereis(__MODULE__), :current_function) do
-      nil -> 0
+      nil ->
+        0
+
       _ ->
         # Simplified uptime calculation
         # In production, would track start time properly

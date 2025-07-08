@@ -280,7 +280,7 @@ defmodule RubberDuck.Agents.Behavior do
         cleanup_workspace(state.workspace)
         
         # Log shutdown
-        Logger.info("Agent terminating: #{inspect(reason)}")
+        Logger.info("Agent terminating: \#{inspect(reason)}")
         
         :ok
       end
@@ -316,8 +316,8 @@ defmodule RubberDuck.Agents.Behavior do
         end
       end
   """
-  @callback handle_config_update(config :: map(), agent_state()) :: 
-    {:ok, agent_state()} | {:error, term(), agent_state()}
+  @callback handle_config_update(config :: map(), agent_state()) ::
+              {:ok, agent_state()} | {:error, term(), agent_state()}
 
   @optional_callbacks [handle_config_update: 2]
 

@@ -53,7 +53,7 @@ defmodule RubberDuck.Agents.Agent do
 
   use GenServer
 
-  alias RubberDuck.Agents.{Registry, Behavior}
+  alias RubberDuck.Agents.Registry
 
   require Logger
 
@@ -75,9 +75,9 @@ defmodule RubberDuck.Agents.Agent do
   - `:name` - Process name (optional)
   """
   def start_link(opts) do
-    agent_type = Keyword.fetch!(opts, :agent_type)
+    _agent_type = Keyword.fetch!(opts, :agent_type)
     agent_id = Keyword.fetch!(opts, :agent_id)
-    
+
     name = Keyword.get(opts, :name, {:via, Registry, {opts[:registry], agent_id}})
     GenServer.start_link(__MODULE__, opts, name: name)
   end
@@ -191,33 +191,29 @@ defmodule RubberDuck.Agents.Agent do
     behavior_module = get_behavior_module(agent_type)
 
     # Initialize behavior-specific state
-    case behavior_module.init(config) do
-      {:ok, behavior_state} ->
-        state = %{
-          agent_type: agent_type,
-          agent_id: agent_id,
-          behavior_module: behavior_module,
-          behavior_state: behavior_state,
-          config: config,
-          registry: registry,
-          task_queue: :queue.new(),
-          current_task: nil,
-          metrics: initialize_metrics(),
-          status: :idle,
-          started_at: DateTime.utc_now(),
-          last_activity: DateTime.utc_now()
-        }
+    # Initialize behavior module
+    {:ok, behavior_state} = behavior_module.init(config)
 
-        # Update registry status
-        update_registry_status(state, :running)
+    state = %{
+      agent_type: agent_type,
+      agent_id: agent_id,
+      behavior_module: behavior_module,
+      behavior_state: behavior_state,
+      config: config,
+      registry: registry,
+      task_queue: :queue.new(),
+      current_task: nil,
+      metrics: initialize_metrics(),
+      status: :idle,
+      started_at: DateTime.utc_now(),
+      last_activity: DateTime.utc_now()
+    }
 
-        Logger.info("Started #{agent_type} agent #{agent_id}")
-        {:ok, state}
+    # Update registry status
+    update_registry_status(state, :running)
 
-      {:error, reason} ->
-        Logger.error("Failed to initialize #{agent_type} agent #{agent_id}: #{inspect(reason)}")
-        {:stop, reason}
-    end
+    Logger.info("Started #{agent_type} agent #{agent_id}")
+    {:ok, state}
   end
 
   @impl true
@@ -232,7 +228,7 @@ defmodule RubberDuck.Agents.Agent do
         task_with_context = %{task: task, context: context, from: from}
         new_queue = :queue.in(task_with_context, state.task_queue)
         new_state = %{state | task_queue: new_queue}
-        
+
         {:noreply, new_state}
 
       :error ->
@@ -257,12 +253,12 @@ defmodule RubberDuck.Agents.Agent do
     case state.behavior_module.handle_config_update(new_config, state.behavior_state) do
       {:ok, new_behavior_state} ->
         new_state = %{
-          state 
+          state
           | config: new_config,
             behavior_state: new_behavior_state,
             last_activity: DateTime.utc_now()
         }
-        
+
         update_registry_status(new_state, state.status)
         {:reply, :ok, new_state}
 
@@ -277,29 +273,32 @@ defmodule RubberDuck.Agents.Agent do
     case state.behavior_module.handle_message(message, from, state.behavior_state) do
       {:ok, new_behavior_state} ->
         new_state = %{
-          state 
+          state
           | behavior_state: new_behavior_state,
             last_activity: DateTime.utc_now()
         }
+
         {:noreply, new_state}
 
       {:noreply, new_behavior_state} ->
         new_state = %{
-          state 
+          state
           | behavior_state: new_behavior_state,
             last_activity: DateTime.utc_now()
         }
+
         {:noreply, new_state}
 
       {:error, reason, new_behavior_state} ->
         Logger.warning("Agent #{state.agent_id} message handling failed: #{inspect(reason)}")
+
         new_state = %{
-          state 
+          state
           | behavior_state: new_behavior_state,
             status: :error,
             last_activity: DateTime.utc_now()
         }
-        
+
         update_registry_status(new_state, :error)
         {:noreply, new_state}
     end
@@ -332,7 +331,7 @@ defmodule RubberDuck.Agents.Agent do
     case state.behavior_module.terminate(reason, state.behavior_state) do
       :ok ->
         Logger.info("Agent #{state.agent_id} terminated normally")
-      
+
       {:error, cleanup_reason} ->
         Logger.warning("Agent #{state.agent_id} cleanup failed: #{inspect(cleanup_reason)}")
     end
@@ -356,12 +355,12 @@ defmodule RubberDuck.Agents.Agent do
   defp handle_task_execution(task, context, from, state) do
     # Update status to busy
     new_state = %{
-      state 
+      state
       | status: :busy,
         current_task: task,
         last_activity: DateTime.utc_now()
     }
-    
+
     update_registry_status(new_state, :busy)
 
     # Execute task in behavior module
@@ -379,7 +378,7 @@ defmodule RubberDuck.Agents.Agent do
 
         # Process next task if any
         send(self(), :process_next_task)
-        
+
         {:noreply, final_state}
 
       {:error, reason, new_behavior_state} ->
@@ -396,7 +395,7 @@ defmodule RubberDuck.Agents.Agent do
 
         # Update registry
         update_registry_status(final_state, :error)
-        
+
         {:noreply, final_state}
     end
   end
@@ -431,7 +430,7 @@ defmodule RubberDuck.Agents.Agent do
 
   defp build_status_response(state) do
     behavior_status = state.behavior_module.get_status(state.behavior_state)
-    
+
     Map.merge(behavior_status, %{
       agent_id: state.agent_id,
       agent_type: state.agent_type,

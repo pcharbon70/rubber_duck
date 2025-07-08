@@ -70,10 +70,10 @@ defmodule RubberDuck.Agents.Registry do
     case Registry.register(registry, agent_id, metadata) do
       {:ok, _pid} ->
         :ok
-      
+
       {:error, {:already_registered, _pid}} ->
         {:error, :already_registered}
-      
+
       error ->
         error
     end
@@ -96,11 +96,11 @@ defmodule RubberDuck.Agents.Registry do
   @spec update_agent(atom(), String.t(), map()) :: :ok | {:error, term()}
   def update_agent(registry, agent_id, updates) do
     case Registry.lookup(registry, agent_id) do
-      [{pid, metadata}] ->
+      [{_pid, metadata}] ->
         updated_metadata = Map.merge(metadata, updates)
         Registry.update_value(registry, agent_id, fn _ -> updated_metadata end)
         :ok
-      
+
       [] ->
         {:error, :not_found}
     end
@@ -124,7 +124,7 @@ defmodule RubberDuck.Agents.Registry do
     case Registry.lookup(registry, agent_id) do
       [{_pid, metadata}] ->
         {:ok, metadata}
-      
+
       [] ->
         {:error, :not_found}
     end
@@ -150,11 +150,11 @@ defmodule RubberDuck.Agents.Registry do
         case lookup_agent(registry, agent_id) do
           {:ok, metadata} ->
             {:ok, agent_id, metadata}
-          
+
           error ->
             error
         end
-      
+
       [] ->
         {:error, :not_found}
     end
@@ -278,12 +278,12 @@ defmodule RubberDuck.Agents.Registry do
   @spec get_stats(atom()) :: map()
   def get_stats(registry) do
     all_agents = list_all_agents(registry)
-    
-    agents_by_type = 
+
+    agents_by_type =
       all_agents
       |> Enum.group_by(fn {_id, metadata} -> Map.get(metadata, :type, :unknown) end)
       |> Map.new(fn {type, agents} -> {type, length(agents)} end)
-    
+
     agents_by_status =
       all_agents
       |> Enum.group_by(fn {_id, metadata} -> Map.get(metadata, :status, :unknown) end)
@@ -314,7 +314,7 @@ defmodule RubberDuck.Agents.Registry do
     case Process.whereis(registry) do
       nil ->
         {:unhealthy, :registry_not_running}
-      
+
       pid when is_pid(pid) ->
         case Process.alive?(pid) do
           true -> :healthy
@@ -340,11 +340,12 @@ defmodule RubberDuck.Agents.Registry do
   @spec cleanup_stale_agents(atom()) :: {:ok, non_neg_integer()}
   def cleanup_stale_agents(registry) do
     all_agents = list_all_agents(registry)
-    
-    stale_count = 
+
+    stale_count =
       all_agents
       |> Enum.count(fn {agent_id, metadata} ->
         pid = Map.get(metadata, :pid)
+
         if pid && !Process.alive?(pid) do
           unregister_agent(registry, agent_id)
           true
@@ -352,7 +353,7 @@ defmodule RubberDuck.Agents.Registry do
           false
         end
       end)
-    
+
     {:ok, stale_count}
   end
 end

@@ -36,8 +36,8 @@ defmodule RubberDuck.Agents.Coordinator do
   use GenServer
 
   alias RubberDuck.Agents.{Supervisor, Registry, Agent}
-  alias RubberDuck.Memory.Manager, as: MemoryManager
-  alias RubberDuck.MessageBus
+  # alias RubberDuck.Memory.Manager, as: MemoryManager
+  # alias RubberDuck.MessageBus
 
   require Logger
 
@@ -98,8 +98,7 @@ defmodule RubberDuck.Agents.Coordinator do
   """
   @spec execute_workflow(workflow_spec(), context(), keyword()) :: coordination_result()
   def execute_workflow(workflow_spec, context \\ %{}, opts \\ []) do
-    GenServer.call(__MODULE__, {:execute_workflow, workflow_spec, context, opts}, 
-                   Keyword.get(opts, :timeout, 60_000))
+    GenServer.call(__MODULE__, {:execute_workflow, workflow_spec, context, opts}, Keyword.get(opts, :timeout, 60_000))
   end
 
   @doc """
@@ -129,8 +128,7 @@ defmodule RubberDuck.Agents.Coordinator do
   """
   @spec route_task(task_spec(), context(), keyword()) :: coordination_result()
   def route_task(task, context \\ %{}, opts \\ []) do
-    GenServer.call(__MODULE__, {:route_task, task, context, opts},
-                   Keyword.get(opts, :timeout, 30_000))
+    GenServer.call(__MODULE__, {:route_task, task, context, opts}, Keyword.get(opts, :timeout, 30_000))
   end
 
   @doc """
@@ -191,8 +189,8 @@ defmodule RubberDuck.Agents.Coordinator do
   @impl true
   def init(opts) do
     # Subscribe to agent events
-    MessageBus.subscribe("agents.events")
-    
+    # MessageBus.subscribe("agents.events")
+
     state = %{
       active_workflows: %{},
       workflow_counter: 0,
@@ -215,9 +213,9 @@ defmodule RubberDuck.Agents.Coordinator do
   end
 
   @impl true
-  def handle_call({:execute_workflow, workflow_spec, context, opts}, from, state) do
+  def handle_call({:execute_workflow, workflow_spec, context, _opts}, from, state) do
     workflow_id = generate_workflow_id(state)
-    
+
     case validate_workflow_spec(workflow_spec) do
       :ok ->
         # Start workflow execution
@@ -238,7 +236,7 @@ defmodule RubberDuck.Agents.Coordinator do
 
         # Start executing workflow
         send(self(), {:execute_workflow_steps, workflow_id})
-        
+
         {:noreply, new_state}
 
       {:error, reason} ->
@@ -247,7 +245,7 @@ defmodule RubberDuck.Agents.Coordinator do
   end
 
   @impl true
-  def handle_call({:route_task, task, context, opts}, from, state) do
+  def handle_call({:route_task, task, context, _opts}, from, state) do
     case find_best_agent(task, state) do
       {:ok, agent_id} ->
         # Execute task on selected agent
@@ -274,7 +272,7 @@ defmodule RubberDuck.Agents.Coordinator do
             # Add to agent pool
             new_pools = update_agent_pool(state.agent_pools, agent_type, agent_id, :add)
             new_state = %{state | agent_pools: new_pools}
-            
+
             {:reply, {:ok, agent_id}, new_state}
 
           {:error, reason} ->
@@ -293,7 +291,7 @@ defmodule RubberDuck.Agents.Coordinator do
         # Remove from agent pools
         new_pools = remove_agent_from_pools(state.agent_pools, agent_id)
         new_state = %{state | agent_pools: new_pools}
-        
+
         {:reply, :ok, new_state}
 
       {:error, reason} ->
@@ -331,7 +329,7 @@ defmodule RubberDuck.Agents.Coordinator do
     case topic do
       "agents.events" ->
         handle_agent_event(message, state)
-      
+
       _ ->
         {:noreply, state}
     end
@@ -345,20 +343,20 @@ defmodule RubberDuck.Agents.Coordinator do
 
   # Private Functions
 
-  defp start_initial_agents(state) do
+  defp start_initial_agents(_state) do
     # Start one agent of each type by default
     agent_types = [:research, :analysis, :generation, :review]
-    
+
     Enum.each(agent_types, fn agent_type ->
       config = %{
         name: "default_#{agent_type}",
         pool: :default
       }
-      
+
       case Supervisor.start_agent(agent_type, config) do
         {:ok, _pid} ->
           Logger.info("Started default #{agent_type} agent")
-        
+
         {:error, reason} ->
           Logger.error("Failed to start default #{agent_type} agent: #{inspect(reason)}")
       end
@@ -367,7 +365,7 @@ defmodule RubberDuck.Agents.Coordinator do
 
   defp validate_workflow_spec(spec) do
     required_fields = [:id, :type, :steps]
-    
+
     case Enum.all?(required_fields, &Map.has_key?(spec, &1)) do
       true -> :ok
       false -> {:error, :invalid_workflow_spec}
@@ -382,10 +380,10 @@ defmodule RubberDuck.Agents.Coordinator do
   defp find_best_agent(task, state) do
     required_capabilities = Map.get(task, :requirements, [])
     agent_type = determine_agent_type(task)
-    
+
     # Find agents of the appropriate type with required capabilities
     available_agents = Map.get(state.agent_pools, agent_type, [])
-    
+
     case find_capable_agent(available_agents, required_capabilities) do
       nil ->
         # Try to start a new agent if none available
@@ -393,7 +391,7 @@ defmodule RubberDuck.Agents.Coordinator do
           {:ok, agent_id} -> {:ok, agent_id}
           error -> error
         end
-      
+
       agent_id ->
         {:ok, agent_id}
     end
@@ -405,7 +403,8 @@ defmodule RubberDuck.Agents.Coordinator do
       t when t in [:generate_code, :refactor_code, :code_generation] -> :generation
       t when t in [:research_topic, :gather_context, :semantic_search] -> :research
       t when t in [:review_changes, :quality_review, :code_review] -> :review
-      _ -> :analysis  # Default to analysis
+      # Default to analysis
+      _ -> :analysis
     end
   end
 
@@ -415,7 +414,7 @@ defmodule RubberDuck.Agents.Coordinator do
         {:ok, %{status: :running, capabilities: capabilities}} ->
           required_capabilities
           |> Enum.all?(fn cap -> cap in (capabilities || []) end)
-        
+
         _ ->
           false
       end
@@ -428,7 +427,7 @@ defmodule RubberDuck.Agents.Coordinator do
       task_specific: true,
       requirements: Map.get(task, :requirements, [])
     }
-    
+
     Supervisor.start_agent(agent_type, config)
   end
 
@@ -441,12 +440,12 @@ defmodule RubberDuck.Agents.Coordinator do
           case Agent.assign_task(pid, task, context) do
             {:ok, result} ->
               GenServer.reply(from, {:ok, result})
-            
+
             {:error, reason} ->
               GenServer.reply(from, {:error, reason})
           end
         end)
-        
+
         {:noreply, state}
 
       {:error, :not_found} ->
@@ -457,7 +456,7 @@ defmodule RubberDuck.Agents.Coordinator do
   defp execute_next_workflow_steps(workflow_state, state) do
     # Find steps that can be executed (dependencies satisfied)
     executable_steps = find_executable_steps(workflow_state)
-    
+
     case executable_steps do
       [] ->
         # No more steps to execute, check if workflow is complete
@@ -467,7 +466,7 @@ defmodule RubberDuck.Agents.Coordinator do
           # Waiting for dependencies
           state
         end
-      
+
       steps ->
         # Execute the steps
         Enum.reduce(steps, state, fn step, acc_state ->
@@ -478,7 +477,7 @@ defmodule RubberDuck.Agents.Coordinator do
 
   defp find_executable_steps(workflow_state) do
     completed_step_ids = MapSet.new(workflow_state.completed_steps)
-    
+
     Enum.filter(workflow_state.pending_steps, fn step ->
       dependencies = Map.get(step, :depends_on, [])
       Enum.all?(dependencies, fn dep -> dep in completed_step_ids end)
@@ -486,8 +485,8 @@ defmodule RubberDuck.Agents.Coordinator do
   end
 
   defp execute_workflow_step(workflow_id, step, context, state) do
-    agent_type = step.agent_type
-    
+    # agent_type = step.agent_type
+
     case find_best_agent(%{type: step.task.type, requirements: []}, state) do
       {:ok, agent_id} ->
         # Execute step on agent
@@ -497,16 +496,16 @@ defmodule RubberDuck.Agents.Coordinator do
               case Agent.assign_task(pid, step.task, context) do
                 {:ok, result} ->
                   send(__MODULE__, {:task_completed, workflow_id, step.id, result})
-                
+
                 {:error, reason} ->
                   send(__MODULE__, {:task_failed, workflow_id, step.id, reason})
               end
-            
+
             {:error, reason} ->
               send(__MODULE__, {:task_failed, workflow_id, step.id, reason})
           end
         end)
-        
+
         state
 
       {:error, reason} ->
@@ -520,7 +519,7 @@ defmodule RubberDuck.Agents.Coordinator do
     case Map.get(state.active_workflows, workflow_id) do
       nil ->
         state
-      
+
       workflow_state ->
         # Update workflow state
         new_workflow_state = %{
@@ -535,7 +534,7 @@ defmodule RubberDuck.Agents.Coordinator do
 
         # Continue workflow execution
         send(self(), {:execute_workflow_steps, workflow_id})
-        
+
         new_state
     end
   end
@@ -544,11 +543,11 @@ defmodule RubberDuck.Agents.Coordinator do
     case Map.get(state.active_workflows, workflow_id) do
       nil ->
         state
-      
+
       workflow_state ->
         # Mark workflow as failed
         GenServer.reply(workflow_state.from, {:error, {step_id, reason}})
-        
+
         # Remove from active workflows
         new_active_workflows = Map.delete(state.active_workflows, workflow_id)
         %{state | active_workflows: new_active_workflows}
@@ -558,10 +557,10 @@ defmodule RubberDuck.Agents.Coordinator do
   defp complete_workflow(workflow_state, state) do
     # Aggregate results
     final_result = aggregate_workflow_results(workflow_state)
-    
+
     # Reply to caller
     GenServer.reply(workflow_state.from, {:ok, final_result})
-    
+
     # Remove from active workflows
     new_active_workflows = Map.delete(state.active_workflows, workflow_state.id)
     %{state | active_workflows: new_active_workflows}
@@ -579,7 +578,7 @@ defmodule RubberDuck.Agents.Coordinator do
 
   defp build_system_status(state) do
     agent_stats = Registry.get_stats(@registry_name)
-    
+
     %{
       coordinator: %{
         started_at: state.started_at,
@@ -588,9 +587,10 @@ defmodule RubberDuck.Agents.Coordinator do
       },
       agents: agent_stats,
       workflows: Map.keys(state.active_workflows),
-      agent_pools: Map.new(state.agent_pools, fn {type, agents} -> 
-        {type, length(agents)} 
-      end)
+      agent_pools:
+        Map.new(state.agent_pools, fn {type, agents} ->
+          {type, length(agents)}
+        end)
     }
   end
 
@@ -620,11 +620,11 @@ defmodule RubberDuck.Agents.Coordinator do
       %{event: :agent_started, agent_id: agent_id, agent_type: agent_type} ->
         new_pools = update_agent_pool(state.agent_pools, agent_type, agent_id, :add)
         {:noreply, %{state | agent_pools: new_pools}}
-      
+
       %{event: :agent_stopped, agent_id: agent_id} ->
         new_pools = remove_agent_from_pools(state.agent_pools, agent_id)
         {:noreply, %{state | agent_pools: new_pools}}
-      
+
       _ ->
         {:noreply, state}
     end

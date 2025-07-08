@@ -44,9 +44,9 @@ defmodule RubberDuck.Agents.ResearchAgent do
   use RubberDuck.Agents.Behavior
 
   alias RubberDuck.Memory.Manager, as: MemoryManager
-  alias RubberDuck.RAG.{Retrieval, Chunking}
+  # alias RubberDuck.RAG.{Retrieval, Chunking}
   alias RubberDuck.Analysis.AST
-  alias RubberDuck.LLM.Service, as: LLMService
+  # alias RubberDuck.LLM.Service, as: LLMService
 
   require Logger
 
@@ -78,26 +78,26 @@ defmodule RubberDuck.Agents.ResearchAgent do
   @impl true
   def handle_task(task, context, state) do
     Logger.info("Research Agent handling task: #{task.type}")
-    
+
     case task.type do
       :research_topic ->
         handle_research_topic(task, context, state)
-      
+
       :gather_context ->
         handle_gather_context(task, context, state)
-      
+
       :analyze_patterns ->
         handle_analyze_patterns(task, context, state)
-      
+
       :extract_documentation ->
         handle_extract_documentation(task, context, state)
-      
+
       :build_knowledge_base ->
         handle_build_knowledge_base(task, context, state)
-      
+
       :semantic_search ->
         handle_semantic_search(task, context, state)
-      
+
       _ ->
         {:error, {:unsupported_task_type, task.type}, state}
     end
@@ -110,17 +110,17 @@ defmodule RubberDuck.Agents.ResearchAgent do
         result = perform_search(query, filters, state)
         send_response(from, {:search_result, result})
         {:ok, state}
-      
+
       {:context_request, task_context} ->
         context = build_enhanced_context(task_context, state)
         send_response(from, {:context_result, context})
         {:ok, state}
-      
+
       {:knowledge_query, topic} ->
         knowledge = extract_knowledge(topic, state)
         send_response(from, {:knowledge_result, knowledge})
         {:ok, state}
-      
+
       _ ->
         Logger.debug("Research Agent received unknown message: #{inspect(message)}")
         {:noreply, state}
@@ -157,7 +157,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
 
   # Task Handlers
 
-  defp handle_research_topic(%{payload: payload} = task, context, state) do
+  defp handle_research_topic(%{payload: payload} = _task, context, state) do
     topic = payload.topic
     scope = Map.get(payload, :scope, :standard)
     sources = Map.get(payload, :sources, [:memory, :code])
@@ -182,7 +182,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
               | findings: acc.findings ++ findings,
                 sources_searched: [source | acc.sources_searched]
             }
-          
+
           {:error, reason} ->
             Logger.warning("Research failed for source #{source}: #{inspect(reason)}")
             acc
@@ -204,8 +204,9 @@ defmodule RubberDuck.Agents.ResearchAgent do
     {:ok, final_result, new_state}
   end
 
-  defp handle_gather_context(%{payload: payload} = task, context, state) do
-    target = payload.target  # Code file, function, module, etc.
+  defp handle_gather_context(%{payload: payload} = _task, context, state) do
+    # Code file, function, module, etc.
+    target = payload.target
     depth = Map.get(payload, :depth, :medium)
 
     context_result = %{
@@ -223,13 +224,13 @@ defmodule RubberDuck.Agents.ResearchAgent do
       case context_result.context_type do
         :code_file ->
           gather_file_context(target, depth, context, state, context_result)
-        
+
         :function ->
           gather_function_context(target, depth, context, state, context_result)
-        
+
         :module ->
           gather_module_context(target, depth, context, state, context_result)
-        
+
         :topic ->
           gather_topic_context(target, depth, context, state, context_result)
       end
@@ -243,7 +244,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
     {:ok, context_result, new_state}
   end
 
-  defp handle_analyze_patterns(%{payload: payload} = task, context, state) do
+  defp handle_analyze_patterns(%{payload: payload} = _task, context, state) do
     codebase_path = payload.codebase_path
     pattern_types = Map.get(payload, :pattern_types, [:all])
 
@@ -259,17 +260,12 @@ defmodule RubberDuck.Agents.ResearchAgent do
     analysis_result =
       pattern_types
       |> Enum.reduce(analysis_result, fn pattern_type, acc ->
-        case analyze_pattern_type(codebase_path, pattern_type, context, state) do
-          {:ok, patterns} ->
-            %{
-              acc
-              | patterns_found: acc.patterns_found ++ patterns
-            }
-          
-          {:error, reason} ->
-            Logger.warning("Pattern analysis failed for #{pattern_type}: #{inspect(reason)}")
-            acc
-        end
+        {:ok, patterns} = analyze_pattern_type(codebase_path, pattern_type, context, state)
+
+        %{
+          acc
+          | patterns_found: acc.patterns_found ++ patterns
+        }
       end)
 
     # Generate summary and recommendations
@@ -289,7 +285,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
     {:ok, final_result, new_state}
   end
 
-  defp handle_extract_documentation(%{payload: payload} = task, context, state) do
+  defp handle_extract_documentation(%{payload: payload} = _task, context, state) do
     source = payload.source
     format = Map.get(payload, :format, :markdown)
 
@@ -303,30 +299,26 @@ defmodule RubberDuck.Agents.ResearchAgent do
     }
 
     # Extract documentation based on source type
-    case extract_docs_from_source(source, format, context, state) do
-      {:ok, docs} ->
-        final_result = %{
-          extraction_result
-          | extracted_docs: docs,
-            structure: analyze_doc_structure(docs),
-            metadata: extract_doc_metadata(docs),
-            confidence: 0.9
-        }
+    {:ok, docs} = extract_docs_from_source(source, format, context, state)
 
-        new_state = %{
-          state
-          | metrics: update_task_metrics(state.metrics, :extract_documentation),
-            last_activity: DateTime.utc_now()
-        }
+    final_result = %{
+      extraction_result
+      | extracted_docs: docs,
+        structure: analyze_doc_structure(docs),
+        metadata: extract_doc_metadata(docs),
+        confidence: 0.9
+    }
 
-        {:ok, final_result, new_state}
+    new_state = %{
+      state
+      | metrics: update_task_metrics(state.metrics, :extract_documentation),
+        last_activity: DateTime.utc_now()
+    }
 
-      {:error, reason} ->
-        {:error, reason, state}
-    end
+    {:ok, final_result, new_state}
   end
 
-  defp handle_build_knowledge_base(%{payload: payload} = task, context, state) do
+  defp handle_build_knowledge_base(%{payload: payload} = _task, context, state) do
     sources = payload.sources
     domain = Map.get(payload, :domain, :general)
 
@@ -342,19 +334,14 @@ defmodule RubberDuck.Agents.ResearchAgent do
     kb_result =
       sources
       |> Enum.reduce(kb_result, fn source, acc ->
-        case process_knowledge_source(source, domain, context, state) do
-          {:ok, knowledge} ->
-            %{
-              acc
-              | sources_processed: [source | acc.sources_processed],
-                knowledge_items: acc.knowledge_items ++ knowledge.items,
-                relationships: acc.relationships ++ knowledge.relationships
-            }
-          
-          {:error, reason} ->
-            Logger.warning("Knowledge extraction failed for #{inspect(source)}: #{inspect(reason)}")
-            acc
-        end
+        {:ok, knowledge} = process_knowledge_source(source, domain, context, state)
+
+        %{
+          acc
+          | sources_processed: [source | acc.sources_processed],
+            knowledge_items: acc.knowledge_items ++ knowledge.items,
+            relationships: acc.relationships ++ knowledge.relationships
+        }
       end)
 
     # Build relationships between knowledge items
@@ -374,7 +361,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
     {:ok, final_result, new_state}
   end
 
-  defp handle_semantic_search(%{payload: payload} = task, context, state) do
+  defp handle_semantic_search(%{payload: payload} = _task, context, state) do
     query = payload.query
     scope = Map.get(payload, :scope, :all)
     limit = Map.get(payload, :limit, 10)
@@ -391,29 +378,25 @@ defmodule RubberDuck.Agents.ResearchAgent do
     start_time = System.monotonic_time(:millisecond)
 
     # Perform semantic search
-    case perform_semantic_search(query, scope, limit, context, state) do
-      {:ok, results} ->
-        search_time = System.monotonic_time(:millisecond) - start_time
-        
-        final_result = %{
-          search_result
-          | results: results,
-            total_found: length(results),
-            search_time: search_time,
-            confidence: calculate_search_confidence(results)
-        }
+    {:ok, results} = perform_semantic_search(query, scope, limit, context, state)
 
-        new_state = %{
-          state
-          | metrics: update_task_metrics(state.metrics, :semantic_search),
-            last_activity: DateTime.utc_now()
-        }
+    search_time = System.monotonic_time(:millisecond) - start_time
 
-        {:ok, final_result, new_state}
+    final_result = %{
+      search_result
+      | results: results,
+        total_found: length(results),
+        search_time: search_time,
+        confidence: calculate_search_confidence(results)
+    }
 
-      {:error, reason} ->
-        {:error, reason, state}
-    end
+    new_state = %{
+      state
+      | metrics: update_task_metrics(state.metrics, :semantic_search),
+        last_activity: DateTime.utc_now()
+    }
+
+    {:ok, final_result, new_state}
   end
 
   # Helper Functions
@@ -422,7 +405,8 @@ defmodule RubberDuck.Agents.ResearchAgent do
     %{
       temp_dir: System.tmp_dir(),
       cache_dir: Map.get(config, :cache_dir, "/tmp/research_agent"),
-      max_cache_size: Map.get(config, :max_cache_size, 100_000_000)  # 100MB
+      # 100MB
+      max_cache_size: Map.get(config, :max_cache_size, 100_000_000)
     }
   end
 
@@ -430,7 +414,8 @@ defmodule RubberDuck.Agents.ResearchAgent do
     # Clean up temporary files and caches
     case File.rm_rf(workspace.cache_dir) do
       {:ok, _} -> :ok
-      _ -> :ok  # Don't fail if cleanup fails
+      # Don't fail if cleanup fails
+      _ -> :ok
     end
   end
 
@@ -446,11 +431,9 @@ defmodule RubberDuck.Agents.ResearchAgent do
   end
 
   defp update_task_metrics(metrics, task_type) do
-    %{
-      metrics
-      | tasks_completed: metrics.tasks_completed + 1,
-        task_type => Map.get(metrics, task_type, 0) + 1
-    }
+    metrics
+    |> Map.update(:tasks_completed, 1, &(&1 + 1))
+    |> Map.update(task_type, 1, &(&1 + 1))
   end
 
   defp determine_status(state) do
@@ -461,17 +444,17 @@ defmodule RubberDuck.Agents.ResearchAgent do
     end
   end
 
-  defp research_from_source(topic, :memory, scope, context, state) do
+  defp research_from_source(topic, :memory, scope, _context, _state) do
     # Search memory for topic-related information
-    case MemoryManager.search_memories(topic, scope: scope) do
+    case MemoryManager.search(topic, scope: scope) do
       {:ok, memories} ->
-        findings = 
+        findings =
           memories
           |> Enum.map(&convert_memory_to_finding/1)
-          |> Enum.filter(& &1.relevance > 0.3)
-        
+          |> Enum.filter(&(&1.relevance > 0.3))
+
         {:ok, findings}
-      
+
       error ->
         error
     end
@@ -482,7 +465,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
     case search_codebase_for_topic(topic, scope, context, state) do
       {:ok, code_findings} ->
         {:ok, code_findings}
-      
+
       error ->
         error
     end
@@ -493,13 +476,13 @@ defmodule RubberDuck.Agents.ResearchAgent do
     case search_documentation_for_topic(topic, scope, context, state) do
       {:ok, doc_findings} ->
         {:ok, doc_findings}
-      
+
       error ->
         error
     end
   end
 
-  defp search_codebase_for_topic(topic, scope, _context, _state) do
+  defp search_codebase_for_topic(topic, _scope, _context, _state) do
     # Simplified codebase search - in production would use advanced indexing
     findings = [
       %{
@@ -510,11 +493,11 @@ defmodule RubberDuck.Agents.ResearchAgent do
         metadata: %{pattern_type: :genserver}
       }
     ]
-    
+
     {:ok, findings}
   end
 
-  defp search_documentation_for_topic(topic, scope, _context, _state) do
+  defp search_documentation_for_topic(topic, _scope, _context, _state) do
     # Simplified documentation search
     findings = [
       %{
@@ -525,7 +508,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
         metadata: %{doc_type: :guide}
       }
     ]
-    
+
     {:ok, findings}
   end
 
@@ -546,15 +529,15 @@ defmodule RubberDuck.Agents.ResearchAgent do
     if Enum.empty?(research_result.findings) do
       0.0
     else
-      avg_relevance = 
+      avg_relevance =
         research_result.findings
         |> Enum.map(& &1.relevance)
         |> Enum.sum()
         |> Kernel./(length(research_result.findings))
-      
+
       # Factor in number of sources
       source_factor = min(length(research_result.sources_searched) / 3, 1.0)
-      
+
       avg_relevance * source_factor
     end
   end
@@ -563,21 +546,21 @@ defmodule RubberDuck.Agents.ResearchAgent do
     cond do
       String.ends_with?(target, ".ex") or String.ends_with?(target, ".exs") ->
         :code_file
-      
+
       String.contains?(target, "/") and String.contains?(target, ".") ->
         :function
-      
+
       String.match?(target, ~r/^[A-Z][a-zA-Z0-9]*(\.[A-Z][a-zA-Z0-9]*)*$/) ->
         :module
-      
+
       true ->
         :topic
     end
   end
 
-  defp gather_file_context(file_path, depth, context, state, context_result) do
+  defp gather_file_context(file_path, _depth, _context, _state, context_result) do
     # Analyze file and gather related context
-    case AST.parse_file(file_path) do
+    case AST.parse(File.read!(file_path), :elixir) do
       {:ok, ast_info} ->
         %{
           context_result
@@ -586,23 +569,23 @@ defmodule RubberDuck.Agents.ResearchAgent do
             usage_patterns: analyze_usage_patterns(ast_info),
             confidence: 0.8
         }
-      
+
       {:error, _reason} ->
         %{context_result | confidence: 0.2}
     end
   end
 
-  defp gather_function_context(function_spec, depth, context, state, context_result) do
+  defp gather_function_context(_function_spec, _depth, _context, _state, context_result) do
     # Parse function specification and gather context
     %{context_result | confidence: 0.6}
   end
 
-  defp gather_module_context(module_name, depth, context, state, context_result) do
+  defp gather_module_context(_module_name, _depth, _context, _state, context_result) do
     # Analyze module and gather context
     %{context_result | confidence: 0.7}
   end
 
-  defp gather_topic_context(topic, depth, context, state, context_result) do
+  defp gather_topic_context(_topic, _depth, _context, _state, context_result) do
     # Research topic and build context
     %{context_result | confidence: 0.5}
   end
@@ -621,7 +604,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
     ast_info.calls || []
   end
 
-  defp analyze_pattern_type(codebase_path, pattern_type, context, state) do
+  defp analyze_pattern_type(codebase_path, pattern_type, _context, _state) do
     # Analyze specific pattern types in codebase
     patterns = [
       %{
@@ -631,7 +614,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
         confidence: 0.9
       }
     ]
-    
+
     {:ok, patterns}
   end
 
@@ -642,7 +625,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
     |> Map.new(fn {type, pattern_list} -> {type, length(pattern_list)} end)
   end
 
-  defp generate_pattern_recommendations(patterns) do
+  defp generate_pattern_recommendations(_patterns) do
     # Generate recommendations based on patterns found
     [
       "Consider consolidating similar GenServer patterns",
@@ -661,7 +644,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
     end
   end
 
-  defp extract_docs_from_source(source, format, context, state) do
+  defp extract_docs_from_source(source, format, _context, _state) do
     # Extract documentation from various sources
     docs = [
       %{
@@ -671,7 +654,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
         source: source
       }
     ]
-    
+
     {:ok, docs}
   end
 
@@ -693,7 +676,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
     }
   end
 
-  defp process_knowledge_source(source, domain, context, state) do
+  defp process_knowledge_source(source, domain, _context, _state) do
     # Process knowledge from various sources
     knowledge = %{
       items: [
@@ -706,20 +689,22 @@ defmodule RubberDuck.Agents.ResearchAgent do
       ],
       relationships: []
     }
-    
+
     {:ok, knowledge}
   end
 
-  defp build_knowledge_relationships(knowledge_items) do
+  defp build_knowledge_relationships(_knowledge_items) do
     # Build relationships between knowledge items
-    []  # Simplified - would implement relationship detection
+    # Simplified - would implement relationship detection
+    []
   end
 
   defp calculate_kb_confidence(kb_result) do
     if Enum.empty?(kb_result.knowledge_items) do
       0.0
     else
-      0.7  # Simplified confidence calculation
+      # Simplified confidence calculation
+      0.7
     end
   end
 
@@ -728,24 +713,25 @@ defmodule RubberDuck.Agents.ResearchAgent do
     Map.put(cache, kb_result.domain, kb_result)
   end
 
-  defp perform_semantic_search(query, scope, limit, context, state) do
+  defp perform_semantic_search(query, _scope, limit, _context, _state) do
     # Perform semantic search across available sources
-    results = [
-      %{
-        content: "Semantic search result for: #{query}",
-        relevance: 0.95,
-        source: "memory",
-        metadata: %{type: :code_example}
-      },
-      %{
-        content: "Additional result for: #{query}",
-        relevance: 0.87,
-        source: "documentation",
-        metadata: %{type: :guide}
-      }
-    ]
-    |> Enum.take(limit)
-    
+    results =
+      [
+        %{
+          content: "Semantic search result for: #{query}",
+          relevance: 0.95,
+          source: "memory",
+          metadata: %{type: :code_example}
+        },
+        %{
+          content: "Additional result for: #{query}",
+          relevance: 0.87,
+          source: "documentation",
+          metadata: %{type: :guide}
+        }
+      ]
+      |> Enum.take(limit)
+
     {:ok, results}
   end
 
@@ -760,7 +746,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
     end
   end
 
-  defp perform_search(query, filters, state) do
+  defp perform_search(query, filters, _state) do
     # Perform filtered search
     %{
       query: query,
@@ -770,7 +756,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
     }
   end
 
-  defp build_enhanced_context(task_context, state) do
+  defp build_enhanced_context(task_context, _state) do
     # Build enhanced context using agent's knowledge
     Map.merge(task_context, %{
       enhanced: true,
@@ -779,7 +765,7 @@ defmodule RubberDuck.Agents.ResearchAgent do
     })
   end
 
-  defp extract_knowledge(topic, state) do
+  defp extract_knowledge(topic, _state) do
     # Extract knowledge about a topic
     %{
       topic: topic,
