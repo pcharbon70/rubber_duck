@@ -36,6 +36,22 @@ config :rubber_duck, RubberDuck.LLM.Service,
       options: []
     },
     %{
+      name: :tgi,
+      adapter: RubberDuck.LLM.Providers.TGI,
+      base_url: System.get_env("TGI_BASE_URL", "http://localhost:8080"),
+      models: ["llama-3.1-8b", "llama-3.1-70b", "mistral-7b", "codellama-13b"],
+      priority: 4,
+      # No rate limiting for self-hosted TGI
+      rate_limit: nil,
+      max_retries: 3,
+      timeout: 120_000,
+      options: [
+        supports_function_calling: true,
+        supports_guided_generation: true,
+        supports_json_mode: true
+      ]
+    },
+    %{
       name: :mock,
       adapter: RubberDuck.LLM.Providers.Mock,
       models: ["mock-fast", "mock-smart", "mock-vision"],

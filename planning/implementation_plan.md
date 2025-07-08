@@ -38,12 +38,8 @@
 - **Section 4.5: Agentic Workflows Implementation** ✅ Completed
 - **Section 4.6: Dynamic Workflow Generation** ✅ Completed
 - **Section 4.7: Hybrid Workflow Architecture** ✅ Completed
-- **Section 4.8: Phase 4 Integration Tests** ✅ Completed
 
-### Phase 5: In Progress
-- **Section 5.1: Phoenix Channels Setup** ✅ Completed
-
-### Phase 6: Not Started
+### Phase 5-6: Not Started
 
 ## Table of Contents
 1. [Phase 1: Foundation & Core Infrastructure](#phase-1-foundation--core-infrastructure)
@@ -1099,75 +1095,155 @@ Create comprehensive integration tests in `test/integration/phase_4_test.exs` to
 
 This phase implements the user-facing interfaces including Phoenix Channels for real-time communication, LiveView for the web interface, and a sophisticated CLI/TUI. These interfaces provide interactive access to all the coding assistant capabilities.
 
-### 5.1 Phoenix Channels Setup ✅ Completed
+### 5.1 Phoenix Channels Setup
 
 Implement WebSocket-based real-time communication for streaming code completions and live updates.
 
 #### Tasks:
-- [x] 5.1.1 Configure Phoenix endpoint for WebSocket support
-- [x] 5.1.2 Create `RubberDuckWeb.UserSocket` module
-- [x] 5.1.3 Implement authentication for socket connections
-- [x] 5.1.4 Create `RubberDuckWeb.CodeChannel`:
-  - [x] 5.1.4.1 Handle join with project authorization
-  - [x] 5.1.4.2 Implement completion streaming
-  - [x] 5.1.4.3 Add presence tracking
-  - [x] 5.1.4.4 Handle collaborative editing events
-- [x] 5.1.5 Set up channel tests infrastructure
-- [x] 5.1.6 Implement reconnection logic
-- [x] 5.1.7 Add channel metrics and monitoring
-- [x] 5.1.8 Create channel rate limiting
-- [x] 5.1.9 Build message queuing for offline users
-- [x] 5.1.10 Document channel protocol
+- [ ] 5.1.1 Configure Phoenix endpoint for WebSocket support
+- [ ] 5.1.2 Create `RubberDuckWeb.UserSocket` module
+- [ ] 5.1.3 Implement authentication for socket connections
+- [ ] 5.1.4 Create `RubberDuckWeb.CodeChannel`:
+  - [ ] 5.1.4.1 Handle join with project authorization
+  - [ ] 5.1.4.2 Implement completion streaming
+  - [ ] 5.1.4.3 Add presence tracking
+  - [ ] 5.1.4.4 Handle collaborative editing events
+- [ ] 5.1.5 Set up channel tests infrastructure
+- [ ] 5.1.6 Implement reconnection logic
+- [ ] 5.1.7 Add channel metrics and monitoring
+- [ ] 5.1.8 Create channel rate limiting
+- [ ] 5.1.9 Build message queuing for offline users
+- [ ] 5.1.10 Document channel protocol
 
 #### Unit Tests:
 Create tests in `test/rubber_duck_web/channels/code_channel_test.exs` to verify:
-- [x] 5.1.11 Test channel join with authentication
-- [x] 5.1.12 Test completion streaming in chunks
-- [x] 5.1.13 Test completion error handling
-- [x] 5.1.14 Test cursor position broadcasting
-- [x] 5.1.15 Test user presence tracking
-- [x] 5.1.16 Test message queuing for offline users
-- [x] 5.1.17 Test rate limiting enforcement
-
-**Note**: Implemented comprehensive Phoenix Channels infrastructure including:
-- UserSocket with token and API key authentication
-- CodeChannel for streaming completions and collaborative editing  
-- AnalysisChannel for dedicated analysis operations
-- WorkspaceChannel for file and project management
-- Message queuing with ETS for offline users
-- Presence tracking for user collaboration
-- Full API documentation and JavaScript client example
-See `notes/features/051-phoenix-channels-setup.md` for implementation details.
+- [ ] 5.1.11 Test channel join with authentication
+- [ ] 5.1.12 Test completion streaming in chunks
+- [ ] 5.1.13 Test completion error handling
+- [ ] 5.1.14 Test cursor position broadcasting
+- [ ] 5.1.15 Test user presence tracking
+- [ ] 5.1.16 Test message queuing for offline users
+- [ ] 5.1.17 Test rate limiting enforcement
 
 ### 5.2 LiveView Interface
 
-Build an interactive web interface using Phoenix LiveView for real-time code editing and analysis.
+Build a comprehensive Phoenix LiveView application for real-time collaborative coding with integrated AI assistance, following the architecture design that combines code editing and LLM chat capabilities.
 
 #### Tasks:
-- [ ] 5.2.1 Create `RubberDuckWeb.EditorLive` module
-- [ ] 5.2.2 Implement code editor component:
-  - [ ] 5.2.2.1 Syntax highlighting
-  - [ ] 5.2.2.2 Auto-completion integration
-  - [ ] 5.2.2.3 Real-time error display
-  - [ ] 5.2.2.4 Code folding
-- [ ] 5.2.3 Add file explorer component
-- [ ] 5.2.4 Create analysis results panel
-- [ ] 5.2.5 Implement settings/preferences UI
-- [ ] 5.2.6 Add keyboard shortcuts handling
-- [ ] 5.2.7 Create theme support (light/dark)
-- [ ] 5.2.8 Build responsive layout
-- [ ] 5.2.9 Add collaboration indicators
-- [ ] 5.2.10 Implement undo/redo functionality
+
+**Core LiveView Infrastructure:**
+- [ ] 5.2.1 Create `RubberDuckWeb.CodingSessionLive` module as main coordinator
+- [ ] 5.2.2 Implement Phoenix PubSub subscriptions:
+  - [ ] 5.2.2.1 Project-level updates (`project:#{project_id}`)
+  - [ ] 5.2.2.2 Editor updates (`editor:#{project_id}`)
+  - [ ] 5.2.2.3 Chat updates (`chat:#{project_id}`)
+- [ ] 5.2.3 Set up WebSocket channel subscription for coding sessions
+- [ ] 5.2.4 Implement state management:
+  - [ ] 5.2.4.1 Project and file state
+  - [ ] 5.2.4.2 Conversation and message streams
+  - [ ] 5.2.4.3 Editor content with debouncing
+  - [ ] 5.2.4.4 Streaming status indicators
+
+**Monaco Editor Component:**
+- [ ] 5.2.5 Create `RubberDuckWeb.Components.MonacoEditorComponent`
+- [ ] 5.2.6 Implement Monaco Editor integration:
+  - [ ] 5.2.6.1 JavaScript hooks for editor mounting
+  - [ ] 5.2.6.2 Syntax highlighting with language detection
+  - [ ] 5.2.6.3 Real-time collaborative editing
+  - [ ] 5.2.6.4 External update handling
+  - [ ] 5.2.6.5 Code suggestions overlay
+- [ ] 5.2.7 Add editor configuration:
+  - [ ] 5.2.7.1 Theme support (vs-dark default)
+  - [ ] 5.2.7.2 Font and display preferences
+  - [ ] 5.2.7.3 Language-specific settings
+- [ ] 5.2.8 Implement AI suggestion integration:
+  - [ ] 5.2.8.1 Suggestion display overlay
+  - [ ] 5.2.8.2 Apply/dismiss functionality
+  - [ ] 5.2.8.3 Incremental completion updates
+
+**Chat Panel Component:**
+- [ ] 5.2.9 Create `RubberDuckWeb.Components.ChatPanelComponent`
+- [ ] 5.2.10 Implement chat functionality:
+  - [ ] 5.2.10.1 Message streaming with typing indicators
+  - [ ] 5.2.10.2 LLM response streaming support
+  - [ ] 5.2.10.3 Context-aware prompting
+  - [ ] 5.2.10.4 Message history with timestamps
+- [ ] 5.2.11 Integrate with Phase 3 systems:
+  - [ ] 5.2.11.1 LLM Service for completions
+  - [ ] 5.2.11.2 Memory Manager for context
+  - [ ] 5.2.11.3 Context Builder for prompts
+
+**File Tree Component:**
+- [ ] 5.2.12 Create `RubberDuckWeb.Components.FileTreeComponent`
+- [ ] 5.2.13 Implement file navigation:
+  - [ ] 5.2.13.1 Project file listing
+  - [ ] 5.2.13.2 File selection handling
+  - [ ] 5.2.13.3 Current file highlighting
+  - [ ] 5.2.13.4 File type icons
+
+**Context Panel Component:**
+- [ ] 5.2.14 Create `RubberDuckWeb.Components.ContextPanelComponent`
+- [ ] 5.2.15 Display project context information:
+  - [ ] 5.2.15.1 Current analysis results
+  - [ ] 5.2.15.2 Code metrics
+  - [ ] 5.2.15.3 Relevant documentation
+
+**JavaScript Integration:**
+- [ ] 5.2.16 Create Monaco Editor hooks (`assets/js/hooks/monaco_editor.js`):
+  - [ ] 5.2.16.1 Editor mounting and configuration
+  - [ ] 5.2.16.2 Content change debouncing
+  - [ ] 5.2.16.3 Cursor position tracking
+  - [ ] 5.2.16.4 Completion provider registration
+- [ ] 5.2.17 Implement live_monaco_editor integration
+- [ ] 5.2.18 Add collaborative cursor support
+
+**Real-time Features:**
+- [ ] 5.2.19 Implement file content synchronization:
+  - [ ] 5.2.19.1 Debounced auto-save
+  - [ ] 5.2.19.2 Conflict resolution
+  - [ ] 5.2.19.3 Multi-user awareness
+- [ ] 5.2.20 Add presence tracking for collaboration
+- [ ] 5.2.21 Create real-time analysis updates
+
+**Integration with Existing Systems:**
+- [ ] 5.2.22 Connect to Phase 2 engines:
+  - [ ] 5.2.22.1 Code Analysis Engine integration
+  - [ ] 5.2.22.2 Suggestion Engine for completions
+- [ ] 5.2.23 Integrate Phase 4 workflows:
+  - [ ] 5.2.23.1 Trigger analysis workflows
+  - [ ] 5.2.23.2 Display workflow results
+- [ ] 5.2.24 Add telemetry events for UI interactions
 
 #### Unit Tests:
-Create tests in `test/rubber_duck_web/live/editor_live_test.exs` to verify:
-- [ ] 5.2.11 Test editor renders with file content
-- [ ] 5.2.12 Test code changes with debouncing
-- [ ] 5.2.13 Test real-time completion display
-- [ ] 5.2.14 Test file explorer updates
-- [ ] 5.2.15 Test collaboration cursor display
-- [ ] 5.2.16 Test theme switching
-- [ ] 5.2.17 Test keyboard shortcuts
+
+**CodingSessionLive Tests** (`test/rubber_duck_web/live/coding_session_live_test.exs`):
+- [ ] 5.2.25 Test mount with project authorization
+- [ ] 5.2.26 Test PubSub subscription setup
+- [ ] 5.2.27 Test file selection and content loading
+- [ ] 5.2.28 Test editor content change handling
+- [ ] 5.2.29 Test file save functionality
+- [ ] 5.2.30 Test real-time update broadcasting
+
+**Component Tests** (`test/rubber_duck_web/components/`):
+- [ ] 5.2.31 Test Monaco Editor component rendering
+- [ ] 5.2.32 Test Chat Panel message streaming
+- [ ] 5.2.33 Test File Tree navigation
+- [ ] 5.2.34 Test suggestion application
+- [ ] 5.2.35 Test context panel updates
+
+**Integration Tests** (`test/rubber_duck_web/live/integration_test.exs`):
+- [ ] 5.2.36 Test complete coding session flow
+- [ ] 5.2.37 Test multi-user collaboration
+- [ ] 5.2.38 Test LLM response streaming
+- [ ] 5.2.39 Test code analysis integration
+- [ ] 5.2.40 Test memory persistence across sessions
+
+**JavaScript Hook Tests** (`test/assets/js/hooks/`):
+- [ ] 5.2.41 Test Monaco Editor mounting
+- [ ] 5.2.42 Test content synchronization
+- [ ] 5.2.43 Test completion provider
+- [ ] 5.2.44 Test external update handling
+- [ ] 5.2.45 Test cursor position broadcasting
 
 ### 5.3 CLI Implementation
 

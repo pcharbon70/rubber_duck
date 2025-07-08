@@ -101,6 +101,47 @@ defmodule RubberDuck.LLM.Response do
     }
   end
 
+  def from_provider(:tgi, raw_response) do
+    # TGI can return either OpenAI-compatible or native format
+    if raw_response["id"] && raw_response["object"] do
+      # OpenAI-compatible format from /v1/chat/completions
+      %__MODULE__{
+        id: raw_response["id"],
+        model: raw_response["model"],
+        provider: :tgi,
+        choices: parse_openai_choices(raw_response["choices"]),
+        usage: parse_openai_usage(raw_response["usage"]),
+        created_at: parse_tgi_timestamp(raw_response["created"]) || DateTime.utc_now(),
+        metadata: %{
+          object: raw_response["object"],
+          system_fingerprint: raw_response["system_fingerprint"]
+        }
+      }
+    else
+      # TGI native format from /generate endpoint
+      %__MODULE__{
+        id: generate_id(),
+        model: raw_response["model"] || "tgi",
+        provider: :tgi,
+        choices: [
+          %{
+            index: 0,
+            message: %{
+              "role" => "assistant",
+              "content" => raw_response["generated_text"] || ""
+            },
+            finish_reason: parse_tgi_finish_reason(raw_response["finish_reason"])
+          }
+        ],
+        usage: parse_tgi_usage(raw_response["details"]),
+        created_at: DateTime.utc_now(),
+        metadata: %{
+          details: raw_response["details"]
+        }
+      }
+    end
+  end
+
   def from_provider(provider, raw_response) do
     # Generic fallback for unknown providers
     %__MODULE__{
@@ -257,8 +298,31 @@ defmodule RubberDuck.LLM.Response do
     %{prompt_price: 0.0, completion_price: 0.0}
   end
 
+  defp get_pricing(:tgi, _model) do
+    # TGI is free (self-hosted models)
+    %{prompt_price: 0.0, completion_price: 0.0}
+  end
+
   defp get_pricing(_, _) do
     # Default pricing for unknown providers
     %{prompt_price: 0.01, completion_price: 0.02}
+  end
+
+  defp parse_tgi_timestamp(nil), do: nil
+  defp parse_tgi_timestamp(unix_timestamp) when is_integer(unix_timestamp) do
+    DateTime.from_unix!(unix_timestamp)
+  end
+
+  defp parse_tgi_finish_reason(nil), do: "stop"
+  defp parse_tgi_finish_reason(reason), do: reason
+
+  defp parse_tgi_usage(nil), do: nil
+  defp parse_tgi_usage(details) do
+    %{
+      prompt_tokens: details["prefill"] && length(details["prefill"]) || 0,
+      completion_tokens: details["tokens"] && length(details["tokens"]) || 0,
+      total_tokens: (details["prefill"] && length(details["prefill"]) || 0) + 
+                   (details["tokens"] && length(details["tokens"]) || 0)
+    }
   end
 end
