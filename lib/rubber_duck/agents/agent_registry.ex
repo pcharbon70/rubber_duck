@@ -427,4 +427,3 @@ defmodule RubberDuck.Agents.AgentRegistry do
     end
   end
 end
-
