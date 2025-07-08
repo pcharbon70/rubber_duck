@@ -43,7 +43,15 @@ defmodule RubberDuck.Application do
       RubberDuck.Workflows.Registry,
       RubberDuck.Workflows.Executor,
       RubberDuck.Workflows.Cache,
-      RubberDuck.Workflows.Metrics.Aggregator
+      RubberDuck.Workflows.Metrics.Aggregator,
+      # Phoenix PubSub for channels
+      {Phoenix.PubSub, name: RubberDuck.PubSub},
+      # Phoenix Presence for tracking users
+      RubberDuckWeb.Presence,
+      # Message queue for offline users
+      RubberDuckWeb.MessageQueue,
+      # Web endpoint - start last
+      RubberDuckWeb.Endpoint
       # Error boundary GenServer - started manually in tests
       # RubberDuck.ErrorBoundary
     ]
