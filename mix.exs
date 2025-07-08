@@ -65,7 +65,21 @@ defmodule RubberDuck.MixProject do
       {:pgvector, "~> 0.3"},
 
       # Workflow orchestration
-      {:reactor, "~> 0.15.6"}
+      {:reactor, "~> 0.15.6"},
+
+      # Phoenix and related dependencies for web interface
+      {:phoenix, "~> 1.7.0"},
+      {:phoenix_pubsub, "~> 2.1"},
+      {:phoenix_html, "~> 4.0"},
+      {:phoenix_live_view, "~> 0.20.0"},
+      {:phoenix_live_reload, "~> 1.4", only: :dev},
+      {:phoenix_live_dashboard, "~> 0.8"},
+      {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
+      {:tailwind, "~> 0.2", runtime: Mix.env() == :dev},
+      {:swoosh, "~> 1.5"},
+      {:gen_smtp, "~> 1.0"},
+      {:gettext, "~> 0.20"},
+      {:plug_cowboy, "~> 2.7"}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
