@@ -64,6 +64,25 @@ defmodule RubberDuck.Workflows.Executor do
   end
 
   @doc """
+  Executes a workflow directly without going through GenServer.
+  
+  This is used by the hybrid workflow architecture for direct execution.
+  """
+  def execute_workflow(workflow_name, input, context, opts) do
+    workflow_id = "hybrid_#{Ash.UUID.generate()}"
+    
+    # Build a merged context
+    full_context = Map.merge(context, %{
+      workflow_id: workflow_id,
+      trace_id: opts[:trace_id] || Ash.UUID.generate(),
+      metadata: opts[:metadata] || %{}
+    })
+    
+    # Execute the workflow privately
+    execute_workflow_internal(workflow_id, workflow_name, input, Keyword.put(opts, :context, full_context))
+  end
+
+  @doc """
   Executes a dynamic workflow generated from a task description.
 
   The task will be analyzed for complexity and a workflow will be
@@ -101,7 +120,7 @@ defmodule RubberDuck.Workflows.Executor do
     # Start workflow execution
     task =
       Task.async(fn ->
-        execute_workflow(workflow_id, workflow, input, opts)
+        execute_workflow_internal(workflow_id, workflow, input, opts)
       end)
 
     # Track running workflow
@@ -224,7 +243,7 @@ defmodule RubberDuck.Workflows.Executor do
 
     # Start workflow execution without tracking the caller
     Task.start(fn ->
-      result = execute_workflow(workflow_id, workflow, input, opts)
+      result = execute_workflow_internal(workflow_id, workflow, input, opts)
 
       # Send result to any registered handlers
       if handler = opts[:on_complete] do
@@ -300,7 +319,7 @@ defmodule RubberDuck.Workflows.Executor do
 
   # Private functions
 
-  defp execute_workflow(workflow_id, workflow, input, opts) do
+  defp execute_workflow_internal(workflow_id, workflow, input, opts) do
     start_time = System.monotonic_time(:millisecond)
 
     try do

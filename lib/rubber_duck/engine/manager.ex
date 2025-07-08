@@ -197,6 +197,13 @@ defmodule RubberDuck.Engine.Manager do
   end
 
   @doc """
+  Checks the health of an engine.
+  """
+  def health_check(engine_name) do
+    health_status(engine_name)
+  end
+
+  @doc """
   Lists all running engines.
   """
   def list_engines do
