@@ -24,6 +24,9 @@ defmodule RubberDuck.Application do
       RubberDuck.LLM.Supervisor,
       # Memory system components
       RubberDuck.Memory.Manager,
+      # Agent system components
+      RubberDuck.Agents.AgentRegistry,
+      RubberDuck.Agents.Supervisor,
       # Context building components
       RubberDuck.Context.Cache,
       RubberDuck.Context.AdaptiveSelector,

@@ -49,7 +49,7 @@ defmodule RubberDuck.Agents.Communication do
       Communication.subscribe(:task_completed, self())
   """
 
-  alias RubberDuck.Agents.Registry
+  alias RubberDuck.Agents.{Registry, AgentRegistry}
 
   require Logger
 
@@ -72,10 +72,37 @@ defmodule RubberDuck.Agents.Communication do
   - `:ok` - Message sent successfully
   - `{:error, reason}` - Failed to send
   """
-  def send_message(_agent_id, _message, _sender, _opts \\ []) do
-    # This would need a custom registry implementation that tracks agents
-    # Standard Registry doesn't support our use case
-    {:error, :agent_not_found}
+  def send_message(agent_id, message, sender, opts \\ []) do
+    # Use custom registry if specified, otherwise use AgentRegistry
+    use_agent_registry = Keyword.get(opts, :use_agent_registry, true)
+
+    if use_agent_registry do
+      case AgentRegistry.lookup_agent(agent_id) do
+        {:ok, pid, _metadata} ->
+          formatted_message = format_message(message, sender)
+          send(pid, {:agent_message, formatted_message.payload, formatted_message.sender})
+          update_metrics(:messages_sent, 1)
+          :ok
+
+        {:error, :agent_not_found} ->
+          {:error, :agent_not_found}
+      end
+    else
+      # Fallback to standard Registry if needed
+      registry = Keyword.get(opts, :registry, RubberDuck.Agents.Registry)
+
+      case RubberDuck.Agents.Registry.lookup_agent(registry, agent_id) do
+        {:ok, _metadata} ->
+          formatted_message = format_message(message, sender)
+          [{pid, _}] = Elixir.Registry.lookup(registry, agent_id)
+          send(pid, {:agent_message, formatted_message.payload, formatted_message.sender})
+          update_metrics(:messages_sent, 1)
+          :ok
+
+        {:error, :not_found} ->
+          {:error, :agent_not_found}
+      end
+    end
   end
 
   @doc """
@@ -91,15 +118,26 @@ defmodule RubberDuck.Agents.Communication do
   - `{:ok, count}` - Number of agents that received the message
   - `{:error, reason}` - Failed to broadcast
   """
-  def broadcast_to_type(_agent_type, _message, _sender, _opts \\ []) do
-    # Since Registry doesn't have select, we can't broadcast by type
-    # This is a limitation that would need a custom registry
-    count = 0
+  def broadcast_to_type(agent_type, message, sender, opts \\ []) do
+    use_agent_registry = Keyword.get(opts, :use_agent_registry, true)
 
-    update_metrics(:broadcasts_sent, 1)
-    update_metrics(:messages_sent, count)
+    if use_agent_registry do
+      formatted_message = format_message(message, sender)
+      broadcast_message = {:agent_message, formatted_message.payload, formatted_message.sender}
 
-    {:ok, count}
+      case AgentRegistry.broadcast_to_type(agent_type, broadcast_message) do
+        {:ok, count} ->
+          update_metrics(:broadcasts_sent, 1)
+          update_metrics(:messages_sent, count)
+          {:ok, count}
+
+        error ->
+          error
+      end
+    else
+      # Without AgentRegistry, we can't efficiently broadcast by type
+      {:error, :not_supported}
+    end
   end
 
   @doc """
@@ -115,10 +153,61 @@ defmodule RubberDuck.Agents.Communication do
   - `{:ok, response}` - Response received
   - `{:error, reason}` - Request failed
   """
-  def request_response(_agent_id, _request, _timeout, _opts \\ []) do
-    # This would need a custom registry implementation
-    # Standard Registry doesn't support our agent lookup use case
-    {:error, :agent_not_found}
+  def request_response(agent_id, request, timeout, opts \\ []) do
+    use_agent_registry = Keyword.get(opts, :use_agent_registry, true)
+    ref = make_ref()
+    sender = self()
+
+    lookup_result =
+      if use_agent_registry do
+        case AgentRegistry.lookup_agent(agent_id) do
+          {:ok, pid, metadata} -> {:ok, pid, metadata}
+          {:error, _} -> {:error, :agent_not_found}
+        end
+      else
+        registry = Keyword.get(opts, :registry, RubberDuck.Agents.Registry)
+
+        case RubberDuck.Agents.Registry.lookup_agent(registry, agent_id) do
+          {:ok, meta} ->
+            [{pid, _}] = Elixir.Registry.lookup(registry, agent_id)
+            {:ok, pid, meta}
+
+          {:error, :not_found} ->
+            {:error, :agent_not_found}
+        end
+      end
+
+    case lookup_result do
+      {:ok, pid, _metadata} ->
+        # Monitor the agent process
+        monitor_ref = Process.monitor(pid)
+
+        # Send request
+        send(pid, {:agent_request, request, sender, ref})
+
+        # Wait for response
+        start_time = System.monotonic_time(:millisecond)
+
+        receive do
+          {:agent_response, response, ^ref} ->
+            Process.demonitor(monitor_ref, [:flush])
+            latency = calculate_latency(start_time)
+            update_metrics(:average_latency, latency)
+            {:ok, response}
+
+          {:DOWN, ^monitor_ref, :process, ^pid, _reason} ->
+            update_metrics(:errors, 1)
+            {:error, :agent_crashed}
+        after
+          timeout ->
+            Process.demonitor(monitor_ref, [:flush])
+            update_metrics(:timeouts, 1)
+            {:error, :timeout}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   @doc """
@@ -241,12 +330,27 @@ defmodule RubberDuck.Agents.Communication do
   - `{:ok, agent_id}` - Agent found and message sent
   - `{:error, :no_capable_agent}` - No agent with capability
   """
-  def route_to_capable_agent(_capability, _message, _opts \\ []) do
-    # registry = Keyword.get(opts, :registry, Registry)
+  def route_to_capable_agent(capability, message, opts \\ []) do
+    use_agent_registry = Keyword.get(opts, :use_agent_registry, true)
 
-    # Since Registry doesn't support select, we'll return an error
-    # In a real implementation, we'd need a custom registry that tracks capabilities
-    {:error, :no_capable_agent}
+    if use_agent_registry do
+      case AgentRegistry.find_by_capability(capability) do
+        {:ok, []} ->
+          {:error, :no_capable_agent}
+
+        {:ok, agents} ->
+          # Select first available agent (could implement load balancing)
+          {pid, _metadata} = hd(agents)
+          send(pid, {:agent_message, message, :router})
+          {:ok, :message_routed}
+
+        error ->
+          error
+      end
+    else
+      # Standard Registry doesn't support capability-based routing
+      {:error, :not_supported}
+    end
   end
 
   @doc """
@@ -260,10 +364,15 @@ defmodule RubberDuck.Agents.Communication do
   ## Returns
   - `:ok`
   """
-  def subscribe(_event_type, _subscriber, _opts \\ []) do
-    # Registry.register doesn't support tuple keys in standard Registry
-    # Would need custom registry implementation
-    :ok
+  def subscribe(event_type, subscriber, opts \\ []) do
+    use_agent_registry = Keyword.get(opts, :use_agent_registry, true)
+
+    if use_agent_registry do
+      AgentRegistry.subscribe(event_type, subscriber)
+    else
+      # Standard Registry doesn't support our event subscription pattern
+      {:error, :not_supported}
+    end
   end
 
   @doc """
@@ -277,10 +386,15 @@ defmodule RubberDuck.Agents.Communication do
   ## Returns
   - `:ok`
   """
-  def unsubscribe(_event_type, _subscriber, _opts \\ []) do
-    # Registry.unregister doesn't support tuple keys in standard Registry
-    # Would need custom registry implementation
-    :ok
+  def unsubscribe(event_type, subscriber, opts \\ []) do
+    use_agent_registry = Keyword.get(opts, :use_agent_registry, true)
+
+    if use_agent_registry do
+      AgentRegistry.unsubscribe(event_type, subscriber)
+    else
+      # Standard Registry doesn't support our event subscription pattern
+      {:error, :not_supported}
+    end
   end
 
   @doc """
@@ -293,12 +407,22 @@ defmodule RubberDuck.Agents.Communication do
   ## Returns
   - `:ok`
   """
-  def publish_event({_event_type, _data} = _event, _opts \\ []) do
-    # Registry.lookup doesn't support tuple keys in standard Registry
-    # Would need custom registry implementation
-    # For now, just update metrics
-    update_metrics(:events_published, 1)
-    :ok
+  def publish_event({event_type, data} = _event, opts \\ []) do
+    use_agent_registry = Keyword.get(opts, :use_agent_registry, true)
+
+    if use_agent_registry do
+      case AgentRegistry.publish_event(event_type, data) do
+        {:ok, count} ->
+          update_metrics(:events_published, 1)
+          {:ok, count}
+
+        error ->
+          error
+      end
+    else
+      # Standard Registry doesn't support our event publication pattern
+      {:error, :not_supported}
+    end
   end
 
   @doc """
@@ -358,14 +482,46 @@ defmodule RubberDuck.Agents.Communication do
     {:ok, results}
   end
 
-  defp execute_coordination_steps([step | _rest], _results, coordinator, _registry, _timeout) do
+  defp execute_coordination_steps([step | rest], results, coordinator, registry, timeout) do
     agent_type = step.agent_type
+    task = step.task
 
-    # Since we can't find agents by type with standard Registry,
-    # we'll return an error for now
-    reason = :no_agents_of_type
-    send(coordinator, {:step_failed, step, reason})
-    {:error, {:no_agent_available, agent_type, reason}}
+    # Try to find an agent of the required type using AgentRegistry
+    case find_agent_by_type(agent_type) do
+      {:ok, agent_id} ->
+        # Execute step on agent
+        case request_response(agent_id, task, timeout) do
+          {:ok, result} ->
+            # Notify coordinator of step completion
+            send(coordinator, {:step_completed, step, result})
+
+            # Continue with next step
+            execute_coordination_steps(rest, [result | results], coordinator, registry, timeout)
+
+          {:error, reason} ->
+            send(coordinator, {:step_failed, step, reason})
+            {:error, {:step_failed, step, reason}}
+        end
+
+      {:error, reason} ->
+        send(coordinator, {:step_failed, step, reason})
+        {:error, {:no_agent_available, agent_type, reason}}
+    end
+  end
+
+  defp find_agent_by_type(agent_type) do
+    case AgentRegistry.find_by_type(agent_type) do
+      {:ok, []} ->
+        {:error, :no_agents_of_type}
+
+      {:ok, agents} ->
+        # Return the first available agent's ID
+        {agent_id, _pid, _metadata} = hd(agents)
+        {:ok, agent_id}
+
+      error ->
+        error
+    end
   end
 
   defp update_metrics(key, value) do

@@ -28,7 +28,7 @@ defmodule RubberDuck.Agents.Supervisor do
 
   use DynamicSupervisor
 
-  alias RubberDuck.Agents.{Registry, Agent}
+  alias RubberDuck.Agents.{Registry, Agent, AgentRegistry}
 
   require Logger
 
@@ -89,7 +89,17 @@ defmodule RubberDuck.Agents.Supervisor do
       {:ok, pid} = result ->
         Logger.info("Started #{agent_type} agent #{agent_id} with PID #{inspect(pid)}")
 
-        # Register agent for discovery
+        # Register agent in both registries for compatibility
+        # Use AgentRegistry for advanced features
+        AgentRegistry.register_agent(agent_id, pid, %{
+          type: agent_type,
+          capabilities: get_agent_capabilities(agent_type, agent_config),
+          config: agent_config,
+          started_at: DateTime.utc_now(),
+          status: :running
+        })
+
+        # Also register in standard Registry for backward compatibility
         Registry.register_agent(@registry_name, agent_id, %{
           type: agent_type,
           pid: pid,
@@ -260,5 +270,25 @@ defmodule RubberDuck.Agents.Supervisor do
         # In production, would track start time properly
         System.system_time(:second)
     end
+  end
+
+  defp get_agent_capabilities(:research, _config) do
+    [:semantic_search, :context_building, :pattern_analysis, :information_extraction, :knowledge_synthesis]
+  end
+
+  defp get_agent_capabilities(:analysis, _config) do
+    [:code_analysis, :security_analysis, :complexity_analysis, :pattern_detection, :style_checking]
+  end
+
+  defp get_agent_capabilities(:generation, _config) do
+    [:code_generation, :refactoring, :code_completion, :documentation_generation, :code_fixing]
+  end
+
+  defp get_agent_capabilities(:review, _config) do
+    [:change_review, :quality_assessment, :improvement_suggestions, :correctness_verification, :documentation_review]
+  end
+
+  defp get_agent_capabilities(_, _config) do
+    []
   end
 end
