@@ -116,8 +116,8 @@ defmodule RubberDuck.Workflows.AgentSteps do
     spec = Map.fetch!(arguments, :coordination_spec)
     _workflow_id = Map.get(context, :workflow_id, generate_workflow_id())
 
-    # TODO: Implement when Coordinator module is available
-    # For now, return a placeholder implementation
+    # NOTE: Coordinator module not yet implemented, using placeholder
+    # This will be enhanced when the Coordinator module becomes available
     Logger.warning("Coordinator not yet implemented, returning mock coordination")
 
     case spec.strategy do
@@ -332,5 +332,44 @@ defmodule RubberDuck.Workflows.AgentSteps do
       timeout ->
         {:error, :timeout}
     end
+  end
+
+  @doc """
+  Ensures required agents are available.
+  """
+  def ensure_agents(arguments, _context, _options) do
+    required_agents = Map.fetch!(arguments, :required_agents)
+    requirements = Map.get(arguments, :requirements, %{})
+
+    # Check current agent availability
+    current_agents =
+      for type <- required_agents do
+        case AgentRegistry.find_by_type(type) do
+          {:ok, agents} -> {type, length(agents)}
+          _ -> {type, 0}
+        end
+      end
+
+    # Start any missing agents
+    for {type, count} when count == 0 <- current_agents do
+      Supervisor.start_agent(type, %{
+        memory_tier: requirements[:memory] || :short_term
+      })
+    end
+
+    {:ok, :agents_ready}
+  end
+
+  @doc """
+  Monitors resource usage during workflow execution.
+  """
+  def monitor_resources(arguments, _context, _options) do
+    thresholds = Map.fetch!(arguments, :thresholds)
+
+    # In a real implementation, this would set up monitoring
+    # For now, just log and return success
+    Logger.info("Monitoring resources with thresholds: #{inspect(thresholds)}")
+
+    {:ok, :monitoring_active}
   end
 end

@@ -13,7 +13,7 @@ defmodule RubberDuck.Workflows.Executor do
 
   require Logger
 
-  alias RubberDuck.Workflows.{Registry, Cache, Metrics}
+  alias RubberDuck.Workflows.{Registry, Cache, Metrics, ComplexityAnalyzer, DynamicBuilder}
 
   # 1 minute
   @default_timeout 60_000
@@ -63,6 +63,24 @@ defmodule RubberDuck.Workflows.Executor do
     GenServer.call(__MODULE__, :list_running)
   end
 
+  @doc """
+  Executes a dynamic workflow generated from a task description.
+
+  The task will be analyzed for complexity and a workflow will be
+  dynamically generated and executed.
+  """
+  def run_dynamic(task, opts \\ []) do
+    timeout = opts[:timeout] || @default_timeout
+    GenServer.call(__MODULE__, {:run_dynamic, task, opts}, timeout)
+  end
+
+  @doc """
+  Executes a dynamic workflow asynchronously.
+  """
+  def run_dynamic_async(task, opts \\ []) do
+    GenServer.cast(__MODULE__, {:run_dynamic_async, task, opts})
+  end
+
   # Server callbacks
 
   @impl true
@@ -95,7 +113,41 @@ defmodule RubberDuck.Workflows.Executor do
       task: task,
       started_at: DateTime.utc_now(),
       status: :running,
-      from: from
+      from: from,
+      type: :static
+    }
+
+    new_state = %{
+      state
+      | running_workflows: Map.put(state.running_workflows, workflow_id, workflow_info),
+        workflow_counter: state.workflow_counter + 1
+    }
+
+    # We'll reply when the task completes
+    {:noreply, new_state}
+  end
+
+  @impl true
+  def handle_call({:run_dynamic, task, opts}, from, state) do
+    workflow_id = generate_workflow_id(state)
+
+    # Start dynamic workflow execution
+    execution_task =
+      Task.async(fn ->
+        execute_dynamic_workflow(workflow_id, task, opts)
+      end)
+
+    # Track running workflow
+    workflow_info = %{
+      id: workflow_id,
+      workflow: :dynamic,
+      input: task,
+      opts: opts,
+      task: execution_task,
+      started_at: DateTime.utc_now(),
+      status: :running,
+      from: from,
+      type: :dynamic
     }
 
     new_state = %{
@@ -173,6 +225,25 @@ defmodule RubberDuck.Workflows.Executor do
     # Start workflow execution without tracking the caller
     Task.start(fn ->
       result = execute_workflow(workflow_id, workflow, input, opts)
+
+      # Send result to any registered handlers
+      if handler = opts[:on_complete] do
+        handler.(result)
+      end
+    end)
+
+    new_state = %{state | workflow_counter: state.workflow_counter + 1}
+
+    {:noreply, new_state}
+  end
+
+  @impl true
+  def handle_cast({:run_dynamic_async, task, opts}, state) do
+    workflow_id = generate_workflow_id(state)
+
+    # Start dynamic workflow execution without tracking the caller
+    Task.start(fn ->
+      result = execute_dynamic_workflow(workflow_id, task, opts)
 
       # Send result to any registered handlers
       if handler = opts[:on_complete] do
@@ -359,5 +430,124 @@ defmodule RubberDuck.Workflows.Executor do
     else
       reactor
     end
+  end
+
+  # Dynamic workflow execution
+  defp execute_dynamic_workflow(workflow_id, task, opts) do
+    start_time = System.monotonic_time(:millisecond)
+
+    try do
+      Logger.info("Starting dynamic workflow generation for #{workflow_id}")
+
+      # Analyze task complexity
+      historical_data = opts[:historical_data]
+      analysis = ComplexityAnalyzer.analyze(task, historical_data)
+
+      Logger.debug("Task analysis for #{workflow_id}: #{inspect(analysis)}")
+
+      # Build dynamic workflow
+      build_opts = [
+        use_template: opts[:use_template] != false,
+        optimization_strategy: opts[:optimization_strategy] || :balanced,
+        include_resource_management: opts[:include_resource_management] || false,
+        customization: opts[:customization] || %{}
+      ]
+
+      case DynamicBuilder.build(task, analysis, build_opts) do
+        {:ok, reactor} ->
+          # Execute the dynamically built workflow
+          Logger.info("Executing dynamic workflow #{workflow_id}")
+
+          # Convert task to input map
+          input = task_to_input(task)
+
+          result = Reactor.run(reactor, input, context: build_dynamic_context(workflow_id, task, analysis, opts))
+
+          duration = System.monotonic_time(:millisecond) - start_time
+
+          # Record metrics for dynamic workflow
+          Metrics.record_workflow_execution(workflow_id, :dynamic_workflow, duration, :success)
+
+          Logger.info("Dynamic workflow #{workflow_id} completed successfully in #{duration}ms")
+
+          # Store successful pattern for future reuse
+          if opts[:cache_pattern] do
+            cache_successful_pattern(task, analysis, build_opts, duration)
+          end
+
+          {:ok, result}
+
+        {:error, reason} ->
+          duration = System.monotonic_time(:millisecond) - start_time
+          Logger.error("Failed to build dynamic workflow #{workflow_id}: #{inspect(reason)}")
+
+          Metrics.record_workflow_execution(workflow_id, :dynamic_workflow, duration, :build_failure)
+
+          {:error, {:workflow_build_failed, reason}}
+      end
+    rescue
+      e ->
+        duration = System.monotonic_time(:millisecond) - start_time
+
+        Logger.error("Dynamic workflow #{workflow_id} failed: #{inspect(e)}")
+
+        # Record metrics
+        Metrics.record_workflow_execution(workflow_id, :dynamic_workflow, duration, :failure)
+
+        {:error, e}
+    end
+  end
+
+  defp task_to_input(task) when is_map(task) do
+    # Convert task fields to reactor inputs
+    task
+    |> Map.drop([:type, :id, :metadata])
+    |> Enum.into(%{})
+  end
+
+  defp task_to_input(task), do: %{input: task}
+
+  defp build_dynamic_context(workflow_id, task, analysis, opts) do
+    %{
+      workflow_id: workflow_id,
+      trace_id: opts[:trace_id] || Ash.UUID.generate(),
+      workflow_type: :dynamic,
+      task_type: Map.get(task, :type, :unknown),
+      complexity_score: Map.get(analysis, :complexity_score, 5),
+      resource_requirements: Map.get(analysis, :resource_requirements, %{}),
+      optimization_strategy: opts[:optimization_strategy] || :balanced,
+      metadata: opts[:metadata] || %{},
+      logger: opts[:logger] || Logger
+    }
+  end
+
+  defp cache_successful_pattern(task, analysis, build_opts, duration) do
+    # Store the successful pattern for future similar tasks
+    pattern = %{
+      task_signature: generate_task_signature(task),
+      analysis_result: analysis,
+      build_options: build_opts,
+      performance: %{
+        duration: duration,
+        success: true
+      },
+      timestamp: DateTime.utc_now()
+    }
+
+    # In a real implementation, this would store to a persistent cache
+    # For now, we'll just log it
+    Logger.debug("Caching successful workflow pattern: #{inspect(pattern)}")
+  end
+
+  defp generate_task_signature(task) do
+    # Generate a signature for the task to identify similar tasks
+    %{
+      type: Map.get(task, :type),
+      complexity_indicators: %{
+        has_targets: Map.has_key?(task, :targets) || Map.has_key?(task, :target),
+        has_options: Map.has_key?(task, :options),
+        has_code: Map.has_key?(task, :code)
+      }
+    }
   end
 end
