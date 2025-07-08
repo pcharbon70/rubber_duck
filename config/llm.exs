@@ -24,6 +24,18 @@ config :rubber_duck, RubberDuck.LLM.Service,
       timeout: 30_000
     },
     %{
+      name: :ollama,
+      adapter: RubberDuck.LLM.Providers.Ollama,
+      base_url: System.get_env("OLLAMA_BASE_URL", "http://localhost:11434"),
+      models: ["llama2", "llama2:7b", "llama2:13b", "mistral", "codellama", "mixtral"],
+      priority: 3,
+      # No rate limiting for local models
+      rate_limit: nil,
+      max_retries: 3,
+      timeout: 60_000,
+      options: []
+    },
+    %{
       name: :mock,
       adapter: RubberDuck.LLM.Providers.Mock,
       models: ["mock-fast", "mock-smart", "mock-vision"],
@@ -60,7 +72,7 @@ if config_env() == :dev do
     ]
 end
 
-# Test overrides  
+# Test overrides
 if config_env() == :test do
   config :rubber_duck, RubberDuck.LLM.Service,
     providers: [
