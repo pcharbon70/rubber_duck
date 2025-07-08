@@ -72,6 +72,35 @@ defmodule RubberDuck.LLM.Response do
     }
   end
 
+  def from_provider(:ollama, raw_response) do
+    # Ollama uses a different response format
+    content = raw_response["message"]["content"] || raw_response["response"] || ""
+
+    %__MODULE__{
+      id: generate_id(),
+      model: raw_response["model"],
+      provider: :ollama,
+      choices: [
+        %{
+          index: 0,
+          message: %{
+            "role" => "assistant",
+            "content" => content
+          },
+          finish_reason: if(raw_response["done"], do: "stop", else: "length")
+        }
+      ],
+      usage: parse_ollama_usage(raw_response),
+      created_at: DateTime.utc_now(),
+      metadata: %{
+        total_duration: raw_response["total_duration"],
+        load_duration: raw_response["load_duration"],
+        eval_duration: raw_response["eval_duration"],
+        done: raw_response["done"]
+      }
+    }
+  end
+
   def from_provider(provider, raw_response) do
     # Generic fallback for unknown providers
     %__MODULE__{
@@ -180,6 +209,19 @@ defmodule RubberDuck.LLM.Response do
     }
   end
 
+  defp parse_ollama_usage(nil), do: nil
+
+  defp parse_ollama_usage(response) do
+    prompt_tokens = response["prompt_eval_count"] || 0
+    completion_tokens = response["eval_count"] || 0
+
+    %{
+      prompt_tokens: prompt_tokens,
+      completion_tokens: completion_tokens,
+      total_tokens: prompt_tokens + completion_tokens
+    }
+  end
+
   defp extract_content(response) when is_map(response) do
     response["content"] || response["text"] || response["message"] || ""
   end
@@ -208,6 +250,11 @@ defmodule RubberDuck.LLM.Response do
       "claude-3-haiku" -> %{prompt_price: 0.00025, completion_price: 0.00125}
       _ -> %{prompt_price: 0.003, completion_price: 0.015}
     end
+  end
+
+  defp get_pricing(:ollama, _model) do
+    # Ollama is free (local models)
+    %{prompt_price: 0.0, completion_price: 0.0}
   end
 
   defp get_pricing(_, _) do
