@@ -126,17 +126,15 @@ defmodule RubberDuck.CLI do
           end,
           default: :all,
           required: false
-        ],
+        ]
+      ],
+      flags: [
         recursive: [
           short: "-r",
           long: "--recursive",
           help: "Recursively analyze directories",
-          parser: :boolean,
-          default: true,
-          required: false
-        ]
-      ],
-      flags: [
+          multiple: false
+        ],
         include_suggestions: [
           long: "--include-suggestions",
           help: "Include fix suggestions in the output",

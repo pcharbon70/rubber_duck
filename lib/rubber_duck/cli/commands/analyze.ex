@@ -15,8 +15,8 @@ defmodule RubberDuck.CLI.Commands.Analyze do
   def run(args, config) do
     path = args[:path]
     analysis_type = args[:type] || :all
-    recursive = args[:recursive] || true
-    include_suggestions = args[:include_suggestions] || false
+    recursive = Keyword.get(args[:flags], :recursive, true)
+    include_suggestions = Keyword.get(args[:flags], :include_suggestions, false)
 
     with {:ok, files} <- get_files_to_analyze(path, recursive),
          {:ok, results} <- analyze_files(files, analysis_type, include_suggestions, config) do

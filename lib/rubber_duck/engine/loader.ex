@@ -48,8 +48,8 @@ defmodule RubberDuck.Engine.Loader do
       try do
         # Load the engines using the Engine.Manager
         case RubberDuck.Engine.Manager.load_engines(engine_module) do
-          {:ok, engines} ->
-            Logger.info("Loaded #{length(engines)} engines")
+          :ok ->
+            Logger.info("Successfully loaded engines")
             :ok
 
           {:error, reason} ->
