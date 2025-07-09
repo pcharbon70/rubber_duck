@@ -79,7 +79,10 @@ defmodule RubberDuck.MixProject do
       {:swoosh, "~> 1.5"},
       {:gen_smtp, "~> 1.0"},
       {:gettext, "~> 0.20"},
-      {:plug_cowboy, "~> 2.7"}
+      {:plug_cowboy, "~> 2.7"},
+
+      # CLI dependencies
+      {:optimus, "~> 0.2"}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
