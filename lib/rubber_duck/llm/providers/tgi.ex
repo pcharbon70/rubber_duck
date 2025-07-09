@@ -124,11 +124,11 @@ defmodule RubberDuck.LLM.Providers.TGI do
   def count_tokens(text, _model) do
     # TGI provides token counting via tokenize endpoint
     # For now, return simple estimation
-    estimated_tokens = 
+    estimated_tokens =
       text
       |> String.split(~r/\s+/)
       |> length()
-      |> Kernel.*(4/3)
+      |> Kernel.*(4 / 3)
       |> round()
 
     {:ok, estimated_tokens}
@@ -142,21 +142,23 @@ defmodule RubberDuck.LLM.Providers.TGI do
       {:ok, %{status: 200}} ->
         # Try to get model info
         info_url = build_url(config, "/info")
-        
+
         case Req.get(info_url, receive_timeout: 5_000) do
           {:ok, %{status: 200, body: info_body}} ->
-            {:ok, %{
-              status: :healthy,
-              model: info_body["model_id"] || "unknown",
-              message: "TGI server is healthy and serving model"
-            }}
+            {:ok,
+             %{
+               status: :healthy,
+               model: info_body["model_id"] || "unknown",
+               message: "TGI server is healthy and serving model"
+             }}
 
           _ ->
-            {:ok, %{
-              status: :healthy,
-              model: "unknown",
-              message: "TGI server is healthy"
-            }}
+            {:ok,
+             %{
+               status: :healthy,
+               model: "unknown",
+               message: "TGI server is healthy"
+             }}
         end
 
       {:ok, %{status: status}} ->
@@ -244,7 +246,7 @@ defmodule RubberDuck.LLM.Providers.TGI do
   defp build_request_body(%Request{} = request, %ProviderConfig{} = _config, "/generate") do
     # Build TGI-native generate request
     prompt = get_in(request.options, [:prompt]) || messages_to_prompt(request.messages)
-    
+
     base_body = %{
       "inputs" => prompt,
       "parameters" => %{}
@@ -256,7 +258,7 @@ defmodule RubberDuck.LLM.Providers.TGI do
   defp build_request_body(%Request{} = request, %ProviderConfig{} = _config, "/generate_stream") do
     # Build TGI-native streaming generate request
     prompt = get_in(request.options, [:prompt]) || messages_to_prompt(request.messages)
-    
+
     base_body = %{
       "inputs" => prompt,
       "parameters" => %{},
@@ -305,14 +307,15 @@ defmodule RubberDuck.LLM.Providers.TGI do
 
   defp add_generate_options(body, options) when is_map(options) do
     parameters = body["parameters"]
-    
-    new_parameters = parameters
-    |> maybe_add_param("max_new_tokens", options[:max_tokens])
-    |> maybe_add_param("temperature", options[:temperature])
-    |> maybe_add_param("top_p", options[:top_p])
-    |> maybe_add_param("top_k", options[:top_k])
-    |> maybe_add_param("repetition_penalty", options[:repetition_penalty])
-    |> maybe_add_param("stop", options[:stop])
+
+    new_parameters =
+      parameters
+      |> maybe_add_param("max_new_tokens", options[:max_tokens])
+      |> maybe_add_param("temperature", options[:temperature])
+      |> maybe_add_param("top_p", options[:top_p])
+      |> maybe_add_param("top_k", options[:top_k])
+      |> maybe_add_param("repetition_penalty", options[:repetition_penalty])
+      |> maybe_add_param("stop", options[:stop])
 
     Map.put(body, "parameters", new_parameters)
   end
@@ -326,11 +329,13 @@ defmodule RubberDuck.LLM.Providers.TGI do
   defp maybe_add_param(params, key, value), do: Map.put(params, key, value)
 
   defp maybe_add_tools(body, nil), do: body
+
   defp maybe_add_tools(body, tools) when is_list(tools) do
     Map.put(body, "tools", tools)
   end
 
   defp maybe_add_tool_choice(body, nil), do: body
+
   defp maybe_add_tool_choice(body, tool_choice) do
     Map.put(body, "tool_choice", tool_choice)
   end
@@ -382,6 +387,7 @@ defmodule RubberDuck.LLM.Providers.TGI do
   end
 
   defp parse_chat_choices(nil), do: []
+
   defp parse_chat_choices(choices) when is_list(choices) do
     Enum.map(choices, fn choice ->
       %{
@@ -393,6 +399,7 @@ defmodule RubberDuck.LLM.Providers.TGI do
   end
 
   defp parse_chat_usage(nil), do: nil
+
   defp parse_chat_usage(usage) do
     %{
       prompt_tokens: usage["prompt_tokens"] || 0,
@@ -402,12 +409,14 @@ defmodule RubberDuck.LLM.Providers.TGI do
   end
 
   defp parse_generate_usage(nil), do: nil
+
   defp parse_generate_usage(details) do
     %{
-      prompt_tokens: details["prefill"] && length(details["prefill"]) || 0,
-      completion_tokens: details["tokens"] && length(details["tokens"]) || 0,
-      total_tokens: (details["prefill"] && length(details["prefill"]) || 0) + 
-                   (details["tokens"] && length(details["tokens"]) || 0)
+      prompt_tokens: (details["prefill"] && length(details["prefill"])) || 0,
+      completion_tokens: (details["tokens"] && length(details["tokens"])) || 0,
+      total_tokens:
+        ((details["prefill"] && length(details["prefill"])) || 0) +
+          ((details["tokens"] && length(details["tokens"])) || 0)
     }
   end
 
@@ -415,6 +424,7 @@ defmodule RubberDuck.LLM.Providers.TGI do
   defp parse_finish_reason(reason), do: reason
 
   defp parse_timestamp(nil), do: nil
+
   defp parse_timestamp(unix_timestamp) when is_integer(unix_timestamp) do
     DateTime.from_unix!(unix_timestamp)
   end
@@ -446,7 +456,7 @@ defmodule RubberDuck.LLM.Providers.TGI do
         case parse_stream_chunk(chunk, endpoint) do
           {:ok, parsed_chunk} ->
             callback.({:chunk, parsed_chunk, ref})
-            
+
             if parsed_chunk.done do
               callback.({:done, ref})
             else
@@ -476,22 +486,27 @@ defmodule RubberDuck.LLM.Providers.TGI do
   defp parse_stream_chunk(chunk, "/v1/chat/completions") do
     # Parse OpenAI-compatible streaming chunk
     lines = String.split(chunk, "\n")
-    
+
     Enum.reduce_while(lines, {:ok, %{content: "", done: false}}, fn line, acc ->
       case String.trim(line) do
-        "" -> {:cont, acc}
-        "data: [DONE]" -> {:halt, {:ok, %{content: "", done: true}}}
+        "" ->
+          {:cont, acc}
+
+        "data: [DONE]" ->
+          {:halt, {:ok, %{content: "", done: true}}}
+
         "data: " <> json_str ->
           case Jason.decode(json_str) do
             {:ok, parsed} ->
               content = get_in(parsed, ["choices", Access.at(0), "delta", "content"]) || ""
               {:cont, {:ok, %{content: content, done: false, metadata: parsed}}}
-            
+
             {:error, _} ->
               {:cont, acc}
           end
-        
-        _ -> {:cont, acc}
+
+        _ ->
+          {:cont, acc}
       end
     end)
   end
@@ -502,12 +517,13 @@ defmodule RubberDuck.LLM.Providers.TGI do
       {:ok, parsed} ->
         content = parsed["token"]["text"] || ""
         done = parsed["generated_text"] != nil
-        
-        {:ok, %{
-          content: content,
-          done: done,
-          metadata: parsed
-        }}
+
+        {:ok,
+         %{
+           content: content,
+           done: done,
+           metadata: parsed
+         }}
 
       {:error, _} ->
         {:error, :invalid_json}

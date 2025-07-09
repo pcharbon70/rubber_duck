@@ -366,7 +366,8 @@ defmodule RubberDuck.LLM.Providers.TGITest do
       config = %ProviderConfig{
         name: :tgi,
         adapter: TGI,
-        base_url: "http://localhost:9999"  # Wrong port
+        # Wrong port
+        base_url: "http://localhost:9999"
       }
 
       # Would return {:error, {:connection_failed, reason}}

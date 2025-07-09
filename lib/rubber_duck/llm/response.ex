@@ -309,6 +309,7 @@ defmodule RubberDuck.LLM.Response do
   end
 
   defp parse_tgi_timestamp(nil), do: nil
+
   defp parse_tgi_timestamp(unix_timestamp) when is_integer(unix_timestamp) do
     DateTime.from_unix!(unix_timestamp)
   end
@@ -317,12 +318,14 @@ defmodule RubberDuck.LLM.Response do
   defp parse_tgi_finish_reason(reason), do: reason
 
   defp parse_tgi_usage(nil), do: nil
+
   defp parse_tgi_usage(details) do
     %{
-      prompt_tokens: details["prefill"] && length(details["prefill"]) || 0,
-      completion_tokens: details["tokens"] && length(details["tokens"]) || 0,
-      total_tokens: (details["prefill"] && length(details["prefill"]) || 0) + 
-                   (details["tokens"] && length(details["tokens"]) || 0)
+      prompt_tokens: (details["prefill"] && length(details["prefill"])) || 0,
+      completion_tokens: (details["tokens"] && length(details["tokens"])) || 0,
+      total_tokens:
+        ((details["prefill"] && length(details["prefill"])) || 0) +
+          ((details["tokens"] && length(details["tokens"])) || 0)
     }
   end
 end
