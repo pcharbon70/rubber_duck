@@ -187,6 +187,69 @@ defmodule RubberDuck.LLM.Providers.TGI do
     {:ok, ref}
   end
 
+  @impl true
+  def connect(%ProviderConfig{} = config) do
+    # TGI can optionally use WebSocket connections for streaming
+    # For now, we'll validate HTTP connection and get server info
+    info_url = build_url(config, "/info")
+
+    case Req.get(info_url, receive_timeout: 10_000) do
+      {:ok, %{status: 200, body: info_body}} ->
+        connection_data = %{
+          base_url: config.base_url || @default_base_url,
+          model_id: info_body["model_id"] || "unknown",
+          model_type: info_body["model_type"] || "unknown",
+          max_total_tokens: info_body["max_total_tokens"] || 4096,
+          max_input_length: info_body["max_input_length"] || 4095,
+          connected_at: DateTime.utc_now(),
+          supports_flash_attention: info_body["flash_attn"] || false,
+          dtype: info_body["dtype"] || "float16"
+        }
+
+        {:ok, connection_data}
+
+      {:ok, %{status: status}} ->
+        {:error, {:http_error, status}}
+
+      {:error, %Mint.TransportError{reason: :econnrefused}} ->
+        {:error, {:connection_refused, "TGI server not running at #{config.base_url || @default_base_url}"}}
+
+      {:error, reason} ->
+        {:error, {:connection_error, reason}}
+    end
+  end
+
+  @impl true
+  def disconnect(_config, _connection_data) do
+    # TGI primarily uses stateless HTTP connections
+    # WebSocket connections would be closed here if implemented
+    :ok
+  end
+
+  @impl true
+  def health_check(%ProviderConfig{} = config, connection_data) do
+    # Use the stored base_url from connection data
+    base_url = connection_data[:base_url] || config.base_url || @default_base_url
+    url = "#{base_url}/health"
+
+    case Req.get(url, receive_timeout: 5_000) do
+      {:ok, %{status: 200}} ->
+        {:ok,
+         %{
+           status: :healthy,
+           model: connection_data[:model_id],
+           max_tokens: connection_data[:max_total_tokens],
+           message: "TGI server is healthy and serving #{connection_data[:model_id]}"
+         }}
+
+      {:ok, %{status: status}} ->
+        {:error, {:unhealthy, "TGI server returned status #{status}"}}
+
+      {:error, reason} ->
+        {:error, {:connection_failed, reason}}
+    end
+  end
+
   # Private functions
 
   defp determine_endpoint(%Request{messages: messages}) when is_list(messages) and length(messages) > 0 do

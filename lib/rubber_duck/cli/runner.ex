@@ -40,6 +40,10 @@ defmodule RubberDuck.CLI.Runner do
     Commands.Test.run(args, config)
   end
 
+  defp execute_command(:llm, args, config) do
+    Commands.LLM.run(args, config)
+  end
+
   defp execute_command(nil, _args, _config) do
     {:error, "No command specified. Run with --help for usage information."}
   end

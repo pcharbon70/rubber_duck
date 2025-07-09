@@ -437,7 +437,22 @@ defmodule RubberDuck.LLM.Service do
   defp handle_completion_request(request, from, state) do
     provider_state = Map.get(state.providers, request.provider)
 
+    # Check connection status via ConnectionManager
+    provider_connected = check_provider_connection(request.provider)
+
     cond do
+      # Check if provider is connected
+      not provider_connected ->
+        # Try fallback provider
+        case find_fallback_provider(request, state) do
+          {:ok, fallback_provider} ->
+            request = %{request | provider: fallback_provider}
+            handle_completion_request(request, from, state)
+
+          :error ->
+            {:reply, {:error, :provider_not_connected}, state}
+        end
+
       # Check circuit breaker
       provider_state.circuit_state == :open ->
         # Try fallback provider
@@ -475,6 +490,9 @@ defmodule RubberDuck.LLM.Service do
         # Store active request
         new_active = Map.put(state.active_requests, request_id, request_with_id)
 
+        # Notify ConnectionManager of usage
+        notify_connection_usage(request.provider)
+
         {:noreply, %{state | providers: new_providers, active_requests: new_active}}
     end
   end
@@ -485,7 +503,8 @@ defmodule RubberDuck.LLM.Service do
     |> Enum.filter(fn {name, provider_state} ->
       name != request.provider &&
         provider_state.circuit_state == :closed &&
-        request.model in provider_state.config.models
+        request.model in provider_state.config.models &&
+        check_provider_connection(name)
     end)
     |> Enum.sort_by(fn {_name, provider_state} ->
       provider_state.config.priority
@@ -771,5 +790,29 @@ defmodule RubberDuck.LLM.Service do
     callback.(final_chunk)
 
     {:ok, :completed}
+  end
+
+  defp check_provider_connection(provider_name) do
+    # Check if ConnectionManager is available
+    case Process.whereis(RubberDuck.LLM.ConnectionManager) do
+      nil ->
+        # ConnectionManager not running, assume connected
+        true
+
+      _pid ->
+        RubberDuck.LLM.ConnectionManager.connected?(provider_name)
+    end
+  end
+
+  defp notify_connection_usage(provider_name) do
+    # Notify ConnectionManager that the provider was used
+    case Process.whereis(RubberDuck.LLM.ConnectionManager) do
+      nil ->
+        :ok
+
+      pid ->
+        send(pid, {:update_last_used, provider_name})
+        :ok
+    end
   end
 end
