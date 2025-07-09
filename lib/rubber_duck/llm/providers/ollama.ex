@@ -399,4 +399,3 @@ defmodule RubberDuck.LLM.Providers.Ollama do
     }
   end
 end
-

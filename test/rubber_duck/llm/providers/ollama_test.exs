@@ -284,4 +284,3 @@ defmodule RubberDuck.LLM.Providers.OllamaTest do
     end
   end
 end
-
