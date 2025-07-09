@@ -297,22 +297,19 @@ defmodule RubberDuck.Engines.Completion do
     # Build FIM prompt for the LLM
     prompt = build_fim_prompt(fim_context, input)
 
-    request = %LLM.Request{
+    opts = [
       model: get_completion_model(input.language),
       messages: [
         %{"role" => "system", "content" => get_completion_system_prompt(input.language)},
         %{"role" => "user", "content" => prompt}
       ],
-      options: %{
-        # Lower temperature for more predictable completions
-        temperature: 0.2,
-        max_tokens: state.config[:max_tokens] || 256,
-        # Stop sequences
-        stop: ["\n\n", "def ", "class ", "function "]
-      }
-    }
+      temperature: 0.2,
+      max_tokens: state.config[:max_tokens] || 256,
+      # Stop sequences
+      stop: ["\n\n", "def ", "class ", "function "]
+    ]
 
-    case LLM.Service.chat(request) do
+    case LLM.Service.completion(opts) do
       {:ok, response} ->
         completions = parse_llm_completions(response, input.language)
         {:ok, completions}

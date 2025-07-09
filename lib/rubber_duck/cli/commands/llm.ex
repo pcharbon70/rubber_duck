@@ -48,31 +48,33 @@ defmodule RubberDuck.CLI.Commands.LLM do
     provider = get_provider_arg(args)
 
     if provider do
-      provider_atom = String.to_existing_atom(provider)
+      try do
+        provider_atom = String.to_existing_atom(provider)
 
-      case ConnectionManager.connect(provider_atom) do
-        :ok ->
-          {:ok,
-           %{
-             type: :llm_connection,
-             message: "Successfully connected to #{provider}",
-             provider: provider
-           }}
+        case ConnectionManager.connect(provider_atom) do
+          :ok ->
+            {:ok,
+             %{
+               type: :llm_connection,
+               message: "Successfully connected to #{provider}",
+               provider: provider
+             }}
 
-        {:ok, :already_connected} ->
-          {:ok,
-           %{
-             type: :llm_connection,
-             message: "Already connected to #{provider}",
-             provider: provider
-           }}
+          {:ok, :already_connected} ->
+            {:ok,
+             %{
+               type: :llm_connection,
+               message: "Already connected to #{provider}",
+               provider: provider
+             }}
 
-        {:error, reason} ->
-          {:error, "Failed to connect to #{provider}: #{inspect(reason)}"}
+          {:error, reason} ->
+            {:error, "Failed to connect to #{provider}: #{inspect(reason)}"}
+        end
+      rescue
+        ArgumentError ->
+          {:error, "Unknown provider: #{provider}"}
       end
-    rescue
-      ArgumentError ->
-        {:error, "Unknown provider: #{provider}"}
     else
       # Connect all providers
       case ConnectionManager.connect_all() do
@@ -93,31 +95,33 @@ defmodule RubberDuck.CLI.Commands.LLM do
     provider = get_provider_arg(args)
 
     if provider do
-      provider_atom = String.to_existing_atom(provider)
+      try do
+        provider_atom = String.to_existing_atom(provider)
 
-      case ConnectionManager.disconnect(provider_atom) do
-        :ok ->
-          {:ok,
-           %{
-             type: :llm_disconnection,
-             message: "Disconnected from #{provider}",
-             provider: provider
-           }}
+        case ConnectionManager.disconnect(provider_atom) do
+          :ok ->
+            {:ok,
+             %{
+               type: :llm_disconnection,
+               message: "Disconnected from #{provider}",
+               provider: provider
+             }}
 
-        {:ok, :already_disconnected} ->
-          {:ok,
-           %{
-             type: :llm_disconnection,
-             message: "Already disconnected from #{provider}",
-             provider: provider
-           }}
+          {:ok, :already_disconnected} ->
+            {:ok,
+             %{
+               type: :llm_disconnection,
+               message: "Already disconnected from #{provider}",
+               provider: provider
+             }}
 
-        error ->
-          {:error, "Failed to disconnect: #{inspect(error)}"}
+          error ->
+            {:error, "Failed to disconnect: #{inspect(error)}"}
+        end
+      rescue
+        ArgumentError ->
+          {:error, "Unknown provider: #{provider}"}
       end
-    rescue
-      ArgumentError ->
-        {:error, "Unknown provider: #{provider}"}
     else
       # Disconnect all providers
       case ConnectionManager.disconnect_all() do
@@ -138,23 +142,25 @@ defmodule RubberDuck.CLI.Commands.LLM do
     provider = get_provider_arg(args)
 
     if provider do
-      provider_atom = String.to_existing_atom(provider)
+      try do
+        provider_atom = String.to_existing_atom(provider)
 
-      case ConnectionManager.set_enabled(provider_atom, true) do
-        :ok ->
-          {:ok,
-           %{
-             type: :llm_config,
-             message: "Enabled provider: #{provider}",
-             provider: provider
-           }}
+        case ConnectionManager.set_enabled(provider_atom, true) do
+          :ok ->
+            {:ok,
+             %{
+               type: :llm_config,
+               message: "Enabled provider: #{provider}",
+               provider: provider
+             }}
 
-        error ->
-          {:error, "Failed to enable provider: #{inspect(error)}"}
+          error ->
+            {:error, "Failed to enable provider: #{inspect(error)}"}
+        end
+      rescue
+        ArgumentError ->
+          {:error, "Unknown provider: #{provider}"}
       end
-    rescue
-      ArgumentError ->
-        {:error, "Unknown provider: #{provider}"}
     else
       {:error, "Provider name required for enable command"}
     end
@@ -164,23 +170,25 @@ defmodule RubberDuck.CLI.Commands.LLM do
     provider = get_provider_arg(args)
 
     if provider do
-      provider_atom = String.to_existing_atom(provider)
+      try do
+        provider_atom = String.to_existing_atom(provider)
 
-      case ConnectionManager.set_enabled(provider_atom, false) do
-        :ok ->
-          {:ok,
-           %{
-             type: :llm_config,
-             message: "Disabled provider: #{provider}",
-             provider: provider
-           }}
+        case ConnectionManager.set_enabled(provider_atom, false) do
+          :ok ->
+            {:ok,
+             %{
+               type: :llm_config,
+               message: "Disabled provider: #{provider}",
+               provider: provider
+             }}
 
-        error ->
-          {:error, "Failed to disable provider: #{inspect(error)}"}
+          error ->
+            {:error, "Failed to disable provider: #{inspect(error)}"}
+        end
+      rescue
+        ArgumentError ->
+          {:error, "Unknown provider: #{provider}"}
       end
-    rescue
-      ArgumentError ->
-        {:error, "Unknown provider: #{provider}"}
     else
       {:error, "Provider name required for disable command"}
     end

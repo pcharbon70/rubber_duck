@@ -18,7 +18,6 @@ defmodule RubberDuck.Engines.Analysis do
   require Logger
 
   alias RubberDuck.LLM
-  alias RubberDuck.Analysis
 
   @impl true
   def init(config) do
@@ -291,19 +290,17 @@ defmodule RubberDuck.Engines.Analysis do
   defp enhance_issue_group(category, issues, input, state) do
     prompt = build_analysis_prompt(category, issues, input)
 
-    request = %LLM.Request{
+    opts = [
       model: "codellama",
       messages: [
         %{"role" => "system", "content" => get_analysis_system_prompt()},
         %{"role" => "user", "content" => prompt}
       ],
-      options: %{
-        temperature: 0.3,
-        max_tokens: state.config[:max_tokens] || 1024
-      }
-    }
+      temperature: 0.3,
+      max_tokens: state.config[:max_tokens] || 1024
+    ]
 
-    case LLM.Service.chat(request) do
+    case LLM.Service.completion(opts) do
       {:ok, response} ->
         enhanced = parse_llm_analysis(response, issues)
         {:ok, enhanced}

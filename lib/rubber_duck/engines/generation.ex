@@ -39,7 +39,6 @@ defmodule RubberDuck.Engines.Generation do
 
   require Logger
 
-  alias RubberDuck.LLM
 
   # Default configuration
   @default_max_context_items 10
@@ -510,19 +509,17 @@ defmodule RubberDuck.Engines.Generation do
 
   defp generate_code(prompt, input, state) do
     # Call LLM service to generate code
-    request = %RubberDuck.LLM.Request{
+    opts = [
       model: get_model_for_language(input.language),
       messages: [
         %{"role" => "system", "content" => get_system_prompt(input.language)},
         %{"role" => "user", "content" => prompt}
       ],
-      options: %{
-        temperature: state.config[:temperature] || 0.7,
-        max_tokens: state.config[:max_tokens] || 4096
-      }
-    }
+      temperature: state.config[:temperature] || 0.7,
+      max_tokens: state.config[:max_tokens] || 4096
+    ]
 
-    case RubberDuck.LLM.Service.chat(request) do
+    case RubberDuck.LLM.Service.completion(opts) do
       {:ok, response} ->
         generated_code = extract_code_from_response(response, input.language)
 

@@ -256,19 +256,17 @@ defmodule RubberDuck.Engines.TestGeneration do
   defp generate_tests(test_plan, input, state) do
     prompt = build_test_generation_prompt(test_plan, input)
 
-    request = %LLM.Request{
+    opts = [
       model: get_test_model(input.language),
       messages: [
         %{"role" => "system", "content" => get_test_system_prompt(input.language, input.framework)},
         %{"role" => "user", "content" => prompt}
       ],
-      options: %{
-        temperature: 0.3,
-        max_tokens: state.config[:max_tokens] || 4096
-      }
-    }
+      temperature: 0.3,
+      max_tokens: state.config[:max_tokens] || 4096
+    ]
 
-    case LLM.Service.chat(request) do
+    case LLM.Service.completion(opts) do
       {:ok, response} ->
         parse_test_response(response, input)
 
@@ -455,7 +453,7 @@ defmodule RubberDuck.Engines.TestGeneration do
      }}
   end
 
-  defp generate_exunit_template(test_plan, input) do
+  defp generate_exunit_template(_test_plan, input) do
     module_name = String.replace(Path.basename(input.file_path, ".ex"), ~r/[^A-Za-z0-9]/, "")
 
     """

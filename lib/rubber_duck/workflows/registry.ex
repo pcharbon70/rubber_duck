@@ -83,6 +83,14 @@ defmodule RubberDuck.Workflows.Registry do
     GenServer.call(__MODULE__, {:update_metadata, name, metadata})
   end
 
+  @doc """
+  Manually trigger workflow discovery.
+  This should be called after the application has fully started.
+  """
+  def discover_and_register_workflows do
+    GenServer.cast(__MODULE__, :discover_workflows)
+  end
+
   # Server callbacks
 
   @impl true
@@ -95,8 +103,8 @@ defmodule RubberDuck.Workflows.Registry do
       read_concurrency: true
     ])
 
-    # Discover and auto-register workflows
-    discover_workflows()
+    # Don't auto-discover workflows to avoid circular dependencies
+    # Workflows should register themselves explicitly
 
     state = %{
       workflows: %{},
@@ -165,6 +173,12 @@ defmodule RubberDuck.Workflows.Registry do
     end
   end
 
+  @impl true
+  def handle_cast(:discover_workflows, state) do
+    discover_workflows()
+    {:noreply, state}
+  end
+
   # Private functions
 
   defp discover_workflows do
@@ -173,9 +187,19 @@ defmodule RubberDuck.Workflows.Registry do
     # scan specific directories or use compile-time discovery
 
     with {:ok, modules} <- :application.get_key(:rubber_duck, :modules) do
-      modules
-      |> Enum.filter(&workflow_module?/1)
-      |> Enum.each(&register/1)
+      workflow_modules = 
+        modules
+        |> Enum.filter(&workflow_module?/1)
+      
+      # Register each workflow module
+      Enum.each(workflow_modules, fn module ->
+        try do
+          register(module)
+        rescue
+          e ->
+            Logger.warning("Failed to register workflow #{inspect(module)}: #{inspect(e)}")
+        end
+      end)
     end
   end
 

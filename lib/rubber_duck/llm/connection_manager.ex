@@ -12,7 +12,7 @@ defmodule RubberDuck.LLM.ConnectionManager do
   use GenServer
   require Logger
 
-  alias RubberDuck.LLM.{Service, ProviderConfig}
+  alias RubberDuck.LLM.ProviderConfig
 
   defmodule State do
     @moduledoc false
@@ -173,7 +173,7 @@ defmodule RubberDuck.LLM.ConnectionManager do
 
             # Perform connection
             case perform_connection(provider_name, provider_config, state) do
-              {:ok, connection_data, new_state} ->
+              {:ok, _connection_data, new_state} ->
                 Logger.info("Connected to provider: #{provider_name}")
                 {:reply, :ok, new_state}
 
@@ -217,7 +217,6 @@ defmodule RubberDuck.LLM.ConnectionManager do
   @impl true
   def handle_call(:connect_all, _from, state) do
     providers = get_configured_providers()
-    results = []
 
     new_state =
       Enum.reduce(providers, state, fn {name, _config}, acc_state ->

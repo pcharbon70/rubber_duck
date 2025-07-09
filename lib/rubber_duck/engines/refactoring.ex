@@ -138,7 +138,7 @@ defmodule RubberDuck.Engines.Refactoring do
     |> Kernel.+(1)
   end
 
-  defp detect_patterns(content, language) do
+  defp detect_patterns(content, _language) do
     patterns = []
 
     # Detect common patterns that could be refactored
@@ -165,19 +165,17 @@ defmodule RubberDuck.Engines.Refactoring do
     # Use LLM to generate refactoring suggestions
     prompt = build_refactoring_prompt(analysis, input)
 
-    request = %LLM.Request{
+    opts = [
       model: get_refactoring_model(input.language),
       messages: [
         %{"role" => "system", "content" => get_refactoring_system_prompt(input.language)},
         %{"role" => "user", "content" => prompt}
       ],
-      options: %{
-        temperature: 0.4,
-        max_tokens: state.config[:max_tokens] || 4096
-      }
-    }
+      temperature: 0.4,
+      max_tokens: state.config[:max_tokens] || 4096
+    ]
 
-    case LLM.Service.chat(request) do
+    case LLM.Service.completion(opts) do
       {:ok, response} ->
         parse_refactoring_response(response, input)
 
