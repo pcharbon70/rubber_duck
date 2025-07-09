@@ -60,3 +60,47 @@ config :phoenix, :stacktrace_depth, 20
 
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime
+
+# LLM Provider configuration for development
+config :rubber_duck, :llm,
+  providers: [
+    # Mock provider for testing without external dependencies
+    %{
+      name: :mock,
+      adapter: RubberDuck.LLM.Providers.Mock,
+      default: true,
+      models: ["mock-gpt", "mock-codellama"],
+      responses: [
+        # Add mock responses for development
+        %{
+          pattern: ~r/hello world/i,
+          response: "def hello_world do\n  IO.puts(\"Hello, World!\")\nend"
+        },
+        %{
+          pattern: ~r/genserver/i,
+          response: """
+          defmodule MyServer do
+            use GenServer
+            
+            def start_link(opts) do
+              GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+            end
+            
+            @impl true
+            def init(opts) do
+              {:ok, %{}}
+            end
+          end
+          """
+        }
+      ]
+    }
+    # Ollama provider for local LLM (optional - uncomment if you have Ollama installed)
+    # %{
+    #   name: :ollama,
+    #   adapter: RubberDuck.LLM.Providers.Ollama,
+    #   base_url: "http://localhost:11434",
+    #   models: ["llama2", "codellama", "mistral"],
+    #   timeout: 60_000
+    # }
+  ]

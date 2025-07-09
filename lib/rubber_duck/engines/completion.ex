@@ -35,6 +35,8 @@ defmodule RubberDuck.Engines.Completion do
 
   require Logger
 
+  alias RubberDuck.LLM
+
   # Default configuration
   @default_max_suggestions 5
   # 5 minutes
@@ -271,16 +273,130 @@ defmodule RubberDuck.Engines.Completion do
         {:ok, cached}
 
       :miss ->
-        # Generate new completions
-        completions =
-          case input.language do
-            :elixir -> generate_elixir_completions(fim_context, input, state)
-            :javascript -> generate_javascript_completions(fim_context, input, state)
-            :python -> generate_python_completions(fim_context, input, state)
-            _ -> generate_generic_completions(fim_context, input, state)
-          end
+        # Try LLM-based completion first
+        case generate_llm_completions(fim_context, input, state) do
+          {:ok, llm_completions} when llm_completions != [] ->
+            {:ok, llm_completions}
 
+          _ ->
+            # Fallback to rule-based completions
+            completions =
+              case input.language do
+                :elixir -> generate_elixir_completions(fim_context, input, state)
+                :javascript -> generate_javascript_completions(fim_context, input, state)
+                :python -> generate_python_completions(fim_context, input, state)
+                _ -> generate_generic_completions(fim_context, input, state)
+              end
+
+            {:ok, completions}
+        end
+    end
+  end
+
+  defp generate_llm_completions(fim_context, input, state) do
+    # Build FIM prompt for the LLM
+    prompt = build_fim_prompt(fim_context, input)
+
+    request = %LLM.Request{
+      model: get_completion_model(input.language),
+      messages: [
+        %{"role" => "system", "content" => get_completion_system_prompt(input.language)},
+        %{"role" => "user", "content" => prompt}
+      ],
+      options: %{
+        # Lower temperature for more predictable completions
+        temperature: 0.2,
+        max_tokens: state.config[:max_tokens] || 256,
+        # Stop sequences
+        stop: ["\n\n", "def ", "class ", "function "]
+      }
+    }
+
+    case LLM.Service.chat(request) do
+      {:ok, response} ->
+        completions = parse_llm_completions(response, input.language)
         {:ok, completions}
+
+      {:error, reason} ->
+        Logger.debug("LLM completion failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  defp build_fim_prompt(fim_context, input) do
+    """
+    Complete the following #{input.language} code at the cursor position.
+
+    Context before cursor:
+    ```#{input.language}
+    #{fim_context.prefix_context}
+    ```
+
+    Current line up to cursor: #{fim_context.cursor_context.before_cursor}
+
+    Context after cursor:
+    ```#{input.language}
+    #{fim_context.suffix_context}
+    ```
+
+    Provide 3-5 short completions that would naturally follow at the cursor position.
+    Each completion should be on a separate line.
+    Only provide the text to insert, not the entire line.
+    """
+  end
+
+  defp get_completion_model(:elixir), do: "codellama"
+  defp get_completion_model(:python), do: "codellama"
+  defp get_completion_model(:javascript), do: "codellama"
+  defp get_completion_model(_), do: "llama2"
+
+  defp get_completion_system_prompt(language) do
+    """
+    You are a code completion assistant for #{language}.
+    Provide short, contextually relevant completions.
+    Focus on completing the current expression or statement.
+    Do not add unnecessary code or comments.
+    """
+  end
+
+  defp parse_llm_completions(response, language) do
+    content = get_in(response.choices, [Access.at(0), :message, "content"]) || ""
+
+    content
+    |> String.split("\n")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == "" or String.starts_with?(&1, "#") or String.starts_with?(&1, "//")))
+    |> Enum.take(5)
+    |> Enum.with_index()
+    |> Enum.map(fn {text, index} ->
+      %{
+        text: text,
+        # Higher score for earlier suggestions
+        score: 1.0 - index * 0.1,
+        type: detect_completion_type(text, language),
+        metadata: %{
+          source: :llm,
+          model: response.model
+        }
+      }
+    end)
+  end
+
+  defp detect_completion_type(text, :elixir) do
+    cond do
+      String.contains?(text, "def ") -> :function
+      String.contains?(text, ["import ", "alias ", "use "]) -> :import
+      String.match?(text, ~r/^[a-z_]/) -> :variable
+      String.match?(text, ~r/^[A-Z]/) -> :module
+      true -> :other
+    end
+  end
+
+  defp detect_completion_type(text, _language) do
+    cond do
+      String.contains?(text, ["(", ")"]) -> :function
+      String.contains?(text, ["import", "require", "include"]) -> :import
+      true -> :other
     end
   end
 

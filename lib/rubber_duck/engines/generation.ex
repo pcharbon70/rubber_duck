@@ -39,6 +39,8 @@ defmodule RubberDuck.Engines.Generation do
 
   require Logger
 
+  alias RubberDuck.LLM
+
   # Default configuration
   @default_max_context_items 10
   @default_similarity_threshold 0.7
@@ -507,9 +509,49 @@ defmodule RubberDuck.Engines.Generation do
   end
 
   defp generate_code(prompt, input, state) do
-    # In a real implementation, this would call an LLM
-    # For now, we'll generate based on templates and patterns
+    # Call LLM service to generate code
+    request = %RubberDuck.LLM.Request{
+      model: get_model_for_language(input.language),
+      messages: [
+        %{"role" => "system", "content" => get_system_prompt(input.language)},
+        %{"role" => "user", "content" => prompt}
+      ],
+      options: %{
+        temperature: state.config[:temperature] || 0.7,
+        max_tokens: state.config[:max_tokens] || 4096
+      }
+    }
 
+    case RubberDuck.LLM.Service.chat(request) do
+      {:ok, response} ->
+        generated_code = extract_code_from_response(response, input.language)
+
+        result = %{
+          code: generated_code,
+          language: input.language,
+          imports: detect_imports(generated_code, input.language),
+          explanation: extract_explanation_from_response(response),
+          confidence: calculate_llm_confidence(response),
+          alternatives: generate_alternatives(input, state),
+          metadata: %{
+            prompt_length: String.length(prompt),
+            generation_time: DateTime.utc_now(),
+            model: response.model,
+            tokens_used: get_in(response.usage, [:total_tokens])
+          }
+        }
+
+        {:ok, result}
+
+      {:error, reason} ->
+        # Fallback to template-based generation
+        Logger.warning("LLM generation failed: #{inspect(reason)}, falling back to templates")
+        generate_code_from_templates(prompt, input, state)
+    end
+  end
+
+  defp generate_code_from_templates(prompt, input, state) do
+    # Fallback implementation using templates
     code =
       case input.language do
         :elixir -> generate_elixir_code(input, state)
@@ -523,15 +565,81 @@ defmodule RubberDuck.Engines.Generation do
       language: input.language,
       imports: detect_imports(code, input.language),
       explanation: generate_explanation(input.prompt, code),
-      confidence: calculate_confidence(code, input),
-      alternatives: generate_alternatives(input, state),
+      # Lower confidence for template-based
+      confidence: 0.5,
+      alternatives: [],
       metadata: %{
         prompt_length: String.length(prompt),
-        generation_time: DateTime.utc_now()
+        generation_time: DateTime.utc_now(),
+        fallback: true
       }
     }
 
     {:ok, result}
+  end
+
+  defp get_model_for_language(:elixir), do: "codellama"
+  defp get_model_for_language(:python), do: "codellama"
+  defp get_model_for_language(:javascript), do: "codellama"
+  defp get_model_for_language(_), do: "llama2"
+
+  defp get_system_prompt(language) do
+    """
+    You are an expert #{language} developer. Generate clean, idiomatic, production-ready code.
+    Follow best practices and include proper error handling.
+    Include necessary imports at the top of the code.
+    Add brief comments to explain complex logic.
+    """
+  end
+
+  defp extract_code_from_response(response, language) do
+    content = get_in(response.choices, [Access.at(0), :message, "content"]) || ""
+
+    # Extract code from markdown code blocks if present
+    case Regex.run(~r/```#{language}?\n(.*?)```/s, content) do
+      [_, code] ->
+        String.trim(code)
+
+      _ ->
+        # Try generic code block
+        case Regex.run(~r/```\n(.*?)```/s, content) do
+          [_, code] -> String.trim(code)
+          # Return full content if no code blocks
+          _ -> String.trim(content)
+        end
+    end
+  end
+
+  defp extract_explanation_from_response(response) do
+    content = get_in(response.choices, [Access.at(0), :message, "content"]) || ""
+
+    # Extract explanation that's not in code blocks
+    content
+    |> String.split(~r/```.*?```/s)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join(" ")
+    |> String.slice(0..200)
+  end
+
+  defp calculate_llm_confidence(response) do
+    # Base confidence on finish reason and model
+    base_confidence =
+      case get_in(response.choices, [Access.at(0), :finish_reason]) do
+        "stop" -> 0.9
+        "length" -> 0.7
+        _ -> 0.6
+      end
+
+    # Adjust based on model
+    model_multiplier =
+      case response.model do
+        "codellama" -> 1.0
+        "gpt-4" -> 1.1
+        _ -> 0.9
+      end
+
+    base_confidence * model_multiplier
   end
 
   defp generate_elixir_code(input, _state) do
