@@ -68,7 +68,32 @@ defmodule RubberDuck.LLM.Provider do
   @callback stream_completion(Request.t(), ProviderConfig.t(), function()) ::
               {:ok, reference()} | {:error, term()}
 
-  @optional_callbacks [health_check: 1, stream_completion: 3]
+  @doc """
+  Establishes a connection to the provider.
+
+  This is called when explicitly connecting to a provider that requires
+  persistent connections (e.g., WebSocket connections).
+  Returns `{:ok, connection_data}` where connection_data is provider-specific.
+  """
+  @callback connect(ProviderConfig.t()) :: {:ok, term()} | {:error, term()}
+
+  @doc """
+  Disconnects from the provider.
+
+  This is called when explicitly disconnecting from a provider.
+  The connection_data is what was returned from connect/1.
+  """
+  @callback disconnect(ProviderConfig.t(), connection_data :: term()) :: :ok | {:error, term()}
+
+  @doc """
+  Health check for a connected provider.
+
+  Similar to health_check/1 but receives the connection data for providers
+  that maintain persistent connections.
+  """
+  @callback health_check(ProviderConfig.t(), connection_data :: term()) :: {:ok, term()} | {:error, term()}
+
+  @optional_callbacks [health_check: 1, health_check: 2, stream_completion: 3, connect: 1, disconnect: 2]
 
   # Helper functions for providers
 

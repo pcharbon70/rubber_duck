@@ -24,6 +24,7 @@ defmodule RubberDuck.Application do
       RubberDuck.PluginManager,
       # LLM system components
       RubberDuck.LLM.Supervisor,
+      RubberDuck.LLM.ConnectionManager,
       # Memory system components
       RubberDuck.Memory.Manager,
       # Agent system components

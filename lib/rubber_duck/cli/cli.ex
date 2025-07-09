@@ -27,7 +27,8 @@ defmodule RubberDuck.CLI do
         generate: generate_spec(),
         complete: complete_spec(),
         refactor: refactor_spec(),
-        test: test_spec()
+        test: test_spec(),
+        llm: llm_spec()
       ],
       flags: [
         verbose: [
@@ -312,6 +313,28 @@ defmodule RubberDuck.CLI do
           long: "--include-property-tests",
           help: "Generate property-based tests where applicable",
           multiple: false
+        ]
+      ]
+    ]
+  end
+
+  defp llm_spec do
+    [
+      name: "llm",
+      about: "Manage LLM provider connections",
+      allow_unknown_args: true,
+      args: [
+        subcommand: [
+          value_name: "SUBCOMMAND",
+          help: "LLM subcommand (status, connect, disconnect, enable, disable)",
+          required: false,
+          parser: :string
+        ],
+        provider: [
+          value_name: "PROVIDER",
+          help: "Provider name (e.g., mock, ollama, tgi)",
+          required: false,
+          parser: :string
         ]
       ]
     ]

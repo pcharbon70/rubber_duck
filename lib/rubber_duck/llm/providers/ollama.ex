@@ -149,6 +149,64 @@ defmodule RubberDuck.LLM.Providers.Ollama do
     {:ok, ref}
   end
 
+  @impl true
+  def connect(%ProviderConfig{} = config) do
+    # Ollama uses HTTP, so we'll validate the connection by checking the API
+    url = build_url(config, "/api/version")
+
+    case Req.get(url, receive_timeout: 5000) do
+      {:ok, %{status: 200, body: response_body}} ->
+        connection_data = %{
+          base_url: config.base_url || @default_base_url,
+          version: response_body["version"] || "unknown",
+          connected_at: DateTime.utc_now()
+        }
+
+        {:ok, connection_data}
+
+      {:ok, %{status: status}} ->
+        {:error, {:http_error, status}}
+
+      {:error, %Mint.TransportError{reason: :econnrefused}} ->
+        {:error, {:connection_refused, "Ollama service not running at #{config.base_url || @default_base_url}"}}
+
+      {:error, reason} ->
+        {:error, {:connection_error, reason}}
+    end
+  end
+
+  @impl true
+  def disconnect(_config, _connection_data) do
+    # Ollama doesn't maintain persistent connections
+    :ok
+  end
+
+  @impl true
+  def health_check(%ProviderConfig{} = config, connection_data) do
+    # Use the stored base_url from connection data
+    base_url = connection_data[:base_url] || config.base_url || @default_base_url
+    url = "#{base_url}/api/tags"
+
+    case Req.get(url, receive_timeout: 5_000) do
+      {:ok, %{status: 200, body: %{"models" => models}}} ->
+        model_names = Enum.map(models, & &1["name"])
+
+        {:ok,
+         %{
+           status: :healthy,
+           models: model_names,
+           version: connection_data[:version],
+           message: "Ollama is running with #{length(model_names)} models available"
+         }}
+
+      {:ok, %{status: status}} ->
+        {:error, {:unhealthy, "Ollama returned status #{status}"}}
+
+      {:error, reason} ->
+        {:error, {:connection_failed, reason}}
+    end
+  end
+
   # Private functions
 
   defp determine_endpoint(%Request{messages: messages}) when is_list(messages) and length(messages) > 0 do

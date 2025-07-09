@@ -95,6 +95,58 @@ defmodule RubberDuck.LLM.Providers.Mock do
     end
   end
 
+  @impl true
+  def connect(%ProviderConfig{} = config) do
+    # Simulate connection behavior
+    case config.options[:connection_behavior] do
+      :fail ->
+        {:error, :connection_refused}
+
+      :timeout ->
+        Process.sleep(5000)
+        {:error, :timeout}
+
+      _ ->
+        # Successful connection
+        connection_data = %{
+          connected_at: DateTime.utc_now(),
+          session_id: generate_id(),
+          state: :connected
+        }
+
+        {:ok, connection_data}
+    end
+  end
+
+  @impl true
+  def disconnect(_config, connection_data) do
+    # Log disconnection for testing
+    if connection_data[:session_id] do
+      :ok
+    else
+      {:error, :not_connected}
+    end
+  end
+
+  @impl true
+  def health_check(%ProviderConfig{} = config, connection_data) do
+    cond do
+      config.options[:health_status] == :unhealthy ->
+        {:error, :unhealthy}
+
+      connection_data[:state] != :connected ->
+        {:error, :not_connected}
+
+      true ->
+        {:ok,
+         %{
+           status: :healthy,
+           timestamp: DateTime.utc_now(),
+           session_id: connection_data[:session_id]
+         }}
+    end
+  end
+
   # Private functions
 
   defp generate_success_response(request, config) do
