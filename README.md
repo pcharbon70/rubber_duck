@@ -29,9 +29,21 @@ For detailed implementation plans and architecture decisions, see the [Implement
 
 ## Getting Started
 
+### Quick Setup
+
+```bash
+# Run the setup script
+./scripts/setup.sh
+```
+
+Or manually:
+
 ```bash
 # Install dependencies
 mix deps.get
+
+# Create and setup database (requires PostgreSQL 16+)
+mix ash.setup
 
 # Install git hooks (recommended)
 ./.githooks/install.sh
@@ -42,6 +54,62 @@ mix test
 # Start the application
 mix phx.server
 ```
+
+### Using the CLI
+
+```bash
+# Connect to an LLM provider (e.g., Ollama)
+mix rubber_duck llm connect ollama
+
+# Generate code
+mix rubber_duck generate "create a hello world function"
+
+# Analyze code
+mix rubber_duck analyze lib/my_module.ex
+
+# See all commands
+mix rubber_duck --help
+```
+
+For detailed CLI usage, see the [Command Line Interface Guide](guides/user/001-command_line_interface.md).
+
+## 📖 Documentation
+
+Comprehensive documentation is available in the [**Documentation Guide**](guides/README.md).
+
+### Quick Links
+
+**For Users:**
+- [**Command Line Interface Guide**](guides/user/001-command_line_interface.md) - Complete CLI usage including LLM setup
+
+**For Developers:**
+- [**Development Guidelines**](CLAUDE.md) - Project conventions and rules
+- [**Implementation Plan**](planning/implementation_plan.md) - Detailed roadmap and architecture
+- [**System Overview**](guides/developer/000-system_overview.md) - High-level architecture
+- [**Pluggable Engines**](guides/developer/001-pluggable_engines.md) - Engine system design
+- [**LLM Integration**](guides/developer/002-llm_integration.md) - Integrating language models
+- [**Memory System**](guides/developer/003-os_memory_system.md) - Hierarchical memory design
+- [**Provider Adapters**](guides/developer/004-provider_adapters.md) - LLM provider interface
+- [**Context Building**](guides/developer/005-context_building.md) - Intelligent context construction
+- [**Chain of Thought**](guides/developer/006-chain_of_thought.md) - CoT implementation
+- [**Enhanced RAG**](guides/developer/007-enhanced_rag.md) - Retrieval-augmented generation
+- [**Iterative Self-Correction**](guides/developer/008-iterative_self_correction.md) - Self-improvement loops
+- [**LLM Enhancement**](guides/developer/009-llm_enhancement.md) - LLM capabilities enhancement
+- [**DAG System**](guides/developer/010-directed_acyclic_graph.md) - Task orchestration with DAGs
+
+### Documentation Structure
+
+```
+guides/
+├── README.md           # Documentation index and navigation
+├── user/              # End-user guides
+│   └── 001-command_line_interface.md
+├── developer/         # Developer and contributor guides
+├── features/          # Feature-specific documentation
+└── architecture/      # Technical architecture docs
+```
+
+More guides are being written. See the [Documentation Guide](guides/README.md) for the complete list.
 
 ## Development
 

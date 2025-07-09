@@ -16,10 +16,10 @@ This guide covers how to use RubberDuck's command-line interface (CLI) for AI-po
 ### Prerequisites
 
 - Elixir 1.15+ and Erlang/OTP 25+
-- PostgreSQL 14+ (for vector storage)
+- PostgreSQL 16+ (for vector storage and extensions)
 - Git
 
-### Building the CLI
+### Initial Setup
 
 ```bash
 # Clone the repository
@@ -29,11 +29,39 @@ cd rubber_duck
 # Install dependencies
 mix deps.get
 
+# Create and setup the database
+mix ash.setup
+
+# This will:
+# - Create the database
+# - Install required PostgreSQL extensions (pgvector, uuid-ossp, etc.)
+# - Run all migrations
+```
+
+### Building the CLI
+
+```bash
 # Compile the project
 mix compile
 
 # Build the CLI executable (optional)
 mix escript.build
+```
+
+### Database Management
+
+```bash
+# Run new migrations
+mix ash.migrate
+
+# Rollback migrations
+mix ash.rollback
+
+# Reset database (drop, create, migrate)
+mix ash.reset
+
+# Check migration status
+mix ash.migrate --status
 ```
 
 ### Running the CLI
