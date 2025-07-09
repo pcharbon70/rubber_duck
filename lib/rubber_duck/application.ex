@@ -15,6 +15,8 @@ defmodule RubberDuck.Application do
       # Engine system components
       RubberDuck.Engine.CapabilityRegistry,
       RubberDuck.Engine.Supervisor,
+      # Engine loader - loads engines after startup
+      RubberDuck.Engine.Loader,
       # Plugin system components
       {Registry, keys: :unique, name: RubberDuck.Plugin.Registry},
       RubberDuck.Plugin.Supervisor,
