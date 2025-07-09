@@ -39,7 +39,30 @@
 - **Section 4.6: Dynamic Workflow Generation** ✅ Completed
 - **Section 4.7: Hybrid Workflow Architecture** ✅ Completed
 
-### Phase 5-6: Not Started
+### Phase 5: Real-time Communication & UI
+- **Section 5.1: Phoenix LiveView Setup** 🔲 Not Started
+- **Section 5.2: Real-time Code Streaming** 🔲 Not Started
+- **Section 5.3: CLI Implementation** ✅ Completed
+- **Section 5.4: TGI Provider** ✅ Completed
+- **Section 5.5: Ollama Provider** ✅ Completed
+- **Section 5.6: API Design and Documentation** 🔲 Not Started
+- **Section 5.7: Real-time Collaboration Features** 🔲 Not Started
+
+### Phase 6: Planning Enhancement System
+- **Section 6.1: Planning Domain & Resources** 🔲 Not Started
+- **Section 6.2: Task Decomposition Engine** 🔲 Not Started
+- **Section 6.3: Critics System (Hard & Soft Critics)** 🔲 Not Started
+- **Section 6.4: ReAct-Based Execution Framework** 🔲 Not Started
+- **Section 6.5: Repository-Level Planning** 🔲 Not Started
+- **Section 6.6: Planning DSL with Spark** 🔲 Not Started
+
+### Phase 7: Advanced Features & Production Readiness
+- **Section 7.1: Multi-Project Support** 🔲 Not Started
+- **Section 7.2: Plugin Marketplace** 🔲 Not Started
+- **Section 7.3: Performance Optimization** 🔲 Not Started
+- **Section 7.4: Security Hardening** 🔲 Not Started
+- **Section 7.5: Deployment and Scaling** 🔲 Not Started
+- **Section 7.6: Monitoring and Analytics** 🔲 Not Started
 
 ## Table of Contents
 1. [Phase 1: Foundation & Core Infrastructure](#phase-1-foundation--core-infrastructure)
@@ -47,7 +70,8 @@
 3. [Phase 3: LLM Integration & Memory System](#phase-3-llm-integration--memory-system)
 4. [Phase 4: Workflow Orchestration & Analysis](#phase-4-workflow-orchestration--analysis)
 5. [Phase 5: Real-time Communication & UI](#phase-5-real-time-communication--ui)
-6. [Phase 6: Advanced Features & Production Readiness](#phase-6-advanced-features--production-readiness)
+6. [Phase 6: Planning Enhancement System](#phase-6-planning-enhancement-system)
+7. [Phase 7: Advanced Features & Production Readiness](#phase-7-advanced-features--production-readiness)
 
 ---
 
@@ -1318,221 +1342,396 @@ Create comprehensive integration tests in `test/integration/phase_5_test.exs` to
 
 ---
 
-## Phase 6: Advanced Features & Production Readiness
+## Phase 6: Planning Enhancement System
+
+This phase implements a sophisticated planning system based on the LLM-Modulo framework, where LLMs generate plans that are validated by external critics. The system provides hierarchical task decomposition, repository-level planning, and dynamic execution with ReAct-based adaptation.
+
+### 6.1 Planning Domain & Resources
+
+Set up the core Ash domain and resources for the planning system, including plan tracking, task management, and validation results.
+
+#### Tasks:
+- [ ] 6.1.1 Create Planning domain module with Ash.Domain
+- [ ] 6.1.2 Design Plan resource with attributes:
+  - [ ] 6.1.2.1 Basic fields (id, name, description, type, status)
+  - [ ] 6.1.2.2 Context storage (project context, dependencies, constraints)
+  - [ ] 6.1.2.3 Validation results and execution history
+  - [ ] 6.1.2.4 Timestamps and metadata
+- [ ] 6.1.3 Design Task resource with attributes:
+  - [ ] 6.1.3.1 Task details (name, description, complexity, status)
+  - [ ] 6.1.3.2 Dependencies and ordering information
+  - [ ] 6.1.3.3 Success criteria and validation rules
+  - [ ] 6.1.3.4 Execution metadata and results
+- [ ] 6.1.4 Create Constraint resource for plan constraints
+- [ ] 6.1.5 Create Validation resource for tracking validation results
+- [ ] 6.1.6 Set up relationships between resources
+- [ ] 6.1.7 Create database migrations for planning tables
+- [ ] 6.1.8 Implement Ash actions for CRUD operations
+- [ ] 6.1.9 Add authorization policies for plan access
+- [ ] 6.1.10 Create GraphQL API for planning resources
+
+#### Unit Tests:
+- [ ] 6.1.11 Test Plan resource creation and validation
+- [ ] 6.1.12 Test Task resource with dependency management
+- [ ] 6.1.13 Test constraint enforcement
+- [ ] 6.1.14 Test validation result tracking
+- [ ] 6.1.15 Test authorization policies
+
+### 6.2 Task Decomposition Engine
+
+Implement the task decomposition engine that breaks down high-level requests into actionable tasks using LLM-guided decomposition with validation.
+
+#### Tasks:
+- [ ] 6.2.1 Create TaskDecomposer engine using RubberDuck.Engine behavior
+- [ ] 6.2.2 Implement decomposition strategies:
+  - [ ] 6.2.2.1 Linear decomposition for simple tasks
+  - [ ] 6.2.2.2 Hierarchical decomposition for complex features
+  - [ ] 6.2.2.3 Tree-of-Thought decomposition for exploratory tasks
+- [ ] 6.2.3 Integrate with CoT for reasoning during decomposition
+- [ ] 6.2.4 Create planning-specific prompt templates
+- [ ] 6.2.5 Implement dependency graph builder
+- [ ] 6.2.6 Add task complexity estimation
+- [ ] 6.2.7 Create success criteria generator
+- [ ] 6.2.8 Implement task validation with critics
+- [ ] 6.2.9 Add support for iterative refinement
+- [ ] 6.2.10 Create planning pattern library
+
+#### Unit Tests:
+- [ ] 6.2.11 Test simple task decomposition
+- [ ] 6.2.12 Test complex feature decomposition
+- [ ] 6.2.13 Test dependency graph generation
+- [ ] 6.2.14 Test complexity estimation accuracy
+- [ ] 6.2.15 Test iterative refinement process
+
+### 6.3 Critics System (Hard & Soft Critics)
+
+Implement the external critics system for plan validation, including hard critics for correctness and soft critics for quality.
+
+#### Tasks:
+- [ ] 6.3.1 Define CriticBehaviour for critic implementations
+- [ ] 6.3.2 Implement HardCritic module:
+  - [ ] 6.3.2.1 Syntax validation using AST parser
+  - [ ] 6.3.2.2 Dependency validation and cycle detection
+  - [ ] 6.3.2.3 Constraint satisfaction checking
+  - [ ] 6.3.2.4 Feasibility analysis
+  - [ ] 6.3.2.5 Resource requirement validation
+- [ ] 6.3.3 Implement SoftCritic module:
+  - [ ] 6.3.3.1 Code style and convention checking
+  - [ ] 6.3.3.2 Best practice validation
+  - [ ] 6.3.3.3 Performance impact analysis
+  - [ ] 6.3.3.4 Security consideration checking
+- [ ] 6.3.4 Create critic orchestrator for running multiple critics
+- [ ] 6.3.5 Implement validation result aggregation
+- [ ] 6.3.6 Add critic configuration system
+- [ ] 6.3.7 Create custom critic plugin support
+- [ ] 6.3.8 Implement validation caching
+- [ ] 6.3.9 Add validation explanation generation
+- [ ] 6.3.10 Create validation dashboard UI
+
+#### Unit Tests:
+- [ ] 6.3.11 Test syntax validation critic
+- [ ] 6.3.12 Test dependency cycle detection
+- [ ] 6.3.13 Test constraint satisfaction
+- [ ] 6.3.14 Test soft critic suggestions
+- [ ] 6.3.15 Test critic orchestration
+
+### 6.4 ReAct-Based Execution Framework
+
+Build the ReAct (Reasoning-Acting) execution framework for dynamic plan execution with observation and adaptation.
+
+#### Tasks:
+- [ ] 6.4.1 Create PlanExecutor GenServer
+- [ ] 6.4.2 Implement ReAct loop:
+  - [ ] 6.4.2.1 Thought generation for task analysis
+  - [ ] 6.4.2.2 Action execution with monitoring
+  - [ ] 6.4.2.3 Observation collection and analysis
+  - [ ] 6.4.2.4 Dynamic plan adjustment
+- [ ] 6.4.3 Integrate with existing workflow engine
+- [ ] 6.4.4 Add execution state management
+- [ ] 6.4.5 Implement failure recovery strategies
+- [ ] 6.4.6 Create execution monitoring hooks
+- [ ] 6.4.7 Add real-time progress tracking
+- [ ] 6.4.8 Implement rollback capabilities
+- [ ] 6.4.9 Create execution history tracking
+- [ ] 6.4.10 Add execution analytics
+
+#### Unit Tests:
+- [ ] 6.4.11 Test basic ReAct execution loop
+- [ ] 6.4.12 Test failure recovery
+- [ ] 6.4.13 Test dynamic plan adjustment
+- [ ] 6.4.14 Test rollback functionality
+- [ ] 6.4.15 Test concurrent task execution
+
+### 6.5 Repository-Level Planning
+
+Implement repository-wide planning capabilities for multi-file changes and architectural modifications.
+
+#### Tasks:
+- [ ] 6.5.1 Create RepositoryPlanner module
+- [ ] 6.5.2 Implement change impact analysis:
+  - [ ] 6.5.2.1 File dependency graph building
+  - [ ] 6.5.2.2 Change propagation analysis
+  - [ ] 6.5.2.3 Risk assessment for changes
+- [ ] 6.5.3 Build change sequencing algorithm
+- [ ] 6.5.4 Implement parallel change detection
+- [ ] 6.5.5 Create migration plan generator
+- [ ] 6.5.6 Add test impact analysis
+- [ ] 6.5.7 Implement change preview system
+- [ ] 6.5.8 Create conflict resolution strategies
+- [ ] 6.5.9 Add architectural pattern detection
+- [ ] 6.5.10 Implement change validation pipeline
+
+#### Unit Tests:
+- [ ] 6.5.11 Test impact analysis accuracy
+- [ ] 6.5.12 Test change sequencing
+- [ ] 6.5.13 Test parallel change detection
+- [ ] 6.5.14 Test migration plan generation
+- [ ] 6.5.15 Test conflict resolution
+
+### 6.6 Planning DSL with Spark
+
+Create a domain-specific language for defining plans using the Spark framework.
+
+#### Tasks:
+- [ ] 6.6.1 Design Planning DSL structure
+- [ ] 6.6.2 Implement Spark DSL sections:
+  - [ ] 6.6.2.1 Plan section for plan metadata
+  - [ ] 6.6.2.2 Task entity for task definitions
+  - [ ] 6.6.2.3 Constraint entity for constraints
+  - [ ] 6.6.2.4 Validation entity for custom validators
+- [ ] 6.6.3 Create DSL compiler
+- [ ] 6.6.4 Implement DSL validation
+- [ ] 6.6.5 Add DSL to Ash resource transformation
+- [ ] 6.6.6 Create DSL documentation generator
+- [ ] 6.6.7 Implement DSL migration support
+- [ ] 6.6.8 Add DSL syntax highlighting
+- [ ] 6.6.9 Create example plan templates
+- [ ] 6.6.10 Build DSL testing framework
+
+#### Unit Tests:
+- [ ] 6.6.11 Test DSL parsing
+- [ ] 6.6.12 Test DSL compilation
+- [ ] 6.6.13 Test DSL validation
+- [ ] 6.6.14 Test resource transformation
+- [ ] 6.6.15 Test DSL error handling
+
+---
+
+## Phase 7: Advanced Features & Production Readiness
 
 This final phase implements production-critical features including background job processing, security measures, deployment configurations, and performance optimizations. This phase ensures the system is ready for real-world usage at scale.
 
-### 6.1 Background Job Processing with Oban
+### 7.1 Background Job Processing with Oban
 
 Implement asynchronous job processing for resource-intensive operations like project indexing and batch analysis.
 
 #### Tasks:
-- [ ] 6.1.1 Add Oban dependency and configuration
-- [ ] 6.1.2 Create Oban database migrations
-- [ ] 6.1.3 Set up job queues:
-  - [ ] 6.1.3.1 `:indexing` - File and project indexing
-  - [ ] 6.1.3.2 `:analysis` - Code analysis jobs
-  - [ ] 6.1.3.3 `:generation` - Batch code generation
-  - [ ] 6.1.3.4 `:notification` - User notifications
-- [ ] 6.1.4 Implement job workers:
-  - [ ] 6.1.4.1 `ProjectIndexer` - Index entire projects
-  - [ ] 6.1.4.2 `FileAnalyzer` - Analyze individual files
-  - [ ] 6.1.4.3 `BatchGenerator` - Generate multiple files
-  - [ ] 6.1.4.4 `ReportGenerator` - Create analysis reports
-- [ ] 6.1.5 Add job scheduling for periodic tasks
-- [ ] 6.1.6 Implement job progress tracking
-- [ ] 6.1.7 Create job retry strategies
-- [ ] 6.1.8 Build job monitoring dashboard
-- [ ] 6.1.9 Add job priority system
-- [ ] 6.1.10 Set up job telemetry
+- [ ] 7.1.1 Add Oban dependency and configuration
+- [ ] 7.1.2 Create Oban database migrations
+- [ ] 7.1.3 Set up job queues:
+  - [ ] 7.1.3.1 `:indexing` - File and project indexing
+  - [ ] 7.1.3.2 `:analysis` - Code analysis jobs
+  - [ ] 7.1.3.3 `:generation` - Batch code generation
+  - [ ] 7.1.3.4 `:notification` - User notifications
+- [ ] 7.1.4 Implement job workers:
+  - [ ] 7.1.4.1 `ProjectIndexer` - Index entire projects
+  - [ ] 7.1.4.2 `FileAnalyzer` - Analyze individual files
+  - [ ] 7.1.4.3 `BatchGenerator` - Generate multiple files
+  - [ ] 7.1.4.4 `ReportGenerator` - Create analysis reports
+- [ ] 7.1.5 Add job scheduling for periodic tasks
+- [ ] 7.1.6 Implement job progress tracking
+- [ ] 7.1.7 Create job retry strategies
+- [ ] 7.1.8 Build job monitoring dashboard
+- [ ] 7.1.9 Add job priority system
+- [ ] 7.1.10 Set up job telemetry
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/workers/` directory to verify:
 
 **ProjectIndexer Tests** (`project_indexer_test.exs`):
-- [ ] 6.1.11 Test indexing all project files
-- [ ] 6.1.12 Test handling large projects with batching
-- [ ] 6.1.13 Test recovery from partial failures
-- [ ] 6.1.14 Test progress tracking updates
-- [ ] 6.1.15 Test file change detection
-- [ ] 6.1.16 Test concurrent indexing safety
+- [ ] 7.1.11 Test indexing all project files
+- [ ] 7.1.12 Test handling large projects with batching
+- [ ] 7.1.13 Test recovery from partial failures
+- [ ] 7.1.14 Test progress tracking updates
+- [ ] 7.1.15 Test file change detection
+- [ ] 7.1.16 Test concurrent indexing safety
 
-### 6.2 Security Implementation
+### 7.2 Security Implementation
 
 Implement comprehensive security measures including authentication, authorization, input validation, and rate limiting.
 
 #### Tasks:
-- [ ] 6.2.1 Implement authentication system:
-  - [ ] 6.2.1.1 JWT token generation
-  - [ ] 6.2.1.2 API key management
-  - [ ] 6.2.1.3 OAuth2 integration
-  - [ ] 6.2.1.4 Session management
-- [ ] 6.2.2 Add authorization layer:
-  - [ ] 6.2.2.1 Role-based access control (RBAC)
-  - [ ] 6.2.2.2 Project-level permissions
-  - [ ] 6.2.2.3 Resource-level authorization
-- [ ] 6.2.3 Create input validation:
-  - [ ] 6.2.3.1 Code injection prevention
-  - [ ] 6.2.3.2 Path traversal protection
-  - [ ] 6.2.3.3 Size limits enforcement
-- [ ] 6.2.4 Implement rate limiting:
-  - [ ] 6.2.4.1 Token bucket per user
-  - [ ] 6.2.4.2 Endpoint-specific limits
-  - [ ] 6.2.4.3 DDoS protection
-- [ ] 6.2.5 Add security scanning:
-  - [ ] 6.2.5.1 Dependency vulnerability checks
-  - [ ] 6.2.5.2 Code security analysis
-- [ ] 6.2.6 Set up audit logging
-- [ ] 6.2.7 Implement data encryption at rest
+- [ ] 7.2.1 Implement authentication system:
+  - [ ] 7.2.1.1 JWT token generation
+  - [ ] 7.2.1.2 API key management
+  - [ ] 7.2.1.3 OAuth2 integration
+  - [ ] 7.2.1.4 Session management
+- [ ] 7.2.2 Add authorization layer:
+  - [ ] 7.2.2.1 Role-based access control (RBAC)
+  - [ ] 7.2.2.2 Project-level permissions
+  - [ ] 7.2.2.3 Resource-level authorization
+- [ ] 7.2.3 Create input validation:
+  - [ ] 7.2.3.1 Code injection prevention
+  - [ ] 7.2.3.2 Path traversal protection
+  - [ ] 7.2.3.3 Size limits enforcement
+- [ ] 7.2.4 Implement rate limiting:
+  - [ ] 7.2.4.1 Token bucket per user
+  - [ ] 7.2.4.2 Endpoint-specific limits
+  - [ ] 7.2.4.3 DDoS protection
+- [ ] 7.2.5 Add security scanning:
+  - [ ] 7.2.5.1 Dependency vulnerability checks
+  - [ ] 7.2.5.2 Code security analysis
+- [ ] 7.2.6 Set up audit logging
+- [ ] 7.2.7 Implement data encryption at rest
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/security/` directory:
 
 **Authentication Tests** (`authentication_test.exs`):
-- [ ] 6.2.8 Test JWT token generation and verification
-- [ ] 6.2.9 Test token expiration handling
-- [ ] 6.2.10 Test API key validation
-- [ ] 6.2.11 Test OAuth2 flow
-- [ ] 6.2.12 Test session management
-- [ ] 6.2.13 Test multi-factor authentication
+- [ ] 7.2.8 Test JWT token generation and verification
+- [ ] 7.2.9 Test token expiration handling
+- [ ] 7.2.10 Test API key validation
+- [ ] 7.2.11 Test OAuth2 flow
+- [ ] 7.2.12 Test session management
+- [ ] 7.2.13 Test multi-factor authentication
 
 **Authorization Tests** (`authorization_test.exs`):
-- [ ] 6.2.14 Test project permission enforcement
-- [ ] 6.2.15 Test role-based access
-- [ ] 6.2.16 Test resource-level permissions
-- [ ] 6.2.17 Test permission inheritance
-- [ ] 6.2.18 Test cross-project isolation
-- [ ] 6.2.19 Test admin overrides
+- [ ] 7.2.14 Test project permission enforcement
+- [ ] 7.2.15 Test role-based access
+- [ ] 7.2.16 Test resource-level permissions
+- [ ] 7.2.17 Test permission inheritance
+- [ ] 7.2.18 Test cross-project isolation
+- [ ] 7.2.19 Test admin overrides
 
 **Input Validation Tests** (`validation_test.exs`):
-- [ ] 6.2.20 Test path traversal prevention
-- [ ] 6.2.21 Test code input sanitization
-- [ ] 6.2.22 Test size limit enforcement
-- [ ] 6.2.23 Test injection attack prevention
-- [ ] 6.2.24 Test file type validation
-- [ ] 6.2.25 Test rate limiting
+- [ ] 7.2.20 Test path traversal prevention
+- [ ] 7.2.21 Test code input sanitization
+- [ ] 7.2.22 Test size limit enforcement
+- [ ] 7.2.23 Test injection attack prevention
+- [ ] 7.2.24 Test file type validation
+- [ ] 7.2.25 Test rate limiting
 
-### 6.3 Monitoring and Observability
+### 7.3 Monitoring and Observability
 
 Implement comprehensive monitoring, logging, and observability features for production operations.
 
 #### Tasks:
-- [ ] 6.3.1 Set up Telemetry integration:
-  - [ ] 6.3.1.1 Define telemetry events
-  - [ ] 6.3.1.2 Create metric reporters
-  - [ ] 6.3.1.3 Add custom measurements
-- [ ] 6.3.2 Implement structured logging:
-  - [ ] 6.3.2.1 JSON log formatting
-  - [ ] 6.3.2.2 Log aggregation setup
-  - [ ] 6.3.2.3 Correlation ID tracking
-- [ ] 6.3.3 Create health check endpoints:
-  - [ ] 6.3.3.1 Database connectivity
-  - [ ] 6.3.3.2 LLM provider status
-  - [ ] 6.3.3.3 Memory usage
-  - [ ] 6.3.3.4 Job queue health
-- [ ] 6.3.4 Add performance monitoring:
-  - [ ] 6.3.4.1 Request duration tracking
-  - [ ] 6.3.4.2 Database query analysis
-  - [ ] 6.3.4.3 Memory profiling
-- [ ] 6.3.5 Set up error tracking:
-  - [ ] 6.3.5.1 Sentry integration
-  - [ ] 6.3.5.2 Error aggregation
-  - [ ] 6.3.5.3 Alert configuration
-- [ ] 6.3.6 Build metrics dashboard
-- [ ] 6.3.7 Implement distributed tracing
-- [ ] 6.3.8 Create SLO monitoring
-- [ ] 6.3.9 Add LLM enhancement metrics:
-  - [ ] 6.3.9.1 CoT reasoning quality tracking
-  - [ ] 6.3.9.2 RAG retrieval precision monitoring
-  - [ ] 6.3.9.3 Self-correction effectiveness metrics
-  - [ ] 6.3.9.4 Enhancement technique A/B testing
+- [ ] 7.3.1 Set up Telemetry integration:
+  - [ ] 7.3.1.1 Define telemetry events
+  - [ ] 7.3.1.2 Create metric reporters
+  - [ ] 7.3.1.3 Add custom measurements
+- [ ] 7.3.2 Implement structured logging:
+  - [ ] 7.3.2.1 JSON log formatting
+  - [ ] 7.3.2.2 Log aggregation setup
+  - [ ] 7.3.2.3 Correlation ID tracking
+- [ ] 7.3.3 Create health check endpoints:
+  - [ ] 7.3.3.1 Database connectivity
+  - [ ] 7.3.3.2 LLM provider status
+  - [ ] 7.3.3.3 Memory usage
+  - [ ] 7.3.3.4 Job queue health
+- [ ] 7.3.4 Add performance monitoring:
+  - [ ] 7.3.4.1 Request duration tracking
+  - [ ] 7.3.4.2 Database query analysis
+  - [ ] 7.3.4.3 Memory profiling
+- [ ] 7.3.5 Set up error tracking:
+  - [ ] 7.3.5.1 Sentry integration
+  - [ ] 7.3.5.2 Error aggregation
+  - [ ] 7.3.5.3 Alert configuration
+- [ ] 7.3.6 Build metrics dashboard
+- [ ] 7.3.7 Implement distributed tracing
+- [ ] 7.3.8 Create SLO monitoring
+- [ ] 7.3.9 Add LLM enhancement metrics:
+  - [ ] 7.3.9.1 CoT reasoning quality tracking
+  - [ ] 7.3.9.2 RAG retrieval precision monitoring
+  - [ ] 7.3.9.3 Self-correction effectiveness metrics
+  - [ ] 7.3.9.4 Enhancement technique A/B testing
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/monitoring/` directory:
 
 **Telemetry Tests** (`telemetry_test.exs`):
-- [ ] 6.3.10 Test completion event emission
-- [ ] 6.3.11 Test LLM request latency tracking
-- [ ] 6.3.12 Test custom metric recording
-- [ ] 6.3.13 Test event metadata inclusion
-- [ ] 6.3.14 Test metric aggregation
-- [ ] 6.3.15 Test performance measurements
-- [ ] 6.3.16 Test LLM enhancement metrics
+- [ ] 7.3.10 Test completion event emission
+- [ ] 7.3.11 Test LLM request latency tracking
+- [ ] 7.3.12 Test custom metric recording
+- [ ] 7.3.13 Test event metadata inclusion
+- [ ] 7.3.14 Test metric aggregation
+- [ ] 7.3.15 Test performance measurements
+- [ ] 7.3.16 Test LLM enhancement metrics
 
 **Health Check Tests** (`health_test.exs`):
-- [ ] 6.3.17 Test comprehensive health endpoint
-- [ ] 6.3.18 Test detailed health with issues
-- [ ] 6.3.19 Test individual component checks
-- [ ] 6.3.20 Test health status aggregation
-- [ ] 6.3.21 Test timeout handling
-- [ ] 6.3.22 Test graceful degradation
+- [ ] 7.3.17 Test comprehensive health endpoint
+- [ ] 7.3.18 Test detailed health with issues
+- [ ] 7.3.19 Test individual component checks
+- [ ] 7.3.20 Test health status aggregation
+- [ ] 7.3.21 Test timeout handling
+- [ ] 7.3.22 Test graceful degradation
 
 **Metrics Tests** (`metrics_test.exs`):
-- [ ] 6.3.23 Test request metric tracking
-- [ ] 6.3.24 Test memory usage monitoring
-- [ ] 6.3.25 Test business metric collection
-- [ ] 6.3.26 Test metric persistence
-- [ ] 6.3.27 Test dashboard data aggregation
-- [ ] 6.3.28 Test alert triggering
+- [ ] 7.3.23 Test request metric tracking
+- [ ] 7.3.24 Test memory usage monitoring
+- [ ] 7.3.25 Test business metric collection
+- [ ] 7.3.26 Test metric persistence
+- [ ] 7.3.27 Test dashboard data aggregation
+- [ ] 7.3.28 Test alert triggering
 
-### 6.4 Deployment and Scaling
+### 7.4 Deployment and Scaling
 
 Implement deployment configurations and scaling strategies for production environments.
 
 #### Tasks:
-- [ ] 6.4.1 Create Docker configuration:
-  - [ ] 6.4.1.1 Multi-stage Dockerfile
-  - [ ] 6.4.1.2 Docker Compose setup
-  - [ ] 6.4.1.3 Health check configuration
-  - [ ] 6.4.1.4 Volume management
-- [ ] 6.4.2 Set up Kubernetes deployment:
-  - [ ] 6.4.2.1 Deployment manifests
-  - [ ] 6.4.2.2 Service configuration
-  - [ ] 6.4.2.3 Ingress rules
-  - [ ] 6.4.2.4 ConfigMaps and Secrets
-- [ ] 6.4.3 Implement clustering:
-  - [ ] 6.4.3.1 libcluster configuration
-  - [ ] 6.4.3.2 Node discovery
-  - [ ] 6.4.3.3 Distributed Erlang setup
-  - [ ] 6.4.3.4 State synchronization
-- [ ] 6.4.4 Add horizontal scaling:
-  - [ ] 6.4.4.1 Load balancer configuration
-  - [ ] 6.4.4.2 Session affinity
-  - [ ] 6.4.4.3 Autoscaling rules
-- [ ] 6.4.5 Create database migrations strategy
-- [ ] 6.4.6 Set up blue-green deployment
-- [ ] 6.4.7 Implement feature flags
-- [ ] 6.4.8 Add CDN configuration
-- [ ] 6.4.9 Create backup and restore procedures
+- [ ] 7.4.1 Create Docker configuration:
+  - [ ] 7.4.1.1 Multi-stage Dockerfile
+  - [ ] 7.4.1.2 Docker Compose setup
+  - [ ] 7.4.1.3 Health check configuration
+  - [ ] 7.4.1.4 Volume management
+- [ ] 7.4.2 Set up Kubernetes deployment:
+  - [ ] 7.4.2.1 Deployment manifests
+  - [ ] 7.4.2.2 Service configuration
+  - [ ] 7.4.2.3 Ingress rules
+  - [ ] 7.4.2.4 ConfigMaps and Secrets
+- [ ] 7.4.3 Implement clustering:
+  - [ ] 7.4.3.1 libcluster configuration
+  - [ ] 7.4.3.2 Node discovery
+  - [ ] 7.4.3.3 Distributed Erlang setup
+  - [ ] 7.4.3.4 State synchronization
+- [ ] 7.4.4 Add horizontal scaling:
+  - [ ] 7.4.4.1 Load balancer configuration
+  - [ ] 7.4.4.2 Session affinity
+  - [ ] 7.4.4.3 Autoscaling rules
+- [ ] 7.4.5 Create database migrations strategy
+- [ ] 7.4.6 Set up blue-green deployment
+- [ ] 7.4.7 Implement feature flags
+- [ ] 7.4.8 Add CDN configuration
+- [ ] 7.4.9 Create backup and restore procedures
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/deployment/` directory:
 
 **Clustering Tests** (`clustering_test.exs`):
-- [ ] 6.4.10 Test node discovery and connection
-- [ ] 6.4.11 Test state synchronization across nodes
-- [ ] 6.4.12 Test node failure handling
-- [ ] 6.4.13 Test load distribution
-- [ ] 6.4.14 Test cluster reformation
-- [ ] 6.4.15 Test split-brain resolution
+- [ ] 7.4.10 Test node discovery and connection
+- [ ] 7.4.11 Test state synchronization across nodes
+- [ ] 7.4.12 Test node failure handling
+- [ ] 7.4.13 Test load distribution
+- [ ] 7.4.14 Test cluster reformation
+- [ ] 7.4.15 Test split-brain resolution
 
 **Deployment Tests** (`deployment_test.exs`):
-- [ ] 6.4.16 Test Docker image build
-- [ ] 6.4.17 Test Kubernetes manifest validity
-- [ ] 6.4.18 Test configuration management
-- [ ] 6.4.19 Test secret handling
-- [ ] 6.4.20 Test rollback procedures
-- [ ] 6.4.21 Test zero-downtime deployment
+- [ ] 7.4.16 Test Docker image build
+- [ ] 7.4.17 Test Kubernetes manifest validity
+- [ ] 7.4.18 Test configuration management
+- [ ] 7.4.19 Test secret handling
+- [ ] 7.4.20 Test rollback procedures
+- [ ] 7.4.21 Test zero-downtime deployment
 
 **Feature Flag Tests** (`feature_flags_test.exs`):
-- [ ] 6.4.22 Test feature toggle functionality
-- [ ] 6.4.23 Test gradual rollout percentages
-- [ ] 6.4.24 Test user-specific flags
-- [ ] 6.4.25 Test flag persistence
-- [ ] 6.4.26 Test A/B testing support
-- [ ] 6.4.27 Test flag inheritance
+- [ ] 7.4.22 Test feature toggle functionality
+- [ ] 7.4.23 Test gradual rollout percentages
+- [ ] 7.4.24 Test user-specific flags
+- [ ] 7.4.25 Test flag persistence
+- [ ] 7.4.26 Test A/B testing support
+- [ ] 7.4.27 Test flag inheritance
 
-### Phase 6 Integration Tests
+### Phase 7 Integration Tests
 
 Create comprehensive integration tests in `test/integration/phase_6_test.exs` to verify:
 - [ ] 6.5.1 Test end-to-end secure workflow with monitoring
@@ -1577,7 +1776,8 @@ This implementation plan provides a comprehensive roadmap for building RubberDuc
    - ✅ Dynamic workflow generation with complexity analysis
    - ✅ Hybrid engine-workflow architecture for seamless integration
 5. **Phase 5**: Real-time interfaces (WebSocket, LiveView, CLI/TUI)
-6. **Phase 6**: Production features (jobs, security, monitoring, deployment)
+6. **Phase 6**: Planning enhancement system (LLM-Modulo framework, critics, ReAct execution)
+7. **Phase 7**: Production features (jobs, security, monitoring, deployment)
 
 ### Technical Innovation Highlights:
 
