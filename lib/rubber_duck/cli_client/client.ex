@@ -25,7 +25,8 @@ defmodule RubberDuck.CLIClient.Client do
       :connected,
       :channel_joined,
       :pending_requests,
-      :event_handlers
+      :event_handlers,
+      :connect_from
     ]
   end
 
@@ -103,20 +104,22 @@ defmodule RubberDuck.CLIClient.Client do
   end
 
   @impl true
-  def handle_call({:connect, url}, _from, state) do
+  def handle_call({:connect, url}, from, state) do
     new_url = url || state.url
     
     case do_connect(new_url, state.api_key) do
       {:ok, socket_pid} ->
-        # Store the socket PID
+        # Store the socket PID but don't mark as joined yet
         state = %{state | 
           socket: socket_pid, 
           url: new_url,
           connected: true,
-          channel_joined: true  # Transport handles joining automatically
+          channel_joined: false,
+          connect_from: from  # Store who's waiting for connection
         }
         
-        {:reply, :ok, state}
+        # Don't reply yet - wait for channel_joined message
+        {:noreply, state}
         
       {:error, reason} ->
         {:reply, {:error, reason}, state}
@@ -142,8 +145,10 @@ defmodule RubberDuck.CLIClient.Client do
   @impl true
   def handle_call({:send_command, command, params}, from, state) do
     if state.channel_joined do
-      # Send the command to the Transport process
+      # Create a unique reference for this request
       ref = make_ref()
+      
+      # Send the command to the Transport process
       send(state.socket, {:push, "cli:commands", command, params, ref, self()})
       
       # Store the pending request
@@ -260,11 +265,45 @@ defmodule RubberDuck.CLIClient.Client do
   end
 
   @impl true
+  def handle_info({:channel_joined, topic}, state) do
+    Logger.info("Client notified of channel join: #{topic}")
+    
+    # Reply to the waiting connect call if any
+    if state.connect_from do
+      GenServer.reply(state.connect_from, :ok)
+    end
+    
+    {:noreply, %{state | channel_joined: true, connect_from: nil}}
+  end
+  
+  @impl true
+  def handle_info({:push_reply, ref, payload}, state) do
+    # Handle reply from a push request
+    case Map.pop(state.pending_requests, ref) do
+      {nil, pending_requests} ->
+        Logger.warning("Received reply for unknown ref: #{inspect(ref)}")
+        {:noreply, %{state | pending_requests: pending_requests}}
+        
+      {{from, _command}, pending_requests} ->
+        # Reply based on the response
+        case payload do
+          %{"status" => "ok", "response" => data} ->
+            GenServer.reply(from, {:ok, data})
+          %{"status" => "error", "error" => reason} ->
+            GenServer.reply(from, {:error, reason})
+          _ ->
+            GenServer.reply(from, {:ok, payload})
+        end
+        {:noreply, %{state | pending_requests: pending_requests}}
+    end
+  end
+  
+  @impl true
   def handle_info({:disconnected, reason}, state) do
     Logger.warning("Disconnected: #{inspect(reason)}")
     
     # Clear pending requests
-    for {_id, from} <- state.pending_requests do
+    for {_id, {from, _}} <- state.pending_requests do
       GenServer.reply(from, {:error, :disconnected})
     end
     
@@ -283,6 +322,20 @@ defmodule RubberDuck.CLIClient.Client do
   end
 
   @impl true
+  def handle_info({:push_error, ref, reason}, state) do
+    # Handle error from a push request
+    case Map.pop(state.pending_requests, ref) do
+      {nil, pending_requests} ->
+        Logger.warning("Received push error for unknown ref: #{inspect(ref)}")
+        {:noreply, %{state | pending_requests: pending_requests}}
+        
+      {{from, _command}, pending_requests} ->
+        GenServer.reply(from, {:error, reason})
+        {:noreply, %{state | pending_requests: pending_requests}}
+    end
+  end
+  
+  @impl true
   def handle_info(msg, state) do
     Logger.debug("Unhandled message: #{inspect(msg)}")
     {:noreply, state}
@@ -299,7 +352,8 @@ defmodule RubberDuck.CLIClient.Client do
         __MODULE__.Transport,
         Phoenix.Channels.GenSocketClient.Transport.WebSocketClient,
         url: url,
-        params: %{api_key: api_key}
+        params: %{api_key: api_key},
+        parent: self()
       )
     else
       {:error, :no_api_key}
@@ -311,28 +365,36 @@ defmodule RubberDuck.CLIClient.Client do
   end
 
   defp handle_reply(payload, state) do
-    # The payload format from the transport will be different
-    # We need to extract the ref and response
+    # The payload comes from Transport with ref and payload
     case payload do
-      %{ref: ref, payload: response} ->
-        # Find the pending request
-        case Map.pop(state.pending_requests, ref) do
-          {nil, pending_requests} ->
-            # No pending request for this ref
-            {:noreply, %{state | pending_requests: pending_requests}}
-            
-          {{from, _command}, pending_requests} ->
-            # Reply based on the response
-            case response do
-              {:ok, data} ->
-                GenServer.reply(from, {:ok, data})
-              {:error, reason} ->
-                GenServer.reply(from, {:error, reason})
-              _ ->
-                GenServer.reply(from, {:ok, response})
-            end
-            {:noreply, %{state | pending_requests: pending_requests}}
+      %{ref: push_ref, payload: response} ->
+        # Find the pending request by checking all refs
+        {matching_ref, pending_requests} = 
+          Enum.find_value(state.pending_requests, {nil, state.pending_requests}, fn
+            {ref, {_from, _command}} ->
+              # Check if this is our ref (stored in Transport's pending map)
+              if Map.get(state, {:push_ref, ref}) == push_ref do
+                {ref, Map.delete(state.pending_requests, ref)}
+              else
+                nil
+              end
+          end)
+        
+        if matching_ref do
+          {{from, _command}, _} = Map.get(state.pending_requests, matching_ref)
+          
+          # Reply based on the response
+          case response do
+            %{"status" => "ok", "response" => data} ->
+              GenServer.reply(from, {:ok, data})
+            %{"status" => "error", "error" => reason} ->
+              GenServer.reply(from, {:error, reason})
+            _ ->
+              GenServer.reply(from, {:ok, response})
+          end
         end
+        
+        {:noreply, %{state | pending_requests: pending_requests}}
         
       _ ->
         Logger.warning("Unexpected reply format: #{inspect(payload)}")

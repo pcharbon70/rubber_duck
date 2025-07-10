@@ -22,6 +22,7 @@ defmodule RubberDuck.CLIClient.Client.Transport do
     
     url = Keyword.fetch!(opts, :url)
     params = Keyword.get(opts, :params, %{})
+    parent = Keyword.get(opts, :parent)
     
     # Convert params map to keyword list for Phoenix.Socket
     socket_params = 
@@ -29,18 +30,21 @@ defmodule RubberDuck.CLIClient.Client.Transport do
       |> Map.to_list()
       |> Keyword.new()
     
-    {:connect, url, socket_params, %{parent: self()}}
+    {:connect, url, socket_params, %{parent: parent}}
   end
 
   @impl true
   def handle_connected(transport, state) do
     Logger.info("WebSocket connected")
     
+    # Store the transport and notify the parent
+    state = Map.put(state, :transport, transport)
+    
     # Automatically join the CLI channel once connected
     case Phoenix.Channels.GenSocketClient.join(transport, "cli:commands", %{}) do
-      {:ok, _ref} ->
+      {:ok, ref} ->
         Logger.info("Joining cli:commands channel")
-        {:ok, Map.put(state, :transport, transport)}
+        {:ok, Map.put(state, :join_ref, ref)}
         
       {:error, reason} ->
         Logger.error("Failed to join channel: #{inspect(reason)}")
@@ -58,6 +62,12 @@ defmodule RubberDuck.CLIClient.Client.Transport do
   @impl true
   def handle_joined(topic, _payload, _transport, state) do
     Logger.info("Joined channel: #{topic}")
+    
+    # Notify the parent Client process that we've successfully joined
+    if state.parent do
+      send(state.parent, {:channel_joined, topic})
+    end
+    
     {:ok, state}
   end
 
@@ -81,8 +91,20 @@ defmodule RubberDuck.CLIClient.Client.Transport do
 
   @impl true
   def handle_reply(topic, ref, payload, _transport, state) do
-    Process.send(state.parent, {:channel_reply, topic, %{ref: ref, payload: payload}}, [])
-    {:ok, state}
+    # Check if this is a reply to one of our push requests
+    case Map.get(state, {:pending, ref}) do
+      {client_ref, from} ->
+        # Send the reply back to the client with the original ref
+        send(from, {:push_reply, client_ref, payload})
+        # Remove from pending
+        state = Map.delete(state, {:pending, ref})
+        {:ok, state}
+        
+      nil ->
+        # Regular channel reply
+        Process.send(state.parent, {:channel_reply, topic, %{ref: ref, payload: payload}}, [])
+        {:ok, state}
+    end
   end
 
   @impl true
