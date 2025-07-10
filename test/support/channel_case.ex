@@ -29,7 +29,8 @@ defmodule RubberDuckWeb.ChannelCase do
   end
 
   setup tags do
-    RubberDuck.DataCase.setup_sandbox(tags)
+    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(RubberDuck.Repo, shared: not tags[:async])
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
     :ok
   end
 end

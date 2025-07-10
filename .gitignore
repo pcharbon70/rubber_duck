@@ -21,3 +21,6 @@ rubber_duck-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Built CLI binary
+/bin/rubber_duck
