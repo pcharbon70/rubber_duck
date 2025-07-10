@@ -13,11 +13,11 @@ defmodule RubberDuck.CLIClient.Commands.Refactor do
       "format" => opts[:format],
       "verbose" => opts[:verbose]
     }
-    
+
     case Client.send_command("refactor", params) do
       {:ok, result} ->
         {:ok, result}
-        
+
       {:error, reason} ->
         {:error, format_error(reason)}
     end

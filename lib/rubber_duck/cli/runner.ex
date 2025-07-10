@@ -47,9 +47,11 @@ defmodule RubberDuck.CLI.Runner do
       %{subcommand: nil} ->
         # No subcommand specified, default to status
         Commands.LLM.run(:status, %{}, config)
+
       %{subcommand: {subcommand, subcommand_args}} ->
         # Pass the subcommand and its args
         Commands.LLM.run(subcommand, subcommand_args, config)
+
       _ ->
         # Fallback - might be direct args
         Commands.LLM.run(:status, args, config)

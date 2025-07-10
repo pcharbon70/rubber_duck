@@ -1,7 +1,7 @@
 defmodule RubberDuck.CLIClient.Main do
   @moduledoc """
   Main entry point for the RubberDuck CLI client.
-  
+
   This module handles command-line parsing and routing to appropriate handlers.
   """
 
@@ -15,12 +15,12 @@ defmodule RubberDuck.CLIClient.Main do
   def main(argv) do
     # Ensure we have the necessary applications started
     start_apps()
-    
+
     # Parse and execute command
     case parse_args(argv) do
       {:ok, command, args, opts} ->
         execute_command(command, args, opts)
-        
+
       {:error, reason} ->
         IO.puts(:stderr, "Error: #{reason}")
         System.halt(1)
@@ -106,20 +106,20 @@ defmodule RubberDuck.CLIClient.Main do
     case parsed do
       %{subcommand: nil} ->
         {:error, "No command specified. Run with --help for usage information."}
-        
+
       # Handle nested subcommands (e.g., [:auth, :setup])
       {[cmd, subcmd], args} ->
         args_with_subcommand = Map.put(args, :subcommand, {subcmd, args})
         {:ok, cmd, args_with_subcommand, build_opts(args)}
-        
+
       # Handle single command as list (e.g., [:health])
       {[cmd], args} ->
         {:ok, cmd, args, build_opts(args)}
-        
+
       # Handle single command (e.g., :health)
       {cmd, args} when is_atom(cmd) ->
         {:ok, cmd, args, build_opts(args)}
-        
+
       _ ->
         {:error, "Invalid command structure"}
     end
@@ -146,40 +146,42 @@ defmodule RubberDuck.CLIClient.Main do
       Error: Not authenticated. Please run:
         #{@app_name} auth setup
       """)
+
       System.halt(1)
     end
-    
+
     # Start the client with the server URL from auth or options
     server_url = opts[:server] || Auth.get_server_url()
     {:ok, _pid} = Client.start_link(url: server_url)
-    
+
     # Connect to server
     case Client.connect() do
       :ok ->
         # Execute the command
-        result = case command do
-          :analyze -> Commands.Analyze.run(args, opts)
-          :generate -> Commands.Generate.run(args, opts)
-          :complete -> Commands.Complete.run(args, opts)
-          :refactor -> Commands.Refactor.run(args, opts)
-          :test -> Commands.Test.run(args, opts)
-          :llm -> Commands.LLM.run(args, opts)
-          :health -> Commands.Health.run(args, opts)
-          _ -> {:error, "Unknown command: #{command}"}
-        end
-        
+        result =
+          case command do
+            :analyze -> Commands.Analyze.run(args, opts)
+            :generate -> Commands.Generate.run(args, opts)
+            :complete -> Commands.Complete.run(args, opts)
+            :refactor -> Commands.Refactor.run(args, opts)
+            :test -> Commands.Test.run(args, opts)
+            :llm -> Commands.LLM.run(args, opts)
+            :health -> Commands.Health.run(args, opts)
+            _ -> {:error, "Unknown command: #{command}"}
+          end
+
         # Handle the result
         case result do
           {:ok, output} ->
             formatted = Formatter.format(output, opts[:format])
             IO.puts(formatted)
             System.halt(0)
-            
+
           {:error, reason} ->
             IO.puts(:stderr, "Error: #{reason}")
             System.halt(1)
         end
-        
+
       {:error, reason} ->
         IO.puts(:stderr, "Failed to connect to server: #{inspect(reason)}")
         System.halt(1)

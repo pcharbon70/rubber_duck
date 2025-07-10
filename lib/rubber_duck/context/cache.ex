@@ -157,12 +157,13 @@ defmodule RubberDuck.Context.Cache do
 
     # Get all entries and filter expired ones manually
     # Skip the stats entry which is a 2-tuple
-    expired_keys = 
+    expired_keys =
       :ets.tab2list(@table_name)
-      |> Enum.filter(fn 
+      |> Enum.filter(fn
         {_key, _value, expires_at} when is_struct(expires_at, DateTime) ->
           DateTime.compare(now, expires_at) == :gt
-        _ -> 
+
+        _ ->
           false
       end)
       |> Enum.map(fn {key, _value, _expires_at} -> key end)

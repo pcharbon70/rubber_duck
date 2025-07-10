@@ -13,11 +13,11 @@ defmodule RubberDuck.CLIClient.Commands.Analyze do
       "format" => opts[:format],
       "verbose" => opts[:verbose]
     }
-    
+
     case Client.send_command("analyze", params) do
       {:ok, result} ->
         {:ok, result}
-        
+
       {:error, reason} ->
         {:error, format_error(reason)}
     end

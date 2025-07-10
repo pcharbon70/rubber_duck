@@ -1,7 +1,7 @@
 defmodule RubberDuckWeb.CLIChannel do
   @moduledoc """
   Channel for handling CLI commands via WebSocket connection.
-  
+
   This channel provides a real-time interface for CLI clients to execute
   commands without requiring compilation or losing server state.
   """
@@ -20,11 +20,11 @@ defmodule RubberDuckWeb.CLIChannel do
   def join("cli:commands", _params, socket) do
     # CLI client authenticated via API key in UserSocket
     if socket.assigns[:user_id] do
-      socket = 
+      socket =
         socket
         |> assign(:request_count, 0)
         |> assign(:connected_at, DateTime.utc_now())
-      
+
       Logger.info("CLI client connected: #{socket.assigns.user_id}")
       {:ok, %{status: "connected", server_time: DateTime.utc_now()}, socket}
     else
@@ -36,7 +36,7 @@ defmodule RubberDuckWeb.CLIChannel do
   @impl true
   def handle_in("analyze", %{"path" => path} = params, socket) do
     socket = increment_request_count(socket)
-    
+
     Task.start_link(fn ->
       case Commands.Analyze.run(%{path: path}, build_config(params)) do
         {:ok, result} ->
@@ -44,7 +44,7 @@ defmodule RubberDuckWeb.CLIChannel do
             status: "success",
             result: result
           })
-          
+
         {:error, reason} ->
           push(socket, "analyze:error", %{
             status: "error",
@@ -52,7 +52,7 @@ defmodule RubberDuckWeb.CLIChannel do
           })
       end
     end)
-    
+
     {:reply, {:ok, %{status: "processing"}}, socket}
   end
 
@@ -60,7 +60,7 @@ defmodule RubberDuckWeb.CLIChannel do
   @impl true
   def handle_in("generate", %{"prompt" => prompt} = params, socket) do
     socket = increment_request_count(socket)
-    
+
     Task.start_link(fn ->
       case Commands.Generate.run(%{prompt: prompt}, build_config(params)) do
         {:ok, result} ->
@@ -68,7 +68,7 @@ defmodule RubberDuckWeb.CLIChannel do
             status: "success",
             result: result
           })
-          
+
         {:error, reason} ->
           push(socket, "generate:error", %{
             status: "error",
@@ -76,7 +76,7 @@ defmodule RubberDuckWeb.CLIChannel do
           })
       end
     end)
-    
+
     {:reply, {:ok, %{status: "processing"}}, socket}
   end
 
@@ -84,7 +84,7 @@ defmodule RubberDuckWeb.CLIChannel do
   @impl true
   def handle_in("complete", params, socket) do
     socket = increment_request_count(socket)
-    
+
     Task.start_link(fn ->
       case Commands.Complete.run(params, build_config(params)) do
         {:ok, result} ->
@@ -92,7 +92,7 @@ defmodule RubberDuckWeb.CLIChannel do
             status: "success",
             result: result
           })
-          
+
         {:error, reason} ->
           push(socket, "complete:error", %{
             status: "error",
@@ -100,7 +100,7 @@ defmodule RubberDuckWeb.CLIChannel do
           })
       end
     end)
-    
+
     {:reply, {:ok, %{status: "processing"}}, socket}
   end
 
@@ -108,7 +108,7 @@ defmodule RubberDuckWeb.CLIChannel do
   @impl true
   def handle_in("refactor", params, socket) do
     socket = increment_request_count(socket)
-    
+
     Task.start_link(fn ->
       case Commands.Refactor.run(params, build_config(params)) do
         {:ok, result} ->
@@ -116,7 +116,7 @@ defmodule RubberDuckWeb.CLIChannel do
             status: "success",
             result: result
           })
-          
+
         {:error, reason} ->
           push(socket, "refactor:error", %{
             status: "error",
@@ -124,7 +124,7 @@ defmodule RubberDuckWeb.CLIChannel do
           })
       end
     end)
-    
+
     {:reply, {:ok, %{status: "processing"}}, socket}
   end
 
@@ -132,7 +132,7 @@ defmodule RubberDuckWeb.CLIChannel do
   @impl true
   def handle_in("test", params, socket) do
     socket = increment_request_count(socket)
-    
+
     Task.start_link(fn ->
       case Commands.Test.run(params, build_config(params)) do
         {:ok, result} ->
@@ -140,7 +140,7 @@ defmodule RubberDuckWeb.CLIChannel do
             status: "success",
             result: result
           })
-          
+
         {:error, reason} ->
           push(socket, "test:error", %{
             status: "error",
@@ -148,7 +148,7 @@ defmodule RubberDuckWeb.CLIChannel do
           })
       end
     end)
-    
+
     {:reply, {:ok, %{status: "processing"}}, socket}
   end
 
@@ -156,31 +156,32 @@ defmodule RubberDuckWeb.CLIChannel do
   @impl true
   def handle_in("llm", %{"subcommand" => subcommand} = params, socket) do
     socket = increment_request_count(socket)
-    
-    result = case subcommand do
-      "status" ->
-        handle_llm_status(socket)
-        
-      "connect" ->
-        handle_llm_connect(params["provider"], socket)
-        
-      "disconnect" ->
-        handle_llm_disconnect(params["provider"], socket)
-        
-      "enable" ->
-        handle_llm_enable(params["provider"], socket)
-        
-      "disable" ->
-        handle_llm_disable(params["provider"], socket)
-        
-      _ ->
-        {:error, "Unknown LLM subcommand: #{subcommand}"}
-    end
-    
+
+    result =
+      case subcommand do
+        "status" ->
+          handle_llm_status(socket)
+
+        "connect" ->
+          handle_llm_connect(params["provider"], socket)
+
+        "disconnect" ->
+          handle_llm_disconnect(params["provider"], socket)
+
+        "enable" ->
+          handle_llm_enable(params["provider"], socket)
+
+        "disable" ->
+          handle_llm_disable(params["provider"], socket)
+
+        _ ->
+          {:error, "Unknown LLM subcommand: #{subcommand}"}
+      end
+
     case result do
       {:ok, response} ->
         {:reply, {:ok, response}, socket}
-        
+
       {:error, reason} ->
         {:reply, {:error, %{reason: to_string(reason)}}, socket}
     end
@@ -191,12 +192,12 @@ defmodule RubberDuckWeb.CLIChannel do
   def handle_in("stream:" <> command, params, socket) do
     socket = increment_request_count(socket)
     stream_id = generate_stream_id()
-    
+
     # Start streaming in a separate process
     Task.start_link(fn ->
       handle_streaming_command(command, params, stream_id, socket)
     end)
-    
+
     {:reply, {:ok, %{stream_id: stream_id}}, socket}
   end
 
@@ -217,7 +218,7 @@ defmodule RubberDuckWeb.CLIChannel do
       connections: get_connection_stats(),
       providers: get_provider_health()
     }
-    
+
     {:reply, {:ok, health_data}, socket}
   end
 
@@ -229,7 +230,7 @@ defmodule RubberDuckWeb.CLIChannel do
       connected_at: socket.assigns.connected_at,
       uptime_seconds: DateTime.diff(DateTime.utc_now(), socket.assigns.connected_at)
     }
-    
+
     {:reply, {:ok, stats}, socket}
   end
 
@@ -251,11 +252,12 @@ defmodule RubberDuckWeb.CLIChannel do
   defp handle_llm_status(_socket) do
     case ConnectionManager.status() do
       status when is_map(status) ->
-        {:ok, %{
-          type: :llm_status,
-          providers: format_provider_status(status)
-        }}
-        
+        {:ok,
+         %{
+           type: :llm_status,
+           providers: format_provider_status(status)
+         }}
+
       error ->
         {:error, "Failed to get status: #{inspect(error)}"}
     end
@@ -264,15 +266,15 @@ defmodule RubberDuckWeb.CLIChannel do
   defp handle_llm_connect(provider, socket) when is_binary(provider) do
     try do
       provider_atom = String.to_existing_atom(provider)
-      
+
       case ConnectionManager.connect(provider_atom) do
         :ok ->
           push(socket, "llm:connected", %{provider: provider})
           {:ok, %{message: "Successfully connected to #{provider}"}}
-          
+
         {:ok, :already_connected} ->
           {:ok, %{message: "Already connected to #{provider}"}}
-          
+
         {:error, reason} ->
           {:error, "Failed to connect to #{provider}: #{inspect(reason)}"}
       end
@@ -286,7 +288,7 @@ defmodule RubberDuckWeb.CLIChannel do
     case ConnectionManager.connect_all() do
       :ok ->
         {:ok, %{message: "Connected to all configured providers"}}
-        
+
       error ->
         {:error, "Failed to connect: #{inspect(error)}"}
     end
@@ -295,14 +297,14 @@ defmodule RubberDuckWeb.CLIChannel do
   defp handle_llm_disconnect(provider, _socket) when is_binary(provider) do
     try do
       provider_atom = String.to_existing_atom(provider)
-      
+
       case ConnectionManager.disconnect(provider_atom) do
         :ok ->
           {:ok, %{message: "Disconnected from #{provider}"}}
-          
+
         {:ok, :already_disconnected} ->
           {:ok, %{message: "Already disconnected from #{provider}"}}
-          
+
         error ->
           {:error, "Failed to disconnect: #{inspect(error)}"}
       end
@@ -316,7 +318,7 @@ defmodule RubberDuckWeb.CLIChannel do
     case ConnectionManager.disconnect_all() do
       :ok ->
         {:ok, %{message: "Disconnected from all providers"}}
-        
+
       error ->
         {:error, "Failed to disconnect: #{inspect(error)}"}
     end
@@ -325,11 +327,11 @@ defmodule RubberDuckWeb.CLIChannel do
   defp handle_llm_enable(provider, _socket) when is_binary(provider) do
     try do
       provider_atom = String.to_existing_atom(provider)
-      
+
       case ConnectionManager.set_enabled(provider_atom, true) do
         :ok ->
           {:ok, %{message: "Enabled provider: #{provider}"}}
-          
+
         error ->
           {:error, "Failed to enable provider: #{inspect(error)}"}
       end
@@ -346,11 +348,11 @@ defmodule RubberDuckWeb.CLIChannel do
   defp handle_llm_disable(provider, _socket) when is_binary(provider) do
     try do
       provider_atom = String.to_existing_atom(provider)
-      
+
       case ConnectionManager.set_enabled(provider_atom, false) do
         :ok ->
           {:ok, %{message: "Disabled provider: #{provider}"}}
-          
+
         error ->
           {:error, "Failed to disable provider: #{inspect(error)}"}
       end
@@ -395,27 +397,28 @@ defmodule RubberDuckWeb.CLIChannel do
     # This is a placeholder for streaming command implementation
     # Each command type would handle its own streaming logic
     push(socket, "stream:start", %{stream_id: stream_id, command: command})
-    
+
     # Simulate streaming data
     for i <- 1..5 do
       Process.sleep(500)
+
       push(socket, "stream:data", %{
         stream_id: stream_id,
         chunk: "Processing #{command} - step #{i}/5"
       })
     end
-    
+
     push(socket, "stream:end", %{stream_id: stream_id, status: "completed"})
   end
 
   defp get_server_uptime do
     {uptime, _} = :erlang.statistics(:wall_clock)
     seconds = div(uptime, 1000)
-    
+
     days = div(seconds, 86400)
     hours = div(rem(seconds, 86400), 3600)
     minutes = div(rem(seconds, 3600), 60)
-    
+
     %{
       days: days,
       hours: hours,
@@ -426,7 +429,7 @@ defmodule RubberDuckWeb.CLIChannel do
 
   defp get_memory_stats do
     memory = :erlang.memory()
-    
+
     %{
       total_mb: Float.round(memory[:total] / 1_048_576, 2),
       processes_mb: Float.round(memory[:processes] / 1_048_576, 2),
@@ -440,10 +443,11 @@ defmodule RubberDuckWeb.CLIChannel do
     # Get WebSocket connection count
     # Get WebSocket connection count - simplified for now
     connections = 1
-    
+
     %{
       active_connections: connections,
-      total_channels: 4  # code, analysis, workspace, cli
+      # code, analysis, workspace, cli
+      total_channels: 4
     }
   end
 
@@ -457,7 +461,7 @@ defmodule RubberDuckWeb.CLIChannel do
             health: format_health(info.health)
           }
         end)
-        
+
       _ ->
         []
     end

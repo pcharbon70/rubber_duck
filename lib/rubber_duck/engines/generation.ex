@@ -39,7 +39,6 @@ defmodule RubberDuck.Engines.Generation do
 
   require Logger
 
-
   # Default configuration
   @default_max_context_items 10
   @default_similarity_threshold 0.7

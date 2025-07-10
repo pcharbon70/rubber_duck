@@ -11,7 +11,7 @@ defmodule RubberDuck.Telemetry do
     console_reporter_config = Application.get_env(:rubber_duck, :telemetry, [])[:console_reporter] || []
     console_reporter_enabled = Keyword.get(console_reporter_config, :enabled, false)
 
-    children = 
+    children =
       if console_reporter_enabled do
         [
           {Telemetry.Metrics.ConsoleReporter, metrics: metrics()},

@@ -1,7 +1,7 @@
 defmodule RubberDuck.CLIClient.Client do
   @moduledoc """
   WebSocket client for RubberDuck CLI.
-  
+
   Handles connection management, message sending/receiving, and reconnection logic.
   """
 
@@ -106,21 +106,23 @@ defmodule RubberDuck.CLIClient.Client do
   @impl true
   def handle_call({:connect, url}, from, state) do
     new_url = url || state.url
-    
+
     case do_connect(new_url, state.api_key) do
       {:ok, socket_pid} ->
         # Store the socket PID but don't mark as joined yet
-        state = %{state | 
-          socket: socket_pid, 
-          url: new_url,
-          connected: true,
-          channel_joined: false,
-          connect_from: from  # Store who's waiting for connection
+        state = %{
+          state
+          | socket: socket_pid,
+            url: new_url,
+            connected: true,
+            channel_joined: false,
+            # Store who's waiting for connection
+            connect_from: from
         }
-        
+
         # Don't reply yet - wait for channel_joined message
         {:noreply, state}
-        
+
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
@@ -131,14 +133,9 @@ defmodule RubberDuck.CLIClient.Client do
     if state.socket do
       Process.exit(state.socket, :normal)
     end
-    
-    state = %{state | 
-      socket: nil, 
-      connected: false,
-      channel_joined: false,
-      pending_requests: %{}
-    }
-    
+
+    state = %{state | socket: nil, connected: false, channel_joined: false, pending_requests: %{}}
+
     {:reply, :ok, state}
   end
 
@@ -147,10 +144,10 @@ defmodule RubberDuck.CLIClient.Client do
     if state.channel_joined do
       # Create a unique reference for this request
       ref = make_ref()
-      
+
       # Send the command to the Transport process
       send(state.socket, {:push, "cli:commands", command, params, ref, self()})
-      
+
       # Store the pending request
       pending_requests = Map.put(state.pending_requests, ref, {from, command})
       {:noreply, %{state | pending_requests: pending_requests}}
@@ -163,15 +160,20 @@ defmodule RubberDuck.CLIClient.Client do
   def handle_call({:send_streaming_command, command, params, handler}, _from, state) do
     if state.channel_joined do
       stream_id = generate_request_id()
-      
+
       # Register the stream handler
       event_handlers = Map.put(state.event_handlers, stream_id, handler)
-      
+
       # Send the streaming command
-      case GenSocketClient.push(state.socket, "cli:commands", "stream:#{command}", Map.put(params, :stream_id, stream_id)) do
+      case GenSocketClient.push(
+             state.socket,
+             "cli:commands",
+             "stream:#{command}",
+             Map.put(params, :stream_id, stream_id)
+           ) do
         {:ok, _ref} ->
           {:reply, {:ok, stream_id}, %{state | event_handlers: event_handlers}}
-          
+
         {:error, reason} ->
           {:reply, {:error, reason}, state}
       end
@@ -191,7 +193,7 @@ defmodule RubberDuck.CLIClient.Client do
       case GenSocketClient.push(state.socket, "cli:commands", "stats", %{}) do
         {:ok, stats} ->
           {:reply, {:ok, stats}, state}
-          
+
         {:error, reason} ->
           {:reply, {:error, reason}, state}
       end
@@ -208,20 +210,16 @@ defmodule RubberDuck.CLIClient.Client do
         case GenSocketClient.join(socket, "cli:commands", %{}) do
           {:ok, _ref} ->
             Logger.info("Connected and joined CLI channel")
-            state = %{state | 
-              socket: socket, 
-              connected: true,
-              channel_joined: true
-            }
+            state = %{state | socket: socket, connected: true, channel_joined: true}
             {:noreply, state}
-            
+
           {:error, reason} ->
             Logger.error("Failed to join CLI channel: #{inspect(reason)}")
             Process.exit(socket, :normal)
             Process.send_after(self(), :connect, @reconnect_interval)
             {:noreply, state}
         end
-        
+
       {:error, reason} ->
         Logger.error("Connection failed: #{inspect(reason)}")
         Process.send_after(self(), :connect, @reconnect_interval)
@@ -234,30 +232,29 @@ defmodule RubberDuck.CLIClient.Client do
   def handle_info({:channel_reply, "cli:commands", payload}, state) do
     handle_reply(payload, state)
   end
-  
+
   @impl true
   def handle_info({:channel_event, "cli:commands", event, payload}, state) do
     case event do
-        
       "stream:start" ->
         handle_stream_start(payload, state)
-        
+
       "stream:data" ->
         handle_stream_data(payload, state)
-        
+
       "stream:end" ->
         handle_stream_end(payload, state)
-        
+
       event when event in ~w(analyze:result generate:result complete:result refactor:result test:result) ->
         handle_command_result(event, payload, state)
-        
+
       event when event in ~w(analyze:error generate:error complete:error refactor:error test:error) ->
         handle_command_error(event, payload, state)
-        
+
       "llm:connected" ->
         Logger.info("LLM provider connected: #{payload["provider"]}")
         {:noreply, state}
-        
+
       _ ->
         Logger.debug("Unhandled channel event: #{event}")
         {:noreply, state}
@@ -267,15 +264,15 @@ defmodule RubberDuck.CLIClient.Client do
   @impl true
   def handle_info({:channel_joined, topic}, state) do
     Logger.info("Client notified of channel join: #{topic}")
-    
+
     # Reply to the waiting connect call if any
     if state.connect_from do
       GenServer.reply(state.connect_from, :ok)
     end
-    
+
     {:noreply, %{state | channel_joined: true, connect_from: nil}}
   end
-  
+
   @impl true
   def handle_info({:push_reply, ref, payload}, state) do
     # Handle reply from a push request
@@ -283,41 +280,38 @@ defmodule RubberDuck.CLIClient.Client do
       {nil, pending_requests} ->
         Logger.warning("Received reply for unknown ref: #{inspect(ref)}")
         {:noreply, %{state | pending_requests: pending_requests}}
-        
+
       {{from, _command}, pending_requests} ->
         # Reply based on the response
         case payload do
           %{"status" => "ok", "response" => data} ->
             GenServer.reply(from, {:ok, data})
+
           %{"status" => "error", "error" => reason} ->
             GenServer.reply(from, {:error, reason})
+
           _ ->
             GenServer.reply(from, {:ok, payload})
         end
+
         {:noreply, %{state | pending_requests: pending_requests}}
     end
   end
-  
+
   @impl true
   def handle_info({:disconnected, reason}, state) do
     Logger.warning("Disconnected: #{inspect(reason)}")
-    
+
     # Clear pending requests
     for {_id, {from, _}} <- state.pending_requests do
       GenServer.reply(from, {:error, :disconnected})
     end
-    
-    state = %{state | 
-      socket: nil,
-      connected: false, 
-      channel_joined: false,
-      pending_requests: %{},
-      event_handlers: %{}
-    }
-    
+
+    state = %{state | socket: nil, connected: false, channel_joined: false, pending_requests: %{}, event_handlers: %{}}
+
     # Schedule reconnection
     Process.send_after(self(), :connect, @reconnect_interval)
-    
+
     {:noreply, state}
   end
 
@@ -328,13 +322,13 @@ defmodule RubberDuck.CLIClient.Client do
       {nil, pending_requests} ->
         Logger.warning("Received push error for unknown ref: #{inspect(ref)}")
         {:noreply, %{state | pending_requests: pending_requests}}
-        
+
       {{from, _command}, pending_requests} ->
         GenServer.reply(from, {:error, reason})
         {:noreply, %{state | pending_requests: pending_requests}}
     end
   end
-  
+
   @impl true
   def handle_info(msg, state) do
     Logger.debug("Unhandled message: #{inspect(msg)}")
@@ -345,8 +339,8 @@ defmodule RubberDuck.CLIClient.Client do
 
   defp do_connect(url, api_key) do
     if api_key do
-      Logger.debug("Connecting to #{url} with API key")
-      
+      Logger.debug("Connecting to #{url}")
+
       # start_link expects (module, transport_mod, opts)
       GenSocketClient.start_link(
         __MODULE__.Transport,
@@ -369,7 +363,7 @@ defmodule RubberDuck.CLIClient.Client do
     case payload do
       %{ref: push_ref, payload: response} ->
         # Find the pending request by checking all refs
-        {matching_ref, pending_requests} = 
+        {matching_ref, pending_requests} =
           Enum.find_value(state.pending_requests, {nil, state.pending_requests}, fn
             {ref, {_from, _command}} ->
               # Check if this is our ref (stored in Transport's pending map)
@@ -379,23 +373,25 @@ defmodule RubberDuck.CLIClient.Client do
                 nil
               end
           end)
-        
+
         if matching_ref do
           {{from, _command}, _} = Map.get(state.pending_requests, matching_ref)
-          
+
           # Reply based on the response
           case response do
             %{"status" => "ok", "response" => data} ->
               GenServer.reply(from, {:ok, data})
+
             %{"status" => "error", "error" => reason} ->
               GenServer.reply(from, {:error, reason})
+
             _ ->
               GenServer.reply(from, {:ok, response})
           end
         end
-        
+
         {:noreply, %{state | pending_requests: pending_requests}}
-        
+
       _ ->
         Logger.warning("Unexpected reply format: #{inspect(payload)}")
         {:noreply, state}
@@ -408,7 +404,7 @@ defmodule RubberDuck.CLIClient.Client do
       {nil, pending_requests} ->
         # No pending request, might be a broadcast
         {:noreply, %{state | pending_requests: pending_requests}}
-        
+
       {from, pending_requests} ->
         GenServer.reply(from, {:ok, payload["result"]})
         {:noreply, %{state | pending_requests: pending_requests}}
@@ -420,7 +416,7 @@ defmodule RubberDuck.CLIClient.Client do
     case Map.pop(state.pending_requests, payload["request_id"]) do
       {nil, pending_requests} ->
         {:noreply, %{state | pending_requests: pending_requests}}
-        
+
       {from, pending_requests} ->
         GenServer.reply(from, {:error, payload["reason"]})
         {:noreply, %{state | pending_requests: pending_requests}}
@@ -429,11 +425,11 @@ defmodule RubberDuck.CLIClient.Client do
 
   defp handle_stream_start(payload, state) do
     stream_id = payload["stream_id"]
-    
+
     case Map.get(state.event_handlers, stream_id) do
       nil ->
         {:noreply, state}
-        
+
       handler ->
         handler.({:start, payload})
         {:noreply, state}
@@ -442,11 +438,11 @@ defmodule RubberDuck.CLIClient.Client do
 
   defp handle_stream_data(payload, state) do
     stream_id = payload["stream_id"]
-    
+
     case Map.get(state.event_handlers, stream_id) do
       nil ->
         {:noreply, state}
-        
+
       handler ->
         handler.({:data, payload["chunk"]})
         {:noreply, state}
@@ -455,11 +451,11 @@ defmodule RubberDuck.CLIClient.Client do
 
   defp handle_stream_end(payload, state) do
     stream_id = payload["stream_id"]
-    
+
     case Map.pop(state.event_handlers, stream_id) do
       {nil, event_handlers} ->
         {:noreply, %{state | event_handlers: event_handlers}}
-        
+
       {handler, event_handlers} ->
         handler.({:end, payload["status"]})
         {:noreply, %{state | event_handlers: event_handlers}}

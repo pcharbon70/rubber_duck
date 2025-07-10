@@ -29,15 +29,18 @@ defmodule RubberDuck.CLI.Config do
   """
   def from_parsed_args(parsed) do
     # Handle different parsed formats (struct vs map)
-    {options, flags} = case parsed do
-      %Optimus.ParseResult{options: opts, flags: flgs} ->
-        {opts, flgs}
-      %{options: opts, flags: flgs} ->
-        {opts, flgs}
-      _ ->
-        {%{}, %{}}
-    end
-    
+    {options, flags} =
+      case parsed do
+        %Optimus.ParseResult{options: opts, flags: flgs} ->
+          {opts, flgs}
+
+        %{options: opts, flags: flgs} ->
+          {opts, flgs}
+
+        _ ->
+          {%{}, %{}}
+      end
+
     config = %__MODULE__{
       format: Map.get(options, :format, :plain),
       verbose: Map.get(flags, :verbose, false),

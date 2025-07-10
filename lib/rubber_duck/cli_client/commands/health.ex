@@ -1,7 +1,7 @@
 defmodule RubberDuck.CLIClient.Commands.Health do
   @moduledoc """
   Health check command for RubberDuck CLI.
-  
+
   Displays server health information including uptime, memory usage,
   active connections, and provider status.
   """
@@ -12,7 +12,7 @@ defmodule RubberDuck.CLIClient.Commands.Health do
     case Client.send_command("health", %{}) do
       {:ok, health_data} ->
         {:ok, format_health_data(health_data)}
-        
+
       {:error, reason} ->
         {:error, "Failed to get health status: #{inspect(reason)}"}
     end
@@ -34,14 +34,15 @@ defmodule RubberDuck.CLIClient.Commands.Health do
     days = Map.get(uptime, "days", 0)
     hours = Map.get(uptime, "hours", 0)
     minutes = Map.get(uptime, "minutes", 0)
-    
+
     parts = []
     parts = if days > 0, do: ["#{days}d" | parts], else: parts
     parts = if hours > 0, do: ["#{hours}h" | parts], else: parts
     parts = if minutes > 0 or (days == 0 and hours == 0), do: ["#{minutes}m" | parts], else: parts
-    
+
     Enum.reverse(parts) |> Enum.join(" ")
   end
+
   defp format_uptime(_), do: "unknown"
 
   defp format_memory(memory) when is_map(memory) do
@@ -53,6 +54,7 @@ defmodule RubberDuck.CLIClient.Commands.Health do
       system_mb: Map.get(memory, "system_mb", 0)
     }
   end
+
   defp format_memory(_), do: %{}
 
   defp format_providers(providers) when is_list(providers) do
@@ -64,5 +66,6 @@ defmodule RubberDuck.CLIClient.Commands.Health do
       }
     end)
   end
+
   defp format_providers(_), do: []
 end

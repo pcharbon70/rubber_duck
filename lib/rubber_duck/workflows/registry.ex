@@ -187,10 +187,10 @@ defmodule RubberDuck.Workflows.Registry do
     # scan specific directories or use compile-time discovery
 
     with {:ok, modules} <- :application.get_key(:rubber_duck, :modules) do
-      workflow_modules = 
+      workflow_modules =
         modules
         |> Enum.filter(&workflow_module?/1)
-      
+
       # Register each workflow module
       Enum.each(workflow_modules, fn module ->
         try do
