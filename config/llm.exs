@@ -1,7 +1,7 @@
 import Config
 
 # LLM Service Configuration
-config :rubber_duck, RubberDuck.LLM.Service,
+config :rubber_duck, :llm,
   providers: [
     %{
       name: :openai,
@@ -72,7 +72,7 @@ config :rubber_duck, RubberDuck.LLM.Service,
 
 # Development overrides
 if config_env() == :dev do
-  config :rubber_duck, RubberDuck.LLM.Service,
+  config :rubber_duck, :llm,
     providers: [
       %{
         name: :mock,
@@ -84,13 +84,24 @@ if config_env() == :dev do
         options: [
           simulate_delay: true
         ]
+      },
+      %{
+        name: :ollama,
+        adapter: RubberDuck.LLM.Providers.Ollama,
+        base_url: System.get_env("OLLAMA_BASE_URL", "http://localhost:11434"),
+        models: ["llama2", "llama2:7b", "llama2:13b", "mistral", "codellama", "mixtral"],
+        priority: 2,
+        rate_limit: nil,
+        max_retries: 3,
+        timeout: 60_000,
+        options: []
       }
     ]
 end
 
 # Test overrides
 if config_env() == :test do
-  config :rubber_duck, RubberDuck.LLM.Service,
+  config :rubber_duck, :llm,
     providers: [
       %{
         name: :mock,

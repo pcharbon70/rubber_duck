@@ -41,7 +41,19 @@ defmodule RubberDuck.CLI.Runner do
   end
 
   defp execute_command(:llm, args, config) do
-    Commands.LLM.run(args, config)
+    # For llm command with nested subcommands, we need to handle it differently
+    # args will have the structure from the nested subcommand
+    case args do
+      %{subcommand: nil} ->
+        # No subcommand specified, default to status
+        Commands.LLM.run(:status, %{}, config)
+      %{subcommand: {subcommand, subcommand_args}} ->
+        # Pass the subcommand and its args
+        Commands.LLM.run(subcommand, subcommand_args, config)
+      _ ->
+        # Fallback - might be direct args
+        Commands.LLM.run(:status, args, config)
+    end
   end
 
   defp execute_command(nil, _args, _config) do

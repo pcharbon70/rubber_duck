@@ -8,30 +8,26 @@ defmodule RubberDuck.CLI.Commands.LLM do
   @doc """
   Handles LLM management commands.
   """
-  def run(args, config) do
-    subcommand = get_subcommand(args)
-
+  def run(subcommand, args, config) when is_atom(subcommand) do
+    # Direct call from Runner with subcommand as first arg
     case subcommand do
-      "status" -> show_status(args, config)
-      "connect" -> connect_provider(args, config)
-      "disconnect" -> disconnect_provider(args, config)
-      "enable" -> enable_provider(args, config)
-      "disable" -> disable_provider(args, config)
+      :status -> show_status(args, config)
+      :connect -> connect_provider(args, config)
+      :disconnect -> disconnect_provider(args, config)
+      :enable -> enable_provider(args, config)
+      :disable -> disable_provider(args, config)
       _ -> {:error, "Unknown LLM subcommand: #{subcommand}"}
     end
   end
 
-  defp get_subcommand(args) do
-    # The subcommand is the first non-option argument after "llm"
-    args[:args] |> List.first() || "status"
+  def run(args, config) do
+    # Legacy call pattern - default to status
+    show_status(args, config)
   end
 
   defp get_provider_arg(args) do
-    # The provider is the second non-option argument
-    case args[:args] do
-      [_subcommand, provider | _] -> provider
-      _ -> nil
-    end
+    # The provider is a named argument in the args map
+    args[:provider]
   end
 
   defp show_status(_args, config) do

@@ -82,11 +82,33 @@ defmodule RubberDuck.CLI do
   end
 
   defp execute(parsed) do
+    # Handle different parse result formats
+    {subcommand, subcommand_args, raw_parsed} = case parsed do
+      # Nested subcommands return a tuple
+      {subcommand_path, %Optimus.ParseResult{} = parse_result} ->
+        # subcommand_path is a list like [:llm, :connect]
+        [main_cmd | sub_cmds] = subcommand_path
+        case sub_cmds do
+          [] -> {main_cmd, parse_result.args, parse_result}
+          [sub_cmd] -> {main_cmd, %{subcommand: {sub_cmd, parse_result.args}}, parse_result}
+          _ -> {main_cmd, parse_result.args, parse_result}
+        end
+        
+      # Regular commands return a ParseResult directly  
+      %Optimus.ParseResult{} = parse_result ->
+        cmd = Map.get(parse_result, :subcommand)
+        {cmd, parse_result.args, parse_result}
+        
+      # Fallback
+      _ ->
+        {nil, %{}, %{}}
+    end
+    
     # Set up global configuration from parsed args
-    config = Config.from_parsed_args(parsed)
+    config = Config.from_parsed_args(raw_parsed)
 
     # Execute the command
-    result = Runner.run(parsed.subcommand, parsed.args, config)
+    result = Runner.run(subcommand, subcommand_args, config)
 
     case result do
       {:ok, _output} ->
@@ -320,19 +342,58 @@ defmodule RubberDuck.CLI do
     [
       name: "llm",
       about: "Manage LLM provider connections",
-      allow_unknown_args: true,
-      args: [
-        subcommand: [
-          value_name: "SUBCOMMAND",
-          help: "LLM subcommand (status, connect, disconnect, enable, disable)",
-          required: false,
-          parser: :string
+      subcommands: [
+        status: [
+          name: "status",
+          about: "Show LLM connection status"
         ],
-        provider: [
-          value_name: "PROVIDER",
-          help: "Provider name (e.g., mock, ollama, tgi)",
-          required: false,
-          parser: :string
+        connect: [
+          name: "connect",
+          about: "Connect to an LLM provider",
+          args: [
+            provider: [
+              value_name: "PROVIDER",
+              help: "Provider name (e.g., mock, ollama, tgi)",
+              required: false,
+              parser: :string
+            ]
+          ]
+        ],
+        disconnect: [
+          name: "disconnect",
+          about: "Disconnect from an LLM provider",
+          args: [
+            provider: [
+              value_name: "PROVIDER",
+              help: "Provider name (e.g., mock, ollama, tgi)",
+              required: false,
+              parser: :string
+            ]
+          ]
+        ],
+        enable: [
+          name: "enable",
+          about: "Enable an LLM provider",
+          args: [
+            provider: [
+              value_name: "PROVIDER",
+              help: "Provider name (e.g., mock, ollama, tgi)",
+              required: true,
+              parser: :string
+            ]
+          ]
+        ],
+        disable: [
+          name: "disable",
+          about: "Disable an LLM provider",
+          args: [
+            provider: [
+              value_name: "PROVIDER",
+              help: "Provider name (e.g., mock, ollama, tgi)",
+              required: true,
+              parser: :string
+            ]
+          ]
         ]
       ]
     ]
