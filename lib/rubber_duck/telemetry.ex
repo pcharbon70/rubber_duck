@@ -7,13 +7,27 @@ defmodule RubberDuck.Telemetry do
   end
 
   def init(_arg) do
-    children = [
-      {Telemetry.Metrics.ConsoleReporter, metrics: metrics()},
-      {
-        :telemetry_poller,
-        measurements: periodic_measurements(), period: 10_000, name: :rubber_duck_poller
-      }
-    ]
+    # Check if console reporter is enabled
+    console_reporter_config = Application.get_env(:rubber_duck, :telemetry, [])[:console_reporter] || []
+    console_reporter_enabled = Keyword.get(console_reporter_config, :enabled, false)
+
+    children = 
+      if console_reporter_enabled do
+        [
+          {Telemetry.Metrics.ConsoleReporter, metrics: metrics()},
+          {
+            :telemetry_poller,
+            measurements: periodic_measurements(), period: 10_000, name: :rubber_duck_poller
+          }
+        ]
+      else
+        [
+          {
+            :telemetry_poller,
+            measurements: periodic_measurements(), period: 10_000, name: :rubber_duck_poller
+          }
+        ]
+      end
 
     # Attach Ash telemetry handlers
     RubberDuck.Telemetry.AshHandler.attach()

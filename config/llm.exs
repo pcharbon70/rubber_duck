@@ -95,6 +95,26 @@ if config_env() == :dev do
         max_retries: 3,
         timeout: 60_000,
         options: []
+      },
+      %{
+        name: :openai,
+        adapter: RubberDuck.LLM.Providers.OpenAI,
+        api_key: System.get_env("OPENAI_API_KEY"),
+        models: ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
+        priority: 3,
+        rate_limit: {100, :minute},
+        max_retries: 3,
+        timeout: 30_000
+      },
+      %{
+        name: :anthropic,
+        adapter: RubberDuck.LLM.Providers.Anthropic,
+        api_key: System.get_env("ANTHROPIC_API_KEY"),
+        models: ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"],
+        priority: 4,
+        rate_limit: {50, :minute},
+        max_retries: 3,
+        timeout: 30_000
       }
     ]
 end

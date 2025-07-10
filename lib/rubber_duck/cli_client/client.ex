@@ -94,10 +94,10 @@ defmodule RubberDuck.CLIClient.Client do
       event_handlers: %{}
     }
 
-    # Auto-connect if API key is available
-    if api_key do
-      send(self(), :connect)
-    end
+    # Don't auto-connect, wait for explicit connect call
+    # if api_key do
+    #   send(self(), :connect)
+    # end
 
     {:ok, state}
   end
@@ -107,23 +107,16 @@ defmodule RubberDuck.CLIClient.Client do
     new_url = url || state.url
     
     case do_connect(new_url, state.api_key) do
-      {:ok, socket} ->
-        # Join the CLI channel
-        case GenSocketClient.join(socket, "cli:commands", %{}) do
-          {:ok, _ref} ->
-            state = %{state | 
-              socket: socket, 
-              url: new_url,
-              connected: true,
-              channel_joined: true
-            }
-            {:reply, :ok, state}
-            
-          {:error, reason} ->
-            Logger.error("Failed to join CLI channel: #{inspect(reason)}")
-            Process.exit(socket, :normal)
-            {:reply, {:error, reason}, state}
-        end
+      {:ok, socket_pid} ->
+        # Store the socket PID
+        state = %{state | 
+          socket: socket_pid, 
+          url: new_url,
+          connected: true,
+          channel_joined: true  # Transport handles joining automatically
+        }
+        
+        {:reply, :ok, state}
         
       {:error, reason} ->
         {:reply, {:error, reason}, state}
@@ -149,16 +142,13 @@ defmodule RubberDuck.CLIClient.Client do
   @impl true
   def handle_call({:send_command, command, params}, from, state) do
     if state.channel_joined do
-      # All commands go through the same flow
-      case GenSocketClient.push(state.socket, "cli:commands", command, params) do
-        {:ok, ref} ->
-          # Store the pending request with the ref
-          pending_requests = Map.put(state.pending_requests, ref, {from, command})
-          {:noreply, %{state | pending_requests: pending_requests}}
-          
-        {:error, reason} ->
-          {:reply, {:error, reason}, state}
-      end
+      # Send the command to the Transport process
+      ref = make_ref()
+      send(state.socket, {:push, "cli:commands", command, params, ref, self()})
+      
+      # Store the pending request
+      pending_requests = Map.put(state.pending_requests, ref, {from, command})
+      {:noreply, %{state | pending_requests: pending_requests}}
     else
       {:reply, {:error, :not_connected}, state}
     end
@@ -302,15 +292,14 @@ defmodule RubberDuck.CLIClient.Client do
 
   defp do_connect(url, api_key) do
     if api_key do
-      transport_opts = [
-        url: url,
-        params: %{api_key: api_key}
-      ]
+      Logger.debug("Connecting to #{url} with API key")
       
+      # start_link expects (module, transport_mod, opts)
       GenSocketClient.start_link(
         __MODULE__.Transport,
-        transport_opts,
-        []
+        Phoenix.Channels.GenSocketClient.Transport.WebSocketClient,
+        url: url,
+        params: %{api_key: api_key}
       )
     else
       {:error, :no_api_key}

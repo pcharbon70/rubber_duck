@@ -7,7 +7,7 @@ config :rubber_duck, :telemetry,
 
   # Console reporter configuration
   console_reporter: [
-    enabled: Mix.env() == :dev,
+    enabled: false,
     level: :info
   ],
 

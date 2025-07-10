@@ -155,10 +155,21 @@ defmodule RubberDuck.Context.Cache do
   defp cleanup_expired() do
     now = DateTime.utc_now()
 
-    expired_count =
-      :ets.select_delete(@table_name, [
-        {{~c"$1", :_, ~c"$2"}, [{:>, now, ~c"$2"}], [true]}
-      ])
+    # Get all entries and filter expired ones manually
+    # Skip the stats entry which is a 2-tuple
+    expired_keys = 
+      :ets.tab2list(@table_name)
+      |> Enum.filter(fn 
+        {_key, _value, expires_at} when is_struct(expires_at, DateTime) ->
+          DateTime.compare(now, expires_at) == :gt
+        _ -> 
+          false
+      end)
+      |> Enum.map(fn {key, _value, _expires_at} -> key end)
+
+    # Delete expired entries
+    expired_count = length(expired_keys)
+    Enum.each(expired_keys, &:ets.delete(@table_name, &1))
 
     if expired_count > 0 do
       Logger.debug("Context cache: cleaned up #{expired_count} expired entries")

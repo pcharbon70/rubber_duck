@@ -28,10 +28,10 @@ defmodule RubberDuck.CLIClient.Auth do
   def get_server_url do
     case load_config() do
       {:ok, config} ->
-        config["server_url"] || "ws://localhost:4000/socket/websocket"
+        config["server_url"] || "ws://localhost:5555/socket/websocket"
         
       {:error, _} ->
-        "ws://localhost:4000/socket/websocket"
+        "ws://localhost:5555/socket/websocket"
     end
   end
 

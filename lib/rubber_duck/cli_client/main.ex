@@ -107,8 +107,18 @@ defmodule RubberDuck.CLIClient.Main do
       %{subcommand: nil} ->
         {:error, "No command specified. Run with --help for usage information."}
         
-      %{subcommand: {cmd, args}} ->
-        {:ok, cmd, args, build_opts(parsed)}
+      # Handle nested subcommands (e.g., [:auth, :setup])
+      {[cmd, subcmd], args} ->
+        args_with_subcommand = Map.put(args, :subcommand, {subcmd, args})
+        {:ok, cmd, args_with_subcommand, build_opts(args)}
+        
+      # Handle single command as list (e.g., [:health])
+      {[cmd], args} ->
+        {:ok, cmd, args, build_opts(args)}
+        
+      # Handle single command (e.g., :health)
+      {cmd, args} when is_atom(cmd) ->
+        {:ok, cmd, args, build_opts(args)}
         
       _ ->
         {:error, "Invalid command structure"}
@@ -139,8 +149,9 @@ defmodule RubberDuck.CLIClient.Main do
       System.halt(1)
     end
     
-    # Start the client
-    {:ok, _pid} = Client.start_link(server: opts[:server])
+    # Start the client with the server URL from auth or options
+    server_url = opts[:server] || Auth.get_server_url()
+    {:ok, _pid} = Client.start_link(url: server_url)
     
     # Connect to server
     case Client.connect() do

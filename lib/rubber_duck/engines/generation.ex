@@ -868,52 +868,54 @@ defmodule RubberDuck.Engines.Generation do
     |> length()
   end
 
-  defp calculate_confidence(code, input) do
-    # Simple confidence calculation
-    factors = []
+  # TODO: Re-enable when confidence scoring is implemented
+  # defp calculate_confidence(code, input) do
+  #   # Simple confidence calculation
+  #   factors = []
 
-    # Factor 1: Code length appropriateness
-    lines = count_lines(code)
+  #   # Factor 1: Code length appropriateness
+  #   lines = count_lines(code)
 
-    length_score =
-      cond do
-        lines < 3 -> 0.5
-        lines > 100 -> 0.7
-        true -> 0.9
-      end
+  #   length_score =
+  #     cond do
+  #       lines < 3 -> 0.5
+  #       lines > 100 -> 0.7
+  #       true -> 0.9
+  #     end
 
-    factors = [length_score | factors]
+  #   factors = [length_score | factors]
 
-    # Factor 2: Contains TODO markers
-    todo_score = if String.contains?(code, "TODO"), do: 0.6, else: 1.0
-    factors = [todo_score | factors]
+  #   # Factor 2: Contains TODO markers
+  #   todo_score = if String.contains?(code, "TODO"), do: 0.6, else: 1.0
+  #   factors = [todo_score | factors]
 
-    # Factor 3: Matches language syntax patterns
-    syntax_score = if valid_syntax_pattern?(code, input.language), do: 0.9, else: 0.5
-    factors = [syntax_score | factors]
+  #   # Factor 3: Matches language syntax patterns
+  #   syntax_score = if valid_syntax_pattern?(code, input.language), do: 0.9, else: 0.5
+  #   factors = [syntax_score | factors]
 
-    # Average all factors
-    Enum.sum(factors) / length(factors)
-  end
+  #   # Average all factors
+  #   Enum.sum(factors) / length(factors)
+  # end
 
-  defp valid_syntax_pattern?(code, :elixir) do
-    String.contains?(code, "def") or
-      String.contains?(code, "defmodule") or
-      String.contains?(code, "defp")
-  end
+  # TODO: Re-enable when syntax validation is needed
+  # defp valid_syntax_pattern?(code, :elixir) do
+  #   String.contains?(code, "def") or
+  #     String.contains?(code, "defmodule") or
+  #     String.contains?(code, "defp")
+  # end
 
-  defp valid_syntax_pattern?(code, :javascript) do
-    String.contains?(code, "function") or
-      String.contains?(code, "const") or
-      String.contains?(code, "=>")
-  end
+  # defp valid_syntax_pattern?(code, :javascript) do
+  #   String.contains?(code, "function") or
+  #     String.contains?(code, "const") or
+  #     String.contains?(code, "=>")
+  # end
 
-  defp valid_syntax_pattern?(code, :python) do
-    String.contains?(code, "def") or
-      String.contains?(code, "class")
-  end
+  # defp valid_syntax_pattern?(code, :python) do
+  #   String.contains?(code, "def") or
+  #     String.contains?(code, "class")
+  # end
 
-  defp valid_syntax_pattern?(_code, _language), do: true
+  # defp valid_syntax_pattern?(_code, _language), do: true
 
   defp generate_alternatives(input, state) do
     # Generate 1-2 alternative approaches

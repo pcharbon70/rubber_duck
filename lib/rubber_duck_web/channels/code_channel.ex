@@ -6,7 +6,6 @@ defmodule RubberDuckWeb.CodeChannel do
 
   use RubberDuckWeb, :channel
 
-  alias RubberDuck.Engines.Completion
   alias RubberDuck.Analysis.Analyzer
   alias RubberDuck.Workspace
 
@@ -230,22 +229,18 @@ defmodule RubberDuckWeb.CodeChannel do
     end
   end
 
-  defp stream_completion(socket, completion_id, code, cursor_position, file_type, options) do
+  defp stream_completion(socket, completion_id, code, cursor_position, file_type, _options) do
     try do
       # Build context
-      context = build_completion_context(socket, code, cursor_position, file_type)
+      _context = build_completion_context(socket, code, cursor_position, file_type)
 
-      # Start streaming completion
-      stream = Completion.stream_completion(code, context, options)
-
-      # Send chunks as they arrive
-      Enum.each(stream, fn
-        {:ok, chunk} ->
-          send(self(), {:completion_chunk, completion_id, chunk})
-
-        {:error, error} ->
-          send(self(), {:completion_error, completion_id, error})
-      end)
+      # TODO: Implement streaming completion properly
+      # For now, send a placeholder response
+      push(socket, "completion", %{
+        completion_id: completion_id,
+        suggestions: [],
+        error: "Streaming completion not yet implemented"
+      })
 
       # Signal completion done
       send(self(), {:completion_done, completion_id, %{status: "completed"}})
@@ -259,7 +254,7 @@ defmodule RubberDuckWeb.CodeChannel do
   defp perform_analysis(socket, analysis_id, code, file_type) do
     try do
       # Run analysis
-      result = Analyzer.analyze_code(code, file_type)
+      result = Analyzer.analyze_source(code, file_type)
 
       # Send results
       push(socket, "analysis_result", %{

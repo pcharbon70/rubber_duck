@@ -18,17 +18,34 @@ defmodule RubberDuck.CLIClient.Client.Transport do
 
   @impl true
   def init(opts) do
+    Logger.debug("Transport init called with opts: #{inspect(opts)}")
+    
     url = Keyword.fetch!(opts, :url)
     params = Keyword.get(opts, :params, %{})
     
-    {:connect, url, params, %{parent: self()}}
+    # Convert params map to keyword list for Phoenix.Socket
+    socket_params = 
+      params
+      |> Map.to_list()
+      |> Keyword.new()
+    
+    {:connect, url, socket_params, %{parent: self()}}
   end
 
   @impl true
   def handle_connected(transport, state) do
     Logger.info("WebSocket connected")
-    GenServer.cast(state.parent, {:connected, transport})
-    {:ok, state}
+    
+    # Automatically join the CLI channel once connected
+    case Phoenix.Channels.GenSocketClient.join(transport, "cli:commands", %{}) do
+      {:ok, _ref} ->
+        Logger.info("Joining cli:commands channel")
+        {:ok, Map.put(state, :transport, transport)}
+        
+      {:error, reason} ->
+        Logger.error("Failed to join channel: #{inspect(reason)}")
+        {:stop, reason, state}
+    end
   end
 
   @impl true
@@ -69,6 +86,20 @@ defmodule RubberDuck.CLIClient.Client.Transport do
   end
 
   @impl true
+  def handle_info({:push, topic, event, payload, ref, from}, transport, state) do
+    # Forward push requests to the channel
+    case Phoenix.Channels.GenSocketClient.push(transport, topic, event, payload) do
+      {:ok, push_ref} ->
+        # Store the mapping between our ref and the push ref
+        state = Map.put(state, {:pending, push_ref}, {ref, from})
+        {:ok, state}
+        
+      {:error, reason} ->
+        send(from, {:push_error, ref, reason})
+        {:ok, state}
+    end
+  end
+  
   def handle_info(message, _transport, state) do
     Logger.debug("Unhandled transport message: #{inspect(message)}")
     {:ok, state}

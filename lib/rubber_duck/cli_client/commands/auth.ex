@@ -16,7 +16,12 @@ defmodule RubberDuck.CLIClient.Commands.Auth do
   end
 
   defp handle_subcommand(:setup, args, _opts) do
-    server_url = args[:server] || prompt_server_url()
+    server_url = 
+      case args do
+        %{options: %{server: server}} when not is_nil(server) -> server
+        _ -> prompt_server_url()
+      end
+      
     api_key = prompt_api_key() || Auth.generate_api_key()
     
     case Auth.save_credentials(api_key, server_url) do
@@ -82,22 +87,26 @@ defmodule RubberDuck.CLIClient.Commands.Auth do
   end
 
   defp prompt_server_url do
-    default = "ws://localhost:4000/socket/websocket"
+    default = "ws://localhost:5555/socket/websocket"
     
-    IO.gets("Enter RubberDuck server URL [#{default}]: ")
-    |> String.trim()
-    |> case do
-      "" -> default
-      url -> url
+    case IO.gets("Enter RubberDuck server URL [#{default}]: ") do
+      :eof -> default
+      input -> 
+        case String.trim(input) do
+          "" -> default
+          url -> url
+        end
     end
   end
 
   defp prompt_api_key do
-    IO.gets("Enter API key (leave blank to generate): ")
-    |> String.trim()
-    |> case do
-      "" -> nil
-      key -> key
+    case IO.gets("Enter API key (leave blank to generate): ") do
+      :eof -> nil
+      input -> 
+        case String.trim(input) do
+          "" -> nil
+          key -> key
+        end
     end
   end
 end
