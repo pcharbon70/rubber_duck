@@ -28,12 +28,22 @@ defmodule RubberDuck.CLI.Config do
   Creates a configuration from parsed command-line arguments.
   """
   def from_parsed_args(parsed) do
+    # Handle different parsed formats (struct vs map)
+    {options, flags} = case parsed do
+      %Optimus.ParseResult{options: opts, flags: flgs} ->
+        {opts, flgs}
+      %{options: opts, flags: flgs} ->
+        {opts, flgs}
+      _ ->
+        {%{}, %{}}
+    end
+    
     config = %__MODULE__{
-      format: get_in(parsed, [:options, :format]) || :plain,
-      verbose: get_in(parsed, [:flags, :verbose]) || false,
-      quiet: get_in(parsed, [:flags, :quiet]) || false,
-      debug: get_in(parsed, [:flags, :debug]) || false,
-      config_file: get_in(parsed, [:options, :config])
+      format: Map.get(options, :format, :plain),
+      verbose: Map.get(flags, :verbose, false),
+      quiet: Map.get(flags, :quiet, false),
+      debug: Map.get(flags, :debug, false),
+      config_file: Map.get(options, :config)
     }
 
     # Load user preferences from config file if specified

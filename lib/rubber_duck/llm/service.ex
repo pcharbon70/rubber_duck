@@ -320,7 +320,8 @@ defmodule RubberDuck.LLM.Service do
   # Private Functions
 
   defp load_config(opts) do
-    app_config = Application.get_env(:rubber_duck, __MODULE__, [])
+    # Get config from :rubber_duck, :llm to match ConnectionManager
+    app_config = Application.get_env(:rubber_duck, :llm, [])
 
     config = Keyword.merge(app_config, opts)
 

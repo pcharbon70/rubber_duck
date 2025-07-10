@@ -94,13 +94,13 @@ config :rubber_duck, :llm,
           """
         }
       ]
+    },
+    # Ollama provider for local LLM
+    %{
+      name: :ollama,
+      adapter: RubberDuck.LLM.Providers.Ollama,
+      base_url: "http://localhost:11434",
+      models: ["llama2", "codellama", "mistral"],
+      timeout: 60_000
     }
-    # Ollama provider for local LLM (optional - uncomment if you have Ollama installed)
-    # %{
-    #   name: :ollama,
-    #   adapter: RubberDuck.LLM.Providers.Ollama,
-    #   base_url: "http://localhost:11434",
-    #   models: ["llama2", "codellama", "mistral"],
-    #   timeout: 60_000
-    # }
   ]

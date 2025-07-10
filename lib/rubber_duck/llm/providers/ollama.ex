@@ -108,6 +108,7 @@ defmodule RubberDuck.LLM.Providers.Ollama do
     {:error, :not_supported}
   end
 
+  # This is the old single-argument health_check for backward compatibility
   @impl true
   def health_check(%ProviderConfig{} = config) do
     url = build_url(config, "/api/tags")
