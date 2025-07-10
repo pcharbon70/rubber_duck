@@ -46,11 +46,13 @@ defmodule RubberDuck.Analysis.Semantic do
     issues = []
 
     # Run various semantic analyses
-    issues = issues ++ analyze_dead_code(ast_info, config)
-    issues = issues ++ analyze_complexity(ast_info, config)
-    issues = issues ++ analyze_dependencies(ast_info, config)
-    issues = issues ++ analyze_unused_variables(ast_info, config)
-    issues = issues ++ analyze_module_cohesion(ast_info, config)
+    issues =
+      issues
+      |> Enum.concat(analyze_dead_code(ast_info, config))
+      |> Enum.concat(analyze_complexity(ast_info, config))
+      |> Enum.concat(analyze_dependencies(ast_info, config))
+      |> Enum.concat(analyze_unused_variables(ast_info, config))
+      |> Enum.concat(analyze_module_cohesion(ast_info, config))
 
     # Calculate metrics
     metrics = calculate_metrics(ast_info)
@@ -81,8 +83,10 @@ defmodule RubberDuck.Analysis.Semantic do
     lines = String.split(source, "\n")
 
     # Check for obvious issues
-    issues = issues ++ check_long_lines(lines, config)
-    issues = issues ++ check_trailing_whitespace(lines)
+    issues =
+      issues
+      |> Enum.concat(check_long_lines(lines, config))
+      |> Enum.concat(check_trailing_whitespace(lines))
 
     {:ok,
      %{
@@ -187,14 +191,49 @@ defmodule RubberDuck.Analysis.Semantic do
   end
 
   # Unused variable detection
-  defp analyze_unused_variables(_ast_info, config) do
+  defp analyze_unused_variables(ast_info, config) do
     if !config.detect_unused_variables do
       []
     else
-      # This requires deeper AST analysis of function bodies
-      # For now, return empty list as we need the full AST
-      []
+      # Analyze each function for unused variables
+      Enum.flat_map(ast_info.functions, fn func ->
+        detect_unused_in_function(func, ast_info.name)
+      end)
     end
+  end
+
+  defp detect_unused_in_function(func, module_name) do
+    # Group variables by name within the function
+    var_groups = Enum.group_by(func.variables, & &1.name)
+
+    # Find variables that are assigned but never used
+    Enum.flat_map(var_groups, fn {var_name, occurrences} ->
+      assignments = Enum.filter(occurrences, &(&1.type in [:assignment, :match]))
+      usages = Enum.filter(occurrences, &(&1.type == :usage))
+
+      # If there are assignments but no usages, it's unused
+      if length(assignments) > 0 && length(usages) == 0 &&
+           !String.starts_with?(Atom.to_string(var_name), "_") do
+        # Report for each assignment location
+        Enum.map(assignments, fn var ->
+          Engine.create_issue(
+            :unused_variable,
+            :low,
+            "Variable #{var_name} is assigned but never used",
+            %{file: "", line: var.line, column: var.column, end_line: nil, end_column: nil},
+            "semantic/unused_variable",
+            :maintainability,
+            %{
+              variable: var_name,
+              function: func.name,
+              module: module_name
+            }
+          )
+        end)
+      else
+        []
+      end
+    end)
   end
 
   # Module cohesion analysis
@@ -244,7 +283,7 @@ defmodule RubberDuck.Analysis.Semantic do
         []
       end
 
-    large_module_issues ++ cohesion_issues
+    Enum.concat(large_module_issues, cohesion_issues)
   end
 
   # Calculate semantic metrics

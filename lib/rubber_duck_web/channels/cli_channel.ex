@@ -36,19 +36,39 @@ defmodule RubberDuckWeb.CLIChannel do
   @impl true
   def handle_in("analyze", %{"path" => path} = params, socket) do
     socket = increment_request_count(socket)
+    request_id = Map.get(params, "request_id")
 
     Task.start_link(fn ->
-      case Commands.Analyze.run(%{path: path}, build_config(params)) do
-        {:ok, result} ->
-          push(socket, "analyze:result", %{
-            status: "success",
-            result: result
-          })
+      args = [
+        path: path,
+        type: String.to_atom(Map.get(params, "type", "all")),
+        flags: [
+          recursive: Map.get(params, "recursive", false),
+          include_suggestions: Map.get(params, "include_suggestions", false)
+        ]
+      ]
 
+      result =
+        case Commands.Analyze.run(args, build_config(params)) do
+          {:ok, data} -> data
+          {:error, _} = error -> error
+          # Handle direct return
+          data -> data
+        end
+
+      case result do
         {:error, reason} ->
           push(socket, "analyze:error", %{
             status: "error",
-            reason: to_string(reason)
+            reason: to_string(reason),
+            request_id: request_id
+          })
+
+        data ->
+          push(socket, "analyze:result", %{
+            status: "success",
+            result: data,
+            request_id: request_id
           })
       end
     end)
@@ -60,19 +80,22 @@ defmodule RubberDuckWeb.CLIChannel do
   @impl true
   def handle_in("generate", %{"prompt" => prompt} = params, socket) do
     socket = increment_request_count(socket)
+    request_id = Map.get(params, "request_id")
 
     Task.start_link(fn ->
       case Commands.Generate.run(%{prompt: prompt}, build_config(params)) do
         {:ok, result} ->
           push(socket, "generate:result", %{
             status: "success",
-            result: result
+            result: result,
+            request_id: request_id
           })
 
         {:error, reason} ->
           push(socket, "generate:error", %{
             status: "error",
-            reason: to_string(reason)
+            reason: to_string(reason),
+            request_id: request_id
           })
       end
     end)
@@ -84,19 +107,22 @@ defmodule RubberDuckWeb.CLIChannel do
   @impl true
   def handle_in("complete", params, socket) do
     socket = increment_request_count(socket)
+    request_id = Map.get(params, "request_id")
 
     Task.start_link(fn ->
       case Commands.Complete.run(params, build_config(params)) do
         {:ok, result} ->
           push(socket, "complete:result", %{
             status: "success",
-            result: result
+            result: result,
+            request_id: request_id
           })
 
         {:error, reason} ->
           push(socket, "complete:error", %{
             status: "error",
-            reason: to_string(reason)
+            reason: to_string(reason),
+            request_id: request_id
           })
       end
     end)
@@ -108,19 +134,22 @@ defmodule RubberDuckWeb.CLIChannel do
   @impl true
   def handle_in("refactor", params, socket) do
     socket = increment_request_count(socket)
+    request_id = Map.get(params, "request_id")
 
     Task.start_link(fn ->
       case Commands.Refactor.run(params, build_config(params)) do
         {:ok, result} ->
           push(socket, "refactor:result", %{
             status: "success",
-            result: result
+            result: result,
+            request_id: request_id
           })
 
         {:error, reason} ->
           push(socket, "refactor:error", %{
             status: "error",
-            reason: to_string(reason)
+            reason: to_string(reason),
+            request_id: request_id
           })
       end
     end)
@@ -132,19 +161,22 @@ defmodule RubberDuckWeb.CLIChannel do
   @impl true
   def handle_in("test", params, socket) do
     socket = increment_request_count(socket)
+    request_id = Map.get(params, "request_id")
 
     Task.start_link(fn ->
       case Commands.Test.run(params, build_config(params)) do
         {:ok, result} ->
           push(socket, "test:result", %{
             status: "success",
-            result: result
+            result: result,
+            request_id: request_id
           })
 
         {:error, reason} ->
           push(socket, "test:error", %{
             status: "error",
-            reason: to_string(reason)
+            reason: to_string(reason),
+            request_id: request_id
           })
       end
     end)

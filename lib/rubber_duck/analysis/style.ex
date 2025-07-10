@@ -47,10 +47,12 @@ defmodule RubberDuck.Analysis.Style do
     issues = []
 
     # Run various style analyses
-    issues = issues ++ analyze_naming_conventions(ast_info, config)
-    issues = issues ++ analyze_elixir_code_smells(ast_info, config)
-    issues = issues ++ analyze_function_organization(ast_info, config)
-    issues = issues ++ analyze_module_structure(ast_info, config)
+    issues =
+      issues
+      |> Enum.concat(analyze_naming_conventions(ast_info, config))
+      |> Enum.concat(analyze_elixir_code_smells(ast_info, config))
+      |> Enum.concat(analyze_function_organization(ast_info, config))
+      |> Enum.concat(analyze_module_structure(ast_info, config))
 
     # Calculate metrics
     metrics = calculate_style_metrics(ast_info)
@@ -79,9 +81,11 @@ defmodule RubberDuck.Analysis.Style do
     # Line-based style analysis
     lines = String.split(source, "\n")
 
-    issues = issues ++ check_line_length(lines, config)
-    issues = issues ++ check_todo_comments(lines)
-    issues = issues ++ check_commented_code(lines)
+    issues =
+      issues
+      |> Enum.concat(check_line_length(lines, config))
+      |> Enum.concat(check_todo_comments(lines))
+      |> Enum.concat(check_commented_code(lines))
 
     {:ok,
      %{
@@ -151,10 +155,10 @@ defmodule RubberDuck.Analysis.Style do
               []
             end
 
-          name_issues ++ length_issues
+          Enum.concat(name_issues, length_issues)
         end)
 
-      module_issues ++ function_issues
+      Enum.concat(module_issues, function_issues)
     else
       []
     end
@@ -185,7 +189,7 @@ defmodule RubberDuck.Analysis.Style do
       # Check for large messages between processes
       large_message_issues = detect_large_messages(ast_info)
 
-      primitive_obsession_issues ++ complex_branching_issues ++ large_message_issues
+      Enum.concat([primitive_obsession_issues, complex_branching_issues, large_message_issues])
     else
       []
     end
@@ -342,7 +346,7 @@ defmodule RubberDuck.Analysis.Style do
   defp calculate_coupling_score(ast_info) do
     # Lower coupling is better
     unique_modules =
-      (ast_info.aliases ++ ast_info.imports ++ ast_info.requires)
+      Enum.concat([ast_info.aliases, ast_info.imports, ast_info.requires])
       |> Enum.uniq()
       |> length()
 

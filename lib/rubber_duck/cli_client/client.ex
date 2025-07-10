@@ -144,12 +144,20 @@ defmodule RubberDuck.CLIClient.Client do
     if state.channel_joined do
       # Create a unique reference for this request
       ref = make_ref()
+      request_id = generate_request_id()
+
+      # Add request_id to params for async result matching
+      params_with_id = Map.put(params, "request_id", request_id)
 
       # Send the command to the Transport process
-      send(state.socket, {:push, "cli:commands", command, params, ref, self()})
+      send(state.socket, {:push, "cli:commands", command, params_with_id, ref, self()})
 
-      # Store the pending request
-      pending_requests = Map.put(state.pending_requests, ref, {from, command})
+      # Store the pending request with both ref (for immediate reply) and request_id (for async result)
+      pending_requests =
+        state.pending_requests
+        |> Map.put(ref, {from, command})
+        |> Map.put(request_id, from)
+
       {:noreply, %{state | pending_requests: pending_requests}}
     else
       {:reply, {:error, :not_connected}, state}
@@ -246,6 +254,7 @@ defmodule RubberDuck.CLIClient.Client do
         handle_stream_end(payload, state)
 
       event when event in ~w(analyze:result generate:result complete:result refactor:result test:result) ->
+        Logger.debug("Received command result event: #{event}, payload: #{inspect(payload)}")
         handle_command_result(event, payload, state)
 
       event when event in ~w(analyze:error generate:error complete:error refactor:error test:error) ->
@@ -276,25 +285,40 @@ defmodule RubberDuck.CLIClient.Client do
   @impl true
   def handle_info({:push_reply, ref, payload}, state) do
     # Handle reply from a push request
-    case Map.pop(state.pending_requests, ref) do
-      {nil, pending_requests} ->
+    case Map.get(state.pending_requests, ref) do
+      nil ->
         Logger.warning("Received reply for unknown ref: #{inspect(ref)}")
-        {:noreply, %{state | pending_requests: pending_requests}}
+        {:noreply, state}
 
-      {{from, _command}, pending_requests} ->
-        # Reply based on the response
-        case payload do
-          %{"status" => "ok", "response" => data} ->
-            GenServer.reply(from, {:ok, data})
-
-          %{"status" => "error", "error" => reason} ->
-            GenServer.reply(from, {:error, reason})
+      {from, command} ->
+        Logger.debug("Push reply for command #{command}: #{inspect(payload)}")
+        # Check if this is a processing status for async commands
+        case {command, payload} do
+          {cmd, %{"status" => "ok", "response" => %{"status" => "processing"}}}
+          when cmd in ["analyze", "generate", "refactor", "test"] ->
+            # Don't reply yet - wait for the async result event
+            Logger.debug("Command #{cmd} is processing, waiting for async result")
+            # Remove the ref-based entry but keep the request_id entry
+            pending_requests = Map.delete(state.pending_requests, ref)
+            {:noreply, %{state | pending_requests: pending_requests}}
 
           _ ->
-            GenServer.reply(from, {:ok, payload})
-        end
+            # For non-async commands or errors, reply immediately
+            pending_requests = Map.delete(state.pending_requests, ref)
 
-        {:noreply, %{state | pending_requests: pending_requests}}
+            case payload do
+              %{"status" => "ok", "response" => data} ->
+                GenServer.reply(from, {:ok, data})
+
+              %{"status" => "error", "error" => reason} ->
+                GenServer.reply(from, {:error, reason})
+
+              _ ->
+                GenServer.reply(from, {:ok, payload})
+            end
+
+            {:noreply, %{state | pending_requests: pending_requests}}
+        end
     end
   end
 
@@ -400,25 +424,34 @@ defmodule RubberDuck.CLIClient.Client do
 
   defp handle_command_result(_event, payload, state) do
     # Find and reply to pending request
-    case Map.pop(state.pending_requests, payload["request_id"]) do
+    request_id = payload["request_id"]
+
+    case Map.pop(state.pending_requests, request_id) do
       {nil, pending_requests} ->
         # No pending request, might be a broadcast
+        Logger.debug("No pending request for result with request_id: #{inspect(request_id)}")
         {:noreply, %{state | pending_requests: pending_requests}}
 
       {from, pending_requests} ->
-        GenServer.reply(from, {:ok, payload["result"]})
+        # Clean up any associated request_id entries
+        result = Map.get(payload, "result", payload)
+        GenServer.reply(from, {:ok, result})
         {:noreply, %{state | pending_requests: pending_requests}}
     end
   end
 
   defp handle_command_error(_event, payload, state) do
     # Find and reply to pending request
-    case Map.pop(state.pending_requests, payload["request_id"]) do
+    request_id = payload["request_id"]
+
+    case Map.pop(state.pending_requests, request_id) do
       {nil, pending_requests} ->
+        Logger.debug("No pending request for error with request_id: #{inspect(request_id)}")
         {:noreply, %{state | pending_requests: pending_requests}}
 
       {from, pending_requests} ->
-        GenServer.reply(from, {:error, payload["reason"]})
+        error_reason = Map.get(payload, "reason", "Unknown error")
+        GenServer.reply(from, {:error, error_reason})
         {:noreply, %{state | pending_requests: pending_requests}}
     end
   end

@@ -15,13 +15,24 @@ defmodule RubberDuck.Analysis.AST do
           imports: list(module()),
           requires: list(module()),
           calls: list(call_info()),
+          variables: list(variable_info()),
           metadata: map()
         }
   @type function_info :: %{
           name: atom(),
           arity: non_neg_integer(),
           line: non_neg_integer(),
-          private: boolean()
+          private: boolean(),
+          variables: list(variable_info()),
+          body_calls: list(call_info())
+        }
+  @type variable_info :: %{
+          name: atom(),
+          line: non_neg_integer(),
+          column: non_neg_integer() | nil,
+          context: atom() | nil,
+          type: :assignment | :match | :usage,
+          scope: {module(), atom(), non_neg_integer()} | :module
         }
   @type call_info :: %{
           from: {module(), atom(), non_neg_integer()},

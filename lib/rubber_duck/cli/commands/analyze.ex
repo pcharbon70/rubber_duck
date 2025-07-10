@@ -18,9 +18,17 @@ defmodule RubberDuck.CLI.Commands.Analyze do
     recursive = Keyword.get(args[:flags], :recursive, true)
     include_suggestions = Keyword.get(args[:flags], :include_suggestions, false)
 
+    require Logger
+    Logger.info("Analyze command called with path: #{inspect(path)}, type: #{inspect(analysis_type)}")
+
     with {:ok, files} <- get_files_to_analyze(path, recursive),
          {:ok, results} <- analyze_files(files, analysis_type, include_suggestions, config) do
+      Logger.info("Analysis completed with #{length(results)} file results")
       format_results(results)
+    else
+      error ->
+        Logger.error("Analysis failed: #{inspect(error)}")
+        error
     end
   end
 
@@ -59,6 +67,9 @@ defmodule RubberDuck.CLI.Commands.Analyze do
       IO.puts("Analyzing #{total} file(s)...")
     end
 
+    require Logger
+    Logger.info("Files to analyze: #{inspect(files)}")
+
     results =
       files
       |> Enum.with_index(1)
@@ -67,10 +78,14 @@ defmodule RubberDuck.CLI.Commands.Analyze do
           Progress.show("Analyzing", idx, total, Path.basename(file))
         end
 
-        analyze_single_file(file, analysis_type, include_suggestions)
+        result = analyze_single_file(file, analysis_type, include_suggestions)
+        Logger.info("Single file result for #{file}: #{inspect(result)}")
+        result
       end)
       |> Enum.reject(&match?({:error, _}, &1))
       |> Enum.map(fn {:ok, result} -> result end)
+
+    Logger.info("Total results after filtering: #{length(results)}")
 
     unless config.quiet do
       Progress.clear()
@@ -80,15 +95,22 @@ defmodule RubberDuck.CLI.Commands.Analyze do
     {:ok, results}
   end
 
-  defp analyze_single_file(file, analysis_type, include_suggestions) do
-    options = %{
-      analysis_types: normalize_analysis_types(analysis_type),
-      include_suggestions: include_suggestions,
-      file_path: file
-    }
+  defp analyze_single_file(file, analysis_type, _include_suggestions) do
+    options = [
+      engines: engines_for_type(analysis_type),
+      min_severity: :info,
+      parallel: true,
+      cache: true
+    ]
 
     case Analyzer.analyze_file(file, options) do
       {:ok, result} ->
+        # Debug logging
+        require Logger
+        Logger.info("Analysis result for #{file}:")
+        Logger.info("Result keys: #{inspect(Map.keys(result))}")
+        Logger.info("Full result: #{inspect(result, pretty: true, limit: :infinity)}")
+
         {:ok, format_file_result(file, result)}
 
       {:error, reason} ->
@@ -99,9 +121,14 @@ defmodule RubberDuck.CLI.Commands.Analyze do
       {:error, "Error analyzing #{file}: #{Exception.message(e)}"}
   end
 
-  defp normalize_analysis_types(:all), do: [:semantic, :style, :security]
-  defp normalize_analysis_types(type) when is_atom(type), do: [type]
-  defp normalize_analysis_types(types) when is_list(types), do: types
+  defp engines_for_type(:all) do
+    [RubberDuck.Analysis.Semantic, RubberDuck.Analysis.Style, RubberDuck.Analysis.Security]
+  end
+
+  defp engines_for_type(:semantic), do: [RubberDuck.Analysis.Semantic]
+  defp engines_for_type(:style), do: [RubberDuck.Analysis.Style]
+  defp engines_for_type(:security), do: [RubberDuck.Analysis.Security]
+  defp engines_for_type(_), do: engines_for_type(:all)
 
   defp format_file_result(file, analysis_result) do
     issues = extract_issues(analysis_result)
@@ -116,24 +143,24 @@ defmodule RubberDuck.CLI.Commands.Analyze do
   end
 
   defp extract_issues(analysis_result) do
-    # Extract issues from different analysis types
-    semantic_issues = get_in(analysis_result, [:semantic, :issues]) || []
-    style_issues = get_in(analysis_result, [:style, :issues]) || []
-    security_issues = get_in(analysis_result, [:security, :issues]) || []
+    # The Analyzer returns issues in :all_issues field
+    issues = Map.get(analysis_result, :all_issues, [])
 
-    (semantic_issues ++ style_issues ++ security_issues)
+    issues
     |> Enum.map(&normalize_issue/1)
     |> Enum.sort_by(fn issue -> {issue.line, issue.column} end)
   end
 
   defp normalize_issue(%{} = issue) do
     %{
-      line: issue[:line] || 0,
-      column: issue[:column] || 0,
+      line: get_in(issue, [:location, :line]) || issue[:line] || 0,
+      column: get_in(issue, [:location, :column]) || issue[:column] || 0,
       severity: issue[:severity] || :info,
       type: issue[:type] || :unknown,
       message: issue[:message] || "Unknown issue",
-      suggestion: issue[:suggestion]
+      suggestion: issue[:suggestion],
+      category: issue[:category] || :unknown,
+      rule: issue[:rule]
     }
   end
 
@@ -150,41 +177,10 @@ defmodule RubberDuck.CLI.Commands.Analyze do
 
   defp build_summary(analysis_result) do
     %{
-      total_issues: count_all_issues(analysis_result),
-      by_severity: count_by_severity(analysis_result),
-      by_type: count_by_type(analysis_result)
+      total_issues: Map.get(analysis_result, :total_issues, 0),
+      by_severity: Map.get(analysis_result, :issues_by_severity, %{}),
+      by_type: Map.get(analysis_result, :issues_by_engine, %{})
     }
-  end
-
-  defp count_all_issues(analysis_result) do
-    [:semantic, :style, :security]
-    |> Enum.map(fn type ->
-      get_in(analysis_result, [type, :issues]) || []
-    end)
-    |> Enum.map(&length/1)
-    |> Enum.sum()
-  end
-
-  defp count_by_severity(analysis_result) do
-    all_issues =
-      [:semantic, :style, :security]
-      |> Enum.flat_map(fn type ->
-        get_in(analysis_result, [type, :issues]) || []
-      end)
-
-    Enum.reduce(all_issues, %{error: 0, warning: 0, info: 0}, fn issue, acc ->
-      severity = issue[:severity] || :info
-      Map.update(acc, severity, 1, &(&1 + 1))
-    end)
-  end
-
-  defp count_by_type(analysis_result) do
-    [:semantic, :style, :security]
-    |> Enum.map(fn type ->
-      issues = get_in(analysis_result, [type, :issues]) || []
-      {type, length(issues)}
-    end)
-    |> Enum.into(%{})
   end
 
   defp format_results(results) do
