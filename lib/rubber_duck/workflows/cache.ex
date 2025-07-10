@@ -206,11 +206,20 @@ defmodule RubberDuck.Workflows.Cache do
   defp cleanup_expired do
     now = DateTime.utc_now()
 
-    # Find expired entries
-    match_spec = [{{:"$1", :"$2", :"$3"}, [{:<, :"$3", now}], [:"$1"]}]
-    expired_keys = :ets.select(@table_name, match_spec)
+    # Get all entries and filter expired ones manually
+    # ETS cannot handle DateTime comparisons in match specifications
+    expired_keys =
+      :ets.tab2list(@table_name)
+      |> Enum.filter(fn
+        {_key, _value, expires_at} when is_struct(expires_at, DateTime) ->
+          DateTime.compare(now, expires_at) == :gt
 
-    # Delete them
+        _ ->
+          false
+      end)
+      |> Enum.map(fn {key, _value, _expires_at} -> key end)
+
+    # Delete expired entries
     Enum.each(expired_keys, &:ets.delete(@table_name, &1))
 
     length(expired_keys)

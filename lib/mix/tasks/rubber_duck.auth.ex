@@ -39,15 +39,15 @@ defmodule Mix.Tasks.RubberDuck.Auth do
 
   defp generate_key(opts) do
     description = Keyword.get(parse_opts(opts), :description, "CLI access")
-    
+
     key = :crypto.strong_rand_bytes(32) |> Base.encode16(case: :lower)
-    
+
     # TODO: Store the key in database
     # For now, just display it
     Mix.shell().info("""
     Generated API key: #{key}
     Description: #{description}
-    
+
     Add this key to your CLI configuration:
       rubber_duck auth setup
       
@@ -71,10 +71,12 @@ defmodule Mix.Tasks.RubberDuck.Auth do
   end
 
   defp parse_opts(opts) do
-    {parsed, _, _} = OptionParser.parse(opts, 
-      switches: [description: :string],
-      aliases: [d: :description]
-    )
+    {parsed, _, _} =
+      OptionParser.parse(opts,
+        switches: [description: :string],
+        aliases: [d: :description]
+      )
+
     parsed
   end
 end

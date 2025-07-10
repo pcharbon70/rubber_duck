@@ -107,28 +107,32 @@ defmodule RubberDuck.Analysis.Analyzer do
   """
   @spec analyze_code_file(Workspace.CodeFile.t(), analysis_options()) :: {:ok, aggregated_result()} | {:error, term()}
   def analyze_code_file(%Workspace.CodeFile{} = code_file, opts \\ []) do
-    # Check if we have cached AST
-    ast_info =
-      if code_file.ast_cache && !code_file.ast_cache["error"] do
-        # Convert cached AST back to our format
-        deserialize_ast_info(code_file.ast_cache)
-      else
-        # Parse the content
-        case AST.parse(code_file.content, String.to_atom(code_file.language || "elixir")) do
-          {:ok, ast} -> ast
-          _ -> nil
-        end
-      end
+    case get_ast_info(code_file) do
+      {:ok, ast_info} ->
+        analyze_with_ast(ast_info, code_file.file_path, opts)
 
-    if ast_info do
-      run_engines(ast_info, code_file.file_path, opts)
-      |> case do
-        {:ok, results} -> {:ok, aggregate_results(results, code_file.file_path)}
-        error -> error
-      end
+      :no_ast ->
+        # Fallback to source analysis
+        language = String.to_atom(code_file.language || "unknown")
+        analyze_source(code_file.content, language, opts)
+    end
+  end
+
+  defp get_ast_info(code_file) do
+    if code_file.ast_cache && !code_file.ast_cache["error"] do
+      {:ok, deserialize_ast_info(code_file.ast_cache)}
     else
-      # Fallback to source analysis
-      analyze_source(code_file.content, String.to_atom(code_file.language || "unknown"), opts)
+      case AST.parse(code_file.content, String.to_atom(code_file.language || "elixir")) do
+        {:ok, ast} -> {:ok, ast}
+        _ -> :no_ast
+      end
+    end
+  end
+
+  defp analyze_with_ast(ast_info, file_path, opts) do
+    case run_engines(ast_info, file_path, opts) do
+      {:ok, results} -> {:ok, aggregate_results(results, file_path)}
+      error -> error
     end
   end
 
@@ -198,7 +202,7 @@ defmodule RubberDuck.Analysis.Analyzer do
     tasks =
       Enum.map(engines, fn engine ->
         Task.async(fn ->
-          engine_config = Map.get(config, engine.name(), %{})
+          engine_config = Map.get(config, engine.name(), engine.default_config())
           {engine, engine.analyze(ast_info, config: engine_config)}
         end)
       end)
@@ -221,7 +225,7 @@ defmodule RubberDuck.Analysis.Analyzer do
   defp run_engines_sequential(engines, ast_info, config) do
     results =
       Enum.reduce_while(engines, {:ok, []}, fn engine, {:ok, acc} ->
-        engine_config = Map.get(config, engine.name(), %{})
+        engine_config = Map.get(config, engine.name(), engine.default_config())
 
         case engine.analyze(ast_info, config: engine_config) do
           {:ok, result} -> {:cont, {:ok, [{engine, result} | acc]}}
@@ -242,7 +246,7 @@ defmodule RubberDuck.Analysis.Analyzer do
       Enum.map(engines, fn engine ->
         Task.async(fn ->
           if function_exported?(engine, :analyze_source, 3) do
-            engine_config = Map.get(config, engine.name(), %{})
+            engine_config = Map.get(config, engine.name(), engine.default_config())
             {engine, engine.analyze_source(source, language, config: engine_config)}
           else
             {engine, {:ok, %{engine: engine.name(), issues: [], metrics: %{}, suggestions: %{}}}}
@@ -267,7 +271,7 @@ defmodule RubberDuck.Analysis.Analyzer do
     results =
       Enum.map(engines, fn engine ->
         if function_exported?(engine, :analyze_source, 3) do
-          engine_config = Map.get(config, engine.name(), %{})
+          engine_config = Map.get(config, engine.name(), engine.default_config())
 
           case engine.analyze_source(source, language, config: engine_config) do
             {:ok, result} -> {engine, result}

@@ -52,6 +52,7 @@ defmodule RubberDuck.Analysis.AST.ElixirParser do
       imports: [],
       requires: [],
       calls: [],
+      variables: [],
       metadata: %{}
     }
 
@@ -73,33 +74,62 @@ defmodule RubberDuck.Analysis.AST.ElixirParser do
   # Function definitions
   defp traverse_ast({def_type, meta, [{name, _, args} | rest]}, info)
        when def_type in [:def, :defp] do
+    arity = get_arity(args)
+    current_function = {info.name, name, arity}
+
+    # Create a new context for this function
+    function_context = %{
+      info
+      | metadata:
+          info.metadata
+          |> Map.put(:current_function, current_function)
+          |> Map.put(:function_variables, [])
+          |> Map.put(:function_calls, [])
+    }
+
+    # Extract parameter variables
+    param_vars = extract_parameter_variables(args, current_function, meta)
+
+    function_context = %{
+      function_context
+      | metadata: Map.update!(function_context.metadata, :function_variables, &(Enum.concat(&1, param_vars)))
+    }
+
+    # Process function body
+    function_context =
+      case rest do
+        [[do: body]] -> traverse_ast(body, function_context)
+        [_guards, [do: body]] -> traverse_ast(body, function_context)
+        _ -> function_context
+      end
+
+    # Extract function-specific data
+    function_vars = Map.get(function_context.metadata, :function_variables, [])
+    function_calls = Map.get(function_context.metadata, :function_calls, [])
+
     function_info = %{
       name: name,
-      arity: get_arity(args),
+      arity: arity,
       line: Keyword.get(meta, :line, 0),
-      private: def_type == :defp
+      private: def_type == :defp,
+      variables: function_vars,
+      body_calls: function_calls
     }
 
-    # Process function body to find calls
-    updated_info = %{
+    # Merge back to main info
+    %{
       info
       | functions: [function_info | info.functions],
-        metadata: Map.put(info.metadata, :current_function, {info.name, name, get_arity(args)})
+        calls: function_context.calls,
+        variables: Enum.concat(info.variables, function_vars)
     }
-
-    # Continue traversing the function body
-    case rest do
-      [[do: body]] -> traverse_ast(body, updated_info)
-      [_guards, [do: body]] -> traverse_ast(body, updated_info)
-      _ -> updated_info
-    end
   end
 
   # Alias
   defp traverse_ast({:alias, _meta, [module_ref | _opts]}, info) do
     case extract_aliases(module_ref) do
       modules when is_list(modules) ->
-        %{info | aliases: modules ++ info.aliases}
+        %{info | aliases: Enum.concat(modules, info.aliases)}
 
       module ->
         %{info | aliases: [module | info.aliases]}
@@ -145,7 +175,14 @@ defmodule RubberDuck.Analysis.AST.ElixirParser do
             line: Keyword.get(meta2, :line, 0)
           }
 
-          %{info | calls: [call_info | info.calls]}
+          info = %{info | calls: [call_info | info.calls]}
+
+          # Also track in function-specific calls if we're inside a function
+          if Map.has_key?(info.metadata, :function_calls) do
+            %{info | metadata: Map.update!(info.metadata, :function_calls, &[call_info | &1])}
+          else
+            info
+          end
 
         _ ->
           info
@@ -171,6 +208,14 @@ defmodule RubberDuck.Analysis.AST.ElixirParser do
         # Continue traversing arguments
         updated_info = %{info | calls: [call_info | info.calls]}
 
+        # Also track in function-specific calls if we're inside a function
+        updated_info =
+          if Map.has_key?(updated_info.metadata, :function_calls) do
+            %{updated_info | metadata: Map.update!(updated_info.metadata, :function_calls, &[call_info | &1])}
+          else
+            updated_info
+          end
+
         Enum.reduce(args, updated_info, fn
           arg, acc when is_tuple(arg) -> traverse_ast(arg, acc)
           _, acc -> acc
@@ -183,6 +228,110 @@ defmodule RubberDuck.Analysis.AST.ElixirParser do
           _, acc -> acc
         end)
     end
+  end
+
+  # Variable assignment with =
+  defp traverse_ast({:=, meta, [left, right]}, info) do
+    # First traverse the right side to find any variable usage
+    info = traverse_ast(right, info)
+
+    # Then extract variables from the left side (pattern match)
+    extract_variables_from_pattern(left, info, :assignment, meta)
+  end
+
+  # Variable usage
+  defp traverse_ast({var_name, meta, context}, info)
+       when is_atom(var_name) and is_atom(context) and var_name != :_ do
+    # This is a variable reference
+    if variable_name?(var_name) do
+      var_info = %{
+        name: var_name,
+        line: Keyword.get(meta, :line, 0),
+        column: Keyword.get(meta, :column, nil),
+        context: context,
+        type: :usage,
+        scope: Map.get(info.metadata, :current_function, :module)
+      }
+
+      updated_info =
+        if Map.has_key?(info.metadata, :function_variables) do
+          %{info | metadata: Map.update!(info.metadata, :function_variables, &[var_info | &1])}
+        else
+          %{info | variables: [var_info | info.variables]}
+        end
+
+      updated_info
+    else
+      info
+    end
+  end
+
+  # Case expressions
+  defp traverse_ast({:case, _meta, [expr, [do: clauses]]}, info) do
+    # First traverse the expression
+    info = traverse_ast(expr, info)
+
+    # Then traverse each clause
+    Enum.reduce(clauses, info, fn
+      {:->, _meta, [[pattern], body]}, acc ->
+        # Extract variables from pattern
+        acc = extract_variables_from_pattern(pattern, acc, :match, [])
+        # Then traverse the body
+        traverse_ast(body, acc)
+
+      _, acc ->
+        acc
+    end)
+  end
+
+  # With expressions
+  defp traverse_ast({:with, _meta, args}, info) do
+    Enum.reduce(args, info, fn
+      {:<-, _meta, [pattern, expr]}, acc ->
+        # First traverse the expression
+        acc = traverse_ast(expr, acc)
+        # Then extract variables from pattern
+        extract_variables_from_pattern(pattern, acc, :match, [])
+
+      [do: body], acc ->
+        traverse_ast(body, acc)
+
+      [else: clauses], acc ->
+        Enum.reduce(clauses, acc, fn
+          {:->, _meta, [[pattern], body]}, acc2 ->
+            acc2 = extract_variables_from_pattern(pattern, acc2, :match, [])
+            traverse_ast(body, acc2)
+
+          _, acc2 ->
+            acc2
+        end)
+
+      expr, acc when is_tuple(expr) ->
+        traverse_ast(expr, acc)
+
+      _, acc ->
+        acc
+    end)
+  end
+
+  # Comprehensions
+  defp traverse_ast({:for, _meta, args}, info) do
+    Enum.reduce(args, info, fn
+      {:<-, _meta, [pattern, expr]}, acc ->
+        # Traverse expression first
+        acc = traverse_ast(expr, acc)
+        # Extract variables from pattern
+        extract_variables_from_pattern(pattern, acc, :match, [])
+
+      [do: body], acc ->
+        traverse_ast(body, acc)
+
+      expr, acc when is_tuple(expr) ->
+        traverse_ast(expr, acc)
+
+      _, acc ->
+        acc
+    end)
   end
 
   # Base case
@@ -212,4 +361,98 @@ defmodule RubberDuck.Analysis.AST.ElixirParser do
   defp get_arity(nil), do: 0
   defp get_arity(args) when is_list(args), do: length(args)
   defp get_arity(_), do: 0
+
+  # Helper functions for variable extraction
+  defp extract_parameter_variables(nil, _scope, _meta), do: []
+
+  defp extract_parameter_variables(args, scope, meta) when is_list(args) do
+    Enum.flat_map(args, fn arg ->
+      extract_variables_from_pattern(arg, %{variables: [], metadata: %{current_function: scope}}, :assignment, meta).variables
+    end)
+  end
+
+  defp extract_parameter_variables(_, _scope, _meta), do: []
+
+  defp extract_variables_from_pattern({var_name, meta, context}, info, var_type, _parent_meta)
+       when is_atom(var_name) and is_atom(context) and var_name != :_ do
+    if variable_name?(var_name) do
+      var_info = %{
+        name: var_name,
+        line: Keyword.get(meta, :line, 0),
+        column: Keyword.get(meta, :column, nil),
+        context: context,
+        type: var_type,
+        scope: Map.get(info.metadata, :current_function, :module)
+      }
+
+      if Map.has_key?(info.metadata, :function_variables) do
+        %{info | metadata: Map.update!(info.metadata, :function_variables, &[var_info | &1])}
+      else
+        %{info | variables: [var_info | info.variables]}
+      end
+    else
+      info
+    end
+  end
+
+  # Pattern matching in tuples
+  defp extract_variables_from_pattern({:{}, _meta, elements}, info, var_type, parent_meta) do
+    Enum.reduce(elements, info, fn elem, acc ->
+      extract_variables_from_pattern(elem, acc, var_type, parent_meta)
+    end)
+  end
+
+  # Pattern matching in lists
+  defp extract_variables_from_pattern(list, info, var_type, parent_meta) when is_list(list) do
+    Enum.reduce(list, info, fn elem, acc ->
+      extract_variables_from_pattern(elem, acc, var_type, parent_meta)
+    end)
+  end
+
+  # Pattern matching with cons operator [head | tail]
+  defp extract_variables_from_pattern({:|, _meta, [head, tail]}, info, var_type, parent_meta) do
+    info
+    |> extract_variables_from_pattern(head, var_type, parent_meta)
+    |> extract_variables_from_pattern(tail, var_type, parent_meta)
+  end
+
+  # Map pattern matching
+  defp extract_variables_from_pattern({:%{}, _meta, pairs}, info, var_type, parent_meta) do
+    Enum.reduce(pairs, info, fn
+      {_key, value}, acc ->
+        extract_variables_from_pattern(value, acc, var_type, parent_meta)
+    end)
+  end
+
+  # Struct pattern matching
+  defp extract_variables_from_pattern({:%, _meta, [_struct, {:%{}, _meta2, pairs}]}, info, var_type, parent_meta) do
+    Enum.reduce(pairs, info, fn
+      {_key, value}, acc ->
+        extract_variables_from_pattern(value, acc, var_type, parent_meta)
+    end)
+  end
+
+  # Binary pattern matching
+  defp extract_variables_from_pattern({:<<>>, _meta, segments}, info, var_type, parent_meta) do
+    Enum.reduce(segments, info, fn
+      {:"::", _meta, [value, _size]}, acc ->
+        extract_variables_from_pattern(value, acc, var_type, parent_meta)
+
+      value, acc ->
+        extract_variables_from_pattern(value, acc, var_type, parent_meta)
+    end)
+  end
+
+  # Skip other patterns
+  defp extract_variables_from_pattern(_pattern, info, _var_type, _parent_meta), do: info
+
+  defp variable_name?(name) when is_atom(name) do
+    name_str = Atom.to_string(name)
+
+    String.match?(name_str, ~r/^[a-z_][a-zA-Z0-9_]*[?!]?$/) and
+      name_str != "_" and
+      not String.starts_with?(name_str, "_")
+  end
+
+  defp variable_name?(_), do: false
 end

@@ -53,11 +53,13 @@ defmodule RubberDuck.Analysis.Security do
     issues = []
 
     # Run various security analyses
-    issues = issues ++ analyze_dynamic_atoms(ast_info, config)
-    issues = issues ++ analyze_unsafe_operations(ast_info, config)
-    issues = issues ++ analyze_sql_injection_risks(ast_info, config)
-    issues = issues ++ analyze_potential_xss(ast_info, config)
-    issues = issues ++ analyze_process_spawning(ast_info, config)
+    issues =
+      issues
+      |> Enum.concat(analyze_dynamic_atoms(ast_info, config))
+      |> Enum.concat(analyze_unsafe_operations(ast_info, config))
+      |> Enum.concat(analyze_sql_injection_risks(ast_info, config))
+      |> Enum.concat(analyze_potential_xss(ast_info, config))
+      |> Enum.concat(analyze_process_spawning(ast_info, config))
 
     # Calculate security metrics
     metrics = calculate_security_metrics(ast_info, issues)
@@ -86,9 +88,11 @@ defmodule RubberDuck.Analysis.Security do
     # Text-based security analysis
     lines = String.split(source, "\n")
 
-    issues = issues ++ detect_hardcoded_secrets(lines, config)
-    issues = issues ++ detect_unsafe_patterns(lines, config)
-    issues = issues ++ detect_suspicious_comments(lines)
+    issues =
+      issues
+      |> Enum.concat(detect_hardcoded_secrets(lines, config))
+      |> Enum.concat(detect_unsafe_patterns(lines, config))
+      |> Enum.concat(detect_suspicious_comments(lines))
 
     {:ok,
      %{
@@ -109,8 +113,10 @@ defmodule RubberDuck.Analysis.Security do
     if !config.detect_dynamic_atoms do
       []
     else
-      # Look for String.to_atom calls
-      ast_info.calls
+      # Look for String.to_atom calls in both module-level and function-level calls
+      all_calls = get_all_calls(ast_info)
+
+      all_calls
       |> Enum.filter(fn call ->
         case call.to do
           {String, :to_atom, 1} -> true
@@ -147,7 +153,9 @@ defmodule RubberDuck.Analysis.Security do
         {:os, :cmd, 1}
       ]
 
-      ast_info.calls
+      all_calls = get_all_calls(ast_info)
+
+      all_calls
       |> Enum.filter(fn call ->
         Enum.any?(unsafe_functions, fn
           {mod, fun, :any} ->
@@ -190,7 +198,9 @@ defmodule RubberDuck.Analysis.Security do
       # Look for Ecto query construction patterns
       sql_related_modules = [Ecto.Query, Ecto.Adapters.SQL]
 
-      ast_info.calls
+      all_calls = get_all_calls(ast_info)
+
+      all_calls
       |> Enum.filter(fn call ->
         {module, _fun, _arity} = call.to
         module in sql_related_modules
@@ -216,7 +226,9 @@ defmodule RubberDuck.Analysis.Security do
       []
     else
       # Look for Phoenix.HTML.raw calls
-      ast_info.calls
+      all_calls = get_all_calls(ast_info)
+
+      all_calls
       |> Enum.filter(fn call ->
         case call.to do
           {Phoenix.HTML, :raw, _} -> true
@@ -248,7 +260,9 @@ defmodule RubberDuck.Analysis.Security do
       {Task, :async, :any}
     ]
 
-    ast_info.calls
+    all_calls = get_all_calls(ast_info)
+
+    all_calls
     |> Enum.filter(fn call ->
       Enum.any?(spawn_functions, fn
         {mod, fun, :any} ->
@@ -534,4 +548,14 @@ defmodule RubberDuck.Analysis.Security do
   end
 
   defp suggest_security_fixes(_, _), do: []
+
+  # Helper function to get all calls from module and function levels
+  defp get_all_calls(ast_info) do
+    function_calls =
+      Enum.flat_map(ast_info.functions, fn func ->
+        func.body_calls || []
+      end)
+
+    Enum.concat(ast_info.calls, function_calls)
+  end
 end

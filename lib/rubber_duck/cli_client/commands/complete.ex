@@ -6,18 +6,23 @@ defmodule RubberDuck.CLIClient.Commands.Complete do
   alias RubberDuck.CLIClient.Client
 
   def run(args, opts) do
+    # Extract values from Optimus.ParseResult struct
+    file = Map.get(args.args, :file)
+    line = Map.get(args.args, :line)
+    column = Map.get(args.args, :column)
+
     params = %{
-      "file" => args.file,
-      "line" => args.line,
-      "column" => args.column,
+      "file" => file,
+      "line" => line,
+      "column" => column,
       "format" => opts[:format],
       "verbose" => opts[:verbose]
     }
-    
+
     case Client.send_command("complete", params) do
       {:ok, result} ->
         {:ok, result}
-        
+
       {:error, reason} ->
         {:error, format_error(reason)}
     end

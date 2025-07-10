@@ -83,27 +83,29 @@ defmodule RubberDuck.CLI do
 
   defp execute(parsed) do
     # Handle different parse result formats
-    {subcommand, subcommand_args, raw_parsed} = case parsed do
-      # Nested subcommands return a tuple
-      {subcommand_path, %Optimus.ParseResult{} = parse_result} ->
-        # subcommand_path is a list like [:llm, :connect]
-        [main_cmd | sub_cmds] = subcommand_path
-        case sub_cmds do
-          [] -> {main_cmd, parse_result.args, parse_result}
-          [sub_cmd] -> {main_cmd, %{subcommand: {sub_cmd, parse_result.args}}, parse_result}
-          _ -> {main_cmd, parse_result.args, parse_result}
-        end
-        
-      # Regular commands return a ParseResult directly  
-      %Optimus.ParseResult{} = parse_result ->
-        cmd = Map.get(parse_result, :subcommand)
-        {cmd, parse_result.args, parse_result}
-        
-      # Fallback
-      _ ->
-        {nil, %{}, %{}}
-    end
-    
+    {subcommand, subcommand_args, raw_parsed} =
+      case parsed do
+        # Nested subcommands return a tuple
+        {subcommand_path, %Optimus.ParseResult{} = parse_result} ->
+          # subcommand_path is a list like [:llm, :connect]
+          [main_cmd | sub_cmds] = subcommand_path
+
+          case sub_cmds do
+            [] -> {main_cmd, parse_result.args, parse_result}
+            [sub_cmd] -> {main_cmd, %{subcommand: {sub_cmd, parse_result.args}}, parse_result}
+            _ -> {main_cmd, parse_result.args, parse_result}
+          end
+
+        # Regular commands return a ParseResult directly  
+        %Optimus.ParseResult{} = parse_result ->
+          cmd = Map.get(parse_result, :subcommand)
+          {cmd, parse_result.args, parse_result}
+
+        # Fallback
+        _ ->
+          {nil, %{}, %{}}
+      end
+
     # Set up global configuration from parsed args
     config = Config.from_parsed_args(raw_parsed)
 

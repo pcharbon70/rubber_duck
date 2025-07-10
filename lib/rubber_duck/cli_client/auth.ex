@@ -1,7 +1,7 @@
 defmodule RubberDuck.CLIClient.Auth do
   @moduledoc """
   Authentication management for RubberDuck CLI client.
-  
+
   Handles API key storage, retrieval, and validation.
   """
 
@@ -16,7 +16,7 @@ defmodule RubberDuck.CLIClient.Auth do
     case load_config() do
       {:ok, config} ->
         config["api_key"]
-        
+
       {:error, _} ->
         nil
     end
@@ -29,7 +29,7 @@ defmodule RubberDuck.CLIClient.Auth do
     case load_config() do
       {:ok, config} ->
         config["server_url"] || "ws://localhost:5555/socket/websocket"
-        
+
       {:error, _} ->
         "ws://localhost:5555/socket/websocket"
     end
@@ -40,17 +40,17 @@ defmodule RubberDuck.CLIClient.Auth do
   """
   def save_credentials(api_key, server_url) do
     ensure_config_dir()
-    
+
     config = %{
       "api_key" => api_key,
       "server_url" => server_url,
       "created_at" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
-    
+
     case Jason.encode(config, pretty: true) do
       {:ok, json} ->
         File.write(@config_file, json)
-        
+
       error ->
         error
     end
@@ -88,10 +88,10 @@ defmodule RubberDuck.CLIClient.Auth do
     case File.read(@config_file) do
       {:ok, content} ->
         Jason.decode(content)
-        
+
       {:error, :enoent} ->
         {:error, :not_configured}
-        
+
       error ->
         error
     end

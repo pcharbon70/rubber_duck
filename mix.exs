@@ -84,7 +84,7 @@ defmodule RubberDuck.MixProject do
 
       # CLI dependencies
       {:optimus, "~> 0.2"},
-      
+
       # WebSocket client dependencies for standalone CLI
       {:phoenix_gen_socket_client, "~> 4.0"},
       {:websocket_client, "~> 1.5"}

@@ -6,18 +6,23 @@ defmodule RubberDuck.CLIClient.Commands.Test do
   alias RubberDuck.CLIClient.Client
 
   def run(args, opts) do
+    # Extract values from Optimus.ParseResult struct
+    file = Map.get(args.args, :file)
+    framework = Map.get(args.options, :framework, "exunit")
+    output = Map.get(args.options, :output)
+
     params = %{
-      "file" => args.file,
-      "framework" => args[:framework] || "exunit",
-      "output" => args[:output],
+      "file" => file,
+      "framework" => framework,
+      "output" => output,
       "format" => opts[:format],
       "verbose" => opts[:verbose]
     }
-    
+
     case Client.send_command("test", params) do
       {:ok, result} ->
         {:ok, result}
-        
+
       {:error, reason} ->
         {:error, format_error(reason)}
     end

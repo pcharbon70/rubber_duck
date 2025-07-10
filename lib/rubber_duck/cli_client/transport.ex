@@ -19,33 +19,33 @@ defmodule RubberDuck.CLIClient.Client.Transport do
   @impl true
   def init(opts) do
     Logger.debug("Transport init called with opts: #{inspect(opts)}")
-    
+
     url = Keyword.fetch!(opts, :url)
     params = Keyword.get(opts, :params, %{})
     parent = Keyword.get(opts, :parent)
-    
+
     # Convert params map to keyword list for Phoenix.Socket
-    socket_params = 
+    socket_params =
       params
       |> Map.to_list()
       |> Keyword.new()
-    
+
     {:connect, url, socket_params, %{parent: parent}}
   end
 
   @impl true
   def handle_connected(transport, state) do
     Logger.info("WebSocket connected")
-    
+
     # Store the transport and notify the parent
     state = Map.put(state, :transport, transport)
-    
+
     # Automatically join the CLI channel once connected
     case Phoenix.Channels.GenSocketClient.join(transport, "cli:commands", %{}) do
       {:ok, ref} ->
         Logger.info("Joining cli:commands channel")
         {:ok, Map.put(state, :join_ref, ref)}
-        
+
       {:error, reason} ->
         Logger.error("Failed to join channel: #{inspect(reason)}")
         {:stop, reason, state}
@@ -62,12 +62,12 @@ defmodule RubberDuck.CLIClient.Client.Transport do
   @impl true
   def handle_joined(topic, _payload, _transport, state) do
     Logger.info("Joined channel: #{topic}")
-    
+
     # Notify the parent Client process that we've successfully joined
     if state.parent do
       send(state.parent, {:channel_joined, topic})
     end
-    
+
     {:ok, state}
   end
 
@@ -99,7 +99,7 @@ defmodule RubberDuck.CLIClient.Client.Transport do
         # Remove from pending
         state = Map.delete(state, {:pending, ref})
         {:ok, state}
-        
+
       nil ->
         # Regular channel reply
         Process.send(state.parent, {:channel_reply, topic, %{ref: ref, payload: payload}}, [])
@@ -115,13 +115,13 @@ defmodule RubberDuck.CLIClient.Client.Transport do
         # Store the mapping between our ref and the push ref
         state = Map.put(state, {:pending, push_ref}, {ref, from})
         {:ok, state}
-        
+
       {:error, reason} ->
         send(from, {:push_error, ref, reason})
         {:ok, state}
     end
   end
-  
+
   def handle_info(message, _transport, state) do
     Logger.debug("Unhandled transport message: #{inspect(message)}")
     {:ok, state}
