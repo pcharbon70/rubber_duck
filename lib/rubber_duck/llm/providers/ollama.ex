@@ -35,7 +35,25 @@ defmodule RubberDuck.LLM.Providers.Ollama do
     body = build_request_body(request, config)
     headers = Provider.build_headers(config)
 
-    case Req.post(url, json: body, headers: headers, receive_timeout: config.timeout || @default_timeout) do
+    # Use request timeout if available, otherwise use config timeout
+    timeout = get_in(request.options, [:timeout]) || config.timeout || @default_timeout
+    
+    require Logger
+    Logger.debug("Ollama request - URL: #{url}")
+    Logger.debug("Ollama request - Body: #{inspect(body)}")
+    Logger.debug("Ollama request - Timeout: #{timeout}ms")
+    
+    req_opts = [
+      json: body,
+      headers: headers,
+      receive_timeout: timeout,
+      # Also set connect_timeout and pool_timeout
+      connect_options: [timeout: timeout],
+      pool_timeout: timeout,
+      retry: false  # Let our retry logic handle it
+    ]
+    
+    case Req.post(url, req_opts) do
       {:ok, %{status: 200, body: response_body}} ->
         {:ok, parse_response(response_body, request)}
 
@@ -184,19 +202,29 @@ defmodule RubberDuck.LLM.Providers.Ollama do
 
   @impl true
   def health_check(%ProviderConfig{} = config, connection_data) do
-    # Use the stored base_url from connection data
-    base_url = connection_data[:base_url] || config.base_url || @default_base_url
+    # Handle both stateless and stateful connections
+    base_url = case connection_data do
+      :stateless -> config.base_url || @default_base_url
+      data when is_map(data) -> data[:base_url] || config.base_url || @default_base_url
+      _ -> config.base_url || @default_base_url
+    end
     url = "#{base_url}/api/tags"
 
     case Req.get(url, receive_timeout: 5_000) do
       {:ok, %{status: 200, body: %{"models" => models}}} ->
         model_names = Enum.map(models, & &1["name"])
 
+        version = case connection_data do
+          :stateless -> "unknown"
+          data when is_map(data) -> data[:version] || "unknown"
+          _ -> "unknown"
+        end
+
         {:ok,
          %{
            status: :healthy,
            models: model_names,
-           version: connection_data[:version],
+           version: version,
            message: "Ollama is running with #{length(model_names)} models available"
          }}
 

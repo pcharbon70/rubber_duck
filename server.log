@@ -1,0 +1,115 @@
+[info] Registered engine generation with capabilities: [:code_generation, :rag_context, :iterative_refinement, :multi_language]
+[info] Performing initial learning from correction history
+[info] Not enough history for learning (0 samples)
+[info] Started engine generation
+[info] Started engine generation with pid #PID<0.425.0>
+[info] Registered engine completion with capabilities: [:code_completion, :incremental_completion, :multi_suggestion]
+[info] Started engine completion
+[info] Started engine completion with pid #PID<0.427.0>
+[info] Registered engine analysis with capabilities: [:code_analysis, :security_scanning, :style_checking, :complexity_analysis]
+[info] Started engine analysis
+[info] Started engine analysis with pid #PID<0.428.0>
+[info] The function passed as a handler with ID "enhancement-coordinator" is a local function.
+This means that it is either an anonymous function or a capture of a function without a module specified. That may cause a performance penalty when calling that handler. For more details see the note in `telemetry:attach/4` documentation.
+
+https://hexdocs.pm/telemetry/telemetry.html#attach/4
+[info] Registered engine refactoring with capabilities: [:code_refactoring, :pattern_detection, :automated_fixes]
+[info] Started engine refactoring
+[info] The function passed as a handler with ID "Elixir.RubberDuck.Workflows.Metrics.Aggregator-aggregator" is a local function.
+This means that it is either an anonymous function or a capture of a function without a module specified. That may cause a performance penalty when calling that handler. For more details see the note in `telemetry:attach/4` documentation.
+
+https://hexdocs.pm/telemetry/telemetry.html#attach/4
+[info] Started engine refactoring with pid #PID<0.433.0>
+[info] Registered engine test_generation with capabilities: [:test_generation, :test_framework_support, :edge_case_detection, :property_testing]
+[info] Started engine test_generation
+[info] Started engine test_generation with pid #PID<0.435.0>
+[info] Successfully loaded 5 engines from Elixir.RubberDuck.Engines
+[info] Successfully loaded engines
+[info] Successfully loaded engines from Elixir.RubberDuck.Engines
+[warning] :instrumenters configuration for RubberDuckWeb.Endpoint is deprecated and has no effect
+[info] Running RubberDuckWeb.Endpoint with cowboy 2.13.0 at 127.0.0.1:5555 (http)
+[info] Access RubberDuckWeb.Endpoint at http://localhost:5555
+spawn: Could not cd to /home/pcharbon/code/rubber_duck/assets
+spawn: Could not cd to /home/pcharbon/code/rubber_duck/assets
+[info] User api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3 connected to socket
+[info] CONNECTED TO RubberDuckWeb.UserSocket in 120µs
+  Transport: :websocket
+  Serializer: Phoenix.Socket.V2.JSONSerializer
+  Parameters: %{"api_key" => "617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3", "vsn" => "2.0.0"}
+[info] CLI client connected: api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3
+[info] JOINED cli:commands in 141µs
+  Parameters: %{}
+[info] User api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3 connected to socket
+[info] CONNECTED TO RubberDuckWeb.UserSocket in 3ms
+  Transport: :websocket
+  Serializer: Phoenix.Socket.V2.JSONSerializer
+  Parameters: %{"api_key" => "617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3", "vsn" => "2.0.0"}
+[info] CLI client connected: api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3
+[info] JOINED cli:commands in 109µs
+  Parameters: %{}
+[info] User api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3 connected to socket
+[info] CONNECTED TO RubberDuckWeb.UserSocket in 3ms
+  Transport: :websocket
+  Serializer: Phoenix.Socket.V2.JSONSerializer
+  Parameters: %{"api_key" => "617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3", "vsn" => "2.0.0"}
+[info] CLI client connected: api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3
+[info] JOINED cli:commands in 100µs
+  Parameters: %{}
+[info] User api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3 connected to socket
+[info] CONNECTED TO RubberDuckWeb.UserSocket in 3ms
+  Transport: :websocket
+  Serializer: Phoenix.Socket.V2.JSONSerializer
+  Parameters: %{"api_key" => "617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3", "vsn" => "2.0.0"}
+[info] CLI client connected: api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3
+[info] JOINED cli:commands in 104µs
+  Parameters: %{}
+[info] User api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3 connected to socket
+[info] CONNECTED TO RubberDuckWeb.UserSocket in 3ms
+  Transport: :websocket
+  Serializer: Phoenix.Socket.V2.JSONSerializer
+  Parameters: %{"api_key" => "617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3", "vsn" => "2.0.0"}
+[info] CLI client connected: api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3
+[info] JOINED cli:commands in 102µs
+  Parameters: %{}
+[info] User api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3 connected to socket
+[info] CONNECTED TO RubberDuckWeb.UserSocket in 126µs
+  Transport: :websocket
+  Serializer: Phoenix.Socket.V2.JSONSerializer
+  Parameters: %{"api_key" => "617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3", "vsn" => "2.0.0"}
+[info] CLI client connected: api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3
+[info] JOINED cli:commands in 94µs
+  Parameters: %{}
+[info] User api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3 connected to socket
+[info] CONNECTED TO RubberDuckWeb.UserSocket in 3ms
+  Transport: :websocket
+  Serializer: Phoenix.Socket.V2.JSONSerializer
+  Parameters: %{"api_key" => "617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3", "vsn" => "2.0.0"}
+[info] CLI client connected: api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3
+[info] JOINED cli:commands in 103µs
+  Parameters: %{}
+[info] User api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3 connected to socket
+[info] CONNECTED TO RubberDuckWeb.UserSocket in 126µs
+  Transport: :websocket
+  Serializer: Phoenix.Socket.V2.JSONSerializer
+  Parameters: %{"api_key" => "617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3", "vsn" => "2.0.0"}
+[info] CLI client connected: api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3
+[info] JOINED cli:commands in 98µs
+  Parameters: %{}
+[info] User api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3 connected to socket
+[info] CONNECTED TO RubberDuckWeb.UserSocket in 3ms
+  Transport: :websocket
+  Serializer: Phoenix.Socket.V2.JSONSerializer
+  Parameters: %{"api_key" => "617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3", "vsn" => "2.0.0"}
+[info] CLI client connected: api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3
+[info] JOINED cli:commands in 118µs
+  Parameters: %{}
+[info] User api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3 connected to socket
+[info] CONNECTED TO RubberDuckWeb.UserSocket in 137µs
+  Transport: :websocket
+  Serializer: Phoenix.Socket.V2.JSONSerializer
+  Parameters: %{"api_key" => "617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3", "vsn" => "2.0.0"}
+[info] CLI client connected: api_user_617070455248c3a8168c83d7554d0a6972952a7e7217b63898e70d765ed3a7e3
+[info] JOINED cli:commands in 126µs
+  Parameters: %{}
+[notice] SIGTERM received - shutting down
+

@@ -24,8 +24,14 @@ defmodule RubberDuckWeb.UserSocket do
   # See `Phoenix.Token` documentation for examples in
   # performing token verification on connect.
   @impl true
-  def connect(params, socket, _connect_info) do
-    case authenticate(params) do
+  def connect(params, socket, connect_info) do
+    # Try to get API key from query params if not in params
+    auth_params = case get_api_key_from_uri(connect_info) do
+      {:ok, api_key} -> Map.put(params, "api_key", api_key)
+      _ -> params
+    end
+    
+    case authenticate(auth_params) do
       {:ok, user_id} ->
         socket =
           socket
@@ -93,4 +99,15 @@ defmodule RubberDuckWeb.UserSocket do
     # This is a placeholder - in production, check against database
     byte_size(api_key) >= 32
   end
+  
+  defp get_api_key_from_uri(%{uri: %{query: query}}) when is_binary(query) do
+    case URI.decode_query(query) do
+      %{"api_key" => api_key} when is_binary(api_key) and api_key != "" ->
+        {:ok, api_key}
+      _ ->
+        :error
+    end
+  end
+  
+  defp get_api_key_from_uri(_), do: :error
 end

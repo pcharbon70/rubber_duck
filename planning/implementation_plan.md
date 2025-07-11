@@ -7,7 +7,7 @@ RubberDuck is an Elixir-based AI coding assistant system built with the Ash Fram
 This document provides the high-level overview and status tracking for the RubberDuck implementation. Detailed implementation plans for each phase are available in separate documents:
 
 - **[Phases 1-4](implementation_part_1.md)**: Foundation, Engine System, LLM Integration, and Workflow Orchestration
-- **[Phases 5-7](implementation_part_2.md)**: Real-time Communication, Planning System, and Production Readiness
+- **[Phases 5-8](implementation_part_2.md)**: Real-time Communication, Planning System, MCP Integration, and Production Readiness
 
 ## Implementation Status
 
@@ -24,7 +24,8 @@ This document provides the high-level overview and status tracking for the Rubbe
 | **Phase 4** | Workflow Orchestration & Analysis | ✅ 100% Complete | [View Details](implementation_part_1.md#phase-4-workflow-orchestration--analysis) |
 | **Phase 5** | Real-time Communication & UI | 🔧 ~30% Complete | [View Details](implementation_part_2.md#phase-5-real-time-communication--ui) |
 | **Phase 6** | Planning Enhancement System | 🔲 0% Complete | [View Details](implementation_part_2.md#phase-6-planning-enhancement-system) |
-| **Phase 7** | Production Hardening | 🔲 0% Complete | [View Details](implementation_part_2.md#phase-7-advanced-features--production-readiness) |
+| **Phase 7** | MCP (Model Context Protocol) Integration | 🔲 0% Complete | [View Details](implementation_part_2.md#phase-7-mcp-model-context-protocol-integration) |
+| **Phase 8** | Advanced Features & Production Readiness | 🔲 0% Complete | [View Details](implementation_part_2.md#phase-8-advanced-features--production-readiness) |
 
 ### Recent Completions
 
@@ -81,7 +82,14 @@ This document provides the high-level overview and status tracking for the Rubbe
    - ReAct-based execution
    - Repository-level planning
 
-7. **Phase 7: Production Readiness** ([Details](implementation_part_2.md#phase-7-advanced-features--production-readiness))
+7. **Phase 7: MCP (Model Context Protocol) Integration** ([Details](implementation_part_2.md#phase-7-mcp-model-context-protocol-integration))
+   - MCP client implementation with Hermes MCP
+   - MCP server to expose RubberDuck capabilities
+   - Tool registry and capability-based discovery
+   - Integration with existing systems
+   - Security and performance optimizations
+
+8. **Phase 8: Advanced Features & Production Readiness** ([Details](implementation_part_2.md#phase-8-advanced-features--production-readiness))
    - Background job processing with Oban
    - Security implementation
    - Monitoring and observability
@@ -170,7 +178,7 @@ The implementation is organized into the following key modules:
 
 Please refer to the detailed implementation plans when contributing:
 - For Phases 1-4: See [implementation_part_1.md](implementation_part_1.md)
-- For Phases 5-7: See [implementation_part_2.md](implementation_part_2.md)
+- For Phases 5-8: See [implementation_part_2.md](implementation_part_2.md)
 
 Each phase includes:
 - Detailed task breakdowns

@@ -178,7 +178,7 @@ defmodule RubberDuck.CLIClient.Main do
             System.halt(0)
 
           {:error, reason} ->
-            IO.puts(:stderr, "Error: #{reason}")
+            IO.puts(:stderr, "Error: #{inspect(reason)}")
             System.halt(1)
         end
 

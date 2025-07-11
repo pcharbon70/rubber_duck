@@ -42,7 +42,8 @@ defmodule RubberDuck.CLI.Commands.Generate do
       context: context
     }
 
-    case Manager.execute(:generation, input) do
+    # Increase timeout to 5 minutes for generation (LLMs can be slow)
+    case Manager.execute(:generation, input, 300_000) do
       {:ok, %{code: code}} -> {:ok, code}
       {:error, reason} -> {:error, reason}
     end

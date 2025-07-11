@@ -392,6 +392,7 @@ defmodule RubberDuck.LLM.Service do
          {:ok, messages} <- validate_messages(opts[:messages]),
          {:ok, validated_opts} <- validate_options(opts) do
       provider_name = Map.get(state.model_mapping, model)
+      Logger.debug("Selected provider #{inspect(provider_name)} for model #{model}")
 
       request = %Request{
         id: nil,
@@ -411,6 +412,7 @@ defmodule RubberDuck.LLM.Service do
   defp validate_model(nil, _state), do: {:error, :model_required}
 
   defp validate_model(model, state) do
+    Logger.debug("Validating model #{model}, available models: #{inspect(Map.keys(state.model_mapping))}")
     if Map.has_key?(state.model_mapping, model) do
       {:ok, model}
     else

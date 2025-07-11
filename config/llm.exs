@@ -93,7 +93,7 @@ if config_env() == :dev do
         priority: 2,
         rate_limit: nil,
         max_retries: 3,
-        timeout: 60_000,
+        timeout: 300_000,  # 5 minutes for LLM operations
         options: []
       },
       %{

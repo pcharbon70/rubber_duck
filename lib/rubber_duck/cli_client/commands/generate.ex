@@ -19,26 +19,9 @@ defmodule RubberDuck.CLIClient.Commands.Generate do
       "verbose" => opts[:verbose]
     }
 
-    # Use streaming for generation
-    stream_handler = fn
-      {:start, _} ->
-        unless opts[:quiet], do: IO.write("Generating code... ")
-
-      {:data, chunk} ->
-        unless opts[:quiet], do: IO.write(chunk)
-
-      {:end, "completed"} ->
-        unless opts[:quiet], do: IO.puts("\n\nGeneration complete!")
-
-      {:end, status} ->
-        IO.puts(:stderr, "\nGeneration ended with status: #{status}")
-    end
-
-    case Client.send_streaming_command("generate", params, stream_handler) do
-      {:ok, stream_id} ->
-        # Wait for streaming to complete
-        Process.sleep(100)
-        {:ok, %{type: :generation_result, stream_id: stream_id}}
+    case Client.send_command("generate", params) do
+      {:ok, result} ->
+        {:ok, result}
 
       {:error, reason} ->
         {:error, format_error(reason)}

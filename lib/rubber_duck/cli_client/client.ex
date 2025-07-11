@@ -13,7 +13,7 @@ defmodule RubberDuck.CLIClient.Client do
 
   @default_url "ws://localhost:5555/socket/websocket"
   @reconnect_interval 5_000
-  @timeout 30_000
+  @timeout 300_000  # 5 minutes for LLM operations
 
   defmodule State do
     @moduledoc false
@@ -142,16 +142,16 @@ defmodule RubberDuck.CLIClient.Client do
   @impl true
   def handle_call({:send_command, command, params}, from, state) do
     if state.channel_joined do
-      # Create a unique reference for this request
-      ref = make_ref()
+      # Create a unique request ID
       request_id = generate_request_id()
 
       # Add request_id to params for async result matching
       params_with_id = Map.put(params, "request_id", request_id)
 
       # Send the command to the Transport process
+      ref = make_ref()
       send(state.socket, {:push, "cli:commands", command, params_with_id, ref, self()})
-
+      
       # Store the pending request with both ref (for immediate reply) and request_id (for async result)
       pending_requests =
         state.pending_requests
@@ -283,6 +283,20 @@ defmodule RubberDuck.CLIClient.Client do
   end
 
   @impl true
+  def handle_info({:push_error, ref, reason}, state) do
+    # Handle error from push request
+    case Map.pop(state.pending_requests, ref) do
+      {nil, pending_requests} ->
+        Logger.warning("Received push error for unknown ref: #{inspect(ref)}")
+        {:noreply, %{state | pending_requests: pending_requests}}
+
+      {{from, _command}, pending_requests} ->
+        GenServer.reply(from, {:error, reason})
+        {:noreply, %{state | pending_requests: pending_requests}}
+    end
+  end
+
+  @impl true
   def handle_info({:push_reply, ref, payload}, state) do
     # Handle reply from a push request
     case Map.get(state.pending_requests, ref) do
@@ -339,19 +353,6 @@ defmodule RubberDuck.CLIClient.Client do
     {:noreply, state}
   end
 
-  @impl true
-  def handle_info({:push_error, ref, reason}, state) do
-    # Handle error from a push request
-    case Map.pop(state.pending_requests, ref) do
-      {nil, pending_requests} ->
-        Logger.warning("Received push error for unknown ref: #{inspect(ref)}")
-        {:noreply, %{state | pending_requests: pending_requests}}
-
-      {{from, _command}, pending_requests} ->
-        GenServer.reply(from, {:error, reason})
-        {:noreply, %{state | pending_requests: pending_requests}}
-    end
-  end
 
   @impl true
   def handle_info(msg, state) do

@@ -1,11 +1,12 @@
-# RubberDuck Implementation Plan - Part 2 (Phases 5-7)
+# RubberDuck Implementation Plan - Part 2 (Phases 5-8)
 
-This document contains the detailed implementation plans for Phases 5-7 of the RubberDuck project. For the overall project status and Phases 1-4, see the [main implementation plan](implementation_plan.md).
+This document contains the detailed implementation plans for Phases 5-8 of the RubberDuck project. For the overall project status and Phases 1-4, see the [main implementation plan](implementation_plan.md).
 
 ## Table of Contents
 5. [Phase 5: Real-time Communication & UI](#phase-5-real-time-communication--ui)
 6. [Phase 6: Planning Enhancement System](#phase-6-planning-enhancement-system)
-7. [Phase 7: Advanced Features & Production Readiness](#phase-7-advanced-features--production-readiness)
+7. [Phase 7: MCP (Model Context Protocol) Integration](#phase-7-mcp-model-context-protocol-integration)
+8. [Phase 8: Advanced Features & Production Readiness](#phase-8-advanced-features--production-readiness)
 
 ---
 
@@ -225,35 +226,137 @@ Created comprehensive tests:
 
 **Note**: Successfully transformed CLI from mix tasks to WebSocket client, providing instant command execution without compilation, persistent server connection, real-time streaming, and distributable binary. See `notes/websocket-cli-feature.md` for implementation details.
 
-### 5.4 TUI (Terminal UI) Implementation
+### 5.4 TUI (Terminal UI) Implementation with Go and Bubble Tea
 
-Build a rich terminal user interface for interactive coding sessions.
+Build a modern terminal user interface using Go and the Bubble Tea framework, leveraging the Elm Architecture for predictable state management and seamless Phoenix WebSocket integration.
 
 #### Tasks:
-- [ ] 5.4.1 Add Ratatouille dependency for TUI
-- [ ] 5.4.2 Create `RubberDuck.TUI` application
-- [ ] 5.4.3 Implement layout components:
-  - [ ] 5.4.3.1 Code editor pane
-  - [ ] 5.4.3.2 File tree sidebar
-  - [ ] 5.4.3.3 Output/results pane
-  - [ ] 5.4.3.4 Status bar
-- [ ] 5.4.4 Add syntax highlighting in terminal
-- [ ] 5.4.5 Implement keyboard navigation
-- [ ] 5.4.6 Create modal dialogs
-- [ ] 5.4.7 Add split pane support
-- [ ] 5.4.8 Implement terminal resizing handling
-- [ ] 5.4.9 Build command palette
-- [ ] 5.4.10 Add mouse support where available
+
+**Project Setup and Dependencies:**
+- [ ] 5.4.1 Create Go module `github.com/rubber_duck/tui`
+- [ ] 5.4.2 Add dependencies to `go.mod`:
+  - [ ] 5.4.2.1 `github.com/charmbracelet/bubbletea` - Core TUI framework
+  - [ ] 5.4.2.2 `github.com/charmbracelet/bubbles` - Component library
+  - [ ] 5.4.2.3 `github.com/charmbracelet/lipgloss` - Styling system
+  - [ ] 5.4.2.4 `github.com/nshafer/phx` - Phoenix channels client
+  - [ ] 5.4.2.5 `github.com/alecthomas/chroma` - Syntax highlighting
+- [ ] 5.4.3 Set up project structure:
+  - [ ] 5.4.3.1 `cmd/rubber_duck_tui/main.go` - Entry point
+  - [ ] 5.4.3.2 `internal/ui/` - UI components
+  - [ ] 5.4.3.3 `internal/phoenix/` - WebSocket integration
+  - [ ] 5.4.3.4 `internal/commands/` - Command system
+
+**Core Architecture Implementation:**
+- [ ] 5.4.4 Implement base Model-Update-View architecture:
+  - [ ] 5.4.4.1 Define `Model` struct with application state
+  - [ ] 5.4.4.2 Create message types for all events
+  - [ ] 5.4.4.3 Implement `Update` function for state transitions
+  - [ ] 5.4.4.4 Build `View` function with Lipgloss layouts
+- [ ] 5.4.5 Create state management system:
+  - [ ] 5.4.5.1 File tree state and operations
+  - [ ] 5.4.5.2 Editor state with content tracking
+  - [ ] 5.4.5.3 Output pane state for results
+  - [ ] 5.4.5.4 WebSocket connection state
+  - [ ] 5.4.5.5 Analysis and generation state
+
+**Phoenix WebSocket Integration:**
+- [ ] 5.4.6 Implement Phoenix channel client:
+  - [ ] 5.4.6.1 Connection management with auto-reconnect
+  - [ ] 5.4.6.2 Channel join/leave operations
+  - [ ] 5.4.6.3 Message serialization/deserialization
+  - [ ] 5.4.6.4 Event subscription system
+- [ ] 5.4.7 Create WebSocket command adapters:
+  - [ ] 5.4.7.1 File analysis commands
+  - [ ] 5.4.7.2 Code generation commands
+  - [ ] 5.4.7.3 Completion requests
+  - [ ] 5.4.7.4 Refactoring operations
+- [ ] 5.4.8 Implement streaming support:
+  - [ ] 5.4.8.1 Stream start/data/end message handling
+  - [ ] 5.4.8.2 Progressive output rendering
+  - [ ] 5.4.8.3 Stream cancellation
+  - [ ] 5.4.8.4 Error recovery
+
+**UI Component Development:**
+- [ ] 5.4.9 Build file tree component:
+  - [ ] 5.4.9.1 Recursive tree rendering with Lipgloss
+  - [ ] 5.4.9.2 Expand/collapse functionality
+  - [ ] 5.4.9.3 File type icons and styling
+  - [ ] 5.4.9.4 Keyboard navigation (j/k, enter)
+  - [ ] 5.4.9.5 File selection events
+- [ ] 5.4.10 Create code editor component:
+  - [ ] 5.4.10.1 Integrate Bubbles textarea
+  - [ ] 5.4.10.2 Syntax highlighting with Chroma
+  - [ ] 5.4.10.3 Line numbers and cursor position
+  - [ ] 5.4.10.4 Content change tracking
+  - [ ] 5.4.10.5 Auto-save functionality
+- [ ] 5.4.11 Implement output/results pane:
+  - [ ] 5.4.11.1 Scrollable viewport with Bubbles
+  - [ ] 5.4.11.2 Formatted analysis results
+  - [ ] 5.4.11.3 Error display with styling
+  - [ ] 5.4.11.4 Progress indicators
+  - [ ] 5.4.11.5 Clear and filter options
+- [ ] 5.4.12 Build command palette:
+  - [ ] 5.4.12.1 Fuzzy search with text input
+  - [ ] 5.4.12.2 Command list with descriptions
+  - [ ] 5.4.12.3 Keyboard shortcuts display
+  - [ ] 5.4.12.4 Command execution system
+  - [ ] 5.4.12.5 Recent commands history
+
+**Layout and Navigation:**
+- [ ] 5.4.13 Implement responsive layout system:
+  - [ ] 5.4.13.1 Three-pane layout with Lipgloss
+  - [ ] 5.4.13.2 Dynamic width calculation
+  - [ ] 5.4.13.3 Terminal resize handling
+  - [ ] 5.4.13.4 Minimum size constraints
+- [ ] 5.4.14 Create navigation system:
+  - [ ] 5.4.14.1 Tab cycling between panes
+  - [ ] 5.4.14.2 Vim-style navigation keys
+  - [ ] 5.4.14.3 Focus indicators
+  - [ ] 5.4.14.4 Mouse support where available
+- [ ] 5.4.15 Add status bar:
+  - [ ] 5.4.15.1 Connection status indicator
+  - [ ] 5.4.15.2 Current file path
+  - [ ] 5.4.15.3 Operation progress
+  - [ ] 5.4.15.4 Key hints
+
+**Advanced Features:**
+- [ ] 5.4.16 Implement modal dialogs:
+  - [ ] 5.4.16.1 Confirmation dialogs
+  - [ ] 5.4.16.2 Input prompts
+  - [ ] 5.4.16.3 Settings dialog
+  - [ ] 5.4.16.4 Help overlay
+- [ ] 5.4.17 Add theming support:
+  - [ ] 5.4.17.1 Color scheme definitions
+  - [ ] 5.4.17.2 Dark/light mode toggle
+  - [ ] 5.4.17.3 Custom style configuration
+- [ ] 5.4.18 Create performance optimizations:
+  - [ ] 5.4.18.1 Render caching for static components
+  - [ ] 5.4.18.2 Debounced file operations
+  - [ ] 5.4.18.3 Lazy loading for large files
+  - [ ] 5.4.18.4 Virtual scrolling for file tree
 
 #### Unit Tests:
-Create tests in `test/rubber_duck/tui_test.exs` to verify:
-- [ ] 5.4.11 Test initial layout structure
-- [ ] 5.4.12 Test keyboard navigation between panes
-- [ ] 5.4.13 Test command palette opening
-- [ ] 5.4.14 Test file selection updates editor
-- [ ] 5.4.15 Test rendering all panes correctly
-- [ ] 5.4.16 Test terminal resize handling
-- [ ] 5.4.17 Test modal dialog display
+Create tests in `tui/internal/ui/*_test.go` files to verify:
+- [ ] 5.4.19 Test Model initialization and state
+- [ ] 5.4.20 Test Update function message handling
+- [ ] 5.4.21 Test View rendering without errors
+- [ ] 5.4.22 Test WebSocket connection lifecycle
+- [ ] 5.4.23 Test file tree navigation operations
+- [ ] 5.4.24 Test editor content synchronization
+- [ ] 5.4.25 Test command palette filtering
+- [ ] 5.4.26 Test layout calculations
+- [ ] 5.4.27 Test keyboard shortcut handling
+- [ ] 5.4.28 Test error recovery mechanisms
+
+#### Integration Tests:
+Create tests in `tui/test/integration_test.go` to verify:
+- [ ] 5.4.29 Test full TUI startup and initialization
+- [ ] 5.4.30 Test Phoenix channel communication
+- [ ] 5.4.31 Test file analysis workflow
+- [ ] 5.4.32 Test code generation streaming
+- [ ] 5.4.33 Test concurrent operations
+- [ ] 5.4.34 Test reconnection after disconnect
+- [ ] 5.4.35 Test state persistence
 
 ### Phase 5 Integration Tests
 
@@ -443,238 +546,524 @@ Create a domain-specific language for defining plans using the Spark framework.
 
 ---
 
-## Phase 7: Advanced Features & Production Readiness
+
+## Phase 7: MCP (Model Context Protocol) Integration
+
+This phase implements comprehensive Model Context Protocol (MCP) support, enabling RubberDuck to connect with a vast ecosystem of external tools and data sources while exposing its own capabilities through standardized interfaces. MCP acts as a universal adapter for AI systems, solving the integration complexity problem and enabling powerful new workflows.
+
+### 7.1 MCP Client Implementation
+
+Implement the MCP client infrastructure using Hermes MCP, enabling RubberDuck to connect to and utilize external MCP servers for enhanced functionality.
+
+#### Tasks:
+- [ ] 7.1.1 Add Hermes MCP dependency to mix.exs
+- [ ] 7.1.2 Create `RubberDuck.MCP.Client` module structure
+- [ ] 7.1.3 Implement transport adapters:
+  - [ ] 7.1.3.1 STDIO transport for local MCP servers
+  - [ ] 7.1.3.2 HTTP/SSE transport for remote servers
+  - [ ] 7.1.3.3 WebSocket transport for real-time connections
+- [ ] 7.1.4 Build client supervisor with OTP patterns:
+  - [ ] 7.1.4.1 DynamicSupervisor for client spawning
+  - [ ] 7.1.4.2 Registry for client tracking
+  - [ ] 7.1.4.3 Connection pool management
+- [ ] 7.1.5 Create capability negotiation:
+  - [ ] 7.1.5.1 Tool discovery
+  - [ ] 7.1.5.2 Resource enumeration
+  - [ ] 7.1.5.3 Prompt template retrieval
+- [ ] 7.1.6 Implement authentication mechanisms:
+  - [ ] 7.1.6.1 OAuth 2.1 support
+  - [ ] 7.1.6.2 API key authentication
+  - [ ] 7.1.6.3 Certificate-based auth
+- [ ] 7.1.7 Add client health monitoring:
+  - [ ] 7.1.7.1 Heartbeat implementation
+  - [ ] 7.1.7.2 Automatic reconnection
+  - [ ] 7.1.7.3 Circuit breaker per server
+- [ ] 7.1.8 Create request/response correlation
+- [ ] 7.1.9 Implement client-side caching
+- [ ] 7.1.10 Add telemetry for MCP operations
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/mcp/client_test.exs` to verify:
+- [ ] 7.1.11 Test client initialization with different transports
+- [ ] 7.1.12 Test capability negotiation protocol
+- [ ] 7.1.13 Test tool discovery and invocation
+- [ ] 7.1.14 Test resource access patterns
+- [ ] 7.1.15 Test authentication flows
+- [ ] 7.1.16 Test reconnection on disconnect
+- [ ] 7.1.17 Test concurrent requests handling
+- [ ] 7.1.18 Test circuit breaker behavior
+
+### 7.2 MCP Server Implementation
+
+Create RubberDuck's own MCP server to expose its capabilities as standardized tools that other AI systems can leverage.
+
+#### Tasks:
+- [ ] 7.2.1 Create `RubberDuck.MCP.Server` module
+- [ ] 7.2.2 Implement server transports:
+  - [ ] 7.2.2.1 STDIO server for local access
+  - [ ] 7.2.2.2 HTTP/SSE server with Plug
+  - [ ] 7.2.2.3 WebSocket server integration
+- [ ] 7.2.3 Build tool exposure framework:
+  - [ ] 7.2.3.1 AST parsing tools
+  - [ ] 7.2.3.2 Code analysis tools
+  - [ ] 7.2.3.3 Code generation tools
+  - [ ] 7.2.3.4 Memory access tools
+- [ ] 7.2.4 Create resource providers:
+  - [ ] 7.2.4.1 Project file resources
+  - [ ] 7.2.4.2 Analysis result resources
+  - [ ] 7.2.4.3 Memory context resources
+- [ ] 7.2.5 Implement prompt templates:
+  - [ ] 7.2.5.1 Code review prompts
+  - [ ] 7.2.5.2 Refactoring prompts
+  - [ ] 7.2.5.3 Documentation prompts
+- [ ] 7.2.6 Add server authorization:
+  - [ ] 7.2.6.1 Per-tool permissions
+  - [ ] 7.2.6.2 Resource access control
+  - [ ] 7.2.6.3 Rate limiting per client
+- [ ] 7.2.7 Create server health endpoints
+- [ ] 7.2.8 Implement server-side logging
+- [ ] 7.2.9 Add connection management
+- [ ] 7.2.10 Build server configuration DSL
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/mcp/server_test.exs` to verify:
+- [ ] 7.2.11 Test server initialization and startup
+- [ ] 7.2.12 Test tool registration and exposure
+- [ ] 7.2.13 Test resource provider functionality
+- [ ] 7.2.14 Test authorization enforcement
+- [ ] 7.2.15 Test concurrent client handling
+- [ ] 7.2.16 Test rate limiting behavior
+- [ ] 7.2.17 Test health check responses
+
+### 7.3 MCP Tool Registry
+
+Build a comprehensive registry system for managing MCP tools from various sources with capability-based discovery.
+
+#### Tasks:
+- [ ] 7.3.1 Create `RubberDuck.MCP.Registry` module
+- [ ] 7.3.2 Implement tool cataloging:
+  - [ ] 7.3.2.1 Internal tool registration
+  - [ ] 7.3.2.2 External tool discovery
+  - [ ] 7.3.2.3 Tool metadata storage
+- [ ] 7.3.3 Build capability indexing:
+  - [ ] 7.3.3.1 Semantic capability matching
+  - [ ] 7.3.3.2 Input/output type tracking
+  - [ ] 7.3.3.3 Performance characteristics
+- [ ] 7.3.4 Create tool composition engine:
+  - [ ] 7.3.4.1 Sequential tool chaining
+  - [ ] 7.3.4.2 Parallel tool execution
+  - [ ] 7.3.4.3 Conditional tool selection
+- [ ] 7.3.5 Add tool versioning support
+- [ ] 7.3.6 Implement tool quality metrics:
+  - [ ] 7.3.6.1 Success rate tracking
+  - [ ] 7.3.6.2 Latency monitoring
+  - [ ] 7.3.6.3 Error rate analysis
+- [ ] 7.3.7 Create tool recommendation system
+- [ ] 7.3.8 Build tool testing framework
+- [ ] 7.3.9 Add tool documentation generator
+- [ ] 7.3.10 Implement tool deprecation handling
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/mcp/registry_test.exs` to verify:
+- [ ] 7.3.11 Test tool registration and retrieval
+- [ ] 7.3.12 Test capability-based discovery
+- [ ] 7.3.13 Test tool composition patterns
+- [ ] 7.3.14 Test quality metrics tracking
+- [ ] 7.3.15 Test recommendation accuracy
+- [ ] 7.3.16 Test version compatibility
+
+### 7.4 MCP Integration with Existing Systems
+
+Create seamless integration between MCP and RubberDuck's existing architecture, enhancing rather than replacing current functionality.
+
+#### Tasks:
+- [ ] 7.4.1 Integrate with LLM providers:
+  - [ ] 7.4.1.1 Add MCP to provider abstraction
+  - [ ] 7.4.1.2 Expose provider capabilities via MCP
+  - [ ] 7.4.1.3 Enable MCP-based provider selection
+- [ ] 7.4.2 Connect to memory system:
+  - [ ] 7.4.2.1 Expose memory as MCP resources
+  - [ ] 7.4.2.2 Enable MCP tool memory updates
+  - [ ] 7.4.2.3 Create memory synchronization
+- [ ] 7.4.3 Enhance workflow system:
+  - [ ] 7.4.3.1 Add MCP tool steps to Reactor
+  - [ ] 7.4.3.2 Create MCP-aware workflows
+  - [ ] 7.4.3.3 Enable dynamic MCP tool selection
+- [ ] 7.4.4 Extend engine system:
+  - [ ] 7.4.4.1 Create MCP engine adapter
+  - [ ] 7.4.4.2 Enable engines as MCP tools
+  - [ ] 7.4.4.3 Add MCP-based engine discovery
+- [ ] 7.4.5 Update context building:
+  - [ ] 7.4.5.1 Include MCP tool states
+  - [ ] 7.4.5.2 Add MCP resource context
+  - [ ] 7.4.5.3 Enable MCP-aware prompts
+- [ ] 7.4.6 Enhance agent system:
+  - [ ] 7.4.6.1 Give agents MCP tool access
+  - [ ] 7.4.6.2 Create MCP-specialized agents
+  - [ ] 7.4.6.3 Enable agent tool learning
+- [ ] 7.4.7 Update CLI for MCP commands
+- [ ] 7.4.8 Add LiveView MCP tool browser
+- [ ] 7.4.9 Create MCP debugging tools
+- [ ] 7.4.10 Build integration test suite
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/mcp/integration_test.exs` to verify:
+- [ ] 7.4.11 Test LLM provider MCP integration
+- [ ] 7.4.12 Test memory system integration
+- [ ] 7.4.13 Test workflow MCP steps
+- [ ] 7.4.14 Test engine MCP adaptation
+- [ ] 7.4.15 Test context enhancement
+- [ ] 7.4.16 Test agent MCP usage
+- [ ] 7.4.17 Test end-to-end MCP flows
+
+### 7.5 MCP Security & Performance
+
+Implement comprehensive security measures and performance optimizations for MCP integration.
+
+#### Tasks:
+- [ ] 7.5.1 Implement security measures:
+  - [ ] 7.5.1.1 Input validation for all MCP calls
+  - [ ] 7.5.1.2 Command injection prevention
+  - [ ] 7.5.1.3 Path traversal protection
+  - [ ] 7.5.1.4 Secrets management
+- [ ] 7.5.2 Add authentication layer:
+  - [ ] 7.5.2.1 mTLS for server connections
+  - [ ] 7.5.2.2 JWT token validation
+  - [ ] 7.5.2.3 API key rotation
+- [ ] 7.5.3 Create audit logging:
+  - [ ] 7.5.3.1 Tool invocation tracking
+  - [ ] 7.5.3.2 Resource access logging
+  - [ ] 7.5.3.3 Security event monitoring
+- [ ] 7.5.4 Implement performance optimization:
+  - [ ] 7.5.4.1 Connection pooling
+  - [ ] 7.5.4.2 Request batching
+  - [ ] 7.5.4.3 Result caching
+  - [ ] 7.5.4.4 Lazy loading
+- [ ] 7.5.5 Add rate limiting:
+  - [ ] 7.5.5.1 Per-tool rate limits
+  - [ ] 7.5.5.2 Global rate limiting
+  - [ ] 7.5.5.3 Adaptive throttling
+- [ ] 7.5.6 Create monitoring dashboard:
+  - [ ] 7.5.6.1 MCP metrics visualization
+  - [ ] 7.5.6.2 Performance analytics
+  - [ ] 7.5.6.3 Security alerts
+- [ ] 7.5.7 Implement failover strategies
+- [ ] 7.5.8 Add request prioritization
+- [ ] 7.5.9 Create security scanner
+- [ ] 7.5.10 Build performance profiler
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/mcp/security_test.exs` to verify:
+- [ ] 7.5.11 Test input validation effectiveness
+- [ ] 7.5.12 Test injection attack prevention
+- [ ] 7.5.13 Test authentication mechanisms
+- [ ] 7.5.14 Test audit logging completeness
+- [ ] 7.5.15 Test rate limiting enforcement
+- [ ] 7.5.16 Test performance under load
+- [ ] 7.5.17 Test failover behavior
+
+### 7.6 Advanced MCP Patterns
+
+Implement sophisticated MCP usage patterns that showcase the protocol's full potential for AI-assisted development.
+
+#### Tasks:
+- [ ] 7.6.1 Create multi-tool workflows:
+  - [ ] 7.6.1.1 GitHub + AWS integration
+  - [ ] 7.6.1.2 Database + API composition
+  - [ ] 7.6.1.3 Browser + Code analysis
+- [ ] 7.6.2 Build reactive MCP systems:
+  - [ ] 7.6.2.1 Event-driven tool activation
+  - [ ] 7.6.2.2 Proactive context updates
+  - [ ] 7.6.2.3 Automatic tool suggestions
+- [ ] 7.6.3 Implement sampling patterns:
+  - [ ] 7.6.3.1 Tool-initiated LLM calls
+  - [ ] 7.6.3.2 Iterative refinement loops
+  - [ ] 7.6.3.3 Multi-step reasoning
+- [ ] 7.6.4 Create federated MCP networks:
+  - [ ] 7.6.4.1 Cross-server tool sharing
+  - [ ] 7.6.4.2 Distributed tool execution
+  - [ ] 7.6.4.3 Consensus mechanisms
+- [ ] 7.6.5 Build MCP marketplace integration:
+  - [ ] 7.6.5.1 Tool discovery service
+  - [ ] 7.6.5.2 Quality ratings
+  - [ ] 7.6.5.3 Usage analytics
+- [ ] 7.6.6 Add MCP-based plugins
+- [ ] 7.6.7 Create MCP workflow templates
+- [ ] 7.6.8 Implement MCP best practices
+- [ ] 7.6.9 Build MCP testing harness
+- [ ] 7.6.10 Create MCP documentation
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/mcp/advanced_test.exs` to verify:
+- [ ] 7.6.11 Test multi-tool coordination
+- [ ] 7.6.12 Test reactive system behavior
+- [ ] 7.6.13 Test sampling pattern execution
+- [ ] 7.6.14 Test federated operations
+- [ ] 7.6.15 Test marketplace integration
+- [ ] 7.6.16 Test advanced error handling
+
+### Phase 7 Integration Tests
+
+Create comprehensive integration tests in `test/integration/phase_7_test.exs` to verify:
+- [ ] 7.7.1 Test complete MCP client-server communication
+- [ ] 7.7.2 Test tool discovery and invocation pipeline
+- [ ] 7.7.3 Test MCP integration with existing systems
+- [ ] 7.7.4 Test security measures effectiveness
+- [ ] 7.7.5 Test performance optimization impact
+- [ ] 7.7.6 Test advanced pattern implementations
+- [ ] 7.7.7 Test multi-server MCP scenarios
+- [ ] 7.7.8 Test MCP-enhanced code generation quality
+- [ ] 7.7.9 Test MCP tool composition workflows
+- [ ] 7.7.10 Test failover and recovery mechanisms
+
+---
+
+## Phase 8: Advanced Features & Production Readiness
 
 This final phase implements production-critical features including background job processing, security measures, deployment configurations, and performance optimizations. This phase ensures the system is ready for real-world usage at scale.
 
-### 7.1 Background Job Processing with Oban
+### 8.1 Background Job Processing with Oban
 
 Implement asynchronous job processing for resource-intensive operations like project indexing and batch analysis.
 
 #### Tasks:
-- [ ] 7.1.1 Add Oban dependency and configuration
-- [ ] 7.1.2 Create Oban database migrations
-- [ ] 7.1.3 Set up job queues:
-  - [ ] 7.1.3.1 `:indexing` - File and project indexing
-  - [ ] 7.1.3.2 `:analysis` - Code analysis jobs
-  - [ ] 7.1.3.3 `:generation` - Batch code generation
-  - [ ] 7.1.3.4 `:notification` - User notifications
-- [ ] 7.1.4 Implement job workers:
-  - [ ] 7.1.4.1 `ProjectIndexer` - Index entire projects
-  - [ ] 7.1.4.2 `FileAnalyzer` - Analyze individual files
-  - [ ] 7.1.4.3 `BatchGenerator` - Generate multiple files
-  - [ ] 7.1.4.4 `ReportGenerator` - Create analysis reports
-- [ ] 7.1.5 Add job scheduling for periodic tasks
-- [ ] 7.1.6 Implement job progress tracking
-- [ ] 7.1.7 Create job retry strategies
-- [ ] 7.1.8 Build job monitoring dashboard
-- [ ] 7.1.9 Add job priority system
-- [ ] 7.1.10 Set up job telemetry
+- [ ] 8.1.1 Add Oban dependency and configuration
+- [ ] 8.1.2 Create Oban database migrations
+- [ ] 8.1.3 Set up job queues:
+  - [ ] 8.1.3.1 `:indexing` - File and project indexing
+  - [ ] 8.1.3.2 `:analysis` - Code analysis jobs
+  - [ ] 8.1.3.3 `:generation` - Batch code generation
+  - [ ] 8.1.3.4 `:notification` - User notifications
+- [ ] 8.1.4 Implement job workers:
+  - [ ] 8.1.4.1 `ProjectIndexer` - Index entire projects
+  - [ ] 8.1.4.2 `FileAnalyzer` - Analyze individual files
+  - [ ] 8.1.4.3 `BatchGenerator` - Generate multiple files
+  - [ ] 8.1.4.4 `ReportGenerator` - Create analysis reports
+- [ ] 8.1.5 Add job scheduling for periodic tasks
+- [ ] 8.1.6 Implement job progress tracking
+- [ ] 8.1.7 Create job retry strategies
+- [ ] 8.1.8 Build job monitoring dashboard
+- [ ] 8.1.9 Add job priority system
+- [ ] 8.1.10 Set up job telemetry
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/workers/` directory to verify:
 
 **ProjectIndexer Tests** (`project_indexer_test.exs`):
-- [ ] 7.1.11 Test indexing all project files
-- [ ] 7.1.12 Test handling large projects with batching
-- [ ] 7.1.13 Test recovery from partial failures
-- [ ] 7.1.14 Test progress tracking updates
-- [ ] 7.1.15 Test file change detection
-- [ ] 7.1.16 Test concurrent indexing safety
+- [ ] 8.1.11 Test indexing all project files
+- [ ] 8.1.12 Test handling large projects with batching
+- [ ] 8.1.13 Test recovery from partial failures
+- [ ] 8.1.14 Test progress tracking updates
+- [ ] 8.1.15 Test file change detection
+- [ ] 8.1.16 Test concurrent indexing safety
 
-### 7.2 Security Implementation
+### 8.2 Security Implementation
 
 Implement comprehensive security measures including authentication, authorization, input validation, and rate limiting.
 
 #### Tasks:
-- [ ] 7.2.1 Implement authentication system:
-  - [ ] 7.2.1.1 JWT token generation
-  - [ ] 7.2.1.2 API key management
-  - [ ] 7.2.1.3 OAuth2 integration
-  - [ ] 7.2.1.4 Session management
-- [ ] 7.2.2 Add authorization layer:
-  - [ ] 7.2.2.1 Role-based access control (RBAC)
-  - [ ] 7.2.2.2 Project-level permissions
-  - [ ] 7.2.2.3 Resource-level authorization
-- [ ] 7.2.3 Create input validation:
-  - [ ] 7.2.3.1 Code injection prevention
-  - [ ] 7.2.3.2 Path traversal protection
-  - [ ] 7.2.3.3 Size limits enforcement
-- [ ] 7.2.4 Implement rate limiting:
-  - [ ] 7.2.4.1 Token bucket per user
-  - [ ] 7.2.4.2 Endpoint-specific limits
-  - [ ] 7.2.4.3 DDoS protection
-- [ ] 7.2.5 Add security scanning:
-  - [ ] 7.2.5.1 Dependency vulnerability checks
-  - [ ] 7.2.5.2 Code security analysis
-- [ ] 7.2.6 Set up audit logging
-- [ ] 7.2.7 Implement data encryption at rest
+- [ ] 8.2.1 Implement authentication system:
+  - [ ] 8.2.1.1 JWT token generation
+  - [ ] 8.2.1.2 API key management
+  - [ ] 8.2.1.3 OAuth2 integration
+  - [ ] 8.2.1.4 Session management
+- [ ] 8.2.2 Add authorization layer:
+  - [ ] 8.2.2.1 Role-based access control (RBAC)
+  - [ ] 8.2.2.2 Project-level permissions
+  - [ ] 8.2.2.3 Resource-level authorization
+- [ ] 8.2.3 Create input validation:
+  - [ ] 8.2.3.1 Code injection prevention
+  - [ ] 8.2.3.2 Path traversal protection
+  - [ ] 8.2.3.3 Size limits enforcement
+- [ ] 8.2.4 Implement rate limiting:
+  - [ ] 8.2.4.1 Token bucket per user
+  - [ ] 8.2.4.2 Endpoint-specific limits
+  - [ ] 8.2.4.3 DDoS protection
+- [ ] 8.2.5 Add security scanning:
+  - [ ] 8.2.5.1 Dependency vulnerability checks
+  - [ ] 8.2.5.2 Code security analysis
+- [ ] 8.2.6 Set up audit logging
+- [ ] 8.2.7 Implement data encryption at rest
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/security/` directory:
 
 **Authentication Tests** (`authentication_test.exs`):
-- [ ] 7.2.8 Test JWT token generation and verification
-- [ ] 7.2.9 Test token expiration handling
-- [ ] 7.2.10 Test API key validation
-- [ ] 7.2.11 Test OAuth2 flow
-- [ ] 7.2.12 Test session management
-- [ ] 7.2.13 Test multi-factor authentication
+- [ ] 8.2.8 Test JWT token generation and verification
+- [ ] 8.2.9 Test token expiration handling
+- [ ] 8.2.10 Test API key validation
+- [ ] 8.2.11 Test OAuth2 flow
+- [ ] 8.2.12 Test session management
+- [ ] 8.2.13 Test multi-factor authentication
 
 **Authorization Tests** (`authorization_test.exs`):
-- [ ] 7.2.14 Test project permission enforcement
-- [ ] 7.2.15 Test role-based access
-- [ ] 7.2.16 Test resource-level permissions
-- [ ] 7.2.17 Test permission inheritance
-- [ ] 7.2.18 Test cross-project isolation
-- [ ] 7.2.19 Test admin overrides
+- [ ] 8.2.14 Test project permission enforcement
+- [ ] 8.2.15 Test role-based access
+- [ ] 8.2.16 Test resource-level permissions
+- [ ] 8.2.17 Test permission inheritance
+- [ ] 8.2.18 Test cross-project isolation
+- [ ] 8.2.19 Test admin overrides
 
 **Input Validation Tests** (`validation_test.exs`):
-- [ ] 7.2.20 Test path traversal prevention
-- [ ] 7.2.21 Test code input sanitization
-- [ ] 7.2.22 Test size limit enforcement
-- [ ] 7.2.23 Test injection attack prevention
-- [ ] 7.2.24 Test file type validation
-- [ ] 7.2.25 Test rate limiting
+- [ ] 8.2.20 Test path traversal prevention
+- [ ] 8.2.21 Test code input sanitization
+- [ ] 8.2.22 Test size limit enforcement
+- [ ] 8.2.23 Test injection attack prevention
+- [ ] 8.2.24 Test file type validation
+- [ ] 8.2.25 Test rate limiting
 
-### 7.3 Monitoring and Observability
+### 8.3 Monitoring and Observability
 
 Implement comprehensive monitoring, logging, and observability features for production operations.
 
 #### Tasks:
-- [ ] 7.3.1 Set up Telemetry integration:
-  - [ ] 7.3.1.1 Define telemetry events
-  - [ ] 7.3.1.2 Create metric reporters
-  - [ ] 7.3.1.3 Add custom measurements
-- [ ] 7.3.2 Implement structured logging:
-  - [ ] 7.3.2.1 JSON log formatting
-  - [ ] 7.3.2.2 Log aggregation setup
-  - [ ] 7.3.2.3 Correlation ID tracking
-- [ ] 7.3.3 Create health check endpoints:
-  - [ ] 7.3.3.1 Database connectivity
-  - [ ] 7.3.3.2 LLM provider status
-  - [ ] 7.3.3.3 Memory usage
-  - [ ] 7.3.3.4 Job queue health
-- [ ] 7.3.4 Add performance monitoring:
-  - [ ] 7.3.4.1 Request duration tracking
-  - [ ] 7.3.4.2 Database query analysis
-  - [ ] 7.3.4.3 Memory profiling
-- [ ] 7.3.5 Set up error tracking:
-  - [ ] 7.3.5.1 Sentry integration
-  - [ ] 7.3.5.2 Error aggregation
-  - [ ] 7.3.5.3 Alert configuration
-- [ ] 7.3.6 Build metrics dashboard
-- [ ] 7.3.7 Implement distributed tracing
-- [ ] 7.3.8 Create SLO monitoring
-- [ ] 7.3.9 Add LLM enhancement metrics:
-  - [ ] 7.3.9.1 CoT reasoning quality tracking
-  - [ ] 7.3.9.2 RAG retrieval precision monitoring
-  - [ ] 7.3.9.3 Self-correction effectiveness metrics
-  - [ ] 7.3.9.4 Enhancement technique A/B testing
+- [ ] 8.3.1 Set up Telemetry integration:
+  - [ ] 8.3.1.1 Define telemetry events
+  - [ ] 8.3.1.2 Create metric reporters
+  - [ ] 8.3.1.3 Add custom measurements
+- [ ] 8.3.2 Implement structured logging:
+  - [ ] 8.3.2.1 JSON log formatting
+  - [ ] 8.3.2.2 Log aggregation setup
+  - [ ] 8.3.2.3 Correlation ID tracking
+- [ ] 8.3.3 Create health check endpoints:
+  - [ ] 8.3.3.1 Database connectivity
+  - [ ] 8.3.3.2 LLM provider status
+  - [ ] 8.3.3.3 Memory usage
+  - [ ] 8.3.3.4 Job queue health
+- [ ] 8.3.4 Add performance monitoring:
+  - [ ] 8.3.4.1 Request duration tracking
+  - [ ] 8.3.4.2 Database query analysis
+  - [ ] 8.3.4.3 Memory profiling
+- [ ] 8.3.5 Set up error tracking:
+  - [ ] 8.3.5.1 Sentry integration
+  - [ ] 8.3.5.2 Error aggregation
+  - [ ] 8.3.5.3 Alert configuration
+- [ ] 8.3.6 Build metrics dashboard
+- [ ] 8.3.7 Implement distributed tracing
+- [ ] 8.3.8 Create SLO monitoring
+- [ ] 8.3.9 Add LLM enhancement metrics:
+  - [ ] 8.3.9.1 CoT reasoning quality tracking
+  - [ ] 8.3.9.2 RAG retrieval precision monitoring
+  - [ ] 8.3.9.3 Self-correction effectiveness metrics
+  - [ ] 8.3.9.4 Enhancement technique A/B testing
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/monitoring/` directory:
 
 **Telemetry Tests** (`telemetry_test.exs`):
-- [ ] 7.3.10 Test completion event emission
-- [ ] 7.3.11 Test LLM request latency tracking
-- [ ] 7.3.12 Test custom metric recording
-- [ ] 7.3.13 Test event metadata inclusion
-- [ ] 7.3.14 Test metric aggregation
-- [ ] 7.3.15 Test performance measurements
-- [ ] 7.3.16 Test LLM enhancement metrics
+- [ ] 8.3.10 Test completion event emission
+- [ ] 8.3.11 Test LLM request latency tracking
+- [ ] 8.3.12 Test custom metric recording
+- [ ] 8.3.13 Test event metadata inclusion
+- [ ] 8.3.14 Test metric aggregation
+- [ ] 8.3.15 Test performance measurements
+- [ ] 8.3.16 Test LLM enhancement metrics
 
 **Health Check Tests** (`health_test.exs`):
-- [ ] 7.3.17 Test comprehensive health endpoint
-- [ ] 7.3.18 Test detailed health with issues
-- [ ] 7.3.19 Test individual component checks
-- [ ] 7.3.20 Test health status aggregation
-- [ ] 7.3.21 Test timeout handling
-- [ ] 7.3.22 Test graceful degradation
+- [ ] 8.3.17 Test comprehensive health endpoint
+- [ ] 8.3.18 Test detailed health with issues
+- [ ] 8.3.19 Test individual component checks
+- [ ] 8.3.20 Test health status aggregation
+- [ ] 8.3.21 Test timeout handling
+- [ ] 8.3.22 Test graceful degradation
 
 **Metrics Tests** (`metrics_test.exs`):
-- [ ] 7.3.23 Test request metric tracking
-- [ ] 7.3.24 Test memory usage monitoring
-- [ ] 7.3.25 Test business metric collection
-- [ ] 7.3.26 Test metric persistence
-- [ ] 7.3.27 Test dashboard data aggregation
-- [ ] 7.3.28 Test alert triggering
+- [ ] 8.3.23 Test request metric tracking
+- [ ] 8.3.24 Test memory usage monitoring
+- [ ] 8.3.25 Test business metric collection
+- [ ] 8.3.26 Test metric persistence
+- [ ] 8.3.27 Test dashboard data aggregation
+- [ ] 8.3.28 Test alert triggering
 
-### 7.4 Deployment and Scaling
+### 8.4 Deployment and Scaling
 
 Implement deployment configurations and scaling strategies for production environments.
 
 #### Tasks:
-- [ ] 7.4.1 Create Docker configuration:
-  - [ ] 7.4.1.1 Multi-stage Dockerfile
-  - [ ] 7.4.1.2 Docker Compose setup
-  - [ ] 7.4.1.3 Health check configuration
-  - [ ] 7.4.1.4 Volume management
-- [ ] 7.4.2 Set up Kubernetes deployment:
-  - [ ] 7.4.2.1 Deployment manifests
-  - [ ] 7.4.2.2 Service configuration
-  - [ ] 7.4.2.3 Ingress rules
-  - [ ] 7.4.2.4 ConfigMaps and Secrets
-- [ ] 7.4.3 Implement clustering:
-  - [ ] 7.4.3.1 libcluster configuration
-  - [ ] 7.4.3.2 Node discovery
-  - [ ] 7.4.3.3 Distributed Erlang setup
-  - [ ] 7.4.3.4 State synchronization
-- [ ] 7.4.4 Add horizontal scaling:
-  - [ ] 7.4.4.1 Load balancer configuration
-  - [ ] 7.4.4.2 Session affinity
-  - [ ] 7.4.4.3 Autoscaling rules
-- [ ] 7.4.5 Create database migrations strategy
-- [ ] 7.4.6 Set up blue-green deployment
-- [ ] 7.4.7 Implement feature flags
-- [ ] 7.4.8 Add CDN configuration
-- [ ] 7.4.9 Create backup and restore procedures
+- [ ] 8.4.1 Create Docker configuration:
+  - [ ] 8.4.1.1 Multi-stage Dockerfile
+  - [ ] 8.4.1.2 Docker Compose setup
+  - [ ] 8.4.1.3 Health check configuration
+  - [ ] 8.4.1.4 Volume management
+  - [ ] 8.4.1.5 MCP server containerization
+- [ ] 8.4.2 Set up Kubernetes deployment:
+  - [ ] 8.4.2.1 Deployment manifests
+  - [ ] 8.4.2.2 Service configuration
+  - [ ] 8.4.2.3 Ingress rules
+  - [ ] 8.4.2.4 ConfigMaps and Secrets
+  - [ ] 8.4.2.5 MCP service mesh integration
+- [ ] 8.4.3 Implement clustering:
+  - [ ] 8.4.3.1 libcluster configuration
+  - [ ] 8.4.3.2 Node discovery
+  - [ ] 8.4.3.3 Distributed Erlang setup
+  - [ ] 8.4.3.4 State synchronization
+  - [ ] 8.4.3.5 MCP registry distribution
+- [ ] 8.4.4 Add horizontal scaling:
+  - [ ] 8.4.4.1 Load balancer configuration
+  - [ ] 8.4.4.2 Session affinity
+  - [ ] 8.4.4.3 Autoscaling rules
+  - [ ] 8.4.4.4 MCP connection pooling
+- [ ] 8.4.5 Create database migrations strategy
+- [ ] 8.4.6 Set up blue-green deployment
+- [ ] 8.4.7 Implement feature flags
+- [ ] 8.4.8 Add CDN configuration
+- [ ] 8.4.9 Create backup and restore procedures
+- [ ] 8.4.10 Build disaster recovery plan
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/deployment/` directory:
 
 **Clustering Tests** (`clustering_test.exs`):
-- [ ] 7.4.10 Test node discovery and connection
-- [ ] 7.4.11 Test state synchronization across nodes
-- [ ] 7.4.12 Test node failure handling
-- [ ] 7.4.13 Test load distribution
-- [ ] 7.4.14 Test cluster reformation
-- [ ] 7.4.15 Test split-brain resolution
+- [ ] 8.4.11 Test node discovery and connection
+- [ ] 8.4.12 Test state synchronization across nodes
+- [ ] 8.4.13 Test node failure handling
+- [ ] 8.4.14 Test load distribution
+- [ ] 8.4.15 Test cluster reformation
+- [ ] 8.4.16 Test split-brain resolution
 
 **Deployment Tests** (`deployment_test.exs`):
-- [ ] 7.4.16 Test Docker image build
-- [ ] 7.4.17 Test Kubernetes manifest validity
-- [ ] 7.4.18 Test configuration management
-- [ ] 7.4.19 Test secret handling
-- [ ] 7.4.20 Test rollback procedures
-- [ ] 7.4.21 Test zero-downtime deployment
+- [ ] 8.4.17 Test Docker image build
+- [ ] 8.4.18 Test Kubernetes manifest validity
+- [ ] 8.4.19 Test configuration management
+- [ ] 8.4.20 Test secret handling
+- [ ] 8.4.21 Test rollback procedures
+- [ ] 8.4.22 Test zero-downtime deployment
 
 **Feature Flag Tests** (`feature_flags_test.exs`):
-- [ ] 7.4.22 Test feature toggle functionality
-- [ ] 7.4.23 Test gradual rollout percentages
-- [ ] 7.4.24 Test user-specific flags
-- [ ] 7.4.25 Test flag persistence
-- [ ] 7.4.26 Test A/B testing support
-- [ ] 7.4.27 Test flag inheritance
+- [ ] 8.4.23 Test feature toggle functionality
+- [ ] 8.4.24 Test gradual rollout percentages
+- [ ] 8.4.25 Test user-specific flags
+- [ ] 8.4.26 Test flag persistence
+- [ ] 8.4.27 Test A/B testing support
+- [ ] 8.4.28 Test flag inheritance
 
-### Phase 7 Integration Tests
+### Phase 8 Integration Tests
 
-Create comprehensive integration tests in `test/integration/phase_7_test.exs` to verify:
-- [ ] 7.5.1 Test end-to-end secure workflow with monitoring
-- [ ] 7.5.2 Test high load handling with rate limiting
-- [ ] 7.5.3 Test monitoring captures system health
-- [ ] 7.5.4 Test graceful degradation when services fail
-- [ ] 7.5.5 Test distributed deployment scenario
-- [ ] 7.5.6 Test backup and restore procedures
-- [ ] 7.5.7 Test feature flag integration
+Create comprehensive integration tests in `test/integration/phase_8_test.exs` to verify:
+- [ ] 8.5.1 Test end-to-end secure workflow with monitoring
+- [ ] 8.5.2 Test high load handling with rate limiting
+- [ ] 8.5.3 Test monitoring captures system health
+- [ ] 8.5.4 Test graceful degradation when services fail
+- [ ] 8.5.5 Test distributed deployment scenario
+- [ ] 8.5.6 Test backup and restore procedures
+- [ ] 8.5.7 Test feature flag integration
+- [ ] 8.5.8 Test MCP server scaling
+- [ ] 8.5.9 Test security controls with MCP
+- [ ] 8.5.10 Test production readiness criteria
 
 ### Final System Integration Tests
 
 Create final system tests in `test/integration/complete_system_test.exs` to verify:
-- [ ] 7.6.1 Test full coding assistant workflow from project creation to code generation
-- [ ] 7.6.2 Test system behavior under sustained load
-- [ ] 7.6.3 Test monitoring and alerting pipeline
-- [ ] 7.6.4 Test multi-user collaboration scenarios
-- [ ] 7.6.5 Test disaster recovery procedures
-- [ ] 7.6.6 Test performance meets SLOs
-- [ ] 7.6.7 Test security controls are effective
+- [ ] 8.6.1 Test full coding assistant workflow from project creation to code generation
+- [ ] 8.6.2 Test system behavior under sustained load
+- [ ] 8.6.3 Test monitoring and alerting pipeline
+- [ ] 8.6.4 Test multi-user collaboration scenarios
+- [ ] 8.6.5 Test disaster recovery procedures
+- [ ] 8.6.6 Test performance meets SLOs
+- [ ] 8.6.7 Test security controls are effective
+- [ ] 8.6.8 Test MCP integration enhances code quality
+- [ ] 8.6.9 Test planning system with MCP tools
+- [ ] 8.6.10 Test complete system resilience
+
+---
+

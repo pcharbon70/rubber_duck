@@ -12,7 +12,10 @@ defmodule RubberDuckWeb.Endpoint do
   ]
 
   socket("/socket", RubberDuckWeb.UserSocket,
-    websocket: true,
+    websocket: [
+      connect_info: [:uri, :peer_data],
+      check_origin: false
+    ],
     longpoll: false
   )
 

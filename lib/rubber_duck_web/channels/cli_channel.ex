@@ -79,12 +79,22 @@ defmodule RubberDuckWeb.CLIChannel do
   # Handle generate command
   @impl true
   def handle_in("generate", %{"prompt" => prompt} = params, socket) do
+    Logger.debug("Received generate command with params: #{inspect(params)}")
     socket = increment_request_count(socket)
     request_id = Map.get(params, "request_id")
 
     Task.start_link(fn ->
-      case Commands.Generate.run(%{prompt: prompt}, build_config(params)) do
+      Logger.debug("Running generate command with prompt: #{prompt}")
+      args = %{
+        prompt: prompt,
+        language: String.to_atom(Map.get(params, "language", "elixir")),
+        output: Map.get(params, "output"),
+        context: Map.get(params, "context"),
+        interactive: Map.get(params, "interactive", false)
+      }
+      case Commands.Generate.run(args, build_config(params)) do
         {:ok, result} ->
+          Logger.debug("Generate command succeeded, sending result with request_id: #{request_id}")
           push(socket, "generate:result", %{
             status: "success",
             result: result,
@@ -92,9 +102,11 @@ defmodule RubberDuckWeb.CLIChannel do
           })
 
         {:error, reason} ->
+          Logger.error("Generate command failed: #{inspect(reason)}, request_id: #{request_id}")
+          error_message = format_error_reason(reason)
           push(socket, "generate:error", %{
             status: "error",
-            reason: to_string(reason),
+            reason: error_message,
             request_id: request_id
           })
       end
@@ -264,6 +276,13 @@ defmodule RubberDuckWeb.CLIChannel do
     }
 
     {:reply, {:ok, stats}, socket}
+  end
+
+  # Catch-all handler for debugging
+  @impl true
+  def handle_in(event, params, socket) do
+    Logger.warning("Unhandled CLI channel event: #{event}, params: #{inspect(params)}")
+    {:reply, {:error, %{reason: "Unknown command: #{event}"}}, socket}
   end
 
   # Private functions
@@ -498,4 +517,16 @@ defmodule RubberDuckWeb.CLIChannel do
         []
     end
   end
+
+  defp format_error_reason(reason) when is_binary(reason), do: reason
+  defp format_error_reason(reason) when is_atom(reason), do: to_string(reason)
+  defp format_error_reason(reason) when is_list(reason) do
+    # Try to convert if it's a charlist
+    try do
+      List.to_string(reason)
+    rescue
+      _ -> inspect(reason)
+    end
+  end
+  defp format_error_reason(reason), do: inspect(reason)
 end

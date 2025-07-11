@@ -101,14 +101,20 @@ defmodule RubberDuck.Engines.Generation do
 
   @impl true
   def execute(input, state) do
+    Logger.debug("Generation engine execute called with input: #{inspect(input)}")
+    
     with {:ok, validated_input} <- validate_input(input),
+         _ = Logger.debug("Validated input: #{inspect(validated_input)}"),
          {:ok, rag_context} <- retrieve_context(validated_input, state),
+         _ = Logger.debug("Retrieved RAG context with #{length(rag_context.items)} items"),
          {:ok, prompt} <- build_generation_prompt(validated_input, rag_context, state),
+         _ = Logger.debug("Built prompt (#{String.length(prompt)} chars)"),
          {:ok, generated} <- generate_code(prompt, validated_input, state),
+         _ = Logger.debug("Generated code: #{inspect(generated)}"),
          {:ok, validated} <- validate_generated_code(generated, validated_input, state),
          {:ok, enhanced} <- enhance_with_imports(validated, validated_input, state) do
       # Update history
-      updated_state = update_history(state, validated_input.prompt, enhanced.code)
+      _updated_state = update_history(state, validated_input.prompt, enhanced.code)
 
       # Emit telemetry
       :telemetry.execute(
@@ -117,7 +123,11 @@ defmodule RubberDuck.Engines.Generation do
         %{language: validated_input.language}
       )
 
-      {:ok, %{result: enhanced, state: updated_state}}
+      {:ok, enhanced}
+    else
+      error ->
+        Logger.error("Generation engine error: #{inspect(error)}")
+        error
     end
   end
 
@@ -508,6 +518,8 @@ defmodule RubberDuck.Engines.Generation do
 
   defp generate_code(prompt, input, state) do
     # Call LLM service to generate code
+    Logger.debug("Calling LLM service for code generation")
+    
     opts = [
       model: get_model_for_language(input.language),
       messages: [
@@ -515,11 +527,15 @@ defmodule RubberDuck.Engines.Generation do
         %{"role" => "user", "content" => prompt}
       ],
       temperature: state.config[:temperature] || 0.7,
-      max_tokens: state.config[:max_tokens] || 4096
+      max_tokens: state.config[:max_tokens] || 4096,
+      timeout: 280_000  # 4.5 minutes, slightly less than the 5 minute engine timeout
     ]
+    
+    Logger.debug("LLM request options: #{inspect(opts)}")
 
     case RubberDuck.LLM.Service.completion(opts) do
       {:ok, response} ->
+        Logger.debug("LLM response received: #{inspect(response)}")
         generated_code = extract_code_from_response(response, input.language)
 
         result = %{
