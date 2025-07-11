@@ -43,7 +43,9 @@ defmodule RubberDuck.Analysis.Security do
         ~r/api[_-]?key/i,
         ~r/token/i,
         ~r/private[_-]?key/i
-      ]
+      ],
+      analyze_call_chains: true,
+      check_input_validation: true
     }
   end
 
@@ -60,6 +62,8 @@ defmodule RubberDuck.Analysis.Security do
       |> Enum.concat(analyze_sql_injection_risks(ast_info, config))
       |> Enum.concat(analyze_potential_xss(ast_info, config))
       |> Enum.concat(analyze_process_spawning(ast_info, config))
+      |> Enum.concat(analyze_call_chains(ast_info, config))
+      |> Enum.concat(analyze_input_validation(ast_info, config))
 
     # Calculate security metrics
     metrics = calculate_security_metrics(ast_info, issues)
@@ -557,5 +561,165 @@ defmodule RubberDuck.Analysis.Security do
       end)
 
     Enum.concat(ast_info.calls, function_calls)
+  end
+
+  # Enhanced call chain analysis for security vulnerabilities
+  defp analyze_call_chains(ast_info, config) do
+    if !config[:analyze_call_chains] do
+      []
+    else
+      call_graph = build_security_call_graph(ast_info)
+      
+      # Find paths to dangerous functions
+      dangerous_targets = [
+        {System, :cmd, 2},
+        {:os, :cmd, 1},
+        {Code, :eval_string, 1},
+        {Code, :eval_file, 1},
+        {Code, :eval_quoted, 1},
+        {:erlang, :binary_to_term, 1},
+        {:erlang, :binary_to_term, 2}
+      ]
+      
+      issues = Enum.flat_map(call_graph, fn {from, calls} ->
+        dangerous_calls = Enum.filter(calls, fn call ->
+          call in dangerous_targets
+        end)
+        
+        Enum.map(dangerous_calls, fn dangerous ->
+          func = Enum.find(ast_info.functions, fn f ->
+            f.name == elem(from, 1) && f.arity == elem(from, 2)
+          end)
+          
+          Engine.create_issue(
+            :dangerous_call_chain,
+            :high,
+            "Function #{elem(from, 1)}/#{elem(from, 2)} calls potentially dangerous #{format_call(dangerous)}",
+            %{file: "", line: func && func.line || 0, column: nil, end_line: nil, end_column: nil},
+            "security/dangerous_call",
+            :security,
+            %{
+              caller: from,
+              dangerous_function: dangerous
+            }
+          )
+        end)
+      end)
+      
+      issues
+    end
+  end
+
+  defp build_security_call_graph(ast_info) do
+    all_calls = get_all_calls(ast_info)
+    
+    all_calls
+    |> Enum.group_by(& &1.from)
+    |> Map.new(fn {from, calls} ->
+      {from, Enum.map(calls, & &1.to) |> Enum.uniq()}
+    end)
+  end
+
+  defp format_call({module, function, arity}) do
+    "#{inspect(module)}.#{function}/#{arity}"
+  end
+
+  # Enhanced input validation analysis
+  defp analyze_input_validation(ast_info, config) do
+    if !config[:check_input_validation] do
+      []
+    else
+      # Find variables that might contain user input
+      input_patterns = ~r/(params|input|data|request|body|args)/
+      
+      suspicious_vars = 
+        ast_info.variables
+        |> Enum.filter(fn var ->
+          var.type == :assignment &&
+          Regex.match?(input_patterns, Atom.to_string(var.name))
+        end)
+      
+      # Check if these variables are used in dangerous contexts
+      issues = Enum.flat_map(suspicious_vars, fn var ->
+        check_variable_usage(var, ast_info)
+      end)
+      
+      # Also check for direct parameter usage in dangerous functions
+      param_usage_issues = check_direct_param_usage(ast_info)
+      
+      issues ++ param_usage_issues
+    end
+  end
+
+  defp check_variable_usage(var, ast_info) do
+    # Find where this variable is used
+    usages = 
+      ast_info.variables
+      |> Enum.filter(fn v ->
+        v.name == var.name && v.type == :usage && v.line > var.line
+      end)
+    
+    # Check if any usage is in a dangerous context
+    # This is simplified - real implementation would need data flow analysis
+    if Enum.any?(usages) do
+      [Engine.create_issue(
+        :unvalidated_input,
+        :medium,
+        "Variable '#{var.name}' may contain user input - ensure proper validation",
+        %{file: "", line: var.line, column: var.column, end_line: nil, end_column: nil},
+        "security/input_validation",
+        :security,
+        %{
+          variable: var.name,
+          recommendation: "Validate and sanitize user input before use"
+        }
+      )]
+    else
+      []
+    end
+  end
+
+  defp check_direct_param_usage(ast_info) do
+    # Check functions that might directly use parameters in dangerous ways
+    Enum.flat_map(ast_info.functions, fn func ->
+      # Look for patterns like SQL queries, shell commands, etc.
+      dangerous_patterns = [
+        ~r/Repo\.(query|execute)/,
+        ~r/System\.cmd/,
+        ~r/File\.(read|write)/,
+        ~r/Code\.eval/
+      ]
+      
+      # Simple heuristic: functions with "params" or "input" in parameters
+      if Enum.any?(func.variables || [], fn v -> 
+        v.type == :pattern && Regex.match?(~r/(params|input)/, Atom.to_string(v.name))
+      end) do
+        # Check if function has calls to dangerous functions
+        dangerous_calls = 
+          (func.body_calls || [])
+          |> Enum.filter(fn call ->
+            call_string = format_call(call.to)
+            Enum.any?(dangerous_patterns, &Regex.match?(&1, call_string))
+          end)
+        
+        Enum.map(dangerous_calls, fn call ->
+          Engine.create_issue(
+            :potential_injection,
+            :high,
+            "Function #{func.name}/#{func.arity} may pass user input to #{format_call(call.to)}",
+            %{file: "", line: func.line, column: nil, end_line: nil, end_column: nil},
+            "security/injection_risk",
+            :security,
+            %{
+              function: func.name,
+              dangerous_call: call.to,
+              recommendation: "Ensure proper input validation and parameterization"
+            }
+          )
+        end)
+      else
+        []
+      end
+    end)
   end
 end
