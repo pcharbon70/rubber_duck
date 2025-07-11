@@ -36,7 +36,9 @@ defmodule RubberDuck.Analysis.Semantic do
       max_nesting_depth: 4,
       detect_dead_code: true,
       detect_unused_variables: true,
-      detect_circular_dependencies: true
+      detect_circular_dependencies: true,
+      detect_variable_shadowing: true,
+      analyze_call_patterns: true
     }
   end
 
@@ -52,7 +54,9 @@ defmodule RubberDuck.Analysis.Semantic do
       |> Enum.concat(analyze_complexity(ast_info, config))
       |> Enum.concat(analyze_dependencies(ast_info, config))
       |> Enum.concat(analyze_unused_variables(ast_info, config))
+      |> Enum.concat(analyze_variable_shadowing(ast_info, config))
       |> Enum.concat(analyze_module_cohesion(ast_info, config))
+      |> Enum.concat(analyze_call_patterns(ast_info, config))
 
     # Calculate metrics
     metrics = calculate_metrics(ast_info)
@@ -404,6 +408,157 @@ defmodule RubberDuck.Analysis.Semantic do
         :style,
         %{}
       )
+    end)
+  end
+
+  # Enhanced variable shadowing detection
+  defp analyze_variable_shadowing(ast_info, config) do
+    if !config[:detect_variable_shadowing] do
+      []
+    else
+      # Group all variables by name across all scopes
+      all_variables = 
+        ast_info.variables ++
+        Enum.flat_map(ast_info.functions, fn func -> func.variables || [] end)
+      
+      vars_by_name = Enum.group_by(all_variables, & &1.name)
+      
+      Enum.flat_map(vars_by_name, fn {var_name, vars} ->
+        assignments = Enum.filter(vars, &(&1.type in [:assignment, :pattern]))
+        
+        if length(assignments) > 1 do
+          # Check for actual shadowing based on scope
+          find_shadowing_issues(var_name, assignments, ast_info.name)
+        else
+          []
+        end
+      end)
+    end
+  end
+
+  defp find_shadowing_issues(var_name, assignments, module_name) do
+    # Sort by line number
+    sorted = Enum.sort_by(assignments, & &1.line)
+    
+    # Find actual shadowing cases
+    for {outer, i} <- Enum.with_index(sorted),
+        inner <- Enum.drop(sorted, i + 1),
+        shadows?(outer, inner) do
+      Engine.create_issue(
+        :variable_shadowing,
+        :medium,
+        "Variable '#{var_name}' shadows outer variable defined at line #{outer.line}",
+        %{file: "", line: inner.line, column: inner.column, end_line: nil, end_column: nil},
+        "semantic/variable_shadowing",
+        :maintainability,
+        %{
+          variable: var_name,
+          outer_line: outer.line,
+          inner_line: inner.line,
+          module: module_name
+        }
+      )
+    end
+  end
+
+  defp shadows?(outer, inner) do
+    # Check if inner variable actually shadows outer
+    # This is simplified - proper implementation would need full scope analysis
+    case {outer.scope, inner.scope} do
+      {{:module, _}, {:function, _, _}} -> true
+      {{:function, f1, a1}, {:function, f2, a2}} when {f1, a1} != {f2, a2} -> false
+      _ -> outer.line < inner.line
+    end
+  end
+
+  # Enhanced call pattern analysis
+  defp analyze_call_patterns(ast_info, config) do
+    if !config[:analyze_call_patterns] do
+      []
+    else
+      issues = []
+      
+      # Build call graph
+      call_graph = build_call_graph(ast_info)
+      
+      # Detect potentially dead code (uncalled private functions)
+      dead_code_issues = find_dead_code(ast_info, call_graph)
+      
+      # Detect circular dependencies
+      circular_issues = find_circular_dependencies(call_graph)
+      
+      issues ++ dead_code_issues ++ circular_issues
+    end
+  end
+
+  defp build_call_graph(ast_info) do
+    # Build a map of function -> [called functions]
+    ast_info.calls
+    |> Enum.group_by(& &1.from)
+    |> Map.new(fn {from, calls} ->
+      {from, Enum.map(calls, & &1.to) |> Enum.uniq()}
+    end)
+  end
+
+  defp find_dead_code(ast_info, call_graph) do
+    # Find all private functions
+    private_functions = 
+      ast_info.functions
+      |> Enum.filter(& &1.private)
+      |> Enum.map(fn f -> {ast_info.name, f.name, f.arity} end)
+    
+    # Find which ones are called
+    called_functions = 
+      call_graph
+      |> Map.values()
+      |> List.flatten()
+      |> Enum.uniq()
+    
+    # Find uncalled private functions
+    uncalled = private_functions -- called_functions
+    
+    # Filter out common callbacks and special functions
+    uncalled
+    |> Enum.reject(fn {_mod, name, _arity} ->
+      name in [:__struct__, :__changeset__, :__schema__, :__info__]
+    end)
+    |> Enum.map(fn {module, name, arity} ->
+      func = Enum.find(ast_info.functions, fn f ->
+        f.name == name && f.arity == arity
+      end)
+      
+      Engine.create_issue(
+        :potentially_dead_code,
+        :low,
+        "Private function #{name}/#{arity} is never called",
+        %{file: "", line: func.line, column: nil, end_line: nil, end_column: nil},
+        "semantic/dead_code",
+        :maintainability,
+        %{
+          function: name,
+          arity: arity,
+          module: module
+        }
+      )
+    end)
+  end
+
+  defp find_circular_dependencies(call_graph) do
+    # Simple cycle detection - would need more sophisticated algorithm for complex cases
+    Enum.flat_map(call_graph, fn {from, calls} ->
+      if from in calls do
+        [Engine.create_issue(
+          :circular_dependency,
+          :high,
+          "Function #{elem(from, 1)}/#{elem(from, 2)} calls itself directly",
+          %{file: "", line: 0, column: nil, end_line: nil, end_column: nil},
+          "semantic/circular_dependency",
+          :maintainability,
+          %{function: elem(from, 1), arity: elem(from, 2)}
+        )]
+      else
+        []
+      end
     end)
   end
 end

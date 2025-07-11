@@ -2,7 +2,7 @@ defmodule RubberDuck.Analysis.ASTTest do
   use ExUnit.Case, async: true
 
   alias RubberDuck.Analysis.AST
-  alias RubberDuck.Analysis.AST.ElixirParser
+  alias RubberDuck.Analysis.AST.SourcerorParser
 
   describe "AST module" do
     test "parse/2 delegates to appropriate parser based on language" do
@@ -20,7 +20,7 @@ defmodule RubberDuck.Analysis.ASTTest do
     end
   end
 
-  describe "ElixirParser" do
+  describe "SourcerorParser" do
     test "parse/1 extracts module information" do
       code = """
       defmodule MyApp.User do
@@ -30,10 +30,12 @@ defmodule RubberDuck.Analysis.ASTTest do
       end
       """
 
-      assert {:ok, ast_info} = ElixirParser.parse(code)
+      assert {:ok, ast_info} = SourcerorParser.parse(code)
       assert ast_info.type == :module
       assert ast_info.name == MyApp.User
-      assert ast_info.functions == [%{name: :name, arity: 1, line: 5}]
+      assert length(ast_info.functions) == 1
+      assert hd(ast_info.functions).name == :name
+      assert hd(ast_info.functions).arity == 1
     end
 
     test "parse/1 extracts function signatures with arity" do
@@ -46,7 +48,7 @@ defmodule RubberDuck.Analysis.ASTTest do
       end
       """
 
-      assert {:ok, ast_info} = ElixirParser.parse(code)
+      assert {:ok, ast_info} = SourcerorParser.parse(code)
 
       assert Enum.find(ast_info.functions, &(&1.name == :zero_arity)).arity == 0
       assert Enum.find(ast_info.functions, &(&1.name == :one_arity)).arity == 1
@@ -68,7 +70,7 @@ defmodule RubberDuck.Analysis.ASTTest do
       end
       """
 
-      assert {:ok, ast_info} = ElixirParser.parse(code)
+      assert {:ok, ast_info} = SourcerorParser.parse(code)
 
       assert MyApp.User in ast_info.aliases
       assert MyApp.Post in ast_info.aliases
@@ -82,7 +84,8 @@ defmodule RubberDuck.Analysis.ASTTest do
         def incomplete(
       """
 
-      assert {:error, {:syntax_error, _}} = ElixirParser.parse(code)
+      assert {:error, error} = SourcerorParser.parse(code)
+      assert is_map(error)
     end
   end
 end

@@ -70,7 +70,7 @@ defmodule RubberDuck.Analysis.AST do
   Returns the parser module for the given language.
   """
   @spec get_parser(language()) :: {:ok, module()} | {:error, :unsupported_language}
-  def get_parser(:elixir), do: {:ok, RubberDuck.Analysis.AST.ElixirParser}
+  def get_parser(:elixir), do: {:ok, RubberDuck.Analysis.AST.SourcerorParser}
   def get_parser(:javascript), do: {:error, :not_implemented_yet}
   def get_parser(:typescript), do: {:error, :not_implemented_yet}
   def get_parser(_), do: {:error, :unsupported_language}
