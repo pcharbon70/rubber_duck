@@ -474,62 +474,74 @@ defmodule RubberDuck.Analysis.Style do
   # Enhanced import organization analysis
   defp analyze_import_organization(ast_info, config) do
     issues = []
-    
+
     # Check for excessive imports
-    issues = if length(ast_info.imports) > config[:max_imports] || 10 do
-      [Engine.create_issue(
-        :excessive_imports,
-        :medium,
-        "Module has #{length(ast_info.imports)} imports, consider reducing",
-        %{file: "", line: 1, column: nil, end_line: nil, end_column: nil},
-        "style/excessive_imports",
-        :maintainability,
-        %{
-          import_count: length(ast_info.imports),
-          threshold: config[:max_imports] || 10
-        }
-      ) | issues]
-    else
-      issues
-    end
-    
+    max_imports = Map.get(config, :max_imports, 10)
+
+    issues =
+      if length(ast_info.imports) > max_imports do
+        [
+          Engine.create_issue(
+            :excessive_imports,
+            :medium,
+            "Module has #{length(ast_info.imports)} imports, consider reducing",
+            %{file: "", line: 1, column: nil, end_line: nil, end_column: nil},
+            "style/excessive_imports",
+            :maintainability,
+            %{
+              import_count: length(ast_info.imports),
+              threshold: max_imports
+            }
+          )
+          | issues
+        ]
+      else
+        issues
+      end
+
     # Check for import order (alphabetical)
     sorted_imports = Enum.sort_by(ast_info.imports, &to_string/1)
-    if ast_info.imports != sorted_imports && config[:enforce_import_order] do
-      issues = [Engine.create_issue(
-        :import_order,
-        :low,
-        "Imports are not in alphabetical order",
-        %{file: "", line: 1, column: nil, end_line: nil, end_column: nil},
-        "style/import_order",
-        :style,
-        %{}
-      ) | issues]
-    else
-      issues
-    end
-    
+
+    issues =
+      if ast_info.imports != sorted_imports && config[:enforce_import_order] do
+        [
+          Engine.create_issue(
+            :import_order,
+            :low,
+            "Imports are not in alphabetical order",
+            %{file: "", line: 1, column: nil, end_line: nil, end_column: nil},
+            "style/import_order",
+            :style,
+            %{}
+          )
+          | issues
+        ]
+      else
+        issues
+      end
+
     # Check for unused imports (simplified version)
     if config[:detect_unused_imports] do
-      used_modules = 
+      used_modules =
         ast_info.calls
         |> Enum.map(fn call -> elem(call.to, 0) end)
         |> Enum.uniq()
-      
+
       potentially_unused = ast_info.imports -- used_modules
-      
-      unused_issues = Enum.map(potentially_unused, fn import ->
-        Engine.create_issue(
-          :potentially_unused_import,
-          :low,
-          "Import #{inspect(import)} might be unused",
-          %{file: "", line: 1, column: nil, end_line: nil, end_column: nil},
-          "style/unused_import",
-          :maintainability,
-          %{module: import}
-        )
-      end)
-      
+
+      unused_issues =
+        Enum.map(potentially_unused, fn import ->
+          Engine.create_issue(
+            :potentially_unused_import,
+            :low,
+            "Import #{inspect(import)} might be unused",
+            %{file: "", line: 1, column: nil, end_line: nil, end_column: nil},
+            "style/unused_import",
+            :maintainability,
+            %{module: import}
+          )
+        end)
+
       issues ++ unused_issues
     else
       issues
@@ -540,66 +552,84 @@ defmodule RubberDuck.Analysis.Style do
   defp analyze_function_complexity(ast_info, config) do
     Enum.flat_map(ast_info.functions, fn func ->
       issues = []
-      
+
       # Check function name length
       name_length = func.name |> Atom.to_string() |> String.length()
-      issues = if name_length > config[:max_function_name_length] || 30 do
-        [Engine.create_issue(
-          :long_function_name,
-          :low,
-          "Function name '#{func.name}' is #{name_length} characters long",
-          %{file: "", line: func.line, column: nil, end_line: nil, end_column: nil},
-          "style/long_function_name",
-          :style,
-          %{
-            function: func.name,
-            length: name_length,
-            threshold: config[:max_function_name_length] || 30
-          }
-        ) | issues]
-      else
-        issues
-      end
-      
+      max_name_length = Map.get(config, :max_function_name_length, 30)
+
+      issues =
+        if name_length > max_name_length do
+          [
+            Engine.create_issue(
+              :long_function_name,
+              :low,
+              "Function name '#{func.name}' is #{name_length} characters long",
+              %{file: "", line: func.line, column: nil, end_line: nil, end_column: nil},
+              "style/long_function_name",
+              :style,
+              %{
+                function: func.name,
+                length: name_length,
+                threshold: max_name_length
+              }
+            )
+            | issues
+          ]
+        else
+          issues
+        end
+
       # Check arity
-      issues = if func.arity > config[:max_function_arity] || 5 do
-        [Engine.create_issue(
-          :high_arity,
-          :medium,
-          "Function #{func.name}/#{func.arity} has too many parameters",
-          %{file: "", line: func.line, column: nil, end_line: nil, end_column: nil},
-          "style/high_arity",
-          :maintainability,
-          %{
-            function: func.name,
-            arity: func.arity,
-            threshold: config[:max_function_arity] || 5
-          }
-        ) | issues]
-      else
-        issues
-      end
-      
+      max_arity = Map.get(config, :max_function_arity, 5)
+
+      issues =
+        if func.arity > max_arity do
+          [
+            Engine.create_issue(
+              :high_arity,
+              :medium,
+              "Function #{func.name}/#{func.arity} has too many parameters",
+              %{file: "", line: func.line, column: nil, end_line: nil, end_column: nil},
+              "style/high_arity",
+              :maintainability,
+              %{
+                function: func.name,
+                arity: func.arity,
+                threshold: max_arity
+              }
+            )
+            | issues
+          ]
+        else
+          issues
+        end
+
       # Check variable count in function
       var_count = length(func.variables || [])
-      issues = if var_count > config[:max_variables_per_function] || 10 do
-        [Engine.create_issue(
-          :too_many_variables,
-          :medium,
-          "Function #{func.name}/#{func.arity} has #{var_count} variables",
-          %{file: "", line: func.line, column: nil, end_line: nil, end_column: nil},
-          "style/too_many_variables",
-          :complexity,
-          %{
-            function: func.name,
-            variable_count: var_count,
-            threshold: config[:max_variables_per_function] || 10
-          }
-        ) | issues]
-      else
-        issues
-      end
-      
+      max_vars = Map.get(config, :max_variables_per_function, 10)
+
+      issues =
+        if var_count > max_vars do
+          [
+            Engine.create_issue(
+              :too_many_variables,
+              :medium,
+              "Function #{func.name}/#{func.arity} has #{var_count} variables",
+              %{file: "", line: func.line, column: nil, end_line: nil, end_column: nil},
+              "style/too_many_variables",
+              :complexity,
+              %{
+                function: func.name,
+                variable_count: var_count,
+                threshold: max_vars
+              }
+            )
+            | issues
+          ]
+        else
+          issues
+        end
+
       issues
     end)
   end
