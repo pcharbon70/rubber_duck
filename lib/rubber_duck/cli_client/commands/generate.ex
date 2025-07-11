@@ -6,10 +6,15 @@ defmodule RubberDuck.CLIClient.Commands.Generate do
   alias RubberDuck.CLIClient.Client
 
   def run(args, opts) do
+    # Extract values from Optimus.ParseResult struct
+    prompt = Map.get(args.args, :prompt)
+    language = Map.get(args.options, :language, "elixir")
+    output = Map.get(args.options, :output)
+
     params = %{
-      "prompt" => args.prompt,
-      "language" => args[:language] || "elixir",
-      "output" => args[:output],
+      "prompt" => prompt,
+      "language" => language,
+      "output" => output,
       "format" => opts[:format],
       "verbose" => opts[:verbose]
     }
