@@ -1,0 +1,28 @@
+# Binaries
+rubber_duck_tui
+*.exe
+
+# Go build artifacts
+*.o
+*.a
+*.so
+
+# Test binaries
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
