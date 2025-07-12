@@ -1,32 +1,45 @@
-defmodule RubberDuck.CLI.Commands.Test do
+defmodule RubberDuck.Commands.Handlers.Test do
   @moduledoc """
-  CLI command for generating tests for existing code.
+  Handler for test generation commands.
+  
+  Generates comprehensive tests for existing code using the generation engine
+  with support for multiple test frameworks and edge cases.
   """
 
-  @doc """
-  Runs the test command with the given arguments and configuration.
-  """
-  def run(args, _config) do
-    file = args[:file]
-    framework = args[:framework] || "exunit"
-    output_file = args[:output]
-    include_edge_cases = args[:include_edge_cases] || false
-    include_property_tests = args[:include_property_tests] || false
+  @behaviour RubberDuck.Commands.Handler
 
-    with {:ok, content} <- File.read(file),
-         {:ok, tests} <- generate_tests(content, file, framework, include_edge_cases, include_property_tests) do
-      handle_output(tests, output_file, framework, file)
-    else
-      {:error, :enoent} ->
-        {:error, "File not found: #{file}"}
+  alias RubberDuck.Commands.{Command, Handler}
+  alias RubberDuck.Engine.Manager
 
-      {:error, reason} ->
-        {:error, "Test generation failed: #{inspect(reason)}"}
+  @impl true
+  def execute(%Command{name: :test, args: args, options: options} = command) do
+    with :ok <- validate(command),
+         {:ok, content} <- File.read(args.file),
+         {:ok, tests} <- generate_tests(content, args.file, options) do
+      handle_output(tests, args.file, options)
     end
   end
 
-  defp generate_tests(content, file_path, framework, include_edge_cases, include_property_tests) do
-    alias RubberDuck.Engine.Manager
+  def execute(_command) do
+    {:error, "Invalid command for test handler"}
+  end
+
+  @impl true
+  def validate(%Command{name: :test, args: args}) do
+    with :ok <- Handler.validate_required_args(%{args: args}, [:file]),
+         :ok <- Handler.validate_file_exists(args.file) do
+      :ok
+    end
+  end
+  
+  def validate(_), do: {:error, "Invalid command for test handler"}
+
+  # Private functions
+
+  defp generate_tests(content, file_path, options) do
+    framework = Map.get(options, :framework, "exunit")
+    include_edge_cases = Map.get(options, :include_edge_cases, false)
+    include_property_tests = Map.get(options, :include_property_tests, false)
     
     # Detect language from file extension
     language = detect_language(file_path)
@@ -49,12 +62,14 @@ defmodule RubberDuck.CLI.Commands.Test do
       prompt: prompt,
       language: language,
       context: %{
-        current_file: file_path
+        current_file: file_path,
+        framework: framework
       }
     }
 
-    # Use generation engine with test generation context
-    case Manager.execute(:generation, input, 300_000) do
+    timeout = Map.get(options, :timeout, 300_000)
+
+    case Manager.execute(:generation, input, timeout) do
       {:ok, %{code: test_code}} ->
         {:ok, test_code}
         
@@ -71,12 +86,12 @@ defmodule RubberDuck.CLI.Commands.Test do
   
   defp detect_language(file_path) do
     case Path.extname(file_path) do
-      ".ex" -> :elixir
-      ".exs" -> :elixir
-      ".py" -> :python
-      ".js" -> :javascript
-      ".ts" -> :typescript
-      _ -> :unknown
+      ".ex" -> "elixir"
+      ".exs" -> "elixir"
+      ".py" -> "python"
+      ".js" -> "javascript"
+      ".ts" -> "typescript"
+      _ -> "unknown"
     end
   end
 
@@ -132,34 +147,37 @@ defmodule RubberDuck.CLI.Commands.Test do
     """
   end
 
-  defp handle_output(tests, nil, framework, file) do
-    # Output to stdout
-    suggested_path = suggest_test_file_path(file)
+  defp handle_output(tests, file, options) do
+    output_file = Map.get(options, :output)
+    framework = Map.get(options, :framework, "exunit")
+    
+    if output_file do
+      # Write to file
+      case File.write(output_file, tests) do
+        :ok ->
+          {:ok, %{
+            type: "test_generation",
+            tests: tests,
+            framework: framework,
+            output_file: output_file,
+            message: "Tests written to #{output_file}",
+            timestamp: DateTime.utc_now()
+          }}
 
-    {:ok,
-     %{
-       type: :test_generation,
-       tests: tests,
-       framework: framework,
-       suggested_path: suggested_path
-     }}
-  end
+        {:error, reason} ->
+          {:error, "Failed to write output file: #{reason}"}
+      end
+    else
+      # Return tests with suggested path
+      suggested_path = suggest_test_file_path(file)
 
-  defp handle_output(tests, output_file, framework, _file) do
-    # Write to file
-    case File.write(output_file, tests) do
-      :ok ->
-        {:ok,
-         %{
-           type: :test_generation,
-           tests: tests,
-           framework: framework,
-           output_file: output_file,
-           message: "Tests written to #{output_file}"
-         }}
-
-      {:error, reason} ->
-        {:error, "Failed to write output file: #{reason}"}
+      {:ok, %{
+        type: "test_generation",
+        tests: tests,
+        framework: framework,
+        suggested_path: suggested_path,
+        timestamp: DateTime.utc_now()
+      }}
     end
   end
 
