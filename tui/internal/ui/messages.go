@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/json"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/nshafer/phx"
@@ -107,4 +108,96 @@ type InitiateConnectionMsg struct{}
 // AutoSaveMsg indicates an auto-save operation
 type AutoSaveMsg struct {
 	File string
+}
+
+// Local command messages from unified command system
+type ShowHelpMsg struct {
+	Topic string
+}
+
+type ShowSettingsMsg struct {
+	Tab string
+}
+
+type ToggleThemeMsg struct{}
+
+type ClearOutputMsg struct{}
+
+type ShowPerformanceStatsMsg struct {
+	Detailed bool
+}
+
+type ClearCacheMsg struct {
+	CacheType string
+}
+
+type ShowInputModalMsg struct {
+	Title       string
+	Prompt      string
+	Placeholder string
+	Action      string
+}
+
+type SaveFileMsg struct {
+	Path    string
+	Content string
+	Force   bool
+}
+
+type CloseFileMsg struct {
+	Path string
+	Save bool
+}
+
+type FocusPaneMsg struct {
+	Pane string
+}
+
+type ShowSearchMsg struct {
+	Query         string
+	Scope         string
+	CaseSensitive bool
+}
+
+type GotoLineMsg struct {
+	Line int
+}
+
+type ShowCommandPaletteMsg struct {
+	Filter string
+}
+
+// Unified command system response messages
+type UnsolicitedResponseMsg struct {
+	Response interface{} // commands.UnifiedResponse
+}
+
+type CommandCompletedMsg struct {
+	Command  string
+	Content  interface{}
+	Duration time.Duration
+}
+
+type CommandErrorMsg struct {
+	Command string
+	Error   interface{} // *commands.CommandError
+}
+
+type CommandStreamingMsg struct {
+	Command  string
+	StreamID string
+	Content  interface{}
+}
+
+type CommandStatusMsg struct {
+	Command string
+	Status  string
+	Content interface{}
+}
+
+type RetryCommandMsg struct {
+	Command     interface{} // commands.UnifiedCommand
+	AttemptNum  int
+	MaxRetries  int
+	OriginalCmd interface{} // *commands.PendingCommand
 }

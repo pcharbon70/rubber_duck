@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rubber_duck/tui/internal/phoenix"
+	"github.com/rubber_duck/tui/internal/commands"
 )
 
 // Update handles all state transitions
@@ -221,6 +222,200 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle auto-save operation
 		m.statusBar = fmt.Sprintf("Auto-saved: %s", msg.File)
 		// TODO: Implement actual file saving logic
+		return m, nil
+	
+	case ExecuteCommandMsg:
+		// Handle legacy command execution
+		return m.handleCommand(msg)
+	
+	// Handle unified command system messages
+	case ShowHelpMsg:
+		m.modal.ShowHelp()
+		if msg.Topic != "general" {
+			m.statusBar = fmt.Sprintf("Showing help for: %s", msg.Topic)
+		}
+		return m, nil
+	
+	case ShowSettingsMsg:
+		m.settingsModal.SetAvailableThemes(m.GetAvailableThemes())
+		m.settingsModal.ShowSettings(func(settings Settings, saved bool) {
+			if saved {
+				m.editor.ShowLineNumbers = settings.ShowLineNumbers
+				if m.SetTheme(settings.Theme) {
+					m.statusBar = fmt.Sprintf("Settings saved - Theme: %s", settings.Theme)
+				} else {
+					m.statusBar = "Settings saved"
+				}
+			}
+		})
+		if msg.Tab != "general" {
+			m.statusBar = fmt.Sprintf("Opening settings tab: %s", msg.Tab)
+		}
+		return m, nil
+	
+	case ToggleThemeMsg:
+		currentTheme := m.themeManager.GetCurrentThemeName()
+		if currentTheme == "dark" {
+			m.themeManager.SetTheme("light")
+			m.statusBar = "Switched to light theme"
+		} else {
+			m.themeManager.SetTheme("dark")
+			m.statusBar = "Switched to dark theme"
+		}
+		return m, nil
+	
+	case ClearOutputMsg:
+		m.output.SetContent("")
+		m.statusBar = "Output cleared"
+		return m, nil
+	
+	case ShowPerformanceStatsMsg:
+		stats := m.GetPerformanceStats()
+		if stats != nil {
+			avgRender := stats["avg_render_time"]
+			avgUpdate := stats["avg_update_time"]
+			if msg.Detailed {
+				m.output.SetContent(fmt.Sprintf("Detailed Performance Statistics:\nAverage Render Time: %v\nAverage Update Time: %v\nRender Samples: %v\nUpdate Samples: %v\nMemory Usage: %v\nGoroutines: %v", 
+					avgRender, avgUpdate, stats["render_samples"], stats["update_samples"], "N/A", "N/A"))
+			} else {
+				m.output.SetContent(fmt.Sprintf("Performance Statistics:\nAverage Render Time: %v\nAverage Update Time: %v", avgRender, avgUpdate))
+			}
+			m.statusBar = "Performance statistics displayed"
+		} else {
+			m.statusBar = "Performance monitoring not available"
+		}
+		return m, nil
+	
+	case ClearCacheMsg:
+		m.ClearViewCache()
+		if msg.CacheType == "all" {
+			m.statusBar = "All caches cleared"
+		} else {
+			m.statusBar = fmt.Sprintf("%s cache cleared", msg.CacheType)
+		}
+		return m, nil
+	
+	case ShowInputModalMsg:
+		m.modal.ShowInput(msg.Title, msg.Prompt, msg.Placeholder, func(result ModalResult) {
+			if !result.Canceled && result.Input != "" {
+				// Handle the input based on action
+				switch msg.Action {
+				case "create_file":
+					m.statusBar = fmt.Sprintf("Creating file: %s", result.Input)
+				default:
+					m.statusBar = fmt.Sprintf("Input received: %s", result.Input)
+				}
+			}
+		})
+		return m, nil
+	
+	case SaveFileMsg:
+		if msg.Path != "" {
+			// TODO: Implement actual file saving logic
+			m.statusBar = fmt.Sprintf("Saving file: %s", msg.Path)
+			if msg.Force {
+				m.statusBar += " (forced)"
+			}
+		} else {
+			m.statusBar = "Cannot save: no file path specified"
+		}
+		return m, nil
+	
+	case CloseFileMsg:
+		if msg.Path != "" {
+			if msg.Save {
+				m.statusBar = fmt.Sprintf("Saving and closing file: %s", msg.Path)
+			} else {
+				m.statusBar = fmt.Sprintf("Closing file without saving: %s", msg.Path)
+			}
+			// TODO: Implement actual file closing logic
+			m.editor.SetValue("")
+			m.currentFile = ""
+		} else {
+			m.statusBar = "No file to close"
+		}
+		return m, nil
+	
+	case FocusPaneMsg:
+		switch msg.Pane {
+		case "editor":
+			m.activePane = EditorPane
+		case "filetree", "tree":
+			m.activePane = FileTreePane
+		case "output":
+			m.activePane = OutputPane
+		case "next":
+			m.activePane = m.nextPane()
+		default:
+			m.activePane = m.nextPane() // fallback to next
+		}
+		m.statusBar = fmt.Sprintf("Focused pane: %s", msg.Pane)
+		return m, nil
+	
+	case ShowSearchMsg:
+		// TODO: Implement search functionality
+		m.statusBar = fmt.Sprintf("Searching for: %s", msg.Query)
+		if msg.Scope != "current_file" {
+			m.statusBar += fmt.Sprintf(" (scope: %s)", msg.Scope)
+		}
+		return m, nil
+	
+	case GotoLineMsg:
+		// TODO: Implement goto line functionality
+		m.statusBar = fmt.Sprintf("Going to line: %d", msg.Line)
+		return m, nil
+	
+	case ShowCommandPaletteMsg:
+		m.commandPalette.Show()
+		if msg.Filter != "" {
+			m.statusBar = fmt.Sprintf("Command palette opened with filter: %s", msg.Filter)
+		} else {
+			m.statusBar = "Command palette opened"
+		}
+		return m, nil
+	
+	// Handle unified command system response messages
+	case UnsolicitedResponseMsg:
+		m.statusBar = "Received unsolicited response from server"
+		// TODO: Handle based on response type
+		return m, nil
+	
+	case CommandCompletedMsg:
+		m.statusBar = fmt.Sprintf("Command '%s' completed in %v", msg.Command, msg.Duration)
+		if msg.Content != nil {
+			// Display content in output panel
+			content := fmt.Sprintf("Command: %s\nResult: %v\n\n", msg.Command, msg.Content)
+			m.output.SetContent(m.output.View() + content)
+		}
+		return m, nil
+	
+	case CommandErrorMsg:
+		m.statusBar = fmt.Sprintf("Command '%s' failed", msg.Command)
+		if msg.Error != nil {
+			error := fmt.Sprintf("Error in command '%s': %v\n\n", msg.Command, msg.Error)
+			m.output.SetContent(m.output.View() + error)
+		}
+		return m, nil
+	
+	case CommandStreamingMsg:
+		m.statusBar = fmt.Sprintf("Streaming data from command '%s'", msg.Command)
+		if msg.Content != nil {
+			content := fmt.Sprintf("%v", msg.Content)
+			m.output.SetContent(m.output.View() + content)
+		}
+		return m, nil
+	
+	case CommandStatusMsg:
+		m.statusBar = fmt.Sprintf("Command '%s' status: %s", msg.Command, msg.Status)
+		if msg.Content != nil {
+			content := fmt.Sprintf("Status update for '%s': %v\n", msg.Command, msg.Content)
+			m.output.SetContent(m.output.View() + content)
+		}
+		return m, nil
+	
+	case RetryCommandMsg:
+		m.statusBar = fmt.Sprintf("Retrying command (attempt %d/%d)", msg.AttemptNum, msg.MaxRetries)
+		// TODO: Re-execute the command through the router
 		return m, nil
 	}
 
