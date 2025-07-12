@@ -29,7 +29,7 @@ type Model struct {
 	socket     *phx.Socket
 	channel    *phx.Channel
 	connected  bool
-	phoenixClient *phoenix.Client
+	phoenixClient phoenix.PhoenixClient
 	phoenixConfig phoenix.Config
 	
 	// UI state
@@ -40,6 +40,8 @@ type Model struct {
 	// Components
 	fileTree       FileTree
 	commandPalette CommandPalette
+	modal          Modal
+	settingsModal  SettingsModal
 	
 	// File state
 	currentFile string
@@ -88,6 +90,19 @@ func NewModel() Model {
 	// Initialize components
 	fileTree := NewFileTree()
 	commandPalette := NewCommandPalette()
+	modal := NewModal()
+	
+	// Default settings
+	settings := Settings{
+		Theme:           "dark",
+		ShowLineNumbers: true,
+		AutoSave:        false,
+		TabSize:         4,
+		FontSize:        14,
+		ServerURL:       "ws://localhost:5555/socket",
+		UsesMockClient:  phoenix.IsRunningInMockMode(),
+	}
+	settingsModal := NewSettingsModal(settings)
 	
 	return Model{
 		editor:         ta,
@@ -96,6 +111,8 @@ func NewModel() Model {
 		activePane:     FileTreePane,
 		fileTree:       fileTree,
 		commandPalette: commandPalette,
+		modal:          modal,
+		settingsModal:  settingsModal,
 		files:          []FileNode{}, // Will be populated when connected
 	}
 }

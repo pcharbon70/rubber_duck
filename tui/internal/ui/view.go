@@ -74,6 +74,16 @@ func (m Model) View() string {
 	if m.commandPalette.IsVisible() {
 		return m.commandPalette.View()
 	}
+	
+	// Overlay modal if visible
+	if m.modal.IsVisible() {
+		return m.modal.View()
+	}
+	
+	// Overlay settings modal if visible
+	if m.settingsModal.IsVisible() {
+		return m.settingsModal.View()
+	}
 
 	return ui
 }

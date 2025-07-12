@@ -17,9 +17,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Handle modals first if they're visible
+		if m.modal.IsVisible() {
+			var cmd tea.Cmd
+			m.modal, cmd = m.modal.Update(msg)
+			return m, cmd
+		}
+		
+		if m.settingsModal.IsVisible() {
+			var cmd tea.Cmd
+			m.settingsModal, cmd = m.settingsModal.Update(msg)
+			return m, cmd
+		}
+		
 		// Global hotkeys
 		switch msg.String() {
 		case "ctrl+c", "q":
+			// Show confirmation dialog if there are unsaved changes
+			if m.modified {
+				m.modal.ShowConfirm(
+					"Unsaved Changes",
+					"You have unsaved changes. Are you sure you want to quit?",
+					func(result ModalResult) {
+						if result.Action == "yes" {
+							if prog := GetProgram(); prog != nil {
+								prog.Send(tea.Quit())
+							}
+						}
+					},
+				)
+				return m, nil
+			}
 			return m, tea.Quit
 		case "tab":
 			m.activePane = m.nextPane()
@@ -28,7 +56,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.commandPalette.Show()
 			return m, nil
 		case "ctrl+h":
-			// TODO: Show help
+			// Show help modal
+			m.modal.ShowHelp()
 			return m, nil
 		}
 
@@ -65,24 +94,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.updateComponentSizes()
+		m.modal.SetSize(msg.Width, msg.Height)
+		m.settingsModal.SetSize(msg.Width, msg.Height)
 		return m, nil
 
 	case InitiateConnectionMsg:
-		// Load API key from config file or environment
-		apiKey := loadAPIKey()
+		// Create Phoenix configuration
+		config := phoenix.CreateConfig()
 		
-		// Set up Phoenix connection configuration
-		config := phoenix.Config{
-			URL:       "ws://localhost:5555/socket",
-			APIKey:    apiKey,
-			ChannelID: "cli:commands",
-		}
-		
-		// Create the Phoenix client
-		client := phoenix.NewClient(config)
+		// Create the Phoenix client (will use mock in development)
+		client := phoenix.NewPhoenixClient()
 		m.phoenixClient = client
 		m.phoenixConfig = config
-		m.statusBar = "Connecting to Phoenix..."
+		
+		// Update status based on client type
+		if phoenix.IsRunningInMockMode() {
+			m.statusBar = "Connecting to Mock Phoenix..."
+		} else {
+			m.statusBar = "Connecting to Phoenix..."
+		}
 		
 		// Get the program reference
 		prog := GetProgram()
@@ -97,16 +127,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.socket = msg.Socket
 		m.statusBar = "Socket created, joining channel..."
 		// Join the channel
-		return m, m.phoenixClient.JoinChannel(msg.Socket, m.phoenixConfig.ChannelID)
+		return m, m.phoenixClient.JoinChannel(m.phoenixConfig.ChannelID)
 
 	case phoenix.ChannelJoinedMsg:
 		m.channel = msg.Channel
 		m.connected = true
 		m.statusBar = "Connected to Phoenix | " + m.getKeyHints()
 		// Request initial file list
-		return m, m.phoenixClient.Push("file:list", map[string]any{
-			"path": ".",
-		})
+		return m, m.phoenixClient.ListFiles(".")
 
 	case ConnectedMsg:
 		m.connected = true
@@ -125,10 +153,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "analyze_result":
 			// TODO: Handle analysis result
 			m.output.SetContent("Analysis complete!")
-		case "completion":
+		case "completion_result":
 			// TODO: Handle completion
 		case "file_list":
-			// TODO: Update file tree
+			// Update file tree with response data
+			return m, m.handleFileListResponse(msg.Payload)
+		case "file_loaded":
+			// Handle file content response
+			return m, m.handleFileLoadedResponse(msg.Payload)
 		}
 
 	case FileSelectedMsg:
@@ -234,14 +266,181 @@ func (m Model) getKeyHints() string {
 
 // loadFile creates a command to load a file
 func (m Model) loadFile(path string) tea.Cmd {
+	if m.phoenixClient != nil {
+		return m.phoenixClient.LoadFile(path)
+	}
+	
+	// Fallback for when no client is available
 	return func() tea.Msg {
-		// TODO: Implement actual file loading via Phoenix channel
-		// For now, return a mock response
 		return FileLoadedMsg{
 			Path:    path,
-			Content: fmt.Sprintf("// Contents of %s\n// TODO: Load from Phoenix channel", path),
+			Content: fmt.Sprintf("// Contents of %s\n// No Phoenix client available", path),
 		}
 	}
+}
+
+// handleFileListResponse processes file list response from Phoenix
+func (m Model) handleFileListResponse(payload []byte) tea.Cmd {
+	var response phoenix.FileListResponse
+	if err := json.Unmarshal(payload, &response); err != nil {
+		return func() tea.Msg {
+			return ErrorMsg{
+				Err:       err,
+				Component: "File List",
+			}
+		}
+	}
+	
+	// Convert Phoenix FileInfo to UI FileNode
+	root := convertFileInfoToNode(response.Files, response.Path)
+	
+	return func() tea.Msg {
+		return FileTreeLoadedMsg{Root: root}
+	}
+}
+
+// handleFileLoadedResponse processes file loaded response from Phoenix
+func (m Model) handleFileLoadedResponse(payload []byte) tea.Cmd {
+	var response phoenix.FileContentResponse
+	if err := json.Unmarshal(payload, &response); err != nil {
+		return func() tea.Msg {
+			return ErrorMsg{
+				Err:       err,
+				Component: "File Load",
+			}
+		}
+	}
+	
+	return func() tea.Msg {
+		return FileLoadedMsg{
+			Path:    response.Path,
+			Content: response.Content,
+		}
+	}
+}
+
+// convertFileInfoToNode converts Phoenix FileInfo to UI FileNode
+func convertFileInfoToNode(files []phoenix.FileInfo, basePath string) FileNode {
+	if len(files) == 0 {
+		return FileNode{
+			Name:     "empty",
+			Path:     basePath,
+			IsDir:    true,
+			Children: []FileNode{},
+		}
+	}
+	
+	// If we have multiple files, create a root node
+	if len(files) > 1 {
+		var children []FileNode
+		for _, file := range files {
+			children = append(children, convertSingleFileInfo(file))
+		}
+		
+		return FileNode{
+			Name:     "project",
+			Path:     basePath,
+			IsDir:    true,
+			Children: children,
+		}
+	}
+	
+	// Single file/directory
+	return convertSingleFileInfo(files[0])
+}
+
+// convertSingleFileInfo converts a single Phoenix FileInfo to UI FileNode
+func convertSingleFileInfo(file phoenix.FileInfo) FileNode {
+	var children []FileNode
+	for _, child := range file.Children {
+		children = append(children, convertSingleFileInfo(child))
+	}
+	
+	return FileNode{
+		Name:     file.Name,
+		Path:     file.Path,
+		IsDir:    file.IsDir,
+		Children: children,
+	}
+}
+
+// handleCommand processes ExecuteCommandMsg
+func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
+	switch msg.Command {
+	case "help":
+		m.modal.ShowHelp()
+		return m, nil
+		
+	case "settings":
+		m.settingsModal.ShowSettings(func(settings Settings, saved bool) {
+			if saved {
+				// Apply settings
+				m.editor.ShowLineNumbers = settings.ShowLineNumbers
+				// TODO: Apply other settings
+			}
+		})
+		return m, nil
+		
+	case "new_file":
+		m.modal.ShowInput(
+			"New File",
+			"Enter the file name:",
+			"example.go",
+			func(result ModalResult) {
+				if !result.Canceled && result.Input != "" {
+					// TODO: Create new file
+					m.statusBar = fmt.Sprintf("Creating file: %s", result.Input)
+				}
+			},
+		)
+		return m, nil
+		
+	case "analyze":
+		if m.currentFile != "" && m.phoenixClient != nil {
+			m.statusBar = fmt.Sprintf("Analyzing %s...", m.currentFile)
+			return m, m.phoenixClient.AnalyzeFile(m.currentFile, "full")
+		}
+		return m, nil
+		
+	case "generate":
+		m.modal.ShowInput(
+			"Generate Code",
+			"What would you like to generate?",
+			"Create a function that...",
+			func(result ModalResult) {
+				if !result.Canceled && result.Input != "" && m.phoenixClient != nil {
+					m.statusBar = "Generating code..."
+					m.phoenixClient.GenerateCode(result.Input, map[string]any{
+						"file": m.currentFile,
+						"language": m.detectLanguage(m.currentFile),
+					})
+				}
+			},
+		)
+		return m, nil
+		
+	case "clear_output":
+		m.output.SetContent("")
+		m.statusBar = "Output cleared"
+		return m, nil
+		
+	default:
+		m.statusBar = fmt.Sprintf("Unknown command: %s", msg.Command)
+		return m, nil
+	}
+}
+
+// detectLanguage detects the programming language from file extension
+func (m Model) detectLanguage(path string) string {
+	// Simple detection based on extension
+	if strings.HasSuffix(path, ".go") {
+		return "go"
+	} else if strings.HasSuffix(path, ".js") {
+		return "javascript"
+	} else if strings.HasSuffix(path, ".py") {
+		return "python"
+	}
+	return "text"
 }
 
 // Config represents the RubberDuck configuration

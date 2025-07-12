@@ -77,6 +77,13 @@ type ExecuteCommandMsg struct {
 	Args    []string
 }
 
+// Modal messages
+type ShowModalMsg struct {
+	Type    ModalType
+	Title   string
+	Content string
+}
+
 type CommandResultMsg struct {
 	Command string
 	Result  string
@@ -91,7 +98,7 @@ type RetryMsg struct {
 // Phoenix connection message
 type PhoenixConnectMsg struct {
 	Config phoenix.Config
-	Client *phoenix.Client
+	Client phoenix.PhoenixClient
 }
 
 // InitiateConnectionMsg triggers the Phoenix connection setup

@@ -60,6 +60,7 @@ func NewCommandPalette() CommandPalette {
 		{Name: "Toggle Output", Desc: "Show/hide output panel", Shortcut: "Ctrl+J", Action: "toggle_output", Category: "UI"},
 		{Name: "Clear Output", Desc: "Clear output panel", Shortcut: "Ctrl+L", Action: "clear_output", Category: "UI"},
 		{Name: "Toggle Theme", Desc: "Switch between light/dark theme", Shortcut: "Ctrl+Shift+T", Action: "toggle_theme", Category: "UI"},
+		{Name: "Settings", Desc: "Open settings dialog", Shortcut: "Ctrl+,", Action: "settings", Category: "UI"},
 		
 		// Help
 		{Name: "Show Help", Desc: "Display help information", Shortcut: "F1", Action: "help", Category: "Help"},
