@@ -448,7 +448,7 @@ defmodule RubberDuck.Analysis.Semantic do
         :variable_shadowing,
         :medium,
         "Variable '#{var_name}' shadows outer variable defined at line #{outer.line}",
-        %{file: "", line: inner.line, column: inner.column, end_line: nil, end_column: nil},
+        %{file: "", line: inner.line, column: Map.get(inner, :column, 0), end_line: nil, end_column: nil},
         "semantic/variable_shadowing",
         :maintainability,
         %{

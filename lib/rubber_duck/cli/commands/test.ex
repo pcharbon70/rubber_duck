@@ -26,12 +26,58 @@ defmodule RubberDuck.CLI.Commands.Test do
   end
 
   defp generate_tests(content, file_path, framework, include_edge_cases, include_property_tests) do
-    # TODO: Integrate with test generation engine
-    # For now, return a simple test template
-    module_name = extract_module_name(content, file_path)
+    alias RubberDuck.Engine.Manager
+    
+    # Detect language from file extension
+    language = detect_language(file_path)
+    
+    # Build prompt for test generation
+    prompt = """
+    Generate comprehensive tests for the following #{language} code using #{framework} framework.
+    #{if include_edge_cases, do: "Include edge case tests.", else: ""}
+    #{if include_property_tests, do: "Include property-based tests.", else: ""}
+    
+    Code to test:
+    ```#{language}
+    #{content}
+    ```
+    
+    Please provide the test code without any explanations or markdown formatting.
+    """
+    
+    input = %{
+      prompt: prompt,
+      language: language,
+      context: %{
+        current_file: file_path
+      }
+    }
 
-    tests = generate_test_template(module_name, framework, include_edge_cases, include_property_tests)
-    {:ok, tests}
+    # Use generation engine with test generation context
+    case Manager.execute(:generation, input, 300_000) do
+      {:ok, %{code: test_code}} ->
+        {:ok, test_code}
+        
+      {:error, :no_provider_available} ->
+        # Fallback to template if no LLM is available
+        module_name = extract_module_name(content, file_path)
+        tests = generate_test_template(module_name, framework, include_edge_cases, include_property_tests)
+        {:ok, tests}
+        
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+  
+  defp detect_language(file_path) do
+    case Path.extname(file_path) do
+      ".ex" -> :elixir
+      ".exs" -> :elixir
+      ".py" -> :python
+      ".js" -> :javascript
+      ".ts" -> :typescript
+      _ -> :unknown
+    end
   end
 
   defp extract_module_name(content, file_path) do
@@ -92,7 +138,7 @@ defmodule RubberDuck.CLI.Commands.Test do
 
     {:ok,
      %{
-       type: :test,
+       type: :test_generation,
        tests: tests,
        framework: framework,
        suggested_path: suggested_path
@@ -105,7 +151,7 @@ defmodule RubberDuck.CLI.Commands.Test do
       :ok ->
         {:ok,
          %{
-           type: :test,
+           type: :test_generation,
            tests: tests,
            framework: framework,
            output_file: output_file,
