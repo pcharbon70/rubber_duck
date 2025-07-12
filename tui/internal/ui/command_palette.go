@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/rubber_duck/tui/internal/commands"
 )
 
 // Command represents a command in the palette
@@ -25,17 +26,36 @@ func (c Command) Description() string { return c.Desc }
 
 // CommandPalette represents the command palette component
 type CommandPalette struct {
-	textInput textinput.Model
-	list      list.Model
-	commands  []Command
-	filtered  []list.Item
-	visible   bool
-	width     int
-	height    int
+	textInput    textinput.Model
+	list         list.Model
+	commands     []Command
+	filtered     []list.Item
+	visible      bool
+	width        int
+	height       int
+	commandRouter *commands.CommandRouter
 }
 
 // NewCommandPalette creates a new command palette
 func NewCommandPalette() CommandPalette {
+	// Initialize command router
+	router := commands.NewCommandRouter()
+	registry := commands.NewCommandRegistry()
+	localHandler := commands.NewLocalHandler()
+	contextBuilder := commands.NewContextBuilder()
+	unifiedClient := commands.NewUnifiedClient("ws://localhost:4000/socket/websocket")
+	
+	// Initialize router with dependencies
+	router.SetRegistry(registry)
+	router.SetLocalHandler(localHandler)
+	router.SetContextBuilder(contextBuilder)
+	router.SetUnifiedClient(unifiedClient)
+	
+	// Register server commands in registry
+	registerServerCommands(registry)
+	
+	// Register local TUI commands in registry
+	registerLocalCommands(registry)
 	// Define available commands
 	commands := []Command{
 		// File operations
@@ -101,11 +121,12 @@ func NewCommandPalette() CommandPalette {
 		Bold(true)
 
 	return CommandPalette{
-		textInput: ti,
-		list:      l,
-		commands:  commands,
-		filtered:  items,
-		visible:   false,
+		textInput:     ti,
+		list:          l,
+		commands:      commands,
+		filtered:      items,
+		visible:       false,
+		commandRouter: router,
 	}
 }
 
@@ -126,7 +147,7 @@ func (cp CommandPalette) Update(msg tea.Msg) (CommandPalette, tea.Cmd) {
 		case "enter":
 			if selectedItem, ok := cp.list.SelectedItem().(Command); ok {
 				cp.visible = false
-				return cp, executeCommand(selectedItem)
+				return cp, cp.executeCommand(selectedItem)
 			}
 		case "tab", "shift+tab":
 			// Switch between input and list
@@ -222,6 +243,19 @@ func (cp CommandPalette) IsVisible() bool {
 	return cp.visible
 }
 
+// GetCommandRouter returns the command router for external use
+func (cp CommandPalette) GetCommandRouter() *commands.CommandRouter {
+	return cp.commandRouter
+}
+
+// ExecuteCommandDirectly allows external components to execute commands through the router
+func (cp *CommandPalette) ExecuteCommandDirectly(commandName string, args map[string]interface{}, tuiContext interface{}) tea.Cmd {
+	if cp.commandRouter == nil {
+		return nil
+	}
+	return cp.commandRouter.ExecuteCommand(commandName, args, tuiContext)
+}
+
 // filterCommands filters the command list based on input
 func (cp *CommandPalette) filterCommands() {
 	query := strings.ToLower(cp.textInput.Value())
@@ -283,12 +317,241 @@ func (cp *CommandPalette) updateSize() {
 	}
 }
 
-// executeCommand creates a command to execute the selected command
-func executeCommand(cmd Command) tea.Cmd {
+// executeCommand creates a command to execute the selected command using the new router
+func (cp *CommandPalette) executeCommand(cmd Command) tea.Cmd {
 	return func() tea.Msg {
-		return ExecuteCommandMsg{
-			Command: cmd.Action,
-			Args:    []string{},
+		// Create a simple TUI context for command execution
+		tuiContext := commands.TUIContext{
+			CurrentFile:   getCurrentFile(),
+			EditorContent: getEditorContent(),
+			Language:      detectLanguageFromFile(getCurrentFile()),
+			CursorLine:    getCursorLine(),
+			CursorColumn:  getCursorColumn(),
+			Metadata:      make(map[string]interface{}),
 		}
+		
+		// Convert legacy command args format to map
+		args := make(map[string]interface{})
+		if cmd.Category != "" {
+			args["category"] = cmd.Category
+		}
+		
+		// Execute command through router
+		return cp.commandRouter.ExecuteCommand(cmd.Action, args, tuiContext)
 	}
+}
+
+// Helper functions to extract TUI state - these would be implemented based on actual model structure
+func getCurrentFile() string {
+	// In a real implementation, this would access the current model state
+	return ""
+}
+
+func getEditorContent() string {
+	// In a real implementation, this would access the editor content
+	return ""
+}
+
+func detectLanguageFromFile(filename string) string {
+	// Simple language detection based on file extension
+	if strings.HasSuffix(filename, ".go") {
+		return "go"
+	}
+	if strings.HasSuffix(filename, ".js") {
+		return "javascript"
+	}
+	if strings.HasSuffix(filename, ".py") {
+		return "python"
+	}
+	if strings.HasSuffix(filename, ".ex") || strings.HasSuffix(filename, ".exs") {
+		return "elixir"
+	}
+	return "text"
+}
+
+func getCursorLine() int {
+	// In a real implementation, this would access the cursor position
+	return 1
+}
+
+func getCursorColumn() int {
+	// In a real implementation, this would access the cursor position
+	return 1
+}
+
+// registerServerCommands registers server-side commands in the registry
+func registerServerCommands(registry *commands.CommandRegistry) {
+	// Analysis commands - these run on the server
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "analyze",
+		Description: "Analyze current file for issues",
+		Category:    "Analysis",
+		Type:        commands.ServerCommand,
+		Args: []commands.ArgDef{
+			{Name: "file", Type: "file", Required: false, Description: "File to analyze"},
+		},
+		Options: []commands.OptDef{
+			{Name: "deep", Type: "bool", Default: false, Description: "Perform deep analysis"},
+		},
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "analyze_project",
+		Description: "Analyze entire project",
+		Category:    "Analysis",
+		Type:        commands.ServerCommand,
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "find_issues",
+		Description: "Find issues in current file",
+		Category:    "Analysis",
+		Type:        commands.ServerCommand,
+	})
+	
+	// Code generation commands - these run on the server
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "generate",
+		Description: "Generate code with AI",
+		Category:    "Generate",
+		Type:        commands.ServerCommand,
+		Args: []commands.ArgDef{
+			{Name: "prompt", Type: "string", Required: true, Description: "Generation prompt"},
+		},
+		Options: []commands.OptDef{
+			{Name: "language", Type: "string", Default: "go", Description: "Target language"},
+		},
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "complete",
+		Description: "Complete code at cursor",
+		Category:    "Generate",
+		Type:        commands.ServerCommand,
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "refactor",
+		Description: "Refactor selected code",
+		Category:    "Generate",
+		Type:        commands.ServerCommand,
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "generate_tests",
+		Description: "Generate tests for current code",
+		Category:    "Generate",
+		Type:        commands.ServerCommand,
+	})
+}
+
+// registerLocalCommands registers local TUI commands in the registry
+func registerLocalCommands(registry *commands.CommandRegistry) {
+	// File operations - these are local TUI operations
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "open_file",
+		Description: "Open a file in the editor",
+		Category:    "File",
+		Type:        commands.LocalCommand,
+		LocalOnly:   true,
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "save_file",
+		Description: "Save the current file",
+		Category:    "File",
+		Type:        commands.LocalCommand,
+		LocalOnly:   true,
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "new_file",
+		Description: "Create a new file",
+		Category:    "File",
+		Type:        commands.LocalCommand,
+		LocalOnly:   true,
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "close_file",
+		Description: "Close the current file",
+		Category:    "File",
+		Type:        commands.LocalCommand,
+		LocalOnly:   true,
+	})
+	
+	// UI operations - these are local to the TUI
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "toggle_tree",
+		Description: "Toggle file tree visibility",
+		Category:    "UI",
+		Type:        commands.LocalCommand,
+		LocalOnly:   true,
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "toggle_output",
+		Description: "Toggle output panel visibility",
+		Category:    "UI",
+		Type:        commands.LocalCommand,
+		LocalOnly:   true,
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "clear_output",
+		Description: "Clear output panel",
+		Category:    "UI",
+		Type:        commands.LocalCommand,
+		LocalOnly:   true,
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "toggle_theme",
+		Description: "Toggle between light/dark theme",
+		Category:    "UI",
+		Type:        commands.LocalCommand,
+		LocalOnly:   true,
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "settings",
+		Description: "Open settings dialog",
+		Category:    "UI",
+		Type:        commands.LocalCommand,
+		LocalOnly:   true,
+	})
+	
+	// Help commands - these are local
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "help",
+		Description: "Display help information",
+		Category:    "Help",
+		Type:        commands.LocalCommand,
+		LocalOnly:   true,
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "shortcuts",
+		Description: "Display keyboard shortcuts",
+		Category:    "Help",
+		Type:        commands.LocalCommand,
+		LocalOnly:   true,
+	})
+	
+	// Debug commands - these are local
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "performance_stats",
+		Description: "Show performance statistics",
+		Category:    "Debug",
+		Type:        commands.LocalCommand,
+		LocalOnly:   true,
+	})
+	
+	registry.RegisterCommand(commands.CommandDefinition{
+		Name:        "clear_cache",
+		Description: "Clear view cache",
+		Category:    "Debug",
+		Type:        commands.LocalCommand,
+		LocalOnly:   true,
+	})
 }
