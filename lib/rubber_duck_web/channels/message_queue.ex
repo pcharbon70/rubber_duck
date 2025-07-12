@@ -152,11 +152,24 @@ defmodule RubberDuckWeb.MessageQueue do
   def handle_info(:cleanup, state) do
     # Remove expired messages
     now = DateTime.utc_now()
+    now_unix = DateTime.to_unix(now, :microsecond)
 
-    expired_count =
-      :ets.select_delete(@table_name, [
-        {{:_, %{expires_at: :"$1"}}, [{:<, :"$1", now}], [true]}
-      ])
+    # Get all messages and filter them manually since ETS select_delete has limitations 
+    # with complex data types like DateTime structs in match specifications
+    all_messages = :ets.tab2list(@table_name)
+    
+    expired_keys = 
+      for {key, message} <- all_messages,
+          message.expires_at && DateTime.to_unix(message.expires_at, :microsecond) < now_unix do
+        key
+      end
+    
+    expired_count = length(expired_keys)
+    
+    # Delete expired messages
+    for key <- expired_keys do
+      :ets.delete(@table_name, key)
+    end
 
     if expired_count > 0 do
       Logger.info("Cleaned up #{expired_count} expired messages from queue")
