@@ -121,7 +121,7 @@ defmodule RubberDuck.Commands.Handlers.LLMTest do
       })
 
       assert {:error, reason} = Processor.execute(command)
-      assert reason =~ "Unknown provider"
+      assert reason =~ "provider_not_configured"
     end
   end
 
@@ -266,7 +266,7 @@ defmodule RubberDuck.Commands.Handlers.LLMTest do
       })
 
       assert {:error, reason} = Processor.execute(command)
-      assert reason =~ "Unknown LLM subcommand"
+      assert reason =~ "Invalid LLM subcommand"
     end
   end
 

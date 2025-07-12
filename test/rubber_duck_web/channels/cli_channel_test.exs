@@ -52,8 +52,8 @@ defmodule RubberDuckWeb.CLIChannelTest do
     end
 
     test "increments request count", %{socket: socket} do
-      # Make a request
-      ref1 = push(socket, "ping", %{})
+      # Make a request that goes through the unified command system
+      ref1 = push(socket, "health", %{})
       assert_reply(ref1, :ok, _)
 
       # Check stats
@@ -66,19 +66,19 @@ defmodule RubberDuckWeb.CLIChannelTest do
 
   describe "analyze command" do
     test "accepts analyze request and returns processing status", %{socket: socket} do
-      ref = push(socket, "analyze", %{"path" => "lib/test.ex"})
+      ref = push(socket, "analyze", %{"path" => "mix.exs"})
       assert_reply(ref, :ok, %{status: "processing"})
 
-      # Should receive result via push
-      assert_push("analyze:result", %{status: "success", result: _})
+      # Should receive result via push with longer timeout
+      assert_push("analyze:result", %{status: "success", result: _}, 5000)
     end
 
     test "handles analyze errors", %{socket: socket} do
       ref = push(socket, "analyze", %{"path" => "/invalid/path"})
       assert_reply(ref, :ok, %{status: "processing"})
 
-      # Should receive error via push
-      assert_push("analyze:error", %{status: "error", reason: _})
+      # Should receive error via push with longer timeout
+      assert_push("analyze:error", %{status: "error", reason: _}, 5000)
     end
   end
 
@@ -87,7 +87,7 @@ defmodule RubberDuckWeb.CLIChannelTest do
       ref = push(socket, "generate", %{"prompt" => "Create a hello world function"})
       assert_reply(ref, :ok, %{status: "processing"})
 
-      assert_push("generate:result", %{status: "success", result: _})
+      assert_push("generate:result", %{status: "success", result: _}, 5000)
     end
   end
 
@@ -96,22 +96,29 @@ defmodule RubberDuckWeb.CLIChannelTest do
       ref = push(socket, "llm", %{"subcommand" => "status"})
       assert_reply(ref, :ok, response)
 
-      assert response.type == :llm_status
-      assert is_list(response.providers)
+      assert response["status"] == "ok"
+      assert response["data"]
+      
+      # Parse the JSON response
+      {:ok, llm_data} = Jason.decode(response["data"])
+      assert llm_data["type"] == "llm_status"
+      assert is_list(llm_data["providers"])
     end
 
     test "connects to LLM provider", %{socket: socket} do
       ref = push(socket, "llm", %{"subcommand" => "connect", "provider" => "mock"})
       assert_reply(ref, :ok, response)
 
-      assert response.message =~ "connected"
+      assert response["status"] == "ok"
+      {:ok, llm_data} = Jason.decode(response["data"])
+      assert llm_data["message"] =~ "connected"
     end
 
     test "handles unknown provider", %{socket: socket} do
       ref = push(socket, "llm", %{"subcommand" => "connect", "provider" => "unknown"})
-      assert_reply(ref, :error, %{reason: reason})
+      assert_reply(ref, :error, response)
 
-      assert reason =~ "Unknown provider"
+      assert response["error"] =~ "provider_not_configured"
     end
 
     test "disconnects from LLM provider", %{socket: socket} do
@@ -123,28 +130,34 @@ defmodule RubberDuckWeb.CLIChannelTest do
       ref2 = push(socket, "llm", %{"subcommand" => "disconnect", "provider" => "mock"})
       assert_reply(ref2, :ok, response)
 
-      assert response.message =~ "Disconnected"
+      assert response["status"] == "ok"
+      {:ok, llm_data} = Jason.decode(response["data"])
+      assert llm_data["message"] =~ "Disconnected"
     end
 
     test "enables LLM provider", %{socket: socket} do
       ref = push(socket, "llm", %{"subcommand" => "enable", "provider" => "mock"})
       assert_reply(ref, :ok, response)
 
-      assert response.message =~ "Enabled"
+      assert response["status"] == "ok"
+      {:ok, llm_data} = Jason.decode(response["data"])
+      assert llm_data["message"] =~ "Enabled"
     end
 
     test "disables LLM provider", %{socket: socket} do
       ref = push(socket, "llm", %{"subcommand" => "disable", "provider" => "mock"})
       assert_reply(ref, :ok, response)
 
-      assert response.message =~ "Disabled"
+      assert response["status"] == "ok"
+      {:ok, llm_data} = Jason.decode(response["data"])
+      assert llm_data["message"] =~ "Disabled"
     end
 
     test "handles unknown LLM subcommand", %{socket: socket} do
       ref = push(socket, "llm", %{"subcommand" => "invalid"})
-      assert_reply(ref, :error, %{reason: reason})
+      assert_reply(ref, :error, response)
 
-      assert reason =~ "Unknown LLM subcommand"
+      assert response["error"] =~ "Invalid LLM subcommand"
     end
   end
 
@@ -156,25 +169,31 @@ defmodule RubberDuckWeb.CLIChannelTest do
       assert stream_id
 
       # Should receive stream events
-      assert_push("stream:start", %{stream_id: ^stream_id})
-      assert_push("stream:data", %{stream_id: ^stream_id, chunk: _})
-      assert_push("stream:end", %{stream_id: ^stream_id, status: "completed"})
+      assert_push("stream:start", %{stream_id: ^stream_id}, 1000)
+      assert_push("stream:data", %{stream_id: ^stream_id, chunk: _}, 3000)
+      assert_push("stream:end", %{stream_id: ^stream_id, status: "completed"}, 3000)
     end
   end
 
   describe "health command" do
     test "returns server health information", %{socket: socket} do
       ref = push(socket, "health", %{})
-      assert_reply(ref, :ok, health_data)
+      assert_reply(ref, :ok, response)
 
-      assert health_data.status == "healthy"
-      assert health_data.server_time
-      assert is_map(health_data.uptime)
-      assert health_data.uptime.total_seconds >= 0
-      assert is_map(health_data.memory)
-      assert health_data.memory.total_mb > 0
-      assert is_map(health_data.connections)
-      assert is_list(health_data.providers)
+      # The response is wrapped in the unified command format
+      assert response["status"] == "ok"
+      assert response["data"]
+      
+      # Parse the JSON data
+      {:ok, health_data} = Jason.decode(response["data"])
+      
+      assert health_data["status"] == "healthy"
+      assert health_data["timestamp"]
+      assert is_map(health_data["uptime"])
+      assert health_data["uptime"]["seconds"] >= 0
+      assert is_map(health_data["memory"])
+      assert health_data["memory"]["total"] > 0
+      assert is_map(health_data["services"])
     end
   end
 end

@@ -87,10 +87,9 @@ defmodule RubberDuck.Commands.Adapters.WebSocket do
         Map.put(response, "data", data)
         
       {:error, reason} ->
-        %{response | 
-          "status" => "error",
-          "error" => to_string(reason)
-        }
+        response
+        |> Map.put("status", "error")
+        |> Map.put("error", to_string(reason))
     end
   end
 

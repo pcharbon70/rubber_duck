@@ -12,10 +12,18 @@ defmodule RubberDuck.Commands.Handlers.Health do
 
   @impl true
   def execute(%Command{name: :health} = _command) do
+    uptime_ms = get_uptime()
+    
     health_data = %{
       status: "healthy",
       timestamp: DateTime.utc_now(),
-      uptime: get_uptime(),
+      uptime: %{
+        milliseconds: uptime_ms,
+        seconds: div(uptime_ms, 1000),
+        minutes: div(uptime_ms, 60_000),
+        hours: div(uptime_ms, 3_600_000),
+        days: div(uptime_ms, 86_400_000)
+      },
       memory: get_memory_info(),
       services: check_services()
     }

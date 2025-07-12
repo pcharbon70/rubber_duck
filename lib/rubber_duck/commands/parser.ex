@@ -50,7 +50,37 @@ defmodule RubberDuck.Commands.Parser do
   end
 
   # WebSocket message parsing
+  defp parse_websocket_message(%{"event" => event, "payload" => payload} = message, context) do
+    # Handle messages from the WebSocket adapter
+    try do
+      name = String.to_atom(event)
+      {args, options} = extract_websocket_args_and_options(payload, name)
+      format = determine_format(options, :websocket)
+      
+      # Handle LLM subcommands
+      {name, subcommand} = case name do
+        :llm -> 
+          subcommand = payload["subcommand"] && String.to_atom(payload["subcommand"])
+          {:llm, subcommand}
+        _ -> {name, nil}
+      end
+      
+      Command.new(%{
+        name: name,
+        subcommand: subcommand,
+        args: args,
+        options: options,
+        context: context,
+        client_type: :websocket,
+        format: format
+      })
+    rescue
+      e -> {:error, Exception.message(e)}
+    end
+  end
+  
   defp parse_websocket_message(%{"command" => command_name} = message, context) do
+    # Handle direct command format
     try do
       name = String.to_atom(command_name)
       args = Map.get(message, "args", %{}) |> atomize_keys()
@@ -177,6 +207,33 @@ defmodule RubberDuck.Commands.Parser do
            |> atomize_keys()
     options = Map.drop(params, ["command", "description", "path", "file", "instruction", "action"])
               |> atomize_keys()
+    {args, options}
+  end
+
+  # Extract args and options for WebSocket
+  defp extract_websocket_args_and_options(payload, :analyze) do
+    args = %{path: Map.get(payload, "path")}
+    options = Map.take(payload, ["type", "recursive"]) |> atomize_keys()
+    {args, options}
+  end
+  
+  defp extract_websocket_args_and_options(payload, :generate) do
+    args = %{description: Map.get(payload, "prompt")}
+    options = Map.take(payload, ["language", "output"]) |> atomize_keys()
+    {args, options}
+  end
+  
+  defp extract_websocket_args_and_options(payload, :llm) do
+    # For LLM commands, args include provider info
+    args = %{provider: Map.get(payload, "provider")}
+    options = Map.drop(payload, ["subcommand", "provider"]) |> atomize_keys()
+    {args, options}
+  end
+
+  defp extract_websocket_args_and_options(payload, _command) do
+    # Default: all payload goes to args
+    args = Map.drop(payload, ["subcommand"]) |> atomize_keys()
+    options = %{}
     {args, options}
   end
 

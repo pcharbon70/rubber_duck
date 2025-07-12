@@ -39,12 +39,7 @@ defmodule RubberDuckWeb.CLIChannel do
     request_id = Map.get(params, "request_id")
 
     Task.start_link(fn ->
-      payload = %{
-        "command" => command,
-        "params" => params
-      }
-
-      case CommandAdapter.handle_async_message("cli:commands", payload, socket) do
+      case CommandAdapter.handle_async_message(command, params, socket) do
         {:ok, %{request_id: async_request_id}} ->
           # Monitor the async request and push updates
           monitor_async_command(command, async_request_id, request_id, socket)
@@ -69,12 +64,7 @@ defmodule RubberDuckWeb.CLIChannel do
     request_id = Map.get(params, "request_id")
 
     # Handle synchronously for LLM commands as they are typically quick
-    payload = %{
-      "command" => "llm",
-      "params" => params
-    }
-
-    case CommandAdapter.handle_message("cli:commands", payload, socket) do
+    case CommandAdapter.handle_message("llm", params, socket) do
       {:ok, result} ->
         response = CommandAdapter.build_response({:ok, result}, request_id)
         {:reply, {:ok, response}, socket}
@@ -111,12 +101,7 @@ defmodule RubberDuckWeb.CLIChannel do
     socket = increment_request_count(socket)
     request_id = Map.get(params, "request_id")
 
-    payload = %{
-      "command" => "health",
-      "params" => params
-    }
-
-    case CommandAdapter.handle_message("cli:commands", payload, socket) do
+    case CommandAdapter.handle_message("health", params, socket) do
       {:ok, result} ->
         response = CommandAdapter.build_response({:ok, result}, request_id)
         {:reply, {:ok, response}, socket}
