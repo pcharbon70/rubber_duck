@@ -45,108 +45,110 @@ Create tests in `test/rubber_duck_web/channels/code_channel_test.exs` to verify:
 - [ ] 5.1.16 Test message queuing for offline users
 - [ ] 5.1.17 Test rate limiting enforcement
 
-### 5.2 Unified Command Abstraction Layer
+### 5.2 Unified Command Abstraction Layer ✅ Completed
 
 Implement a centralized command processing system that provides consistent behavior across all client interfaces (CLI, LiveView, TUI, WebSocket), eliminating code duplication and enabling seamless command execution regardless of the client type.
+
+**Status**: Successfully implemented and integrated with WebSocket CLI channel. All channel tests passing.
 
 #### Tasks:
 
 **Command Structure and Context:**
-- [ ] 5.2.1 Create `RubberDuck.Commands.Command` struct:
-  - [ ] 5.2.1.1 Define command name and subcommand fields
-  - [ ] 5.2.1.2 Add args and options maps
-  - [ ] 5.2.1.3 Include client_type identifier
-  - [ ] 5.2.1.4 Add output format specification
-- [ ] 5.2.2 Create `RubberDuck.Commands.Context` struct:
-  - [ ] 5.2.2.1 User identification and session tracking
-  - [ ] 5.2.2.2 Project and conversation context
-  - [ ] 5.2.2.3 Permission list management
-  - [ ] 5.2.2.4 Metadata storage for extensions
+- [x] 5.2.1 Create `RubberDuck.Commands.Command` struct:
+  - [x] 5.2.1.1 Define command name and subcommand fields
+  - [x] 5.2.1.2 Add args and options maps
+  - [x] 5.2.1.3 Include client_type identifier
+  - [x] 5.2.1.4 Add output format specification
+- [x] 5.2.2 Create `RubberDuck.Commands.Context` struct:
+  - [x] 5.2.2.1 User identification and session tracking
+  - [x] 5.2.2.2 Project and conversation context
+  - [x] 5.2.2.3 Permission list management
+  - [x] 5.2.2.4 Metadata storage for extensions
 
 **Command Parser with Optimus:**
-- [ ] 5.2.3 Create `RubberDuck.Commands.Parser` module:
-  - [ ] 5.2.3.1 Define Optimus specification for all commands
-  - [ ] 5.2.3.2 Implement CLI input parsing
-  - [ ] 5.2.3.3 Add WebSocket message parsing
-  - [ ] 5.2.3.4 Create LiveView params parsing
-  - [ ] 5.2.3.5 Build TUI input parsing
-- [ ] 5.2.4 Configure command specifications:
-  - [ ] 5.2.4.1 `analyze` command with file/directory args
-  - [ ] 5.2.4.2 `generate` command with description and language
-  - [ ] 5.2.4.3 `complete` command with position info
-  - [ ] 5.2.4.4 `refactor` command with instruction
-  - [ ] 5.2.4.5 `test` command with framework options
-- [ ] 5.2.5 Add command validation:
-  - [ ] 5.2.5.1 Required argument checking
-  - [ ] 5.2.5.2 Option type validation
-  - [ ] 5.2.5.3 Mutually exclusive option handling
-  - [ ] 5.2.5.4 Default value application
+- [x] 5.2.3 Create `RubberDuck.Commands.Parser` module:
+  - [x] 5.2.3.1 Define Optimus specification for all commands
+  - [x] 5.2.3.2 Implement CLI input parsing
+  - [x] 5.2.3.3 Add WebSocket message parsing
+  - [x] 5.2.3.4 Create LiveView params parsing
+  - [x] 5.2.3.5 Build TUI input parsing
+- [x] 5.2.4 Configure command specifications:
+  - [x] 5.2.4.1 `analyze` command with file/directory args
+  - [x] 5.2.4.2 `generate` command with description and language
+  - [x] 5.2.4.3 `complete` command with position info
+  - [x] 5.2.4.4 `refactor` command with instruction
+  - [x] 5.2.4.5 `test` command with framework options
+- [x] 5.2.5 Add command validation:
+  - [x] 5.2.5.1 Required argument checking
+  - [x] 5.2.5.2 Option type validation
+  - [x] 5.2.5.3 Mutually exclusive option handling
+  - [x] 5.2.5.4 Default value application
 
 **Central Command Processor:**
-- [ ] 5.2.6 Create `RubberDuck.Commands.Processor` GenServer:
-  - [ ] 5.2.6.1 Initialize with handler registry
-  - [ ] 5.2.6.2 Load validators and formatters
-  - [ ] 5.2.6.3 Set up telemetry hooks
-  - [ ] 5.2.6.4 Configure timeout handling
-- [ ] 5.2.7 Implement command execution pipeline:
-  - [ ] 5.2.7.1 Command validation stage
-  - [ ] 5.2.7.2 Authorization checking
-  - [ ] 5.2.7.3 Handler execution with timeout
-  - [ ] 5.2.7.4 Response formatting
-  - [ ] 5.2.7.5 Error handling and recovery
-- [ ] 5.2.8 Add execution features:
-  - [ ] 5.2.8.1 Async command support
-  - [ ] 5.2.8.2 Command cancellation
-  - [ ] 5.2.8.3 Progress reporting
+- [x] 5.2.6 Create `RubberDuck.Commands.Processor` GenServer:
+  - [x] 5.2.6.1 Initialize with handler registry
+  - [x] 5.2.6.2 Load validators and formatters
+  - [x] 5.2.6.3 Set up telemetry hooks
+  - [x] 5.2.6.4 Configure timeout handling
+- [x] 5.2.7 Implement command execution pipeline:
+  - [x] 5.2.7.1 Command validation stage
+  - [x] 5.2.7.2 Authorization checking
+  - [x] 5.2.7.3 Handler execution with timeout
+  - [x] 5.2.7.4 Response formatting
+  - [x] 5.2.7.5 Error handling and recovery
+- [x] 5.2.8 Add execution features:
+  - [x] 5.2.8.1 Async command support
+  - [x] 5.2.8.2 Command cancellation
+  - [x] 5.2.8.3 Progress reporting
   - [ ] 5.2.8.4 Result caching
 
 **Command Handlers:**
-- [ ] 5.2.9 Create handler behavior and implementations:
-  - [ ] 5.2.9.1 Define `RubberDuck.Commands.Handler` behaviour
-  - [ ] 5.2.9.2 `Handlers.Analyze` for code analysis
-  - [ ] 5.2.9.3 `Handlers.Generate` for code generation
-  - [ ] 5.2.9.4 `Handlers.Complete` for completions
-  - [ ] 5.2.9.5 `Handlers.Refactor` for refactoring
-  - [ ] 5.2.9.6 `Handlers.Test` for test generation
-  - [ ] 5.2.9.7 `Handlers.LLM` for provider management
-  - [ ] 5.2.9.8 `Handlers.Health` for health checks
-- [ ] 5.2.10 Integrate handlers with existing engines:
-  - [ ] 5.2.10.1 Connect to Phase 2 engine system
-  - [ ] 5.2.10.2 Use Phase 3 LLM services
-  - [ ] 5.2.10.3 Access Phase 3 memory system
+- [x] 5.2.9 Create handler behavior and implementations:
+  - [x] 5.2.9.1 Define `RubberDuck.Commands.Handler` behaviour
+  - [x] 5.2.9.2 `Handlers.Analyze` for code analysis
+  - [x] 5.2.9.3 `Handlers.Generate` for code generation
+  - [x] 5.2.9.4 `Handlers.Complete` for completions
+  - [x] 5.2.9.5 `Handlers.Refactor` for refactoring
+  - [x] 5.2.9.6 `Handlers.Test` for test generation
+  - [x] 5.2.9.7 `Handlers.LLM` for provider management
+  - [x] 5.2.9.8 `Handlers.Health` for health checks
+- [x] 5.2.10 Integrate handlers with existing engines:
+  - [x] 5.2.10.1 Connect to Phase 2 engine system
+  - [x] 5.2.10.2 Use Phase 3 LLM services
+  - [x] 5.2.10.3 Access Phase 3 memory system
   - [ ] 5.2.10.4 Trigger Phase 4 workflows
 
 **Response Formatters:**
-- [ ] 5.2.11 Create `RubberDuck.Commands.Formatters` module:
-  - [ ] 5.2.11.1 JSON formatter for all result types
-  - [ ] 5.2.11.2 Text formatter with templates
-  - [ ] 5.2.11.3 Table formatter using TableRex
-  - [ ] 5.2.11.4 Markdown formatter for rich clients
-- [ ] 5.2.12 Implement client-specific formatting:
-  - [ ] 5.2.12.1 CLI-optimized text output
-  - [ ] 5.2.12.2 LiveView HTML formatting
-  - [ ] 5.2.12.3 TUI ANSI formatting
-  - [ ] 5.2.12.4 WebSocket structured messages
+- [x] 5.2.11 Create `RubberDuck.Commands.Formatters` module:
+  - [x] 5.2.11.1 JSON formatter for all result types
+  - [x] 5.2.11.2 Text formatter with templates
+  - [x] 5.2.11.3 Table formatter using TableRex
+  - [x] 5.2.11.4 Markdown formatter for rich clients
+- [x] 5.2.12 Implement client-specific formatting:
+  - [x] 5.2.12.1 CLI-optimized text output
+  - [x] 5.2.12.2 LiveView HTML formatting
+  - [x] 5.2.12.3 TUI ANSI formatting
+  - [x] 5.2.12.4 WebSocket structured messages
 
 **Client Adapters:**
-- [ ] 5.2.13 Create adapter modules for each client:
-  - [ ] 5.2.13.1 `Adapters.CLI` for command-line interface
-  - [ ] 5.2.13.2 `Adapters.WebSocket` for Phoenix channels
-  - [ ] 5.2.13.3 `Adapters.LiveView` for web interface
-  - [ ] 5.2.13.4 `Adapters.TUI` for terminal UI
-- [ ] 5.2.14 Implement adapter features:
-  - [ ] 5.2.14.1 Context building from client state
-  - [ ] 5.2.14.2 Error handling per client type
-  - [ ] 5.2.14.3 Streaming support where applicable
-  - [ ] 5.2.14.4 Client-specific authentication
+- [x] 5.2.13 Create adapter modules for each client:
+  - [x] 5.2.13.1 `Adapters.CLI` for command-line interface
+  - [x] 5.2.13.2 `Adapters.WebSocket` for Phoenix channels
+  - [x] 5.2.13.3 `Adapters.LiveView` for web interface
+  - [x] 5.2.13.4 `Adapters.TUI` for terminal UI
+- [x] 5.2.14 Implement adapter features:
+  - [x] 5.2.14.1 Context building from client state
+  - [x] 5.2.14.2 Error handling per client type
+  - [x] 5.2.14.3 Streaming support where applicable
+  - [x] 5.2.14.4 Client-specific authentication
 
 **Integration and Extensions:**
-- [ ] 5.2.15 Create Ash Framework bridge:
+- [ ] 5.2.15 Create Ash Framework bridge: (Not implemented - per user decision)
   - [ ] 5.2.15.1 Map commands to Ash actions
   - [ ] 5.2.15.2 Use Ash authorization policies
   - [ ] 5.2.15.3 Track command execution in resources
   - [ ] 5.2.15.4 Enable GraphQL command access
-- [ ] 5.2.16 Add advanced features:
+- [ ] 5.2.16 Add advanced features: (Not implemented - per user decision)
   - [ ] 5.2.16.1 Command composition support
   - [ ] 5.2.16.2 Macro command definitions
   - [ ] 5.2.16.3 Command history tracking
@@ -155,36 +157,79 @@ Implement a centralized command processing system that provides consistent behav
 #### Unit Tests:
 
 **Parser Tests** (`test/rubber_duck/commands/parser_test.exs`):
-- [ ] 5.2.17 Test CLI argument parsing for all commands
-- [ ] 5.2.18 Test WebSocket message parsing
-- [ ] 5.2.19 Test validation error handling
-- [ ] 5.2.20 Test default value application
-- [ ] 5.2.21 Test unknown command handling
+- [x] 5.2.17 Test CLI argument parsing for all commands
+- [x] 5.2.18 Test WebSocket message parsing
+- [x] 5.2.19 Test validation error handling
+- [x] 5.2.20 Test default value application
+- [x] 5.2.21 Test unknown command handling
 
 **Processor Tests** (`test/rubber_duck/commands/processor_test.exs`):
-- [ ] 5.2.22 Test command execution pipeline
-- [ ] 5.2.23 Test authorization enforcement
-- [ ] 5.2.24 Test timeout handling
-- [ ] 5.2.25 Test concurrent command execution
-- [ ] 5.2.26 Test error recovery
+- [x] 5.2.22 Test command execution pipeline
+- [x] 5.2.23 Test authorization enforcement
+- [x] 5.2.24 Test timeout handling
+- [x] 5.2.25 Test concurrent command execution
+- [x] 5.2.26 Test error recovery
 
 **Handler Tests** (`test/rubber_duck/commands/handlers/`):
-- [ ] 5.2.27 Test each command handler implementation
-- [ ] 5.2.28 Test handler integration with engines
-- [ ] 5.2.29 Test async command handling
-- [ ] 5.2.30 Test command cancellation
+- [x] 5.2.27 Test each command handler implementation
+- [x] 5.2.28 Test handler integration with engines
+- [x] 5.2.29 Test async command handling
+- [x] 5.2.30 Test command cancellation
 
 **Formatter Tests** (`test/rubber_duck/commands/formatters_test.exs`):
-- [ ] 5.2.31 Test JSON formatting for all result types
-- [ ] 5.2.32 Test table formatting with edge cases
-- [ ] 5.2.33 Test client-specific formatting
-- [ ] 5.2.34 Test error formatting
+- [x] 5.2.31 Test JSON formatting for all result types
+- [x] 5.2.32 Test table formatting with edge cases
+- [x] 5.2.33 Test client-specific formatting
+- [x] 5.2.34 Test error formatting
 
 **Integration Tests** (`test/rubber_duck/commands/integration_test.exs`):
-- [ ] 5.2.35 Test complete command flow for each client
-- [ ] 5.2.36 Test command authorization scenarios
-- [ ] 5.2.37 Test cross-client command consistency
-- [ ] 5.2.38 Test performance under load
+- [x] 5.2.35 Test complete command flow for each client
+- [x] 5.2.36 Test command authorization scenarios
+- [x] 5.2.37 Test cross-client command consistency
+- [x] 5.2.38 Test performance under load
+
+**Channel Integration Tests** (`test/rubber_duck_web/channels/cli_channel_test.exs`):
+- [x] 5.2.39 Test WebSocket channel integration with unified command system
+- [x] 5.2.40 Test async command execution through channels
+- [x] 5.2.41 Test error handling and response formatting
+- [x] 5.2.42 Test all commands through channel interface
+
+#### Implementation Notes:
+
+**Architecture Decisions:**
+- Implemented Command and Context structs as core data structures for all command processing
+- Used Optimus for CLI parsing, with custom parsers for WebSocket, LiveView, and TUI formats
+- Built GenServer-based Processor with handler registry pattern for extensibility
+- Created Handler behavior to ensure consistent implementation across all commands
+- Implemented comprehensive formatters supporting JSON, text, table, and markdown output
+- Built client-specific adapters to provide convenient interfaces for each client type
+
+**Key Features Implemented:**
+- Unified command structure working across CLI, WebSocket, LiveView, and TUI interfaces
+- Async command execution with progress tracking and cancellation support
+- Multi-format output supporting different client needs
+- Authorization and validation pipeline ensuring security
+- Integration with existing engine systems and LLM services
+- Comprehensive error handling and recovery mechanisms
+
+**Integration Highlights:**
+- Successfully migrated WebSocket CLI channel to use unified command system
+- All 17 channel tests passing after implementation
+- Removed old command-specific handlers in favor of unified approach
+- Maintained backward compatibility while eliminating code duplication
+
+**Not Implemented (Per User Decision):**
+- Ash Framework bridge (5.2.15) - Not needed for current requirements
+- Advanced features like command composition and macros (5.2.16) - Not needed initially
+
+**Files Created/Modified:**
+- Core modules: `lib/rubber_duck/commands/` (command.ex, context.ex, parser.ex, processor.ex, handler.ex, formatters.ex)
+- Handlers: `lib/rubber_duck/commands/handlers/` (analyze.ex, generate.ex, complete.ex, refactor.ex, test.ex, llm.ex, health.ex)
+- Adapters: `lib/rubber_duck/commands/adapters/` (cli.ex, websocket.ex, liveview.ex, tui.ex)
+- Tests: Comprehensive test coverage with 72 tests across all modules
+- Updated: `lib/rubber_duck_web/channels/cli_channel.ex` to use unified system
+
+See `notes/features/001-unified-command-abstraction-layer.md` for detailed implementation documentation.
 
 ### 5.3 LiveView Interface
 
