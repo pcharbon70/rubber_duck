@@ -46,6 +46,9 @@ type Model struct {
 	settingsModal  SettingsModal
 	themeManager   *ThemeManager
 	
+	// Settings
+	settings       Settings
+	
 	// Performance components
 	viewCache          *ViewCache
 	performanceMonitor *PerformanceMonitor
@@ -115,6 +118,12 @@ func NewModel() Model {
 		FontSize:        14,
 		ServerURL:       "ws://localhost:5555/socket",
 		UsesMockClient:  phoenix.IsRunningInMockMode(),
+		
+		// Syntax highlighting defaults
+		UseSyntaxHighlighting: true,
+		UseChromaHighlighting: true,
+		ChromaStyle:          "monokai",
+		FallbackToCustom:     true,
 	}
 	settingsModal := NewSettingsModal(settings)
 	
@@ -128,6 +137,7 @@ func NewModel() Model {
 		modal:              modal,
 		settingsModal:      settingsModal,
 		themeManager:       themeManager,
+		settings:           settings,
 		viewCache:          viewCache,
 		performanceMonitor: performanceMonitor,
 		saveDebouncer:      saveDebouncer,
@@ -148,6 +158,33 @@ func (m *Model) SetTheme(themeName string) bool {
 // GetAvailableThemes returns all available theme names
 func (m Model) GetAvailableThemes() []string {
 	return m.themeManager.GetThemeNames()
+}
+
+// UpdateSettings updates the model settings and applies them
+func (m *Model) UpdateSettings(newSettings Settings) {
+	m.settings = newSettings
+	
+	// Apply theme if changed
+	if m.themeManager.GetCurrentThemeName() != newSettings.Theme {
+		m.SetTheme(newSettings.Theme)
+	}
+}
+
+// GetSettings returns the current settings
+func (m Model) GetSettings() Settings {
+	return m.settings
+}
+
+// CreateSyntaxHighlighter creates a syntax highlighter configured with current settings
+func (m Model) CreateSyntaxHighlighter() *SyntaxHighlighter {
+	highlighter := NewSyntaxHighlighter(m.GetTheme())
+	
+	// Apply settings
+	highlighter.SetChromaEnabled(m.settings.UseChromaHighlighting)
+	highlighter.SetChromaStyle(m.settings.ChromaStyle)
+	highlighter.SetFallbackEnabled(m.settings.FallbackToCustom)
+	
+	return highlighter
 }
 
 // triggerDebouncedSave triggers a debounced auto-save operation
