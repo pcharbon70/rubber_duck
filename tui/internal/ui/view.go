@@ -7,39 +7,59 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Styles
-var (
-	// Border styles
-	activeStyle = lipgloss.NewStyle().
+// ThemedStyles contains all UI styles based on the current theme
+type ThemedStyles struct {
+	activeStyle       lipgloss.Style
+	inactiveStyle     lipgloss.Style
+	statusBarStyle    lipgloss.Style
+	selectedFileStyle lipgloss.Style
+	dirStyle          lipgloss.Style
+	fileStyle         lipgloss.Style
+}
+
+// getThemedStyles returns styles based on current theme
+func (m Model) getThemedStyles() ThemedStyles {
+	theme := m.GetTheme()
+	
+	return ThemedStyles{
+		activeStyle: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("62"))
-
-	inactiveStyle = lipgloss.NewStyle().
+			BorderForeground(theme.Selection),
+		
+		inactiveStyle: lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder()).
-			BorderForeground(lipgloss.Color("240"))
-
-	// Status bar style
-	statusBarStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")).
-			Background(lipgloss.Color("235"))
-
-	// File tree styles
-	selectedFileStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("212")).
-				Background(lipgloss.Color("236"))
-
-	dirStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("33"))
-
-	fileStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("252"))
-)
+			BorderForeground(theme.Border),
+		
+		statusBarStyle: lipgloss.NewStyle().
+			Foreground(theme.StatusBarText).
+			Background(theme.StatusBar),
+		
+		selectedFileStyle: lipgloss.NewStyle().
+			Foreground(theme.TreeSelected).
+			Background(theme.Selection),
+		
+		dirStyle: lipgloss.NewStyle().
+			Foreground(theme.TreeDirectory),
+		
+		fileStyle: lipgloss.NewStyle().
+			Foreground(theme.TreeFile),
+	}
+}
 
 // View renders the entire UI
 func (m Model) View() string {
 	if m.width == 0 || m.height == 0 {
 		return "Loading..."
 	}
+
+	// Start performance monitoring
+	if m.performanceMonitor != nil {
+		m.performanceMonitor.StartRender()
+		defer m.performanceMonitor.EndRender()
+	}
+
+	// Get themed styles
+	styles := m.getThemedStyles()
 
 	// Calculate dimensions
 	sidebarWidth := 30
@@ -48,9 +68,9 @@ func (m Model) View() string {
 	contentHeight := m.height - 3                            // status bar
 
 	// Build panes
-	fileTree := m.renderFileTree(sidebarWidth, contentHeight)
-	editor := m.renderEditor(editorWidth, contentHeight)
-	output := m.renderOutput(outputWidth, contentHeight)
+	fileTree := m.renderFileTree(sidebarWidth, contentHeight, styles)
+	editor := m.renderEditor(editorWidth, contentHeight, styles)
+	output := m.renderOutput(outputWidth, contentHeight, styles)
 
 	// Combine horizontally
 	main := lipgloss.JoinHorizontal(
@@ -61,7 +81,7 @@ func (m Model) View() string {
 	)
 
 	// Add status bar
-	statusBar := m.renderStatusBar()
+	statusBar := m.renderStatusBar(styles)
 
 	// Combine main UI
 	ui := lipgloss.JoinVertical(
@@ -89,10 +109,10 @@ func (m Model) View() string {
 }
 
 // renderFileTree renders the file tree pane
-func (m Model) renderFileTree(width, height int) string {
-	style := inactiveStyle
+func (m Model) renderFileTree(width, height int, styles ThemedStyles) string {
+	style := styles.inactiveStyle
 	if m.activePane == FileTreePane {
-		style = activeStyle
+		style = styles.activeStyle
 	}
 
 	content := m.buildFileTreeContent()
@@ -118,31 +138,39 @@ func (m Model) buildFileTreeContent() string {
 }
 
 // renderEditor renders the editor pane
-func (m Model) renderEditor(width, height int) string {
-	style := inactiveStyle
+func (m Model) renderEditor(width, height int, styles ThemedStyles) string {
+	style := styles.inactiveStyle
 	if m.activePane == EditorPane {
-		style = activeStyle
+		style = styles.activeStyle
 	}
 
 	// Add title to editor
 	title := " Editor"
-	if m.editor.Value() != "" {
-		title = " Editor - main.go" // TODO: Show actual filename
+	if m.currentFile != "" {
+		title = " Editor - " + m.currentFile
 	}
 
-	editorView := m.editor.View()
+	// Get editor content and apply syntax highlighting
+	editorContent := m.editor.Value()
+	if m.currentFile != "" && editorContent != "" {
+		language := DetectLanguageFromExtension(m.currentFile)
+		highlighter := NewSyntaxHighlighter(m.GetTheme())
+		editorContent = highlighter.HighlightCode(editorContent, language)
+	} else {
+		editorContent = m.editor.View()
+	}
 
 	return style.
 		Width(width).
 		Height(height).
-		Render(title + "\n" + editorView)
+		Render(title + "\n" + editorContent)
 }
 
 // renderOutput renders the output pane
-func (m Model) renderOutput(width, height int) string {
-	style := inactiveStyle
+func (m Model) renderOutput(width, height int, styles ThemedStyles) string {
+	style := styles.inactiveStyle
 	if m.activePane == OutputPane {
-		style = activeStyle
+		style = styles.activeStyle
 	}
 
 	title := " Output"
@@ -159,7 +187,7 @@ func (m Model) renderOutput(width, height int) string {
 }
 
 // renderStatusBar renders the status bar
-func (m Model) renderStatusBar() string {
+func (m Model) renderStatusBar(styles ThemedStyles) string {
 	width := m.width
 
 	// Connection indicator
@@ -177,5 +205,5 @@ func (m Model) renderStatusBar() string {
 		status += strings.Repeat(" ", padding)
 	}
 
-	return statusBarStyle.Render(status)
+	return styles.statusBarStyle.Render(status)
 }

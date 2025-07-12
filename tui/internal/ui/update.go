@@ -13,6 +13,12 @@ import (
 
 // Update handles all state transitions
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Start performance monitoring
+	if m.performanceMonitor != nil {
+		m.performanceMonitor.StartUpdate()
+		defer m.performanceMonitor.EndUpdate()
+	}
+	
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -59,6 +65,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Show help modal
 			m.modal.ShowHelp()
 			return m, nil
+		case "ctrl+shift+t":
+			// Toggle theme shortcut
+			currentTheme := m.themeManager.GetCurrentThemeName()
+			if currentTheme == "dark" {
+				m.themeManager.SetTheme("light")
+				m.statusBar = "Switched to light theme"
+			} else {
+				m.themeManager.SetTheme("dark")
+				m.statusBar = "Switched to dark theme"
+			}
+			return m, nil
 		}
 
 		// Handle command palette if visible
@@ -77,10 +94,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, cmd)
 			}
 		case EditorPane:
+			prevValue := m.editor.Value()
 			var cmd tea.Cmd
 			m.editor, cmd = m.editor.Update(msg)
 			if cmd != nil {
 				cmds = append(cmds, cmd)
+			}
+			
+			// Check if content changed and trigger debounced auto-save
+			if m.editor.Value() != prevValue {
+				m.modified = true
+				m.triggerDebouncedSave()
 			}
 		case OutputPane:
 			var cmd tea.Cmd
@@ -191,6 +215,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case StreamEndMsg:
 		content := m.output.View() + "\n--- Stream Complete ---\n"
 		m.output.SetContent(content)
+		return m, nil
+		
+	case AutoSaveMsg:
+		// Handle auto-save operation
+		m.statusBar = fmt.Sprintf("Auto-saved: %s", msg.File)
+		// TODO: Implement actual file saving logic
 		return m, nil
 	}
 
@@ -372,11 +402,20 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 		return m, nil
 		
 	case "settings":
+		// Set available themes before showing settings
+		m.settingsModal.SetAvailableThemes(m.GetAvailableThemes())
+		
 		m.settingsModal.ShowSettings(func(settings Settings, saved bool) {
 			if saved {
 				// Apply settings
 				m.editor.ShowLineNumbers = settings.ShowLineNumbers
-				// TODO: Apply other settings
+				
+				// Apply theme change
+				if m.SetTheme(settings.Theme) {
+					m.statusBar = fmt.Sprintf("Settings saved - Theme: %s", settings.Theme)
+				} else {
+					m.statusBar = "Settings saved"
+				}
 			}
 		})
 		return m, nil
@@ -422,6 +461,35 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 	case "clear_output":
 		m.output.SetContent("")
 		m.statusBar = "Output cleared"
+		return m, nil
+		
+	case "performance_stats":
+		stats := m.GetPerformanceStats()
+		if stats != nil {
+			avgRender := stats["avg_render_time"]
+			avgUpdate := stats["avg_update_time"]
+			m.output.SetContent(fmt.Sprintf("Performance Statistics:\nAverage Render Time: %v\nAverage Update Time: %v\nRender Samples: %v\nUpdate Samples: %v", 
+				avgRender, avgUpdate, stats["render_samples"], stats["update_samples"]))
+			m.statusBar = "Performance statistics displayed"
+		} else {
+			m.statusBar = "Performance monitoring not available"
+		}
+		return m, nil
+		
+	case "clear_cache":
+		m.ClearViewCache()
+		m.statusBar = "View cache cleared"
+		return m, nil
+		
+	case "toggle_theme":
+		currentTheme := m.themeManager.GetCurrentThemeName()
+		if currentTheme == "dark" {
+			m.themeManager.SetTheme("light")
+			m.statusBar = "Switched to light theme"
+		} else {
+			m.themeManager.SetTheme("dark")
+			m.statusBar = "Switched to dark theme"
+		}
 		return m, nil
 		
 	default:

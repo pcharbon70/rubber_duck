@@ -23,11 +23,12 @@ type Settings struct {
 // SettingsModal is a specialized modal for settings
 type SettingsModal struct {
 	Modal
-	settings      Settings
-	tempSettings  Settings // For editing
-	selectedField int
-	inputs        []textinput.Model
-	editing       bool
+	settings       Settings
+	tempSettings   Settings // For editing
+	selectedField  int
+	inputs         []textinput.Model
+	editing        bool
+	availableThemes []string
 }
 
 // NewSettingsModal creates a new settings modal
@@ -59,7 +60,36 @@ func NewSettingsModal(currentSettings Settings) SettingsModal {
 			tabSizeInput,
 			fontSizeInput,
 		},
+		availableThemes: []string{"dark", "light", "solarized-dark", "dracula"},
 	}
+}
+
+// SetAvailableThemes updates the list of available themes
+func (m *SettingsModal) SetAvailableThemes(themes []string) {
+	m.availableThemes = themes
+}
+
+// cycleTheme moves to the next theme in the list
+func (m *SettingsModal) cycleTheme(forward bool) {
+	if len(m.availableThemes) == 0 {
+		return
+	}
+	
+	currentIndex := 0
+	for i, theme := range m.availableThemes {
+		if theme == m.tempSettings.Theme {
+			currentIndex = i
+			break
+		}
+	}
+	
+	if forward {
+		currentIndex = (currentIndex + 1) % len(m.availableThemes)
+	} else {
+		currentIndex = (currentIndex - 1 + len(m.availableThemes)) % len(m.availableThemes)
+	}
+	
+	m.tempSettings.Theme = m.availableThemes[currentIndex]
 }
 
 // ShowSettings displays the settings modal
@@ -147,6 +177,18 @@ func (m SettingsModal) Update(msg tea.Msg) (SettingsModal, tea.Cmd) {
 			maxField := 6 // Number of settings fields
 			if m.selectedField < maxField {
 				m.selectedField++
+			}
+			
+		case "left", "h":
+			// Cycle theme backwards if on theme field
+			if m.selectedField == 0 {
+				m.cycleTheme(false)
+			}
+			
+		case "right", "l":
+			// Cycle theme forwards if on theme field
+			if m.selectedField == 0 {
+				m.cycleTheme(true)
 			}
 			
 		case "enter", " ":
@@ -351,11 +393,7 @@ func (m SettingsModal) View() string {
 func (m *SettingsModal) toggleOrEditField() {
 	switch m.selectedField {
 	case 0: // Theme
-		if m.tempSettings.Theme == "dark" {
-			m.tempSettings.Theme = "light"
-		} else {
-			m.tempSettings.Theme = "dark"
-		}
+		m.cycleTheme(true)
 		
 	case 1: // Show Line Numbers
 		m.tempSettings.ShowLineNumbers = !m.tempSettings.ShowLineNumbers

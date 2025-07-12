@@ -65,6 +65,10 @@ func NewCommandPalette() CommandPalette {
 		// Help
 		{Name: "Show Help", Desc: "Display help information", Shortcut: "F1", Action: "help", Category: "Help"},
 		{Name: "Show Shortcuts", Desc: "Display keyboard shortcuts", Shortcut: "?", Action: "shortcuts", Category: "Help"},
+		
+		// Performance
+		{Name: "Performance Stats", Desc: "Show performance statistics", Shortcut: "", Action: "performance_stats", Category: "Debug"},
+		{Name: "Clear Cache", Desc: "Clear view cache", Shortcut: "", Action: "clear_cache", Category: "Debug"},
 	}
 
 	// Create text input

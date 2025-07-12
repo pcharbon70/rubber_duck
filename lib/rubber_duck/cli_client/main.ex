@@ -5,8 +5,7 @@ defmodule RubberDuck.CLIClient.Main do
   This module handles command-line parsing and routing to appropriate handlers.
   """
 
-  alias RubberDuck.CLIClient.{Client, Auth, Formatter}
-  alias RubberDuck.CLIClient.Commands
+  alias RubberDuck.CLIClient.{Auth, UnifiedIntegration}
 
   @app_name "rubber_duck"
   @app_description "RubberDuck AI-powered coding assistant CLI"
@@ -136,7 +135,7 @@ defmodule RubberDuck.CLIClient.Main do
   end
 
   defp execute_command(:auth, args, opts) do
-    Commands.Auth.run(args, opts)
+    RubberDuck.CLIClient.Commands.Auth.run(args, opts)
   end
 
   defp execute_command(command, args, opts) do
@@ -150,42 +149,98 @@ defmodule RubberDuck.CLIClient.Main do
       System.halt(1)
     end
 
-    # Start the client with the server URL from auth or options
-    server_url = opts[:server] || Auth.get_server_url()
-    {:ok, _pid} = Client.start_link(url: server_url)
+    # Build configuration for unified integration
+    config = %{
+      user_id: Auth.get_user_id(),
+      session_id: "cli_#{System.system_time(:millisecond)}",
+      permissions: [:read, :write, :execute],
+      format: opts[:format],
+      server_url: opts[:server] || Auth.get_server_url(),
+      metadata: %{
+        cli_version: @app_version,
+        verbose: opts[:verbose],
+        debug: opts[:debug]
+      }
+    }
 
-    # Connect to server
-    case Client.connect() do
-      :ok ->
-        # Execute the command
-        result =
-          case command do
-            :analyze -> Commands.Analyze.run(args, opts)
-            :generate -> Commands.Generate.run(args, opts)
-            :complete -> Commands.Complete.run(args, opts)
-            :refactor -> Commands.Refactor.run(args, opts)
-            :test -> Commands.Test.run(args, opts)
-            :llm -> Commands.LLM.run(args, opts)
-            :health -> Commands.Health.run(args, opts)
-            _ -> {:error, "Unknown command: #{command}"}
-          end
+    # Convert Optimus parsed args to command line args format expected by unified parser
+    unified_args = build_unified_args(command, args, opts)
 
-        # Handle the result
-        case result do
-          {:ok, output} ->
-            formatted = Formatter.format(output, opts[:format])
-            IO.puts(formatted)
-            System.halt(0)
-
-          {:error, reason} ->
-            IO.puts(:stderr, "Error: #{inspect(reason)}")
-            System.halt(1)
-        end
+    # Execute through unified integration
+    case UnifiedIntegration.execute_command(unified_args, config) do
+      {:ok, output} ->
+        IO.puts(output)
+        System.halt(0)
 
       {:error, reason} ->
-        IO.puts(:stderr, "Failed to connect to server: #{inspect(reason)}")
+        IO.puts(:stderr, "Error: #{reason}")
         System.halt(1)
     end
+  end
+
+  defp build_unified_args(command, args, _opts) do
+    # Convert Optimus parsed args back to command line format for unified parser
+    base_args = [to_string(command)]
+    
+    # Add positional arguments based on command type
+    args_list = case command do
+      :analyze ->
+        path = Map.get(args.args, :path)
+        if path, do: base_args ++ [path], else: base_args
+        
+      :generate ->
+        prompt = Map.get(args.args, :prompt)
+        if prompt, do: base_args ++ [prompt], else: base_args
+        
+      :complete ->
+        file = Map.get(args.args, :file)
+        if file, do: base_args ++ [file], else: base_args
+        
+      :refactor ->
+        file = Map.get(args.args, :file)
+        if file, do: base_args ++ [file], else: base_args
+        
+      :test ->
+        file = Map.get(args.args, :file)
+        if file, do: base_args ++ [file], else: base_args
+        
+      :llm ->
+        # LLM command has subcommands
+        case Map.get(args, :subcommand) do
+          {subcmd, _} -> base_args ++ [to_string(subcmd)]
+          _ -> base_args
+        end
+        
+      _ ->
+        base_args
+    end
+    
+    # Add options as flags
+    options_list = args.options
+    |> Enum.reduce([], fn {key, value}, acc ->
+      case key do
+        :type -> acc ++ ["--type", to_string(value)]
+        :language -> acc ++ ["--language", to_string(value)]
+        :framework -> acc ++ ["--framework", to_string(value)]
+        :position -> acc ++ ["--position", to_string(value)]
+        :instruction -> acc ++ ["--instruction", to_string(value)]
+        :provider -> acc ++ ["--provider", to_string(value)]
+        _ -> acc
+      end
+    end)
+    
+    # Add flags
+    flags_list = args.flags
+    |> Enum.reduce([], fn {key, true}, acc ->
+      case key do
+        :recursive -> acc ++ ["--recursive"]
+        :verbose -> acc ++ ["--verbose"]
+        :dry_run -> acc ++ ["--dry-run"]
+        _ -> acc
+      end
+    end)
+    
+    args_list ++ options_list ++ flags_list
   end
 
   # Command specifications

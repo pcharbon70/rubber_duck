@@ -6,7 +6,7 @@ defmodule RubberDuckWeb.CodeChannel do
 
   use RubberDuckWeb, :channel
 
-  alias RubberDuck.Analysis.Analyzer
+  alias RubberDuck.Commands.{Parser, Processor, Context}
   alias RubberDuck.Workspace
 
   require Logger
@@ -22,7 +22,6 @@ defmodule RubberDuckWeb.CodeChannel do
         socket
         |> assign(:project_id, project_id)
         |> assign(:project, project)
-        |> assign(:active_completions, %{})
         |> assign(:cursor_position, params["cursor_position"] || %{})
 
       # Track user presence
@@ -46,7 +45,6 @@ defmodule RubberDuckWeb.CodeChannel do
         socket
         |> assign(:file_id, file_id)
         |> assign(:file, file)
-        |> assign(:active_completions, %{})
 
       {:ok, %{status: "joined", file_id: file_id}, socket}
     else
@@ -57,39 +55,35 @@ defmodule RubberDuckWeb.CodeChannel do
 
   # Handle completion requests
   @impl true
-  def handle_in("request_completion", params, socket) do
-    %{
-      "code" => code,
-      "cursor_position" => cursor_position,
-      "file_type" => file_type
-    } = params
-
-    completion_id = generate_completion_id()
-
-    # Start async completion
-    Task.start_link(fn ->
-      stream_completion(
-        socket,
-        completion_id,
-        code,
-        cursor_position,
-        file_type,
-        params["options"] || %{}
-      )
-    end)
-
-    {:reply, {:ok, %{completion_id: completion_id}}, socket}
+  def handle_in("complete", params, socket) do
+    with {:ok, context} <- build_context(socket, params),
+         {:ok, command} <- Parser.parse(["complete"] ++ build_args(params), :websocket, context),
+         {:ok, result} <- Processor.execute_async(command) do
+      
+      # Monitor the async execution
+      monitor_completion(result.request_id, socket)
+      
+      {:reply, {:ok, %{request_id: result.request_id}}, socket}
+    else
+      {:error, reason} ->
+        {:reply, {:error, %{reason: to_string(reason)}}, socket}
+    end
   end
 
   # Handle analysis requests
-  def handle_in("request_analysis", %{"code" => code, "file_type" => file_type}, socket) do
-    analysis_id = generate_analysis_id()
-
-    Task.start_link(fn ->
-      perform_analysis(socket, analysis_id, code, file_type)
-    end)
-
-    {:reply, {:ok, %{analysis_id: analysis_id}}, socket}
+  def handle_in("analyze", params, socket) do
+    with {:ok, context} <- build_context(socket, params),
+         {:ok, command} <- Parser.parse(["analyze"] ++ build_args(params), :websocket, context),
+         {:ok, result} <- Processor.execute_async(command) do
+      
+      # Monitor the async execution
+      monitor_analysis(result.request_id, socket)
+      
+      {:reply, {:ok, %{request_id: result.request_id}}, socket}
+    else
+      {:error, reason} ->
+        {:reply, {:error, %{reason: to_string(reason)}}, socket}
+    end
   end
 
   # Handle cursor position updates for collaborative features
@@ -160,40 +154,6 @@ defmodule RubberDuckWeb.CodeChannel do
     {:noreply, socket}
   end
 
-  # Handle completion streaming results
-  def handle_info({:completion_chunk, completion_id, chunk}, socket) do
-    push(socket, "completion_chunk", %{
-      completion_id: completion_id,
-      chunk: chunk,
-      timestamp: DateTime.utc_now()
-    })
-
-    {:noreply, socket}
-  end
-
-  def handle_info({:completion_done, completion_id, final_result}, socket) do
-    push(socket, "completion_done", %{
-      completion_id: completion_id,
-      result: final_result,
-      timestamp: DateTime.utc_now()
-    })
-
-    # Clean up tracking
-    active = Map.delete(socket.assigns.active_completions, completion_id)
-    {:noreply, assign(socket, :active_completions, active)}
-  end
-
-  def handle_info({:completion_error, completion_id, error}, socket) do
-    push(socket, "completion_error", %{
-      completion_id: completion_id,
-      error: error,
-      timestamp: DateTime.utc_now()
-    })
-
-    # Clean up tracking
-    active = Map.delete(socket.assigns.active_completions, completion_id)
-    {:noreply, assign(socket, :active_completions, active)}
-  end
 
   # Private functions
 
@@ -229,69 +189,95 @@ defmodule RubberDuckWeb.CodeChannel do
     end
   end
 
-  defp stream_completion(socket, completion_id, code, cursor_position, file_type, _options) do
-    try do
-      # Build context
-      _context = build_completion_context(socket, code, cursor_position, file_type)
-
-      # TODO: Implement streaming completion properly
-      # For now, send a placeholder response
-      push(socket, "completion", %{
-        completion_id: completion_id,
-        suggestions: [],
-        error: "Streaming completion not yet implemented"
-      })
-
-      # Signal completion done
-      send(self(), {:completion_done, completion_id, %{status: "completed"}})
-    rescue
-      error ->
-        Logger.error("Completion streaming error: #{inspect(error)}")
-        send(self(), {:completion_error, completion_id, Exception.message(error)})
-    end
+  defp build_context(socket, params) do
+    context_data = %{
+      user_id: socket.assigns[:user_id] || "websocket_user_#{socket.id}",
+      project_id: socket.assigns[:project_id],
+      session_id: "websocket_session_#{socket.id}_#{System.system_time(:millisecond)}",
+      permissions: [:read, :write, :execute],
+      metadata: %{
+        socket_id: socket.id,
+        transport: "websocket",
+        channel_topic: socket.topic,
+        params: params
+      }
+    }
+    
+    Context.new(context_data)
   end
 
-  defp perform_analysis(socket, analysis_id, code, file_type) do
-    try do
-      # Run analysis
-      result = Analyzer.analyze_source(code, file_type)
+  defp build_args(params) do
+    args = []
+    
+    # Add file path if present
+    args = if params["file_path"], do: args ++ [params["file_path"]], else: args
+    
+    # Add type if present
+    args = if params["type"], do: args ++ ["--type", params["type"]], else: args
+    
+    # Add line and column for completions
+    args = if params["line"] do
+      args ++ ["--line", to_string(params["line"])]
+    else
+      args
+    end
+    
+    args = if params["column"] do
+      args ++ ["--column", to_string(params["column"])]
+    else
+      args
+    end
+    
+    args
+  end
 
-      # Send results
-      push(socket, "analysis_result", %{
-        analysis_id: analysis_id,
-        result: result,
-        timestamp: DateTime.utc_now()
-      })
-    rescue
-      error ->
-        Logger.error("Analysis error: #{inspect(error)}")
+  defp monitor_completion(request_id, socket) do
+    Task.start_link(fn ->
+      poll_status(request_id, socket, "completion", 0)
+    end)
+  end
 
-        push(socket, "analysis_error", %{
-          analysis_id: analysis_id,
-          error: Exception.message(error),
+  defp monitor_analysis(request_id, socket) do
+    Task.start_link(fn ->
+      poll_status(request_id, socket, "analysis", 0)
+    end)
+  end
+
+  defp poll_status(request_id, socket, type, attempts) do
+    case Processor.get_status(request_id) do
+      {:ok, %{status: :completed, result: result}} ->
+        push(socket, "#{type}_result", %{
+          request_id: request_id,
+          result: result,
+          timestamp: DateTime.utc_now()
+        })
+
+      {:ok, %{status: :failed, result: {:error, reason}}} ->
+        push(socket, "#{type}_error", %{
+          request_id: request_id,
+          error: to_string(reason),
+          timestamp: DateTime.utc_now()
+        })
+
+      {:ok, %{status: status}} when status in [:pending, :running] ->
+        # Continue polling
+        if attempts < 120 do  # Max 60 seconds
+          Process.sleep(500)
+          poll_status(request_id, socket, type, attempts + 1)
+        else
+          push(socket, "#{type}_error", %{
+            request_id: request_id,
+            error: "Request timed out",
+            timestamp: DateTime.utc_now()
+          })
+        end
+
+      {:error, reason} ->
+        push(socket, "#{type}_error", %{
+          request_id: request_id,
+          error: to_string(reason),
           timestamp: DateTime.utc_now()
         })
     end
-  end
-
-  defp build_completion_context(socket, code, cursor_position, file_type) do
-    # Build context from available information
-    %{
-      user_id: socket.assigns.user_id,
-      project_id: socket.assigns[:project_id],
-      file_id: socket.assigns[:file_id],
-      code: code,
-      cursor_position: cursor_position,
-      file_type: file_type,
-      timestamp: DateTime.utc_now()
-    }
-  end
-
-  defp generate_completion_id do
-    "completion_#{:crypto.strong_rand_bytes(16) |> Base.encode64(padding: false)}"
-  end
-
-  defp generate_analysis_id do
-    "analysis_#{:crypto.strong_rand_bytes(16) |> Base.encode64(padding: false)}"
   end
 end
