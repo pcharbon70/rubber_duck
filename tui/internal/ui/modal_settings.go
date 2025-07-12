@@ -18,6 +18,12 @@ type Settings struct {
 	FontSize        int
 	ServerURL       string
 	UsesMockClient  bool
+	
+	// Syntax highlighting settings
+	UseSyntaxHighlighting bool
+	UseChromaHighlighting bool
+	ChromaStyle          string
+	FallbackToCustom     bool
 }
 
 // SettingsModal is a specialized modal for settings

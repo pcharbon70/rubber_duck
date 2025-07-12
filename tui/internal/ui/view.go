@@ -152,9 +152,9 @@ func (m Model) renderEditor(width, height int, styles ThemedStyles) string {
 
 	// Get editor content and apply syntax highlighting
 	editorContent := m.editor.Value()
-	if m.currentFile != "" && editorContent != "" {
+	if m.currentFile != "" && editorContent != "" && m.settings.UseSyntaxHighlighting {
 		language := DetectLanguageFromExtension(m.currentFile)
-		highlighter := NewSyntaxHighlighter(m.GetTheme())
+		highlighter := m.CreateSyntaxHighlighter()
 		editorContent = highlighter.HighlightCode(editorContent, language)
 	} else {
 		editorContent = m.editor.View()

@@ -1,21 +1,32 @@
 package ui
 
 import (
+	"bytes"
 	"strings"
 	"unicode"
 
+	"github.com/alecthomas/chroma/v2"
+	"github.com/alecthomas/chroma/v2/formatters"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// SyntaxHighlighter provides basic syntax highlighting for code
+// SyntaxHighlighter provides enhanced syntax highlighting for code using Chroma
 type SyntaxHighlighter struct {
-	theme *Theme
+	theme          *Theme
+	useChroma      bool
+	chromaStyle    string
+	fallbackToCustom bool
 }
 
 // NewSyntaxHighlighter creates a new syntax highlighter with the given theme
 func NewSyntaxHighlighter(theme *Theme) *SyntaxHighlighter {
 	return &SyntaxHighlighter{
-		theme: theme,
+		theme:             theme,
+		useChroma:         true,
+		chromaStyle:       getChromaStyleForTheme(theme),
+		fallbackToCustom:  true,
 	}
 }
 
@@ -25,6 +36,82 @@ func (sh *SyntaxHighlighter) HighlightCode(code, language string) string {
 		return code
 	}
 
+	// Try Chroma first if enabled
+	if sh.useChroma {
+		if highlighted := sh.highlightWithChroma(code, language); highlighted != "" {
+			return highlighted
+		}
+	}
+
+	// Fall back to custom highlighter if Chroma fails or is disabled
+	if sh.fallbackToCustom {
+		return sh.highlightWithCustom(code, language)
+	}
+
+	return code
+}
+
+// getChromaStyleForTheme maps theme names to Chroma styles
+func getChromaStyleForTheme(theme *Theme) string {
+	switch theme.Name {
+	case "dark":
+		return "monokai"
+	case "light":
+		return "github"
+	case "solarized-dark":
+		return "solarized-dark"
+	case "dracula":
+		return "dracula"
+	default:
+		return "monokai"
+	}
+}
+
+// highlightWithChroma uses Chroma library for syntax highlighting
+func (sh *SyntaxHighlighter) highlightWithChroma(code, language string) string {
+	// Get lexer for the language
+	lexer := lexers.Get(language)
+	if lexer == nil {
+		// Try to detect from content or fallback to plaintext
+		lexer = lexers.Analyse(code)
+		if lexer == nil {
+			lexer = lexers.Fallback
+		}
+	}
+
+	// Ensure lexer is coalesced for better performance
+	lexer = chroma.Coalesce(lexer)
+
+	// Get style
+	style := styles.Get(sh.chromaStyle)
+	if style == nil {
+		style = styles.Fallback
+	}
+
+	// Create terminal formatter with 256 colors
+	formatter := formatters.Get("terminal256")
+	if formatter == nil {
+		return "" // Signal fallback needed
+	}
+
+	// Tokenize the code
+	iterator, err := lexer.Tokenise(nil, code)
+	if err != nil {
+		return "" // Signal fallback needed
+	}
+
+	// Format to buffer
+	var buf bytes.Buffer
+	err = formatter.Format(&buf, style, iterator)
+	if err != nil {
+		return "" // Signal fallback needed
+	}
+
+	return buf.String()
+}
+
+// highlightWithCustom uses the original custom highlighting logic
+func (sh *SyntaxHighlighter) highlightWithCustom(code, language string) string {
 	switch strings.ToLower(language) {
 	case "go":
 		return sh.highlightGo(code)
@@ -39,6 +126,41 @@ func (sh *SyntaxHighlighter) HighlightCode(code, language string) string {
 	default:
 		return sh.highlightGeneric(code)
 	}
+}
+
+// SetChromaEnabled enables or disables Chroma highlighting
+func (sh *SyntaxHighlighter) SetChromaEnabled(enabled bool) {
+	sh.useChroma = enabled
+}
+
+// SetChromaStyle sets the Chroma style to use
+func (sh *SyntaxHighlighter) SetChromaStyle(style string) {
+	sh.chromaStyle = style
+}
+
+// SetFallbackEnabled enables or disables fallback to custom highlighting
+func (sh *SyntaxHighlighter) SetFallbackEnabled(enabled bool) {
+	sh.fallbackToCustom = enabled
+}
+
+// IsChromaEnabled returns whether Chroma highlighting is enabled
+func (sh *SyntaxHighlighter) IsChromaEnabled() bool {
+	return sh.useChroma
+}
+
+// GetChromaStyle returns the current Chroma style
+func (sh *SyntaxHighlighter) GetChromaStyle() string {
+	return sh.chromaStyle
+}
+
+// GetAvailableChromaStyles returns available Chroma styles
+func (sh *SyntaxHighlighter) GetAvailableChromaStyles() []string {
+	return styles.Names()
+}
+
+// GetAvailableLanguages returns languages supported by Chroma
+func (sh *SyntaxHighlighter) GetAvailableLanguages() []string {
+	return lexers.Names()
 }
 
 // highlightGo provides Go-specific syntax highlighting
@@ -435,7 +557,19 @@ func (sh *SyntaxHighlighter) highlightNumbers(line string) string {
 }
 
 // detectLanguageFromExtension detects language from file extension
+// DetectLanguageFromExtension detects language from file extension
+// Enhanced to work with Chroma lexer names
 func DetectLanguageFromExtension(filename string) string {
+	// First try using Chroma's built-in file matching
+	lexer := lexers.Match(filename)
+	if lexer != nil {
+		config := lexer.Config()
+		if config != nil && len(config.Aliases) > 0 {
+			return config.Aliases[0]
+		}
+	}
+
+	// Fallback to manual extension mapping
 	parts := strings.Split(filename, ".")
 	if len(parts) < 2 {
 		return "text"
