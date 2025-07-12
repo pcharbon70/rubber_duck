@@ -76,6 +76,16 @@ defmodule RubberDuck.CLIClient.Auth do
   end
 
   @doc """
+  Get the user ID derived from the API key.
+  """
+  def get_user_id do
+    case get_api_key() do
+      nil -> "cli_user_anonymous"
+      api_key -> "cli_user_#{String.slice(api_key, 0, 8)}"
+    end
+  end
+
+  @doc """
   Check if credentials are configured.
   """
   def configured? do

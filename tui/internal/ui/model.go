@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -42,6 +44,12 @@ type Model struct {
 	commandPalette CommandPalette
 	modal          Modal
 	settingsModal  SettingsModal
+	themeManager   *ThemeManager
+	
+	// Performance components
+	viewCache          *ViewCache
+	performanceMonitor *PerformanceMonitor
+	saveDebouncer      *Debouncer
 	
 	// File state
 	currentFile string
@@ -91,6 +99,12 @@ func NewModel() Model {
 	fileTree := NewFileTree()
 	commandPalette := NewCommandPalette()
 	modal := NewModal()
+	themeManager := NewThemeManager()
+	
+	// Initialize performance components
+	viewCache := NewViewCache()
+	performanceMonitor := NewPerformanceMonitor(100) // Keep 100 samples
+	saveDebouncer := NewDebouncer(500 * time.Millisecond) // 500ms debounce
 	
 	// Default settings
 	settings := Settings{
@@ -105,15 +119,62 @@ func NewModel() Model {
 	settingsModal := NewSettingsModal(settings)
 	
 	return Model{
-		editor:         ta,
-		output:         vp,
-		statusBar:      "Disconnected | Press Ctrl+C to quit",
-		activePane:     FileTreePane,
-		fileTree:       fileTree,
-		commandPalette: commandPalette,
-		modal:          modal,
-		settingsModal:  settingsModal,
-		files:          []FileNode{}, // Will be populated when connected
+		editor:             ta,
+		output:             vp,
+		statusBar:          "Disconnected | Press Ctrl+C to quit",
+		activePane:         FileTreePane,
+		fileTree:           fileTree,
+		commandPalette:     commandPalette,
+		modal:              modal,
+		settingsModal:      settingsModal,
+		themeManager:       themeManager,
+		viewCache:          viewCache,
+		performanceMonitor: performanceMonitor,
+		saveDebouncer:      saveDebouncer,
+		files:              []FileNode{}, // Will be populated when connected
+	}
+}
+
+// GetTheme returns the current theme
+func (m Model) GetTheme() *Theme {
+	return m.themeManager.GetTheme()
+}
+
+// SetTheme changes the current theme
+func (m *Model) SetTheme(themeName string) bool {
+	return m.themeManager.SetTheme(themeName)
+}
+
+// GetAvailableThemes returns all available theme names
+func (m Model) GetAvailableThemes() []string {
+	return m.themeManager.GetThemeNames()
+}
+
+// triggerDebouncedSave triggers a debounced auto-save operation
+func (m Model) triggerDebouncedSave() {
+	if m.saveDebouncer != nil && m.currentFile != "" {
+		m.saveDebouncer.Debounce(func() {
+			// Auto-save logic would go here
+			// For now, just update status to show file is being saved
+			if prog := GetProgram(); prog != nil {
+				prog.Send(AutoSaveMsg{File: m.currentFile})
+			}
+		})
+	}
+}
+
+// GetPerformanceStats returns current performance statistics
+func (m Model) GetPerformanceStats() map[string]interface{} {
+	if m.performanceMonitor != nil {
+		return m.performanceMonitor.GetStats()
+	}
+	return nil
+}
+
+// ClearViewCache clears the view cache
+func (m *Model) ClearViewCache() {
+	if m.viewCache != nil {
+		m.viewCache.Clear()
 	}
 }
 

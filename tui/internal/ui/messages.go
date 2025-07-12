@@ -103,3 +103,8 @@ type PhoenixConnectMsg struct {
 
 // InitiateConnectionMsg triggers the Phoenix connection setup
 type InitiateConnectionMsg struct{}
+
+// AutoSaveMsg indicates an auto-save operation
+type AutoSaveMsg struct {
+	File string
+}
