@@ -8,7 +8,7 @@ defmodule RubberDuckWeb.CLIChannel do
 
   use RubberDuckWeb, :channel
 
-  alias RubberDuck.CLI.Commands
+  alias RubberDuck.Commands.Adapters.WebSocket, as: CommandAdapter
   alias RubberDuck.LLM.ConnectionManager
 
   require Logger
@@ -32,106 +32,25 @@ defmodule RubberDuckWeb.CLIChannel do
     end
   end
 
-  # Handle analyze command
+  # Handle unified commands through the adapter
   @impl true
-  def handle_in("analyze", %{"path" => path} = params, socket) do
+  def handle_in(command, params, socket) when command in ["analyze", "generate", "complete", "refactor", "test"] do
     socket = increment_request_count(socket)
     request_id = Map.get(params, "request_id")
 
     Task.start_link(fn ->
-      args = [
-        path: path,
-        type: String.to_atom(Map.get(params, "type", "all")),
-        flags: [
-          recursive: Map.get(params, "recursive", false),
-          include_suggestions: Map.get(params, "include_suggestions", false)
-        ]
-      ]
-
-      result =
-        case Commands.Analyze.run(args, build_config(params)) do
-          {:ok, data} -> data
-          {:error, _} = error -> error
-          # Handle direct return
-          data -> data
-        end
-
-      case result do
-        {:error, reason} ->
-          push(socket, "analyze:error", %{
-            status: "error",
-            reason: to_string(reason),
-            request_id: request_id
-          })
-
-        data ->
-          push(socket, "analyze:result", %{
-            status: "success",
-            result: data,
-            request_id: request_id
-          })
-      end
-    end)
-
-    {:reply, {:ok, %{status: "processing"}}, socket}
-  end
-
-  # Handle generate command
-  @impl true
-  def handle_in("generate", %{"prompt" => prompt} = params, socket) do
-    Logger.debug("Received generate command with params: #{inspect(params)}")
-    socket = increment_request_count(socket)
-    request_id = Map.get(params, "request_id")
-
-    Task.start_link(fn ->
-      Logger.debug("Running generate command with prompt: #{prompt}")
-      args = %{
-        prompt: prompt,
-        language: String.to_atom(Map.get(params, "language", "elixir")),
-        output: Map.get(params, "output"),
-        context: Map.get(params, "context"),
-        interactive: Map.get(params, "interactive", false)
+      payload = %{
+        "command" => command,
+        "params" => params
       }
-      case Commands.Generate.run(args, build_config(params)) do
-        {:ok, result} ->
-          Logger.debug("Generate command succeeded, sending result with request_id: #{request_id}")
-          push(socket, "generate:result", %{
-            status: "success",
-            result: result,
-            request_id: request_id
-          })
 
+      case CommandAdapter.handle_async_message("cli:commands", payload, socket) do
+        {:ok, %{request_id: async_request_id}} ->
+          # Monitor the async request and push updates
+          monitor_async_command(command, async_request_id, request_id, socket)
+          
         {:error, reason} ->
-          Logger.error("Generate command failed: #{inspect(reason)}, request_id: #{request_id}")
-          error_message = format_error_reason(reason)
-          push(socket, "generate:error", %{
-            status: "error",
-            reason: error_message,
-            request_id: request_id
-          })
-      end
-    end)
-
-    {:reply, {:ok, %{status: "processing"}}, socket}
-  end
-
-  # Handle complete command
-  @impl true
-  def handle_in("complete", params, socket) do
-    socket = increment_request_count(socket)
-    request_id = Map.get(params, "request_id")
-
-    Task.start_link(fn ->
-      case Commands.Complete.run(params, build_config(params)) do
-        {:ok, result} ->
-          push(socket, "complete:result", %{
-            status: "success",
-            result: result,
-            request_id: request_id
-          })
-
-        {:error, reason} ->
-          push(socket, "complete:error", %{
+          push(socket, "#{command}:error", %{
             status: "error",
             reason: to_string(reason),
             request_id: request_id
@@ -142,92 +61,27 @@ defmodule RubberDuckWeb.CLIChannel do
     {:reply, {:ok, %{status: "processing"}}, socket}
   end
 
-  # Handle refactor command
-  @impl true
-  def handle_in("refactor", params, socket) do
-    socket = increment_request_count(socket)
-    request_id = Map.get(params, "request_id")
-
-    Task.start_link(fn ->
-      case Commands.Refactor.run(params, build_config(params)) do
-        {:ok, result} ->
-          push(socket, "refactor:result", %{
-            status: "success",
-            result: result,
-            request_id: request_id
-          })
-
-        {:error, reason} ->
-          push(socket, "refactor:error", %{
-            status: "error",
-            reason: to_string(reason),
-            request_id: request_id
-          })
-      end
-    end)
-
-    {:reply, {:ok, %{status: "processing"}}, socket}
-  end
-
-  # Handle test command
-  @impl true
-  def handle_in("test", params, socket) do
-    socket = increment_request_count(socket)
-    request_id = Map.get(params, "request_id")
-
-    Task.start_link(fn ->
-      case Commands.Test.run(params, build_config(params)) do
-        {:ok, result} ->
-          push(socket, "test:result", %{
-            status: "success",
-            result: result,
-            request_id: request_id
-          })
-
-        {:error, reason} ->
-          push(socket, "test:error", %{
-            status: "error",
-            reason: to_string(reason),
-            request_id: request_id
-          })
-      end
-    end)
-
-    {:reply, {:ok, %{status: "processing"}}, socket}
-  end
 
   # Handle LLM commands
   @impl true
-  def handle_in("llm", %{"subcommand" => subcommand} = params, socket) do
+  def handle_in("llm", params, socket) do
     socket = increment_request_count(socket)
+    request_id = Map.get(params, "request_id")
 
-    result =
-      case subcommand do
-        "status" ->
-          handle_llm_status(socket)
+    # Handle synchronously for LLM commands as they are typically quick
+    payload = %{
+      "command" => "llm",
+      "params" => params
+    }
 
-        "connect" ->
-          handle_llm_connect(params["provider"], socket)
-
-        "disconnect" ->
-          handle_llm_disconnect(params["provider"], socket)
-
-        "enable" ->
-          handle_llm_enable(params["provider"], socket)
-
-        "disable" ->
-          handle_llm_disable(params["provider"], socket)
-
-        _ ->
-          {:error, "Unknown LLM subcommand: #{subcommand}"}
-      end
-
-    case result do
-      {:ok, response} ->
+    case CommandAdapter.handle_message("cli:commands", payload, socket) do
+      {:ok, result} ->
+        response = CommandAdapter.build_response({:ok, result}, request_id)
         {:reply, {:ok, response}, socket}
 
       {:error, reason} ->
-        {:reply, {:error, %{reason: to_string(reason)}}, socket}
+        response = CommandAdapter.build_error_response(reason, request_id)
+        {:reply, {:error, response}, socket}
     end
   end
 
@@ -253,17 +107,24 @@ defmodule RubberDuckWeb.CLIChannel do
 
   # Handle health check request
   @impl true
-  def handle_in("health", _params, socket) do
-    health_data = %{
-      status: "healthy",
-      server_time: DateTime.utc_now(),
-      uptime: get_server_uptime(),
-      memory: get_memory_stats(),
-      connections: get_connection_stats(),
-      providers: get_provider_health()
+  def handle_in("health", params, socket) do
+    socket = increment_request_count(socket)
+    request_id = Map.get(params, "request_id")
+
+    payload = %{
+      "command" => "health",
+      "params" => params
     }
 
-    {:reply, {:ok, health_data}, socket}
+    case CommandAdapter.handle_message("cli:commands", payload, socket) do
+      {:ok, result} ->
+        response = CommandAdapter.build_response({:ok, result}, request_id)
+        {:reply, {:ok, response}, socket}
+
+      {:error, reason} ->
+        response = CommandAdapter.build_error_response(reason, request_id)
+        {:reply, {:error, response}, socket}
+    end
   end
 
   # Handle stats request
@@ -291,154 +152,60 @@ defmodule RubberDuckWeb.CLIChannel do
     assign(socket, :request_count, socket.assigns.request_count + 1)
   end
 
-  defp build_config(params) do
-    %RubberDuck.CLI.Config{
-      format: String.to_atom(params["format"] || "json"),
-      verbose: params["verbose"] || false,
-      quiet: params["quiet"] || false,
-      debug: params["debug"] || false
-    }
-  end
-
-  defp handle_llm_status(_socket) do
-    case ConnectionManager.status() do
-      status when is_map(status) ->
-        {:ok,
-         %{
-           type: :llm_status,
-           providers: format_provider_status(status)
-         }}
-
-      error ->
-        {:error, "Failed to get status: #{inspect(error)}"}
-    end
-  end
-
-  defp handle_llm_connect(provider, socket) when is_binary(provider) do
-    try do
-      provider_atom = String.to_existing_atom(provider)
-
-      case ConnectionManager.connect(provider_atom) do
-        :ok ->
-          push(socket, "llm:connected", %{provider: provider})
-          {:ok, %{message: "Successfully connected to #{provider}"}}
-
-        {:ok, :already_connected} ->
-          {:ok, %{message: "Already connected to #{provider}"}}
-
-        {:error, reason} ->
-          {:error, "Failed to connect to #{provider}: #{inspect(reason)}"}
-      end
-    rescue
-      ArgumentError ->
-        {:error, "Unknown provider: #{provider}"}
-    end
-  end
-
-  defp handle_llm_connect(nil, _socket) do
-    case ConnectionManager.connect_all() do
-      :ok ->
-        {:ok, %{message: "Connected to all configured providers"}}
-
-      error ->
-        {:error, "Failed to connect: #{inspect(error)}"}
-    end
-  end
-
-  defp handle_llm_disconnect(provider, _socket) when is_binary(provider) do
-    try do
-      provider_atom = String.to_existing_atom(provider)
-
-      case ConnectionManager.disconnect(provider_atom) do
-        :ok ->
-          {:ok, %{message: "Disconnected from #{provider}"}}
-
-        {:ok, :already_disconnected} ->
-          {:ok, %{message: "Already disconnected from #{provider}"}}
-
-        error ->
-          {:error, "Failed to disconnect: #{inspect(error)}"}
-      end
-    rescue
-      ArgumentError ->
-        {:error, "Unknown provider: #{provider}"}
-    end
-  end
-
-  defp handle_llm_disconnect(nil, _socket) do
-    case ConnectionManager.disconnect_all() do
-      :ok ->
-        {:ok, %{message: "Disconnected from all providers"}}
-
-      error ->
-        {:error, "Failed to disconnect: #{inspect(error)}"}
-    end
-  end
-
-  defp handle_llm_enable(provider, _socket) when is_binary(provider) do
-    try do
-      provider_atom = String.to_existing_atom(provider)
-
-      case ConnectionManager.set_enabled(provider_atom, true) do
-        :ok ->
-          {:ok, %{message: "Enabled provider: #{provider}"}}
-
-        error ->
-          {:error, "Failed to enable provider: #{inspect(error)}"}
-      end
-    rescue
-      ArgumentError ->
-        {:error, "Unknown provider: #{provider}"}
-    end
-  end
-
-  defp handle_llm_enable(nil, _socket) do
-    {:error, "Provider name required for enable command"}
-  end
-
-  defp handle_llm_disable(provider, _socket) when is_binary(provider) do
-    try do
-      provider_atom = String.to_existing_atom(provider)
-
-      case ConnectionManager.set_enabled(provider_atom, false) do
-        :ok ->
-          {:ok, %{message: "Disabled provider: #{provider}"}}
-
-        error ->
-          {:error, "Failed to disable provider: #{inspect(error)}"}
-      end
-    rescue
-      ArgumentError ->
-        {:error, "Unknown provider: #{provider}"}
-    end
-  end
-
-  defp handle_llm_disable(nil, _socket) do
-    {:error, "Provider name required for disable command"}
-  end
-
-  defp format_provider_status(status) do
-    Enum.map(status, fn {name, info} ->
-      %{
-        name: name,
-        status: to_string(info.status),
-        enabled: info.enabled,
-        health: format_health(info.health),
-        last_used: format_time(info.last_used),
-        errors: info.error_count
-      }
+  defp monitor_async_command(command, async_request_id, client_request_id, socket) do
+    # Poll for status updates and push to client
+    Task.start_link(fn ->
+      poll_async_status(command, async_request_id, client_request_id, socket, 0)
     end)
   end
 
-  defp format_health(:healthy), do: "healthy"
-  defp format_health(:not_connected), do: "not connected"
-  defp format_health(:unknown), do: "unknown"
-  defp format_health({:unhealthy, reason}), do: "unhealthy: #{inspect(reason)}"
-  defp format_health(_), do: "unknown"
+  defp poll_async_status(command, async_request_id, client_request_id, socket, attempts) do
+    case CommandAdapter.get_status(async_request_id) do
+      {:ok, %{status: :completed, result: result}} ->
+        push(socket, "#{command}:result", %{
+          status: "success",
+          result: result,
+          request_id: client_request_id
+        })
 
-  defp format_time(nil), do: "never"
-  defp format_time(%DateTime{} = time), do: DateTime.to_iso8601(time)
-  defp format_time(_), do: "unknown"
+      {:ok, %{status: :failed, result: {:error, reason}}} ->
+        push(socket, "#{command}:error", %{
+          status: "error",
+          reason: to_string(reason),
+          request_id: client_request_id
+        })
+
+      {:ok, %{status: status, progress: progress}} when status in [:pending, :running] ->
+        # Optionally push progress updates
+        if rem(attempts, 5) == 0 do  # Every 5th attempt (2.5 seconds)
+          push(socket, "#{command}:progress", %{
+            status: to_string(status),
+            progress: progress,
+            request_id: client_request_id
+          })
+        end
+        
+        # Continue polling
+        if attempts < 120 do  # Max 60 seconds of polling
+          Process.sleep(500)
+          poll_async_status(command, async_request_id, client_request_id, socket, attempts + 1)
+        else
+          push(socket, "#{command}:error", %{
+            status: "error",
+            reason: "Command timed out",
+            request_id: client_request_id
+          })
+        end
+
+      {:error, reason} ->
+        push(socket, "#{command}:error", %{
+          status: "error",
+          reason: to_string(reason),
+          request_id: client_request_id
+        })
+    end
+  end
+
 
   defp generate_stream_id do
     :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
@@ -462,71 +229,4 @@ defmodule RubberDuckWeb.CLIChannel do
     push(socket, "stream:end", %{stream_id: stream_id, status: "completed"})
   end
 
-  defp get_server_uptime do
-    {uptime, _} = :erlang.statistics(:wall_clock)
-    seconds = div(uptime, 1000)
-
-    days = div(seconds, 86400)
-    hours = div(rem(seconds, 86400), 3600)
-    minutes = div(rem(seconds, 3600), 60)
-
-    %{
-      days: days,
-      hours: hours,
-      minutes: minutes,
-      total_seconds: seconds
-    }
-  end
-
-  defp get_memory_stats do
-    memory = :erlang.memory()
-
-    %{
-      total_mb: Float.round(memory[:total] / 1_048_576, 2),
-      processes_mb: Float.round(memory[:processes] / 1_048_576, 2),
-      ets_mb: Float.round(memory[:ets] / 1_048_576, 2),
-      binary_mb: Float.round(memory[:binary] / 1_048_576, 2),
-      system_mb: Float.round(memory[:system] / 1_048_576, 2)
-    }
-  end
-
-  defp get_connection_stats do
-    # Get WebSocket connection count
-    # Get WebSocket connection count - simplified for now
-    connections = 1
-
-    %{
-      active_connections: connections,
-      # code, analysis, workspace, cli
-      total_channels: 4
-    }
-  end
-
-  defp get_provider_health do
-    case ConnectionManager.status() do
-      status when is_map(status) ->
-        Enum.map(status, fn {name, info} ->
-          %{
-            name: name,
-            status: to_string(info.status),
-            health: format_health(info.health)
-          }
-        end)
-
-      _ ->
-        []
-    end
-  end
-
-  defp format_error_reason(reason) when is_binary(reason), do: reason
-  defp format_error_reason(reason) when is_atom(reason), do: to_string(reason)
-  defp format_error_reason(reason) when is_list(reason) do
-    # Try to convert if it's a charlist
-    try do
-      List.to_string(reason)
-    rescue
-      _ -> inspect(reason)
-    end
-  end
-  defp format_error_reason(reason), do: inspect(reason)
 end
