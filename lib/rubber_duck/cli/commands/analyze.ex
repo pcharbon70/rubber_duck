@@ -14,21 +14,30 @@ defmodule RubberDuck.CLI.Commands.Analyze do
   """
   def run(args, config) do
     path = args[:path]
-    analysis_type = args[:type] || :all
-    recursive = Keyword.get(args[:flags], :recursive, true)
-    include_suggestions = Keyword.get(args[:flags], :include_suggestions, false)
-
-    require Logger
-    Logger.info("Analyze command called with path: #{inspect(path)}, type: #{inspect(analysis_type)}")
-
-    with {:ok, files} <- get_files_to_analyze(path, recursive),
-         {:ok, results} <- analyze_files(files, analysis_type, include_suggestions, config) do
-      Logger.info("Analysis completed with #{length(results)} file results")
-      format_results(results)
+    
+    # Validate path first
+    if is_nil(path) do
+      {:error, "Path is required"}
     else
-      error ->
-        Logger.error("Analysis failed: #{inspect(error)}")
-        error
+      analysis_type = args[:type] || :all
+      recursive = if is_nil(args[:flags]), do: true, else: Keyword.get(args[:flags], :recursive, true)
+      include_suggestions = if is_nil(args[:flags]), do: false, else: Keyword.get(args[:flags], :include_suggestions, false)
+
+      require Logger
+      Logger.info("Analyze command called with path: #{inspect(path)}, type: #{inspect(analysis_type)}")
+
+      with {:ok, files} <- get_files_to_analyze(path, recursive),
+           {:ok, results} <- analyze_files(files, analysis_type, include_suggestions, config) do
+        Logger.info("Analysis completed with #{length(results)} file results")
+        {:ok, format_results(results)}
+      else
+        {:error, _} = error ->
+          Logger.error("Analysis failed: #{inspect(error)}")
+          error
+        error ->
+          Logger.error("Analysis failed: #{inspect(error)}")
+          {:error, error}
+      end
     end
   end
 
@@ -131,75 +140,73 @@ defmodule RubberDuck.CLI.Commands.Analyze do
   defp engines_for_type(_), do: engines_for_type(:all)
 
   defp format_file_result(file, analysis_result) do
-    issues = extract_issues(analysis_result)
-    severity = calculate_overall_severity(issues)
+    # Get all issues from the analysis result
+    all_issues = Map.get(analysis_result, :all_issues, [])
+    
+    # Group issues by engine/analyzer type
+    issues_by_engine = Map.get(analysis_result, :issues_by_engine, %{})
+    
+    # Create results for each analyzer that found issues
+    analyzer_results = 
+      issues_by_engine
+      |> Enum.map(fn {analyzer_name, _issue_count} ->
+        # Find issues for this analyzer
+        analyzer_issues = 
+          all_issues
+          |> Enum.filter(fn issue ->
+            # Extract analyzer from rule (e.g., "semantic/unused_function" -> :semantic)
+            rule = Map.get(issue, :rule, "")
+            String.starts_with?(rule, "#{analyzer_name}/")
+          end)
+          |> Enum.map(&format_issue_for_output/1)
+        
+        %{
+          analyzer: analyzer_name,
+          issues: analyzer_issues
+        }
+      end)
+      |> Enum.filter(fn %{issues: issues} -> length(issues) > 0 end)
 
     %{
       file: file,
-      issues: issues,
-      severity: severity,
-      summary: build_summary(analysis_result)
+      results: analyzer_results,
+      summary: %{
+        total_issues: analysis_result.total_issues
+      }
     }
   end
-
-  defp extract_issues(analysis_result) do
-    # The Analyzer returns issues in :all_issues field
-    issues = Map.get(analysis_result, :all_issues, [])
-
-    issues
-    |> Enum.map(&normalize_issue/1)
-    |> Enum.sort_by(fn issue -> {issue.line, issue.column} end)
-  end
-
-  defp normalize_issue(%{} = issue) do
+  
+  defp format_issue_for_output(issue) do
     %{
-      line: get_in(issue, [:location, :line]) || issue[:line] || 0,
-      column: get_in(issue, [:location, :column]) || issue[:column] || 0,
-      severity: issue[:severity] || :info,
-      type: issue[:type] || :unknown,
-      message: issue[:message] || "Unknown issue",
-      suggestion: issue[:suggestion],
-      category: issue[:category] || :unknown,
-      rule: issue[:rule]
+      type: issue.type,
+      details: issue.message,
+      severity: issue.severity,
+      line: get_in(issue, [:location, :line]) || 0,
+      column: get_in(issue, [:location, :column]) || 0
     }
   end
+  
 
-  defp calculate_overall_severity(issues) do
-    severities = Enum.map(issues, & &1.severity)
 
-    cond do
-      :error in severities -> :error
-      :warning in severities -> :warning
-      :info in severities -> :info
-      true -> :none
-    end
+
+  defp format_results([]) do
+    {:error, "No files to analyze"}
   end
-
-  defp build_summary(analysis_result) do
-    %{
-      total_issues: Map.get(analysis_result, :total_issues, 0),
-      by_severity: Map.get(analysis_result, :issues_by_severity, %{}),
-      by_type: Map.get(analysis_result, :issues_by_engine, %{})
-    }
-  end
-
-  defp format_results(results) do
+  
+  defp format_results([single_result]) when is_map(single_result) do
+    # Single file analysis
     %{
       type: :analysis,
-      results: results,
-      summary: build_overall_summary(results)
+      path: single_result.file,
+      results: single_result.results
     }
   end
-
-  defp build_overall_summary(results) do
-    total_files = length(results)
-    total_issues = Enum.sum(Enum.map(results, fn r -> r.summary.total_issues end))
-    files_with_issues = Enum.count(results, fn r -> r.summary.total_issues > 0 end)
-
+  
+  defp format_results(results) when is_list(results) do
+    # Multiple file analysis
     %{
-      total_files: total_files,
-      files_with_issues: files_with_issues,
-      total_issues: total_issues
+      type: :analysis,
+      results: results
     }
   end
 end

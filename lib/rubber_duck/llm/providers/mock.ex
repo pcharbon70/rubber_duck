@@ -56,6 +56,16 @@ defmodule RubberDuck.LLM.Providers.Mock do
           context_window: 4096,
           max_output: 1024,
           supports_vision: true
+        },
+        %{
+          id: "codellama",
+          context_window: 8192,
+          max_output: 4096
+        },
+        %{
+          id: "llama2",
+          context_window: 4096,
+          max_output: 2048
         }
       ],
       features: [:streaming, :function_calling, :system_messages, :json_mode, :vision]
@@ -192,6 +202,22 @@ defmodule RubberDuck.LLM.Providers.Mock do
     user_input = last_message["content"] || last_message[:content] || ""
 
     cond do
+      # Handle refactoring requests
+      String.contains?(user_input, "refactor") or String.contains?(user_input, "rename") ->
+        generate_refactoring_response(user_input)
+
+      # Handle test generation requests
+      String.contains?(user_input, "test") or String.contains?(user_input, "Generate comprehensive tests") ->
+        generate_test_response(user_input)
+
+      # Handle code completion requests
+      String.contains?(user_input, "complete") or String.contains?(user_input, "Complete the following") ->
+        generate_completion_response(user_input)
+
+      # Handle general code generation
+      String.contains?(user_input, "Generate") or String.contains?(user_input, "Create") ->
+        generate_code_response(user_input)
+
       String.contains?(user_input, "hello") ->
         "Hello! I'm a mock LLM provider. How can I help you today?"
 
@@ -212,6 +238,167 @@ defmodule RubberDuck.LLM.Providers.Mock do
 
       true ->
         "This is a mock response to: #{String.slice(user_input, 0, 50)}..."
+    end
+  end
+  
+  defp generate_refactoring_response(input) do
+    cond do
+      String.contains?(input, "rename") and String.contains?(input, "hello") ->
+        """
+        defmodule Test do
+          def greet(name) do
+            "Hello, \#{name}!"
+          end
+          
+          def unused_function do
+            :not_used
+          end
+        end
+        """
+        
+      String.contains?(input, "documentation") ->
+        """
+        defmodule Test do
+          @doc \"\"\"
+          Greets a person by name.
+          
+          ## Examples
+          
+              iex> Test.hello("World")
+              "Hello, World!"
+          
+          \"\"\"
+          def hello(name) do
+            "Hello, \#{name}!"
+          end
+          
+          @doc \"\"\"
+          This function is not used anywhere.
+          \"\"\"
+          def unused_function do
+            :not_used
+          end
+        end
+        """
+        
+      true ->
+        # Default refactoring - return just the code without markdown markers
+        "defmodule RefactoredModule do\n  def refactored_function do\n    :ok\n  end\nend"
+    end
+  end
+  
+  defp generate_test_response(input) do
+    cond do
+      String.contains?(input, "Test do") ->
+        """
+        defmodule TestTest do
+          use ExUnit.Case
+          doctest Test
+          
+          describe "hello/1" do
+            test "greets with the given name" do
+              assert Test.hello("World") == "Hello, World!"
+            end
+            
+            test "handles empty string" do
+              assert Test.hello("") == "Hello, !"
+            end
+          end
+          
+          describe "unused_function/0" do
+            test "returns :not_used" do
+              assert Test.unused_function() == :not_used
+            end
+          end
+        end
+        """
+        
+      true ->
+        # Default test - return just the code without markdown markers
+        """
+        defmodule ModuleTest do
+          use ExUnit.Case
+          
+          test "basic functionality" do
+            assert true
+          end
+        end
+        """
+    end
+  end
+  
+  defp generate_completion_response(_input) do
+    # Return just the code without markdown markers
+    """
+    def completed_function(args) do
+      args
+      |> process_args()
+      |> handle_result()
+    end
+    
+    defp process_args(args) do
+      # Process the arguments
+      {:ok, args}
+    end
+    
+    defp handle_result({:ok, result}) do
+      {:ok, result}
+    end
+    defp handle_result({:error, reason}) do
+      {:error, reason}
+    end
+    """
+  end
+  
+  defp generate_code_response(input) do
+    cond do
+      String.contains?(input, "GenServer") or String.contains?(input, "counter") ->
+        # Return just the code without markdown markers
+        """
+        defmodule Counter do
+          use GenServer
+          
+          # Client API
+          
+          def start_link(initial_value \\\\ 0) do
+            GenServer.start_link(__MODULE__, initial_value, name: __MODULE__)
+          end
+          
+          def increment do
+            GenServer.call(__MODULE__, :increment)
+          end
+          
+          def get_value do
+            GenServer.call(__MODULE__, :get_value)
+          end
+          
+          # Server Callbacks
+          
+          @impl true
+          def init(initial_value) do
+            {:ok, initial_value}
+          end
+          
+          @impl true
+          def handle_call(:increment, _from, state) do
+            new_state = state + 1
+            {:reply, new_state, new_state}
+          end
+          
+          @impl true
+          def handle_call(:get_value, _from, state) do
+            {:reply, state, state}
+          end
+        end
+        """
+        
+      String.contains?(input, "add") and String.contains?(input, "numbers") ->
+        # Return just the code without markdown markers
+        "def add(a, b) when is_number(a) and is_number(b) do\n  a + b\nend"
+        
+      true ->
+        # Default code generation - return just the code without markdown markers
+        "def generated_function do\n  # Generated based on: #{String.slice(input, 0, 50)}\n  :ok\nend"
     end
   end
 
