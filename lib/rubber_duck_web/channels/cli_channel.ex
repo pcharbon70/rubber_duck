@@ -66,7 +66,9 @@ defmodule RubberDuckWeb.CLIChannel do
     # Handle synchronously for LLM commands as they are typically quick
     case CommandAdapter.handle_message("llm", params, socket) do
       {:ok, result} ->
-        response = CommandAdapter.build_response({:ok, result}, request_id)
+        # Handle formatted results - decode JSON strings back to maps
+        parsed_result = parse_formatted_result(result)
+        response = CommandAdapter.build_response({:ok, parsed_result}, request_id)
         {:reply, {:ok, response}, socket}
 
       {:error, reason} ->
@@ -103,7 +105,9 @@ defmodule RubberDuckWeb.CLIChannel do
 
     case CommandAdapter.handle_message("health", params, socket) do
       {:ok, result} ->
-        response = CommandAdapter.build_response({:ok, result}, request_id)
+        # Handle formatted results - decode JSON strings back to maps
+        parsed_result = parse_formatted_result(result)
+        response = CommandAdapter.build_response({:ok, parsed_result}, request_id)
         {:reply, {:ok, response}, socket}
 
       {:error, reason} ->
@@ -147,9 +151,20 @@ defmodule RubberDuckWeb.CLIChannel do
   defp poll_async_status(command, async_request_id, client_request_id, socket, attempts) do
     case CommandAdapter.get_status(async_request_id) do
       {:ok, %{status: :completed, result: result}} ->
+        # Handle formatted results - decode JSON strings back to maps
+        parsed_result = case result do
+          {:ok, json_string} when is_binary(json_string) ->
+            case Jason.decode(json_string) do
+              {:ok, decoded} -> decoded
+              {:error, _} -> json_string  # Fallback to string if not valid JSON
+            end
+          {:ok, data} -> data
+          other -> other
+        end
+        
         push(socket, "#{command}:result", %{
           status: "success",
-          result: result,
+          result: parsed_result,
           request_id: client_request_id
         })
 
@@ -194,6 +209,17 @@ defmodule RubberDuckWeb.CLIChannel do
 
   defp generate_stream_id do
     :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
+  end
+
+  defp parse_formatted_result(result) do
+    case result do
+      json_string when is_binary(json_string) ->
+        case Jason.decode(json_string) do
+          {:ok, decoded} -> decoded
+          {:error, _} -> result  # Return as-is if not valid JSON
+        end
+      _ -> result
+    end
   end
 
   defp handle_streaming_command(command, _params, stream_id, socket) do

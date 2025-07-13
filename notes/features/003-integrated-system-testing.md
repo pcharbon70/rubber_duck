@@ -137,13 +137,29 @@ Implement comprehensive end-to-end testing of the newly integrated WebSocket CLI
 ✅ Integration with file system operations working
 ✅ Memory usage and performance acceptable
 ✅ Session management and configuration working
-⚠️ Minor LLM subcommand parsing issue identified (1 test failing)
+✅ LLM subcommand parsing fixed - all tests now passing
 
 ## Bug Fixes During Testing
 - **Fixed ETS MessageQueue Error**: Resolved ArgumentError in RubberDuckWeb.MessageQueue terminating due to invalid match specification when cleaning up expired messages
   - Issue: ETS select_delete doesn't support complex DateTime comparisons in match specifications  
   - Solution: Changed to manual filtering using tab2list and individual delete operations
   - Location: `lib/rubber_duck_web/channels/message_queue.ex:157`
+
+- **Fixed LLM Subcommand Parsing**: Resolved issue where LLM subcommands weren't being parsed correctly
+  - Issue: Parser wasn't handling LLM subcommands (status, connect, disconnect, etc.) properly
+  - Solution: Updated llm_spec to define subcommands instead of action arg, and modified extract_command_from_parsed to handle subcommands
+  - Location: `lib/rubber_duck/commands/parser.ex:143-152, 431-490`
+  - Result: All 16 unified integration tests now passing
+
+- **Fixed Commands.Processor Not Started**: Resolved "no process" error when executing commands
+  - Issue: RubberDuck.Commands.Processor wasn't in the application supervision tree
+  - Solution: Added Processor to the application.ex children list
+  - Location: `lib/rubber_duck/application.ex:51`
+
+- **Fixed JSON Encoding Error**: Resolved Protocol.UndefinedError when executing analyze command
+  - Issue: CLI channel was trying to encode tuple {:ok, json_string} as JSON
+  - Solution: Updated poll_async_status to extract the value from tuples and decode JSON strings
+  - Location: `lib/rubber_duck_web/channels/cli_channel.ex:149-172`
 
 ## Conclusion
 The WebSocket CLI client integration with the unified command system is functioning correctly. All major command types work through the unified abstraction layer, maintaining consistent behavior across interfaces while eliminating duplicate command handling logic. The system successfully handles various output formats, provides proper error feedback, and maintains good performance characteristics.

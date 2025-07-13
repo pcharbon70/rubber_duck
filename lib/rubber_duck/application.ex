@@ -53,6 +53,8 @@ defmodule RubberDuck.Application do
       RubberDuckWeb.Presence,
       # Message queue for offline users
       RubberDuckWeb.MessageQueue,
+      # Command processing system
+      RubberDuck.Commands.Processor,
       # Web endpoint - start last
       RubberDuckWeb.Endpoint
       # Error boundary GenServer - started manually in tests
