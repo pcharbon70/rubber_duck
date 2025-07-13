@@ -50,7 +50,8 @@ defmodule RubberDuck.CLIClient.Main do
         refactor: refactor_spec(),
         test: test_spec(),
         llm: llm_spec(),
-        health: health_spec()
+        health: health_spec(),
+        conversation: conversation_spec()
       ],
       flags: [
         verbose: [
@@ -211,6 +212,34 @@ defmodule RubberDuck.CLIClient.Main do
           _ -> base_args
         end
         
+      :conversation ->
+        # Conversation command has subcommands
+        case Map.get(args, :subcommand) do
+          {subcmd, subcmd_args} -> 
+            subcmd_base = base_args ++ [to_string(subcmd)]
+            # Add subcommand-specific args
+            case subcmd do
+              :start ->
+                title = Map.get(subcmd_args.args, :title)
+                if title, do: subcmd_base ++ [title], else: subcmd_base
+              :show ->
+                id = Map.get(subcmd_args.args, :conversation_id)
+                if id, do: subcmd_base ++ [id], else: subcmd_base
+              :send ->
+                message = Map.get(subcmd_args.args, :message)
+                if message, do: subcmd_base ++ [message], else: subcmd_base
+              :delete ->
+                id = Map.get(subcmd_args.args, :conversation_id)
+                if id, do: subcmd_base ++ [id], else: subcmd_base
+              :chat ->
+                id = Map.get(subcmd_args.args, :conversation_id)
+                if id, do: subcmd_base ++ [id], else: subcmd_base
+              _ ->
+                subcmd_base
+            end
+          _ -> base_args
+        end
+        
       _ ->
         base_args
     end
@@ -225,6 +254,8 @@ defmodule RubberDuck.CLIClient.Main do
         :position -> acc ++ ["--position", to_string(value)]
         :instruction -> acc ++ ["--instruction", to_string(value)]
         :provider -> acc ++ ["--provider", to_string(value)]
+        :conversation -> acc ++ ["--conversation", to_string(value)]
+        :title -> acc ++ ["--title", to_string(value)]
         _ -> acc
       end
     end)
@@ -500,6 +531,112 @@ defmodule RubberDuck.CLIClient.Main do
     [
       name: "health",
       about: "Check RubberDuck server health status"
+    ]
+  end
+
+  defp conversation_spec do
+    [
+      name: "conversation",
+      about: "Manage AI conversations",
+      subcommands: [
+        start: [
+          name: "start",
+          about: "Start a new conversation",
+          args: [
+            title: [
+              value_name: "TITLE",
+              help: "Title for the conversation",
+              required: false,
+              parser: :string
+            ]
+          ],
+          options: [
+            type: [
+              short: "-t",
+              long: "--type",
+              help: "Type of conversation (general, coding, debugging, planning, review)",
+              parser: fn
+                t when t in ["general", "coding", "debugging", "planning", "review"] -> 
+                  {:ok, t}
+                other -> 
+                  {:error, "Invalid conversation type: #{other}"}
+              end,
+              default: "general",
+              required: false
+            ]
+          ]
+        ],
+        list: [
+          name: "list",
+          about: "List all conversations"
+        ],
+        show: [
+          name: "show",
+          about: "Show conversation details and history",
+          args: [
+            conversation_id: [
+              value_name: "ID",
+              help: "Conversation ID",
+              required: true,
+              parser: :string
+            ]
+          ]
+        ],
+        send: [
+          name: "send",
+          about: "Send a message to a conversation",
+          args: [
+            message: [
+              value_name: "MESSAGE",
+              help: "Message to send",
+              required: true,
+              parser: :string
+            ]
+          ],
+          options: [
+            conversation: [
+              short: "-c",
+              long: "--conversation",
+              help: "Conversation ID",
+              parser: :string,
+              required: true
+            ]
+          ]
+        ],
+        delete: [
+          name: "delete",
+          about: "Delete a conversation",
+          args: [
+            conversation_id: [
+              value_name: "ID",
+              help: "Conversation ID to delete",
+              required: true,
+              parser: :string
+            ]
+          ]
+        ],
+        chat: [
+          name: "chat",
+          about: "Enter interactive chat mode",
+          args: [
+            conversation_id: [
+              value_name: "ID",
+              help: "Conversation ID (optional, creates new if not provided)",
+              required: false,
+              parser: :string
+            ]
+          ],
+          options: [
+            title: [
+              short: "-t",
+              long: "--title",
+              help: "Title for new conversation",
+              parser: :string,
+              required: false
+            ]
+          ]
+        ]
+      ]
     ]
   end
 end
