@@ -23,9 +23,20 @@ defmodule RubberDuck.Commands.Adapters.WebSocket do
   def handle_message(event, payload, socket) do
     with {:ok, context} <- build_context(socket, payload),
          {:ok, command} <- parse_websocket_message(event, payload, context),
-         {:ok, result} <- Processor.execute(command) do
+         {:ok, result} <- execute_with_appropriate_timeout(command) do
       {:ok, result}
     end
+  end
+
+  # Execute with appropriate timeout based on command type
+  defp execute_with_appropriate_timeout(%{name: :conversation} = command) do
+    # Use longer timeout for conversation commands due to LLM operations
+    Processor.execute(command, 150_000)  # 2.5 minutes
+  end
+
+  defp execute_with_appropriate_timeout(command) do
+    # Use default timeout for other commands
+    Processor.execute(command)
   end
 
   @doc """

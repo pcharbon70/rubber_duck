@@ -355,7 +355,7 @@ defmodule RubberDuck.Workflows.DynamicWorkflowIntegrationTest do
       result = Executor.run_dynamic(task, timeout: 10_000)
 
       # Even if agents fail, workflow should complete or fail gracefully
-      assert {:ok, _result} = result or {:error, _reason} = result
+      assert match?({:ok, _result}, result) or match?({:error, _reason}, result)
     end
 
     test "handles timeout scenarios" do

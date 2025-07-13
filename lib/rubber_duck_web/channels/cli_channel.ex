@@ -83,7 +83,7 @@ defmodule RubberDuckWeb.CLIChannel do
     socket = increment_request_count(socket)
     request_id = Map.get(params, "request_id")
 
-    # Handle synchronously for conversation commands as they are typically quick
+    # Handle synchronously but with longer timeout to prevent WebSocket timeouts
     case CommandAdapter.handle_message("conversation", params, socket) do
       {:ok, result} ->
         # Handle formatted results - decode JSON strings back to maps

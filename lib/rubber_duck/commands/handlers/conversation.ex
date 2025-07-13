@@ -276,12 +276,13 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
     {model, temperature} = select_optimal_model_for_message(user_message, conversation_context)
     
     # Build options for LLM service (correct API pattern)
+    # Use longer timeout for conversation responses to allow for complex reasoning
     opts = [
       model: model,
       messages: llm_messages,
       temperature: temperature,
       max_tokens: get_max_tokens_for_context(conversation_context),
-      timeout: 30_000
+      timeout: 120_000  # 2 minutes for complex conversations
     ]
 
     case RubberDuck.LLM.Service.completion(opts) do
@@ -306,7 +307,17 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
         Conversations.create_message(assistant_params)
         
       {:error, reason} ->
-        {:error, "Failed to generate response: #{reason}"}
+        # Provide specific error messages for common failure cases
+        case reason do
+          :timeout ->
+            {:error, "LLM request timed out after 2 minutes. The model may be overloaded or the request too complex."}
+          :provider_not_connected ->
+            {:error, "LLM provider is not connected. Please connect an LLM provider first using: llm connect <provider>"}
+          {:unknown_model, model} ->
+            {:error, "Unknown model '#{model}'. Please check available models with: llm list_models"}
+          _ ->
+            {:error, "Failed to generate response: #{inspect(reason)}"}
+        end
     end
   end
 

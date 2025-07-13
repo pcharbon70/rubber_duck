@@ -33,6 +33,7 @@ defmodule RubberDuck.CLIClient.UnifiedIntegration do
     
     
     
+    
     # Send through WebSocket client
     case RubberDuck.CLIClient.Client.send_command(command, params) do
       {:ok, %{"status" => "ok", "response" => response}} -> 
@@ -184,6 +185,10 @@ defmodule RubberDuck.CLIClient.UnifiedIntegration do
   defp format_response(%{"message" => message, "type" => "llm_connection"}, :plain) do
     message
   end
+  defp format_response(%{"message" => message} = response, :plain) when is_binary(message) do
+    # Handle other message responses (like conversation responses)
+    message
+  end
   defp format_response(%{"providers" => providers} = data, :plain) do
     # Format LLM status output
     lines = ["LLM Provider Status:", ""]
@@ -221,15 +226,23 @@ defmodule RubberDuck.CLIClient.UnifiedIntegration do
   
   defp parse_remaining_args([], params), do: params
   
-  defp parse_remaining_args([subcommand | rest], params) when is_binary(subcommand) or is_atom(subcommand) do
-    # Check if this is a flag or a subcommand
-    if String.starts_with?(to_string(subcommand), "--") do
+  defp parse_remaining_args([arg | rest], params) when is_binary(arg) or is_atom(arg) do
+    # Check if this is a flag or an argument
+    if String.starts_with?(to_string(arg), "--") do
       # Parse flag and its value
-      parse_flag(subcommand, rest, params)
+      parse_flag(arg, rest, params)
     else
-      # It's a subcommand
-      params = Map.put(params, :subcommand, to_string(subcommand))
-      parse_remaining_args(rest, params)
+      # Check if we already have a subcommand
+      if Map.has_key?(params, :subcommand) do
+        # It's a regular argument
+        args = Map.get(params, :args, [])
+        params = Map.put(params, :args, args ++ [to_string(arg)])
+        parse_remaining_args(rest, params)
+      else
+        # It's the subcommand
+        params = Map.put(params, :subcommand, to_string(arg))
+        parse_remaining_args(rest, params)
+      end
     end
   end
   

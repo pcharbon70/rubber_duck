@@ -418,6 +418,10 @@ defmodule RubberDuck.CLIClient.Client do
             %{"status" => "error", "error" => reason} ->
               GenServer.reply(from, {:error, reason})
 
+            %{"status" => "processing"} ->
+              # This shouldn't happen for conversation commands now that they're synchronous again
+              GenServer.reply(from, {:ok, response})
+
             _ ->
               GenServer.reply(from, {:ok, response})
           end
