@@ -5,7 +5,8 @@ defmodule RubberDuck.CLIClient.Main do
   This module handles command-line parsing and routing to appropriate handlers.
   """
 
-  alias RubberDuck.CLIClient.{Auth, UnifiedIntegration}
+  alias RubberDuck.CLIClient.{Auth, Client, UnifiedIntegration}
+  require Logger
 
   @app_name "rubber_duck"
   @app_description "RubberDuck AI-powered coding assistant CLI"
@@ -33,6 +34,9 @@ defmodule RubberDuck.CLIClient.Main do
     {:ok, _} = Application.ensure_all_started(:inets)
     {:ok, _} = Application.ensure_all_started(:jason)
     {:ok, _} = Application.ensure_all_started(:phoenix_gen_socket_client)
+    
+    # Configure logger for CLI
+    Logger.configure(level: :warning)
   end
 
   defp parse_args(argv) do
@@ -139,6 +143,27 @@ defmodule RubberDuck.CLIClient.Main do
     RubberDuck.CLIClient.Commands.Auth.run(args, opts)
   end
 
+  defp execute_command(:conversation, args, opts) do
+    # Check if authenticated first
+    unless Auth.configured?() do
+      IO.puts(:stderr, """
+      Error: Not authenticated. Please run:
+        #{@app_name} auth setup
+      """)
+      System.halt(1)
+    end
+
+    # Handle chat subcommand specially for interactive mode
+    case Map.get(args, :subcommand) do
+      {:chat, chat_args} ->
+        RubberDuck.CLIClient.ConversationHandler.run_chat(chat_args, opts)
+      
+      _ ->
+        # Other conversation subcommands go through unified integration
+        execute_unified_command(:conversation, args, opts)
+    end
+  end
+
   defp execute_command(command, args, opts) do
     # Check if authenticated
     unless Auth.configured?() do
@@ -150,6 +175,10 @@ defmodule RubberDuck.CLIClient.Main do
       System.halt(1)
     end
 
+    execute_unified_command(command, args, opts)
+  end
+
+  defp execute_unified_command(command, args, opts) do
     # Build configuration for unified integration
     config = %{
       user_id: Auth.get_user_id(),
@@ -169,12 +198,21 @@ defmodule RubberDuck.CLIClient.Main do
 
     # Execute through unified integration
     case UnifiedIntegration.execute_command(unified_args, config) do
-      {:ok, output} ->
+      {:ok, output} when is_binary(output) ->
         IO.puts(output)
         System.halt(0)
+        
+      {:ok, output} ->
+        # Handle non-string outputs (e.g., maps, lists)
+        IO.puts(inspect(output, pretty: true))
+        System.halt(0)
 
-      {:error, reason} ->
+      {:error, reason} when is_binary(reason) ->
         IO.puts(:stderr, "Error: #{reason}")
+        System.halt(1)
+        
+      {:error, reason} ->
+        IO.puts(:stderr, "Error: #{inspect(reason)}")
         System.halt(1)
     end
   end

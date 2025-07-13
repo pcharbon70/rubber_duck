@@ -7,7 +7,7 @@ defmodule RubberDuck.CLIClient.UnifiedIntegration do
   execution through the unified system.
   """
 
-  alias RubberDuck.Commands.{Parser, Processor, Context}
+  # alias RubberDuck.Commands.{Parser, Processor, Context}
 
   @doc """
   Execute a command through the unified command system.
@@ -21,20 +21,79 @@ defmodule RubberDuck.CLIClient.UnifiedIntegration do
   - `{:error, reason}` - On failure
   """
   def execute_command(args, config) when is_list(args) do
-    # Determine the unified format based on CLI client format preference
-    unified_format = map_cli_format_to_unified(Map.get(config, :format, :plain))
+    # For escript/CLI client, we need to send commands through WebSocket
+    # The server will handle parsing and execution through the unified system
+    ensure_client_started(config)
     
-    with {:ok, context} <- build_context(config),
-         {:ok, command} <- Parser.parse(args, :cli, context),
-         # Override the command format with our mapped format
-         command <- %{command | format: unified_format},
-         {:ok, result} <- Processor.execute(command) do
-      
-      # The result should already be formatted by the unified system
-      {:ok, result}
-    else
-      {:error, reason} ->
+    # Parse command and params from args
+    {command, params} = parse_command_args(args)
+    
+    # Add format to params
+    params = Map.put(params, :format, config[:format] || :plain)
+    
+    
+    
+    # Send through WebSocket client
+    case RubberDuck.CLIClient.Client.send_command(command, params) do
+      {:ok, %{"status" => "ok", "response" => response}} -> 
+        {:ok, format_response(response, config[:format] || :plain)}
+      {:ok, %{"status" => "error", "error" => reason}} -> 
         {:error, format_error(reason)}
+      {:ok, result} -> 
+        {:ok, format_response(result, config[:format] || :plain)}
+      {:error, reason} -> 
+        {:error, format_error(reason)}
+    end
+  end
+  
+  defp ensure_client_started(config) do
+    case Process.whereis(RubberDuck.CLIClient.Client) do
+      nil ->
+        server_url = config[:server_url] || RubberDuck.CLIClient.Auth.get_server_url()
+        api_key = RubberDuck.CLIClient.Auth.get_api_key()
+        
+        if config[:verbose] do
+          IO.puts("Connecting to server: #{server_url}")
+          IO.puts("Using API key: #{String.slice(api_key || "", 0..7)}...")
+        end
+        
+        case RubberDuck.CLIClient.Client.start_link(url: server_url, api_key: api_key) do
+          {:ok, pid} ->
+            if config[:verbose] do
+              IO.puts("Client started with PID: #{inspect(pid)}")
+            end
+            # Explicitly connect
+            case RubberDuck.CLIClient.Client.connect(server_url) do
+              :ok ->
+                if config[:verbose] do
+                  IO.puts("Connection initiated")
+                end
+                # Wait for connection
+                wait_for_connection(10)
+              {:error, reason} ->
+                IO.puts("Failed to connect: #{inspect(reason)}")
+                raise "Failed to connect to server: #{inspect(reason)}"
+            end
+          {:error, reason} ->
+            IO.puts("Failed to start client: #{inspect(reason)}")
+            raise "Failed to start WebSocket client: #{inspect(reason)}"
+        end
+        
+      _pid ->
+        :ok
+    end
+  end
+  
+  defp wait_for_connection(0) do
+    raise "Failed to connect to server"
+  end
+  
+  defp wait_for_connection(attempts) do
+    if RubberDuck.CLIClient.Client.connected?() do
+      :ok
+    else
+      Process.sleep(500)
+      wait_for_connection(attempts - 1)
     end
   end
 
@@ -117,7 +176,81 @@ defmodule RubberDuck.CLIClient.UnifiedIntegration do
 
 
   defp format_error(reason) when is_binary(reason), do: reason
+  defp format_error(%{"reason" => reason}) when is_binary(reason), do: reason
   defp format_error(reason), do: inspect(reason)
+  
+  defp format_response(response, :plain) when is_binary(response), do: response
+  defp format_response(%{"data" => data}, :plain), do: format_response(data, :plain)
+  defp format_response(%{"message" => message, "type" => "llm_connection"}, :plain) do
+    message
+  end
+  defp format_response(%{"providers" => providers} = data, :plain) do
+    # Format LLM status output
+    lines = ["LLM Provider Status:", ""]
+    
+    provider_lines = for provider <- providers do
+      status_icon = if provider["status"] == "connected", do: "✓", else: "✗"
+      "#{status_icon} #{provider["name"]}: #{provider["status"]} (#{provider["health"]})"
+    end
+    
+    lines = lines ++ provider_lines
+    
+    if summary = data["summary"] do
+      lines = lines ++ ["", "Summary: #{summary["connected"]}/#{summary["total"]} connected"]
+    end
+    
+    Enum.join(lines, "\n")
+  end
+  defp format_response(response, :json) when is_map(response) or is_list(response) do
+    Jason.encode!(response, pretty: true)
+  end
+  defp format_response(response, _format) when is_binary(response), do: response
+  defp format_response(response, _format), do: inspect(response, pretty: true)
+  
+  defp parse_command_args([command | rest]) do
+    # Extract the main command
+    main_command = to_string(command)
+    
+    # Parse the rest of the args into params
+    params = parse_remaining_args(rest, %{})
+    
+    {main_command, params}
+  end
+  
+  defp parse_command_args([]), do: {"help", %{}}
+  
+  defp parse_remaining_args([], params), do: params
+  
+  defp parse_remaining_args([subcommand | rest], params) when is_binary(subcommand) or is_atom(subcommand) do
+    # Check if this is a flag or a subcommand
+    if String.starts_with?(to_string(subcommand), "--") do
+      # Parse flag and its value
+      parse_flag(subcommand, rest, params)
+    else
+      # It's a subcommand
+      params = Map.put(params, :subcommand, to_string(subcommand))
+      parse_remaining_args(rest, params)
+    end
+  end
+  
+  defp parse_remaining_args([arg | rest], params) do
+    # Other arguments go into args list
+    args = Map.get(params, :args, [])
+    params = Map.put(params, :args, args ++ [to_string(arg)])
+    parse_remaining_args(rest, params)
+  end
+  
+  defp parse_flag(flag, [value | rest], params) do
+    flag_name = String.trim_leading(flag, "--")
+    params = Map.put(params, String.to_atom(flag_name), value)
+    parse_remaining_args(rest, params)
+  end
+  
+  defp parse_flag(flag, [], params) do
+    # Boolean flag
+    flag_name = String.trim_leading(flag, "--")
+    Map.put(params, String.to_atom(flag_name), true)
+  end
 
   defp start_stream_monitor(request_id, handler, _config) do
     # Start a task to monitor the async request and call handler with results

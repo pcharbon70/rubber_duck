@@ -84,7 +84,9 @@ defmodule RubberDuckWeb.UserSocket do
     # This would check the API key against your database
     # For now, we'll use a simple check
     if valid_api_key?(api_key) do
-      {:ok, "api_user_#{api_key}"}
+      # Generate a stable UUID from the API key for development
+      user_id = generate_user_uuid_from_api_key(api_key)
+      {:ok, user_id}
     else
       {:error, "Invalid API key"}
     end
@@ -97,7 +99,8 @@ defmodule RubberDuckWeb.UserSocket do
   defp valid_api_key?(api_key) do
     # TODO: Implement real API key validation
     # This is a placeholder - in production, check against database
-    byte_size(api_key) >= 32
+    # For development, accept "test_key"
+    api_key == "test_key" || byte_size(api_key) >= 32
   end
   
   defp get_api_key_from_uri(%{uri: %{query: query}}) when is_binary(query) do
@@ -110,4 +113,21 @@ defmodule RubberDuckWeb.UserSocket do
   end
   
   defp get_api_key_from_uri(_), do: :error
+  
+  defp generate_user_uuid_from_api_key(api_key) do
+    # Generate a stable UUID from the API key
+    # This ensures the same API key always maps to the same user_id
+    # For development, use a fixed UUID for test_key
+    if api_key == "test_key" do
+      "00000000-0000-0000-0000-000000000001"
+    else
+      # For other keys, generate a UUID v4-like string from the hash
+      hash_hex = :crypto.hash(:md5, "rubber_duck_" <> api_key)
+                |> Base.encode16(case: :lower)
+      
+      String.slice(hash_hex, 0..7) <> "-" <>
+      "0000-4000-8000-" <>  # Version 4 UUID markers
+      String.slice(hash_hex, 8..19)
+    end
+  end
 end

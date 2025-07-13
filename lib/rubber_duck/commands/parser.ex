@@ -70,11 +70,14 @@ defmodule RubberDuck.Commands.Parser do
       {args, options} = extract_websocket_args_and_options(payload, name)
       format = determine_format(options, :websocket)
       
-      # Handle LLM subcommands
+      # Handle subcommands for LLM and conversation
       {name, subcommand} = case name do
         :llm -> 
           subcommand = payload["subcommand"] && String.to_atom(payload["subcommand"])
           {:llm, subcommand}
+        :conversation ->
+          subcommand = payload["subcommand"] && String.to_atom(payload["subcommand"])
+          {:conversation, subcommand}
         _ -> {name, nil}
       end
       
@@ -275,6 +278,26 @@ defmodule RubberDuck.Commands.Parser do
     end
     
     options = Map.drop(payload, ["subcommand", "provider", "model"]) |> atomize_keys()
+    {args, options}
+  end
+  
+  defp extract_websocket_args_and_options(payload, :conversation) do
+    # For conversation commands, extract based on subcommand
+    subcommand = payload["subcommand"] && String.to_atom(payload["subcommand"])
+    
+    {args, options} = case subcommand do
+      :start -> 
+        {[], Map.take(payload, ["title", "type"]) |> atomize_keys()}
+      :show -> 
+        {Map.get(payload, "args", []), %{}}
+      :send -> 
+        {Map.get(payload, "args", []), Map.take(payload, ["conversation"]) |> atomize_keys()}
+      :delete -> 
+        {Map.get(payload, "args", []), %{}}
+      _ -> 
+        {[], %{}}
+    end
+    
     {args, options}
   end
 

@@ -18,7 +18,7 @@ defmodule RubberDuck.CLIClient.Client.Transport do
 
   @impl true
   def init(opts) do
-    Logger.debug("Transport init called with opts: #{inspect(opts)}")
+    Logger.info("Transport init called with opts: #{inspect(opts)}")
 
     url = Keyword.fetch!(opts, :url)
     params = Keyword.get(opts, :params, %{})
@@ -30,7 +30,14 @@ defmodule RubberDuck.CLIClient.Client.Transport do
       |> Map.to_list()
       |> Keyword.new()
 
+    Logger.info("Attempting to connect to WebSocket at: #{url}")
+    Logger.info("Socket params: #{inspect(socket_params)}")
+
     {:connect, url, socket_params, %{parent: parent}}
+  rescue
+    e ->
+      Logger.error("Error in Transport init: #{inspect(e)}")
+      {:error, e}
   end
 
   @impl true
@@ -54,7 +61,8 @@ defmodule RubberDuck.CLIClient.Client.Transport do
 
   @impl true
   def handle_disconnected(reason, state) do
-    Logger.warning("WebSocket disconnected: #{inspect(reason)}")
+    Logger.error("WebSocket disconnected: #{inspect(reason)}")
+    Logger.error("State at disconnect: #{inspect(state)}")
     Process.send(state.parent, {:disconnected, reason}, [])
     {:stop, :disconnected, state}
   end

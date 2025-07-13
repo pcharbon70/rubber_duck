@@ -97,6 +97,21 @@ Add conversation command support to the RubberDuck escript CLI client, enabling 
 - Updated build_unified_args to handle conversation subcommands
 - Tests passing for help command output
 - Conversation commands now recognized by CLI parser
+- Created ConversationHandler module for interactive chat mode
+- Added special handling for conversation chat subcommand
+- Implemented REPL with commands: /help, /exit, /clear, /history
+- Added streaming response handling for real-time AI responses
+- Added typing indicator during AI response generation
+- Tests passing for conversation ID extraction
+- Fixed WebSocket routing in UnifiedIntegration module
+- Added connection detection logic to route between local and remote execution
+- Implemented proper connection waiting with retry logic
+- Added clear error message when server is not running
+- All help commands working correctly for conversation subcommands
+- Added LLM connection check before starting conversations
+- Implemented ensure_llm_connected in conversation handler
+- Added helpful error messages directing users to connect LLM first
+- Both CLI chat mode and server-side handlers check for LLM connection
 
 ## Questions for Pascal
 1. Should the interactive chat mode be the primary interface, or should we support both one-shot and interactive?

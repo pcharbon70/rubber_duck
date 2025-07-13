@@ -109,6 +109,7 @@ defmodule RubberDuck.CLIClient.Client do
 
     case do_connect(new_url, state.api_key) do
       {:ok, socket_pid} ->
+        Logger.info("GenSocketClient started with PID: #{inspect(socket_pid)}")
         # Store the socket PID but don't mark as joined yet
         state = %{
           state
@@ -124,6 +125,7 @@ defmodule RubberDuck.CLIClient.Client do
         {:noreply, state}
 
       {:error, reason} ->
+        Logger.error("Failed to start GenSocketClient: #{inspect(reason)}")
         {:reply, {:error, reason}, state}
     end
   end
@@ -192,6 +194,7 @@ defmodule RubberDuck.CLIClient.Client do
 
   @impl true
   def handle_call(:connected?, _from, state) do
+    Logger.debug("Connected check - connected: #{state.connected}, channel_joined: #{state.channel_joined}")
     {:reply, state.connected && state.channel_joined, state}
   end
 
@@ -364,15 +367,20 @@ defmodule RubberDuck.CLIClient.Client do
 
   defp do_connect(url, api_key) do
     if api_key do
-      Logger.debug("Connecting to #{url}")
+      Logger.debug("Connecting to #{url} with api_key: #{String.slice(api_key || "", 0..7)}...")
 
       # start_link expects (module, transport_mod, opts)
-      GenSocketClient.start_link(
-        __MODULE__.Transport,
-        Phoenix.Channels.GenSocketClient.Transport.WebSocketClient,
+      # The opts are passed to the Transport module's init/1 callback
+      transport_opts = [
         url: url,
         params: %{api_key: api_key},
         parent: self()
+      ]
+      
+      GenSocketClient.start_link(
+        __MODULE__.Transport,
+        Phoenix.Channels.GenSocketClient.Transport.WebSocketClient,
+        transport_opts
       )
     else
       {:error, :no_api_key}

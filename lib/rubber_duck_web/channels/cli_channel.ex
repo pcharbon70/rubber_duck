@@ -76,6 +76,26 @@ defmodule RubberDuckWeb.CLIChannel do
         {:reply, {:error, response}, socket}
     end
   end
+  
+  # Handle conversation commands
+  @impl true
+  def handle_in("conversation", params, socket) do
+    socket = increment_request_count(socket)
+    request_id = Map.get(params, "request_id")
+
+    # Handle synchronously for conversation commands as they are typically quick
+    case CommandAdapter.handle_message("conversation", params, socket) do
+      {:ok, result} ->
+        # Handle formatted results - decode JSON strings back to maps
+        parsed_result = parse_formatted_result(result)
+        response = CommandAdapter.build_response({:ok, parsed_result}, request_id)
+        {:reply, {:ok, response}, socket}
+
+      {:error, reason} ->
+        response = CommandAdapter.build_error_response(reason, request_id)
+        {:reply, {:error, response}, socket}
+    end
+  end
 
   # Handle streaming requests
   @impl true
