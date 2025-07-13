@@ -2,6 +2,7 @@ defmodule RubberDuck.Application do
   @moduledoc false
 
   use Application
+  require Logger
 
   @impl true
   def start(_type, _args) do
@@ -62,6 +63,30 @@ defmodule RubberDuck.Application do
     ]
 
     opts = [strategy: :one_for_one, name: RubberDuck.Supervisor]
-    Supervisor.start_link(children, opts)
+    result = Supervisor.start_link(children, opts)
+    
+    # Log WebSocket endpoint information after startup
+    log_websocket_info()
+    
+    result
+  end
+  
+  defp log_websocket_info do
+    port = Application.get_env(:rubber_duck, RubberDuckWeb.Endpoint)[:http][:port]
+    host = Application.get_env(:rubber_duck, RubberDuckWeb.Endpoint)[:url][:host] || "localhost"
+    
+    Logger.info("""
+    
+    ============================================
+    RubberDuck Server Started Successfully!
+    ============================================
+    HTTP Endpoint: http://#{host}:#{port}
+    WebSocket Endpoint: ws://#{host}:#{port}/socket/websocket
+    
+    CLI Client Configuration:
+    - Run: ./bin/rubber_duck auth setup --server ws://#{host}:#{port}/socket/websocket
+    - Use API key: test_key (for development)
+    ============================================
+    """)
   end
 end

@@ -14,13 +14,16 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
 
   @impl true
   def execute(%Command{name: :conversation, subcommand: :start, args: args, options: options, context: context}) do
-    with {:ok, title} <- extract_title(args, options),
+    with :ok <- ensure_llm_connected(),
+         {:ok, title} <- extract_title(args, options),
          {:ok, conversation_type} <- extract_type(options),
          {:ok, conversation} <- create_conversation(context, title, conversation_type),
          {:ok, context_record} <- create_conversation_context(conversation, conversation_type) do
       
       format_conversation_created(conversation, context_record, options[:format])
     else
+      {:error, :no_llm_connected} ->
+        {:error, "No LLM provider is connected. Please connect an LLM provider first using: llm connect <provider>"}
       {:error, reason} -> 
         {:error, "Failed to create conversation: #{reason}"}
     end
@@ -57,7 +60,8 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
 
   @impl true
   def execute(%Command{name: :conversation, subcommand: :send, args: args, options: options, context: context}) do
-    with {:ok, conversation_id} <- extract_conversation_id(options),
+    with :ok <- ensure_llm_connected(),
+         {:ok, conversation_id} <- extract_conversation_id(options),
          {:ok, message_content} <- extract_message_content(args),
          {:ok, conversation} <- get_conversation(conversation_id),
          {:ok, user_message} <- create_user_message(conversation_id, message_content),
@@ -65,6 +69,8 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
       
       format_conversation_exchange(user_message, assistant_response, options[:format])
     else
+      {:error, :no_llm_connected} ->
+        {:error, "No LLM provider is connected. Please connect an LLM provider first using: llm connect <provider>"}
       {:error, reason} -> 
         {:error, "Failed to send message: #{reason}"}
     end
@@ -88,6 +94,22 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
   end
 
   # Private helper functions
+
+  defp ensure_llm_connected do
+    # Check if any LLM provider is connected
+    case RubberDuck.LLM.ConnectionManager.status() do
+      connections when is_map(connections) ->
+        # Check if any provider is connected and healthy
+        connected? = Enum.any?(connections, fn {_provider, info} ->
+          info.status == :connected && info.health in [:ok, :healthy]
+        end)
+        
+        if connected?, do: :ok, else: {:error, :no_llm_connected}
+        
+      _ ->
+        {:error, :no_llm_connected}
+    end
+  end
 
   defp extract_title(args, options) do
     # Try to get title from options first, then from args
