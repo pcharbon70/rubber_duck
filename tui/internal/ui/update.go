@@ -66,6 +66,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Show help modal
 			m.modal.ShowHelp()
 			return m, nil
+		case "ctrl+f":
+			// Toggle file tree
+			m.showFileTree = !m.showFileTree
+			if m.showFileTree {
+				m.statusBar = "File tree shown"
+			} else {
+				m.statusBar = "File tree hidden"
+			}
+			return m, nil
+		case "ctrl+e":
+			// Toggle editor
+			m.showEditor = !m.showEditor
+			if m.showEditor {
+				m.statusBar = "Editor shown"
+			} else {
+				m.statusBar = "Editor hidden"
+			}
+			return m, nil
+		case "ctrl+/":
+			// Focus chat input
+			m.activePane = ChatPane
+			m.statusBar = "Chat focused"
+			return m, nil
 		case "ctrl+shift+t":
 			// Toggle theme shortcut
 			currentTheme := m.themeManager.GetCurrentThemeName()
@@ -88,26 +111,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Pane-specific handling
 		switch m.activePane {
-		case FileTreePane:
+		case ChatPane:
+			// Update chat component
 			var cmd tea.Cmd
-			m.fileTree, cmd = m.fileTree.Update(msg)
+			chatModel, cmd := m.chat.Update(msg)
+			m.chat = chatModel.(*Chat)
 			if cmd != nil {
 				cmds = append(cmds, cmd)
+			}
+		case FileTreePane:
+			if m.showFileTree {
+				var cmd tea.Cmd
+				m.fileTree, cmd = m.fileTree.Update(msg)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
 			}
 		case EditorPane:
-			prevValue := m.editor.Value()
-			var cmd tea.Cmd
-			m.editor, cmd = m.editor.Update(msg)
-			if cmd != nil {
-				cmds = append(cmds, cmd)
-			}
-			
-			// Check if content changed and trigger debounced auto-save
-			if m.editor.Value() != prevValue {
-				m.modified = true
-				m.triggerDebouncedSave()
+			if m.showEditor {
+				prevValue := m.editor.Value()
+				var cmd tea.Cmd
+				m.editor, cmd = m.editor.Update(msg)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+				
+				// Check if content changed and trigger debounced auto-save
+				if m.editor.Value() != prevValue {
+					m.modified = true
+					m.triggerDebouncedSave()
+				}
 			}
 		case OutputPane:
+			// Output pane is deprecated, but keep for compatibility
 			var cmd tea.Cmd
 			m.output, cmd = m.output.Update(msg)
 			if cmd != nil {
@@ -374,6 +410,80 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	
+	// Handle chat messages
+	case ChatMessageSentMsg:
+		// Add user message to chat
+		m.chat.AddMessage(UserMessage, msg.Content, "user")
+		
+		// Route through command system
+		if router := m.commandPalette.GetCommandRouter(); router != nil {
+			// Check if it's a command (starts with /)
+			if strings.HasPrefix(msg.Content, "/") {
+				// Parse command
+				parts := strings.Fields(msg.Content[1:]) // Remove /
+				if len(parts) > 0 {
+					commandName := parts[0]
+					args := make(map[string]interface{})
+					if len(parts) > 1 {
+						args["args"] = strings.Join(parts[1:], " ")
+					}
+					
+					// Execute command
+					cmdResult := router.ExecuteCommand(commandName, args, m.buildChatContext())
+					if cmdResult != nil {
+						cmds = append(cmds, cmdResult)
+					}
+				}
+			} else {
+				// Regular chat message - send to server
+				args := map[string]interface{}{
+					"message": msg.Content,
+				}
+				cmdResult := router.ExecuteCommand("chat", args, m.buildChatContext())
+				if cmdResult != nil {
+					cmds = append(cmds, cmdResult)
+				}
+			}
+		}
+		m.statusBar = "Message sent"
+		return m, tea.Batch(cmds...)
+	
+	case ChatMessageReceivedMsg:
+		// Add received message to chat
+		var msgType MessageType
+		switch msg.Type {
+		case "assistant":
+			msgType = AssistantMessage
+		case "system":
+			msgType = SystemMessage
+		case "error":
+			msgType = ErrorMessage
+		default:
+			msgType = AssistantMessage
+		}
+		
+		m.chat.AddMessage(msgType, msg.Content, msg.Type)
+		m.statusBar = "Message received"
+		return m, nil
+	
+	case ToggleFileTreeMsg:
+		m.showFileTree = !m.showFileTree
+		if m.showFileTree {
+			m.statusBar = "File tree shown"
+		} else {
+			m.statusBar = "File tree hidden"
+		}
+		return m, nil
+	
+	case ToggleEditorMsg:
+		m.showEditor = !m.showEditor
+		if m.showEditor {
+			m.statusBar = "Editor shown"
+		} else {
+			m.statusBar = "Editor hidden"
+		}
+		return m, nil
+	
 	// Handle unified command system response messages
 	case UnsolicitedResponseMsg:
 		m.statusBar = "Received unsolicited response from server"
@@ -438,17 +548,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// nextPane cycles to the next pane
+// nextPane cycles to the next visible pane
 func (m Model) nextPane() Pane {
 	switch m.activePane {
+	case ChatPane:
+		if m.showFileTree {
+			return FileTreePane
+		} else if m.showEditor {
+			return EditorPane
+		}
+		return ChatPane
 	case FileTreePane:
-		return EditorPane
+		if m.showEditor {
+			return EditorPane
+		}
+		return ChatPane
 	case EditorPane:
-		return OutputPane
+		return ChatPane
 	case OutputPane:
-		return FileTreePane
+		// Deprecated pane
+		return ChatPane
 	}
-	return FileTreePane
+	return ChatPane
+}
+
+// buildChatContext creates a context for chat commands
+func (m Model) buildChatContext() interface{} {
+	return map[string]interface{}{
+		"current_file":   m.currentFile,
+		"editor_content": m.editor.Value(),
+		"show_file_tree": m.showFileTree,
+		"show_editor":    m.showEditor,
+		"connected":      m.connected,
+	}
 }
 
 

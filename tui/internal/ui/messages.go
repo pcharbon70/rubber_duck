@@ -167,6 +167,20 @@ type ShowCommandPaletteMsg struct {
 	Filter string
 }
 
+// Chat messages
+type ChatMessageSentMsg struct {
+	Content string
+}
+
+type ChatMessageReceivedMsg struct {
+	Content string
+	Type    string // "assistant", "system", "error"
+}
+
+type ToggleFileTreeMsg struct{}
+
+type ToggleEditorMsg struct{}
+
 // Unified command system response messages
 type UnsolicitedResponseMsg struct {
 	Response interface{} // commands.UnifiedResponse

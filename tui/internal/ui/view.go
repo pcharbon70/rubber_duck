@@ -61,24 +61,49 @@ func (m Model) View() string {
 	// Get themed styles
 	styles := m.getThemedStyles()
 
-	// Calculate dimensions
-	sidebarWidth := 30
-	outputWidth := 40
-	editorWidth := m.width - sidebarWidth - outputWidth - 6 // borders
-	contentHeight := m.height - 3                            // status bar
-
-	// Build panes
-	fileTree := m.renderFileTree(sidebarWidth, contentHeight, styles)
-	editor := m.renderEditor(editorWidth, contentHeight, styles)
-	output := m.renderOutput(outputWidth, contentHeight, styles)
-
-	// Combine horizontally
-	main := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		fileTree,
-		editor,
-		output,
-	)
+	// Calculate dimensions dynamically based on visible panels
+	contentHeight := m.height - 3 // status bar
+	var panes []string
+	
+	// Calculate widths based on visible panels
+	fileTreeWidth := 30
+	editorWidth := 50
+	availableWidth := m.width
+	
+	// Build visible panes
+	if m.showFileTree {
+		fileTree := m.renderFileTree(fileTreeWidth, contentHeight, styles)
+		panes = append(panes, fileTree)
+		availableWidth -= fileTreeWidth + 2 // borders
+	}
+	
+	if m.showEditor {
+		// Editor takes fixed width or remaining space if it's the only other panel
+		if !m.showFileTree {
+			editorWidth = m.width / 2 // Take half when shown with chat only
+		}
+		editor := m.renderEditor(editorWidth, contentHeight, styles)
+		panes = append(panes, editor)
+		availableWidth -= editorWidth + 2 // borders
+	}
+	
+	// Chat takes all remaining space (minimum 40)
+	chatWidth := availableWidth
+	if chatWidth < 40 {
+		chatWidth = 40
+	}
+	chat := m.renderChat(chatWidth, contentHeight, styles)
+	panes = append(panes, chat)
+	
+	// Combine panes horizontally
+	var main string
+	if len(panes) == 1 {
+		// Only chat visible
+		main = panes[0]
+	} else {
+		// Multiple panes
+		main = lipgloss.JoinHorizontal(lipgloss.Top, panes...)
+	}
 
 	// Add status bar
 	statusBar := m.renderStatusBar(styles)
@@ -186,6 +211,24 @@ func (m Model) renderOutput(width, height int, styles ThemedStyles) string {
 		Render(title + "\n" + outputView)
 }
 
+// renderChat renders the chat pane
+func (m Model) renderChat(width, height int, styles ThemedStyles) string {
+	// Update chat size
+	m.chat.SetSize(width, height)
+	
+	// Set theme
+	m.chat.SetTheme(m.GetTheme())
+	
+	// Set focus based on active pane
+	if m.activePane == ChatPane {
+		m.chat.Focus()
+	} else {
+		m.chat.Blur()
+	}
+	
+	return m.chat.View()
+}
+
 // renderStatusBar renders the status bar
 func (m Model) renderStatusBar(styles ThemedStyles) string {
 	width := m.width
@@ -195,9 +238,21 @@ func (m Model) renderStatusBar(styles ThemedStyles) string {
 	if !m.connected {
 		connStatus = "⚠️ "
 	}
+	
+	// Panel indicators
+	panelStatus := ""
+	if m.showFileTree {
+		panelStatus += " [F]iles"
+	}
+	if m.showEditor {
+		panelStatus += " [E]ditor"
+	}
+	if panelStatus == "" {
+		panelStatus = " Chat Mode"
+	}
 
 	// Build status text
-	status := fmt.Sprintf(" %s %s", connStatus, m.statusBar)
+	status := fmt.Sprintf(" %s %s |%s", connStatus, m.statusBar, panelStatus)
 
 	// Pad to full width
 	padding := width - lipgloss.Width(status)

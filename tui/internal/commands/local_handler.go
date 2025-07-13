@@ -221,6 +221,20 @@ func (lh *LocalHandler) registerDefaultHandlers() {
 			}
 		}
 	})
+	
+	// Chat command (for regular chat messages - this would normally go to server)
+	lh.RegisterHandler("chat", func(args map[string]interface{}, context CommandContext) tea.Cmd {
+		return func() tea.Msg {
+			// For now, echo back as assistant message
+			message := getStringArg(args, "message", "")
+			response := fmt.Sprintf("Echo: %s (This would normally go to the AI server)", message)
+			
+			return ChatMessageReceivedMsg{
+				Content: response,
+				Type:    "assistant",
+			}
+		}
+	})
 }
 
 // updateStats updates command execution statistics
@@ -360,4 +374,10 @@ type GotoLineMsg struct {
 
 type ShowCommandPaletteMsg struct {
 	Filter string
+}
+
+// Chat message types (defined here to avoid circular imports)
+type ChatMessageReceivedMsg struct {
+	Content string
+	Type    string
 }
