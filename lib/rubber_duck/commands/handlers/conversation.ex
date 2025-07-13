@@ -544,6 +544,18 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
   defp extract_response_content(response) do
     cond do
       is_binary(response) -> response
+      
+      # Handle RubberDuck.LLM.Response struct
+      is_struct(response, RubberDuck.LLM.Response) and is_list(response.choices) ->
+        response.choices
+        |> List.first()
+        |> case do
+          %{message: %{content: content}} when is_binary(content) -> content
+          %{message: %{"content" => content}} when is_binary(content) -> content
+          _ -> "I apologize, but I couldn't generate a proper response."
+        end
+        
+      # Handle plain maps with choices
       is_map(response) and Map.has_key?(response, :choices) and is_list(response.choices) ->
         response.choices
         |> List.first()
@@ -554,42 +566,51 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
           %{"text" => content} -> content
           _ -> "I apologize, but I couldn't generate a proper response."
         end
+        
       is_map(response) and Map.has_key?(response, :content) ->
         response.content
+        
       true ->
         "I apologize, but I couldn't generate a proper response."
     end
   end
 
   defp extract_model_from_response(response) do
-    case response do
-      %{model: model} -> model
-      %{"model" => model} -> model
-      _ -> "unknown"
+    cond do
+      is_struct(response, RubberDuck.LLM.Response) -> response.model
+      is_map(response) and Map.has_key?(response, :model) -> response.model
+      is_map(response) and Map.has_key?(response, "model") -> response["model"]
+      true -> "unknown"
     end
   end
 
   defp extract_provider_from_response(response) do
-    case response do
-      %{provider: provider} -> provider
-      %{"provider" => provider} -> provider
-      _ -> "unknown"
+    cond do
+      is_struct(response, RubberDuck.LLM.Response) -> to_string(response.provider)
+      is_map(response) and Map.has_key?(response, :provider) -> to_string(response.provider)
+      is_map(response) and Map.has_key?(response, "provider") -> response["provider"]
+      true -> "unknown"
     end
   end
 
   defp extract_tokens_from_response(response) do
-    case response do
-      %{usage: %{total_tokens: tokens}} -> tokens
-      %{"usage" => %{"total_tokens" => tokens}} -> tokens
-      _ -> nil
+    cond do
+      is_struct(response, RubberDuck.LLM.Response) and response.usage -> response.usage.total_tokens
+      is_map(response) and is_map(response[:usage]) -> response.usage.total_tokens
+      is_map(response) and is_map(response["usage"]) -> response["usage"]["total_tokens"]
+      true -> nil
     end
   end
 
   defp extract_generation_time(response) do
-    case response do
-      %{metadata: %{generation_time_ms: time}} -> time
-      %{"metadata" => %{"generation_time_ms" => time}} -> time
-      _ -> nil
+    cond do
+      is_struct(response, RubberDuck.LLM.Response) and response.metadata -> 
+        response.metadata[:generation_time_ms] || response.metadata[:total_duration]
+      is_map(response) and is_map(response[:metadata]) -> 
+        response.metadata[:generation_time_ms] || response.metadata[:total_duration]
+      is_map(response) and is_map(response["metadata"]) -> 
+        response["metadata"]["generation_time_ms"] || response["metadata"]["total_duration"]
+      true -> nil
     end
   end
 
