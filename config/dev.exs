@@ -13,10 +13,10 @@ config :rubber_duck, RubberDuck.Repo,
 config :tower,
   reporters: [
     # Console reporter for development
-    [
+    %{
       module: Tower.LogReporter,
       level: :error
-    ]
+    }
   ]
 
 # For development, we disable any cache and enable
