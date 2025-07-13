@@ -9,7 +9,8 @@ defmodule RubberDuck.Commands.Handlers.LLM do
   @behaviour RubberDuck.Commands.Handler
 
   alias RubberDuck.Commands.{Command, Handler}
-  alias RubberDuck.LLM.ConnectionManager
+  alias RubberDuck.LLM.{ConnectionManager, Config}
+  alias RubberDuck.CLIClient.Auth
 
   @impl true
   def execute(%Command{name: :llm, subcommand: subcommand, args: args, options: options} = command) do
@@ -20,6 +21,9 @@ defmodule RubberDuck.Commands.Handlers.LLM do
         :disconnect -> disconnect_provider(args, options)
         :enable -> enable_provider(args, options)
         :disable -> disable_provider(args, options)
+        :set_model -> set_model(args, options)
+        :set_default -> set_default_provider(args, options)
+        :list_models -> list_models(args, options)
         _ -> {:error, "Unknown LLM subcommand: #{subcommand}"}
       end
     end
@@ -36,7 +40,8 @@ defmodule RubberDuck.Commands.Handlers.LLM do
 
   @impl true
   def validate(%Command{name: :llm, subcommand: subcommand}) do
-    valid_subcommands = [:status, :connect, :disconnect, :enable, :disable, nil]
+    valid_subcommands = [:status, :connect, :disconnect, :enable, :disable, 
+                        :set_model, :set_default, :list_models, nil]
     
     if subcommand in valid_subcommands do
       :ok
@@ -260,4 +265,84 @@ defmodule RubberDuck.Commands.Handlers.LLM do
   end
 
   defp format_time(_), do: "unknown"
+
+  # New subcommand handlers
+  
+  defp set_model(%{provider: provider, model: model}, _options) when not is_nil(provider) and not is_nil(model) do
+    # Validate model is available for provider
+    :ok = Config.validate_model(provider, model)
+    
+    # Update the model in CLI config
+    case Auth.update_provider_model(provider, model) do
+      :ok ->
+        {:ok, %{
+          type: "llm_config",
+          message: "Model set successfully",
+          provider: provider,
+          model: model,
+          timestamp: DateTime.utc_now()
+        }}
+      
+      error ->
+        {:error, "Failed to save model configuration: #{inspect(error)}"}
+    end
+  end
+  
+  defp set_model(_, _) do
+    {:error, "Provider and model required for set_model command"}
+  end
+  
+  defp set_default_provider(%{provider: provider}, _options) when not is_nil(provider) do
+    # Update default provider in CLI config
+    case Auth.set_default_provider(provider) do
+      :ok ->
+        {:ok, %{
+          type: "llm_config",
+          message: "Default provider set to #{provider}",
+          provider: provider,
+          timestamp: DateTime.utc_now()
+        }}
+      
+      error ->
+        {:error, "Failed to set default provider: #{inspect(error)}"}
+    end
+  end
+  
+  defp set_default_provider(_, _) do
+    {:error, "Provider name required for set_default command"}
+  end
+  
+  defp list_models(args, _options) do
+    provider = Map.get(args, :provider)
+    
+    models = Config.list_available_models()
+    
+    # Filter by provider if specified
+    filtered_models = if provider do
+      provider_atom = try do
+        String.to_existing_atom(provider)
+      rescue
+        ArgumentError -> String.to_atom(provider)
+      end
+      Map.take(models, [provider_atom])
+    else
+      models
+    end
+    
+    # Format the response
+    providers_map = Enum.into(filtered_models, %{}, fn {provider, model_list} ->
+      {to_string(provider), %{
+        provider: to_string(provider),
+        models: model_list || [],
+        model_count: length(model_list || [])
+      }}
+    end)
+    
+    {:ok, %{
+      type: "llm_models",
+      providers: providers_map,
+      total_providers: map_size(providers_map),
+      timestamp: DateTime.utc_now()
+    }}
+  end
 end

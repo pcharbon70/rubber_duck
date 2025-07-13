@@ -15,6 +15,7 @@ defmodule RubberDuck.Engines.Refactoring do
   require Logger
 
   alias RubberDuck.LLM
+  alias RubberDuck.LLM.Config
 
   @impl true
   def init(config) do
@@ -165,8 +166,12 @@ defmodule RubberDuck.Engines.Refactoring do
     # Use LLM to generate refactoring suggestions
     prompt = build_refactoring_prompt(analysis, input)
 
+    # Get current provider and model from configuration
+    {provider, model} = Config.get_current_provider_and_model()
+    
     opts = [
-      model: get_refactoring_model(input.language),
+      provider: provider,
+      model: model,
       messages: [
         %{"role" => "system", "content" => get_refactoring_system_prompt(input.language)},
         %{"role" => "user", "content" => prompt}
@@ -211,10 +216,6 @@ defmodule RubberDuck.Engines.Refactoring do
     """
   end
 
-  defp get_refactoring_model(:elixir), do: "codellama"
-  defp get_refactoring_model(:python), do: "codellama"
-  defp get_refactoring_model(:javascript), do: "codellama"
-  defp get_refactoring_model(_), do: "llama2"
 
   defp get_refactoring_system_prompt(language) do
     """

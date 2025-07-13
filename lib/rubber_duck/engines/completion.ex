@@ -36,6 +36,7 @@ defmodule RubberDuck.Engines.Completion do
   require Logger
 
   alias RubberDuck.LLM
+  alias RubberDuck.LLM.Config
 
   # Default configuration
   @default_max_suggestions 5
@@ -297,8 +298,12 @@ defmodule RubberDuck.Engines.Completion do
     # Build FIM prompt for the LLM
     prompt = build_fim_prompt(fim_context, input)
 
+    # Get current provider and model from configuration
+    {provider, model} = Config.get_current_provider_and_model()
+    
     opts = [
-      model: get_completion_model(input.language),
+      provider: provider,
+      model: model,
       messages: [
         %{"role" => "system", "content" => get_completion_system_prompt(input.language)},
         %{"role" => "user", "content" => prompt}
@@ -342,10 +347,6 @@ defmodule RubberDuck.Engines.Completion do
     """
   end
 
-  defp get_completion_model(:elixir), do: "codellama"
-  defp get_completion_model(:python), do: "codellama"
-  defp get_completion_model(:javascript), do: "codellama"
-  defp get_completion_model(_), do: "llama2"
 
   defp get_completion_system_prompt(language) do
     """

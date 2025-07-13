@@ -18,6 +18,7 @@ defmodule RubberDuck.Engines.Analysis do
   require Logger
 
   alias RubberDuck.LLM
+  alias RubberDuck.LLM.Config
 
   @impl true
   def init(config) do
@@ -290,8 +291,12 @@ defmodule RubberDuck.Engines.Analysis do
   defp enhance_issue_group(category, issues, input, state) do
     prompt = build_analysis_prompt(category, issues, input)
 
+    # Get current provider and model from configuration
+    {provider, model} = Config.get_current_provider_and_model()
+
     opts = [
-      model: "codellama",
+      provider: provider,
+      model: model,
       messages: [
         %{"role" => "system", "content" => get_analysis_system_prompt()},
         %{"role" => "user", "content" => prompt}
