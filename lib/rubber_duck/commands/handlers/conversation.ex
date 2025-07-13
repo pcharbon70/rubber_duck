@@ -24,6 +24,12 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
     else
       {:error, :no_llm_connected} ->
         {:error, "No LLM provider is connected. Please connect an LLM provider first using: llm connect <provider>"}
+      {:error, :connection_manager_not_started} ->
+        {:error, "LLM connection manager is not running. Please restart the server."}
+      {:error, :connection_manager_not_available} ->
+        {:error, "LLM connection manager is not available. Please check system configuration."}
+      {:error, :connection_manager_timeout} ->
+        {:error, "Connection manager timed out. The system may be overloaded."}
       {:error, reason} -> 
         {:error, "Failed to create conversation: #{reason}"}
     end
@@ -71,6 +77,18 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
     else
       {:error, :no_llm_connected} ->
         {:error, "No LLM provider is connected. Please connect an LLM provider first using: llm connect <provider>"}
+      {:error, :connection_manager_not_started} ->
+        {:error, "LLM connection manager is not running. Please restart the server."}
+      {:error, :connection_manager_not_available} ->
+        {:error, "LLM connection manager is not available. Please check system configuration."}
+      {:error, :connection_manager_timeout} ->
+        {:error, "Connection manager timed out. The system may be overloaded."}
+      {:error, :llm_service_not_started} ->
+        {:error, "LLM service is not running. Please restart the server."}
+      {:error, :llm_service_not_available} ->
+        {:error, "LLM service is not available. Please check system configuration."}
+      {:error, :llm_service_timeout} ->
+        {:error, "LLM service timed out. The system may be overloaded."}
       {:error, reason} -> 
         {:error, "Failed to send message: #{reason}"}
     end
@@ -96,18 +114,32 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
   # Private helper functions
 
   defp ensure_llm_connected do
-    # Check if any LLM provider is connected
-    case RubberDuck.LLM.ConnectionManager.status() do
-      connections when is_map(connections) ->
-        # Check if any provider is connected and healthy
-        connected? = Enum.any?(connections, fn {_provider, info} ->
-          info.status == :connected && info.health in [:ok, :healthy]
-        end)
-        
-        if connected?, do: :ok, else: {:error, :no_llm_connected}
-        
-      _ ->
-        {:error, :no_llm_connected}
+    # Check if ConnectionManager process is running
+    case Process.whereis(RubberDuck.LLM.ConnectionManager) do
+      nil -> 
+        {:error, :connection_manager_not_started}
+      
+      _pid ->
+        # ConnectionManager is running, check status with timeout handling
+        try do
+          case RubberDuck.LLM.ConnectionManager.status() do
+            connections when is_map(connections) ->
+              # Check if any provider is connected and healthy
+              connected? = Enum.any?(connections, fn {_provider, info} ->
+                info.status == :connected && info.health in [:ok, :healthy]
+              end)
+              
+              if connected?, do: :ok, else: {:error, :no_llm_connected}
+              
+            _ ->
+              {:error, :no_llm_connected}
+          end
+        catch
+          :exit, {:noproc, _} -> 
+            {:error, :connection_manager_not_available}
+          :exit, {:timeout, _} -> 
+            {:error, :connection_manager_timeout}
+        end
     end
   end
 
@@ -285,7 +317,15 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
       timeout: 120_000  # 2 minutes for complex conversations
     ]
 
-    case RubberDuck.LLM.Service.completion(opts) do
+    # Check if LLM Service process is running before making the call
+    case Process.whereis(RubberDuck.LLM.Service) do
+      nil -> 
+        {:error, :llm_service_not_started}
+      
+      _pid ->
+        # LLM Service is running, attempt completion with timeout handling
+        try do
+          case RubberDuck.LLM.Service.completion(opts) do
       {:ok, response} ->
         # Extract content from response (following established pattern)
         content = extract_response_content(response)
@@ -306,17 +346,24 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
         
         Conversations.create_message(assistant_params)
         
-      {:error, reason} ->
-        # Provide specific error messages for common failure cases
-        case reason do
-          :timeout ->
-            {:error, "LLM request timed out after 2 minutes. The model may be overloaded or the request too complex."}
-          :provider_not_connected ->
-            {:error, "LLM provider is not connected. Please connect an LLM provider first using: llm connect <provider>"}
-          {:unknown_model, model} ->
-            {:error, "Unknown model '#{model}'. Please check available models with: llm list_models"}
-          _ ->
-            {:error, "Failed to generate response: #{inspect(reason)}"}
+            {:error, reason} ->
+              # Provide specific error messages for common failure cases
+              case reason do
+                :timeout ->
+                  {:error, "LLM request timed out after 2 minutes. The model may be overloaded or the request too complex."}
+                :provider_not_connected ->
+                  {:error, "LLM provider is not connected. Please connect an LLM provider first using: llm connect <provider>"}
+                {:unknown_model, model} ->
+                  {:error, "Unknown model '#{model}'. Please check available models with: llm list_models"}
+                _ ->
+                  {:error, "Failed to generate response: #{inspect(reason)}"}
+              end
+          end
+        catch
+          :exit, {:noproc, _} -> 
+            {:error, :llm_service_not_available}
+          :exit, {:timeout, _} -> 
+            {:error, :llm_service_timeout}
         end
     end
   end
