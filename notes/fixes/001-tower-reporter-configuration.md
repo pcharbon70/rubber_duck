@@ -96,9 +96,10 @@ Since the current config specifies `level: :error`, we should use the map format
 3. Updated commented-out configurations (TowerSentry, TowerSlack) to use correct format for future use
 
 ## Final Implementation
-Changed Tower reporter configurations from keyword list format to map format in:
-- config/dev.exs: Tower.LogReporter configuration
+Fixed Tower reporter configurations to use correct module atoms:
+- config/dev.exs: Changed to Tower.EphemeralReporter (Tower.LogReporter doesn't exist)
 - config/prod.exs: TowerEmail configuration and commented examples
+- Moved reporter-specific options to separate config blocks
 
 ## Test Results
 - Reproduction test: PASSING

@@ -11,7 +11,7 @@ config :rubber_duck, RubberDuck.Repo,
 # Tower configuration for development
 # Reports errors to console for easy debugging
 config :tower,
-  reporters: [Tower.LogReporter],
+  reporters: [Tower.EphemeralReporter],
   log_level: :error
 
 # For development, we disable any cache and enable
