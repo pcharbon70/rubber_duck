@@ -207,6 +207,17 @@ defmodule RubberDuck.Commands.Parser do
     end
   end
   
+  defp extract_args(%{args: args}, :conversation, subcommand) do
+    case subcommand do
+      :start -> %{title: Map.get(args, :title)}
+      :list -> %{}
+      :show -> %{conversation_id: Map.get(args, :conversation_id)}
+      :send -> %{message: Map.get(args, :message)}
+      :delete -> %{conversation_id: Map.get(args, :conversation_id)}
+      _ -> %{}
+    end
+  end
+  
   defp extract_args(_, _, _), do: %{}
 
   # Extract options from parsed result

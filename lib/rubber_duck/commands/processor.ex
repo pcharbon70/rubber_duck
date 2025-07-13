@@ -261,6 +261,7 @@ defmodule RubberDuck.Commands.Processor do
   defp get_required_permissions(:test), do: [:write]
   defp get_required_permissions(:complete), do: [:read]
   defp get_required_permissions(:llm), do: [:read]
+  defp get_required_permissions(:conversation), do: [:read, :write]
   defp get_required_permissions(:health), do: []
   defp get_required_permissions(_), do: [:read]
 
@@ -282,7 +283,8 @@ defmodule RubberDuck.Commands.Processor do
       complete: RubberDuck.Commands.Handlers.Complete,
       refactor: RubberDuck.Commands.Handlers.Refactor,
       test: RubberDuck.Commands.Handlers.Test,
-      llm: RubberDuck.Commands.Handlers.LLM
+      llm: RubberDuck.Commands.Handlers.LLM,
+      conversation: RubberDuck.Commands.Handlers.Conversation
     }
   end
 
@@ -297,7 +299,8 @@ defmodule RubberDuck.Commands.Processor do
       complete: basic_validator,
       refactor: basic_validator,
       test: basic_validator,
-      llm: basic_validator
+      llm: basic_validator,
+      conversation: basic_validator
     }
   end
 
