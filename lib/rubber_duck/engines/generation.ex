@@ -38,6 +38,8 @@ defmodule RubberDuck.Engines.Generation do
   @behaviour RubberDuck.Engine
 
   require Logger
+  
+  alias RubberDuck.LLM.Config
 
   # Default configuration
   @default_max_context_items 10
@@ -520,8 +522,12 @@ defmodule RubberDuck.Engines.Generation do
     # Call LLM service to generate code
     Logger.debug("Calling LLM service for code generation")
     
+    # Get current provider and model from config
+    {provider, model} = get_provider_and_model_for_language(input.language)
+    
     opts = [
-      model: get_model_for_language(input.language),
+      provider: provider,
+      model: model,
       messages: [
         %{"role" => "system", "content" => get_system_prompt(input.language)},
         %{"role" => "user", "content" => prompt}
@@ -590,10 +596,17 @@ defmodule RubberDuck.Engines.Generation do
     {:ok, result}
   end
 
-  defp get_model_for_language(:elixir), do: "codellama"
-  defp get_model_for_language(:python), do: "codellama"
-  defp get_model_for_language(:javascript), do: "codellama"
-  defp get_model_for_language(_), do: "llama2"
+  defp get_provider_and_model_for_language(_language) do
+    # Get the current provider and model from configuration
+    case Config.get_current_provider_and_model() do
+      {provider, model} when not is_nil(provider) and not is_nil(model) ->
+        {provider, model}
+      _ ->
+        # Fallback to defaults if not configured
+        {:ollama, "codellama"}
+    end
+  end
+  
 
   defp get_system_prompt(language) do
     """

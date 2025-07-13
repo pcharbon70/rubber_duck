@@ -303,4 +303,131 @@ defmodule RubberDuck.Commands.Handlers.LLMTest do
       assert md_result =~ "#"  # Markdown headers
     end
   end
+  
+  describe "set_model subcommand" do
+    test "sets model for a specific provider", %{context: context} do
+      {:ok, command} = Command.new(%{
+        name: :llm,
+        subcommand: :set_model,
+        args: %{provider: "ollama", model: "codellama"},
+        options: %{},
+        context: context,
+        client_type: :cli,
+        format: :json
+      })
+
+      assert {:ok, result_json} = Processor.execute(command)
+      assert {:ok, result} = Jason.decode(result_json)
+      
+      assert result["type"] == "llm_config"
+      assert result["message"] =~ "Model set"
+      assert result["provider"] == "ollama"
+      assert result["model"] == "codellama"
+    end
+    
+    test "returns error when provider not specified", %{context: context} do
+      {:ok, command} = Command.new(%{
+        name: :llm,
+        subcommand: :set_model,
+        args: %{model: "gpt-4"},
+        options: %{},
+        context: context,
+        client_type: :cli,
+        format: :json
+      })
+
+      assert {:error, reason} = Processor.execute(command)
+      assert reason =~ "Provider and model required"
+    end
+    
+    test "returns error when model not specified", %{context: context} do
+      {:ok, command} = Command.new(%{
+        name: :llm,
+        subcommand: :set_model,
+        args: %{provider: "openai"},
+        options: %{},
+        context: context,
+        client_type: :cli,
+        format: :json
+      })
+
+      assert {:error, reason} = Processor.execute(command)
+      assert reason =~ "Provider and model required"
+    end
+  end
+  
+  describe "set_default subcommand" do
+    test "sets default provider", %{context: context} do
+      {:ok, command} = Command.new(%{
+        name: :llm,
+        subcommand: :set_default,
+        args: %{provider: "anthropic"},
+        options: %{},
+        context: context,
+        client_type: :cli,
+        format: :json
+      })
+
+      assert {:ok, result_json} = Processor.execute(command)
+      assert {:ok, result} = Jason.decode(result_json)
+      
+      assert result["type"] == "llm_config"
+      assert result["message"] =~ "Default provider set"
+      assert result["provider"] == "anthropic"
+    end
+    
+    test "returns error when provider not specified", %{context: context} do
+      {:ok, command} = Command.new(%{
+        name: :llm,
+        subcommand: :set_default,
+        args: %{},
+        options: %{},
+        context: context,
+        client_type: :cli,
+        format: :json
+      })
+
+      assert {:error, reason} = Processor.execute(command)
+      assert reason =~ "Provider name required"
+    end
+  end
+  
+  describe "list_models subcommand" do
+    test "lists available models for all providers", %{context: context} do
+      {:ok, command} = Command.new(%{
+        name: :llm,
+        subcommand: :list_models,
+        args: %{},
+        options: %{},
+        context: context,
+        client_type: :cli,
+        format: :json
+      })
+
+      assert {:ok, result_json} = Processor.execute(command)
+      assert {:ok, result} = Jason.decode(result_json)
+      
+      assert result["type"] == "llm_models"
+      assert Map.has_key?(result, "providers")
+      assert is_map(result["providers"])
+    end
+    
+    test "lists models for specific provider", %{context: context} do
+      {:ok, command} = Command.new(%{
+        name: :llm,
+        subcommand: :list_models,
+        args: %{provider: "openai"},
+        options: %{},
+        context: context,
+        client_type: :cli,
+        format: :json
+      })
+
+      assert {:ok, result_json} = Processor.execute(command)
+      assert {:ok, result} = Jason.decode(result_json)
+      
+      assert result["type"] == "llm_models"
+      assert Map.has_key?(result["providers"], "openai")
+    end
+  end
 end

@@ -17,6 +17,7 @@ defmodule RubberDuck.Engines.TestGeneration do
   require Logger
 
   alias RubberDuck.LLM
+  alias RubberDuck.LLM.Config
 
   @impl true
   def init(config) do
@@ -256,8 +257,12 @@ defmodule RubberDuck.Engines.TestGeneration do
   defp generate_tests(test_plan, input, state) do
     prompt = build_test_generation_prompt(test_plan, input)
 
+    # Get current provider and model from configuration
+    {provider, model} = Config.get_current_provider_and_model()
+    
     opts = [
-      model: get_test_model(input.language),
+      provider: provider,
+      model: model,
       messages: [
         %{"role" => "system", "content" => get_test_system_prompt(input.language, input.framework)},
         %{"role" => "user", "content" => prompt}
@@ -319,10 +324,6 @@ defmodule RubberDuck.Engines.TestGeneration do
     Enum.join(sections, "\n\n")
   end
 
-  defp get_test_model(:elixir), do: "codellama"
-  defp get_test_model(:python), do: "codellama"
-  defp get_test_model(:javascript), do: "codellama"
-  defp get_test_model(_), do: "llama2"
 
   defp get_test_system_prompt(:elixir, :exunit) do
     """

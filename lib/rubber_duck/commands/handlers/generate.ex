@@ -8,22 +8,58 @@ defmodule RubberDuck.Commands.Handlers.Generate do
   @behaviour RubberDuck.Commands.Handler
 
   alias RubberDuck.Commands.{Command, Handler}
+  alias RubberDuck.Engine.Manager
+
+  require Logger
 
   @impl true
   def execute(%Command{name: :generate, args: args, options: options} = command) do
     with :ok <- validate(command) do
-      language = Map.get(options, :language, "elixir")
+      language = Map.get(options, :language, "elixir") |> String.to_atom()
       
-      # For now, return mock generated code
-      # In real implementation, this would call the generation engine
-      generated_code = generate_mock_code(args.description, language)
-      
-      {:ok, %{
-        generated_code: generated_code,
+      # Prepare input for the generation engine
+      engine_input = %{
+        prompt: args.description,
         language: language,
-        description: args.description,
-        timestamp: DateTime.utc_now()
-      }}
+        context: %{
+          project_files: Map.get(command.context.metadata, :project_files, []),
+          current_file: Map.get(command.context.metadata, :current_file),
+          imports: Map.get(command.context.metadata, :imports, [])
+        }
+      }
+
+      Logger.debug("Calling generation engine with input: #{inspect(engine_input)}")
+
+      # Call the real generation engine
+      case Manager.execute(:generation, engine_input) do
+        {:ok, result} ->
+          {:ok, %{
+            generated_code: result.code,
+            language: to_string(result.language),
+            description: args.description,
+            imports: result.imports,
+            confidence: result.confidence,
+            explanation: result.explanation,
+            timestamp: DateTime.utc_now()
+          }}
+        
+        {:error, :engine_not_found} ->
+          Logger.warning("Generation engine not found, falling back to mock")
+          # Fallback to mock if engine not available
+          generated_code = generate_mock_code(args.description, to_string(language))
+          
+          {:ok, %{
+            generated_code: generated_code,
+            language: to_string(language),
+            description: args.description,
+            timestamp: DateTime.utc_now(),
+            fallback: true
+          }}
+          
+        {:error, reason} = error ->
+          Logger.error("Generation engine error: #{inspect(reason)}")
+          error
+      end
     end
   end
 

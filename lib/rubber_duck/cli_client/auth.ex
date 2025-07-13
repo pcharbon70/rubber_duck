@@ -41,15 +41,21 @@ defmodule RubberDuck.CLIClient.Auth do
   def save_credentials(api_key, server_url) do
     ensure_config_dir()
 
-    config = %{
-      "api_key" => api_key,
-      "server_url" => server_url,
-      "created_at" => DateTime.utc_now() |> DateTime.to_iso8601()
-    }
+    # Load existing config to preserve other settings
+    existing_config = case load_config() do
+      {:ok, config} -> config
+      {:error, _} -> %{}
+    end
+
+    config = existing_config
+    |> Map.put("api_key", api_key)
+    |> Map.put("server_url", server_url)
+    |> Map.put("created_at", DateTime.utc_now() |> DateTime.to_iso8601())
 
     case Jason.encode(config, pretty: true) do
       {:ok, json} ->
-        File.write(@config_file, json)
+        config_file = Process.get(:rubber_duck_config_file) || @config_file
+        File.write(config_file, json)
 
       error ->
         error
@@ -68,7 +74,8 @@ defmodule RubberDuck.CLIClient.Auth do
   Clear stored credentials.
   """
   def clear_credentials do
-    case File.rm(@config_file) do
+    config_file = Process.get(:rubber_duck_config_file) || @config_file
+    case File.rm(config_file) do
       :ok -> :ok
       {:error, :enoent} -> :ok
       error -> error
@@ -92,10 +99,145 @@ defmodule RubberDuck.CLIClient.Auth do
     get_api_key() != nil
   end
 
+  @doc """
+  Get the LLM configuration from the config file.
+  """
+  def get_llm_config do
+    case load_config() do
+      {:ok, config} ->
+        config["llm"]
+
+      {:error, _} ->
+        nil
+    end
+  end
+
+  @doc """
+  Save LLM settings to the config file.
+  """
+  def save_llm_settings(llm_settings) do
+    ensure_config_dir()
+
+    # Load existing config to preserve other settings
+    existing_config = case load_config() do
+      {:ok, config} -> config
+      {:error, _} -> %{}
+    end
+
+    config = existing_config
+    |> Map.put("llm", llm_settings)
+    |> Map.put("updated_at", DateTime.utc_now() |> DateTime.to_iso8601())
+
+    case Jason.encode(config, pretty: true) do
+      {:ok, json} ->
+        config_file = Process.get(:rubber_duck_config_file) || @config_file
+        File.write(config_file, json)
+
+      error ->
+        error
+    end
+  end
+
+  @doc """
+  Update the model for a specific provider.
+  """
+  def update_provider_model(provider, model) do
+    ensure_config_dir()
+
+    # Load existing config
+    existing_config = case load_config() do
+      {:ok, config} -> config
+      {:error, _} -> %{}
+    end
+
+    # Get existing LLM config or create new one
+    llm_config = existing_config["llm"] || %{
+      "providers" => %{}
+    }
+
+    # Update the provider model
+    updated_providers = llm_config["providers"]
+    |> Map.put(provider, %{"model" => model})
+
+    updated_llm = llm_config
+    |> Map.put("providers", updated_providers)
+
+    # If this provider becomes the default, update default_model too
+    final_llm = if llm_config["default_provider"] == provider do
+      Map.put(updated_llm, "default_model", model)
+    else
+      updated_llm
+    end
+
+    # Save back to config
+    save_llm_settings(final_llm)
+  end
+
+  @doc """
+  Set the default provider.
+  """
+  def set_default_provider(provider) do
+    ensure_config_dir()
+
+    # Load existing config
+    existing_config = case load_config() do
+      {:ok, config} -> config
+      {:error, _} -> %{}
+    end
+
+    # Get existing LLM config or create new one
+    llm_config = existing_config["llm"] || %{
+      "providers" => %{}
+    }
+
+    # Get the model for this provider if configured
+    provider_model = try do
+      llm_config["providers"][provider]["model"]
+    rescue
+      _ -> nil
+    end
+
+    updated_llm = llm_config
+    |> Map.put("default_provider", provider)
+    |> Map.put("default_model", provider_model || "")
+
+    # Save back to config
+    save_llm_settings(updated_llm)
+  end
+
+  @doc """
+  Get the current model for the default provider or a specific provider.
+  """
+  def get_current_model(provider \\ nil) do
+    llm_config = get_llm_config()
+
+    if llm_config do
+      if provider do
+        # Get model for specific provider
+        model = try do
+          llm_config["providers"][provider]["model"]
+        rescue
+          _ -> nil
+        end
+        {provider, model}
+      else
+        # Get default provider and model
+        default_provider = llm_config["default_provider"]
+        default_model = llm_config["default_model"]
+        {default_provider, default_model}
+      end
+    else
+      {provider, nil}
+    end
+  end
+
   # Private functions
 
   defp load_config do
-    case File.read(@config_file) do
+    # Check for test config override
+    config_file = Process.get(:rubber_duck_config_file) || @config_file
+    
+    case File.read(config_file) do
       {:ok, content} ->
         Jason.decode(content)
 
@@ -108,6 +250,8 @@ defmodule RubberDuck.CLIClient.Auth do
   end
 
   defp ensure_config_dir do
-    File.mkdir_p!(@config_dir)
+    # Check for test config override
+    config_dir = Process.get(:rubber_duck_config_dir) || @config_dir
+    File.mkdir_p!(config_dir)
   end
 end

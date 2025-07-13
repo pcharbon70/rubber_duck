@@ -42,6 +42,19 @@ defmodule RubberDuck.Commands.Parser do
             format: format
           })
           
+        {:ok, name, subcommand, command_args, options} ->
+          format = determine_format(options, :cli)
+          
+          Command.new(%{
+            name: name,
+            subcommand: subcommand,
+            args: command_args,
+            options: options,
+            context: context,
+            client_type: :cli,
+            format: format
+          })
+          
         error -> error
       end
     rescue
@@ -140,10 +153,10 @@ defmodule RubberDuck.Commands.Parser do
     {:ok, name, args, options}
   end
   
-  defp extract_command_from_parsed({[name, _subcmd], parsed}) do
-    args = extract_args(parsed, name)
+  defp extract_command_from_parsed({[name, subcmd], parsed}) do
+    args = extract_args(parsed, name, subcmd)
     options = extract_options(parsed)
-    {:ok, name, args, options}
+    {:ok, name, subcmd, args, options}
   end
 
   # Extract arguments based on command type
@@ -173,15 +186,28 @@ defmodule RubberDuck.Commands.Parser do
     %{file: Map.get(args, :file)}
   end
   
-  defp extract_args(%{args: args}, :llm) do
-    %{action: Map.get(args, :action)}
-  end
-  
   defp extract_args(%{args: _args}, :health) do
     %{}
   end
   
   defp extract_args(_, _), do: %{}
+  
+  # Extract args for commands with subcommands
+  defp extract_args(%{args: args}, :llm, subcommand) do
+    case subcommand do
+      :status -> %{}
+      :connect -> %{provider: Map.get(args, :provider)}
+      :disconnect -> %{provider: Map.get(args, :provider)}
+      :enable -> %{provider: Map.get(args, :provider)}
+      :disable -> %{provider: Map.get(args, :provider)}
+      :set_model -> %{provider: Map.get(args, :provider), model: Map.get(args, :model)}
+      :set_default -> %{provider: Map.get(args, :provider)}
+      :list_models -> %{provider: Map.get(args, :provider)}
+      _ -> %{}
+    end
+  end
+  
+  defp extract_args(_, _, _), do: %{}
 
   # Extract options from parsed result
   defp extract_options(%{options: options, flags: flags}) do
@@ -224,9 +250,20 @@ defmodule RubberDuck.Commands.Parser do
   end
   
   defp extract_websocket_args_and_options(payload, :llm) do
-    # For LLM commands, args include provider info
-    args = %{provider: Map.get(payload, "provider")}
-    options = Map.drop(payload, ["subcommand", "provider"]) |> atomize_keys()
+    # For LLM commands, extract based on subcommand
+    subcommand = payload["subcommand"] && String.to_atom(payload["subcommand"])
+    
+    args = case subcommand do
+      :set_model -> %{
+        provider: Map.get(payload, "provider"),
+        model: Map.get(payload, "model")
+      }
+      subcmd when subcmd in [:connect, :disconnect, :enable, :disable, :set_default, :list_models] ->
+        %{provider: Map.get(payload, "provider")}
+      _ -> %{}
+    end
+    
+    options = Map.drop(payload, ["subcommand", "provider", "model"]) |> atomize_keys()
     {args, options}
   end
 
@@ -413,12 +450,100 @@ defmodule RubberDuck.Commands.Parser do
     [
       name: "llm",
       about: "Manage LLM providers",
-      args: [
-        action: [
-          value_name: "ACTION",
-          help: "Action to perform (list, status, configure)",
-          required: true,
-          parser: :string
+      subcommands: [
+        status: [
+          name: "status",
+          about: "Show LLM provider status"
+        ],
+        connect: [
+          name: "connect",
+          about: "Connect to LLM provider(s)",
+          args: [
+            provider: [
+              value_name: "PROVIDER",
+              help: "Provider to connect (optional, connects all if not specified)",
+              required: false,
+              parser: :string
+            ]
+          ]
+        ],
+        disconnect: [
+          name: "disconnect",
+          about: "Disconnect from LLM provider(s)",
+          args: [
+            provider: [
+              value_name: "PROVIDER",
+              help: "Provider to disconnect (optional, disconnects all if not specified)",
+              required: false,
+              parser: :string
+            ]
+          ]
+        ],
+        enable: [
+          name: "enable",
+          about: "Enable an LLM provider",
+          args: [
+            provider: [
+              value_name: "PROVIDER",
+              help: "Provider to enable",
+              required: true,
+              parser: :string
+            ]
+          ]
+        ],
+        disable: [
+          name: "disable",
+          about: "Disable an LLM provider",
+          args: [
+            provider: [
+              value_name: "PROVIDER",
+              help: "Provider to disable",
+              required: true,
+              parser: :string
+            ]
+          ]
+        ],
+        set_model: [
+          name: "set_model",
+          about: "Set the model for a specific provider",
+          args: [
+            provider: [
+              value_name: "PROVIDER",
+              help: "Provider name",
+              required: true,
+              parser: :string
+            ],
+            model: [
+              value_name: "MODEL",
+              help: "Model name",
+              required: true,
+              parser: :string
+            ]
+          ]
+        ],
+        set_default: [
+          name: "set_default",
+          about: "Set the default LLM provider",
+          args: [
+            provider: [
+              value_name: "PROVIDER",
+              help: "Provider to set as default",
+              required: true,
+              parser: :string
+            ]
+          ]
+        ],
+        list_models: [
+          name: "list_models",
+          about: "List available models for all providers",
+          args: [
+            provider: [
+              value_name: "PROVIDER",
+              help: "Provider to list models for (optional, lists all if not specified)",
+              required: false,
+              parser: :string
+            ]
+          ]
         ]
       ]
     ]
