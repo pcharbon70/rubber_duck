@@ -14,9 +14,10 @@ import (
 type Pane int
 
 const (
-	FileTreePane Pane = iota
+	ChatPane Pane = iota  // Chat is now the primary pane
+	FileTreePane
 	EditorPane
-	OutputPane
+	OutputPane  // Deprecated - output now shows in chat
 )
 
 // Model represents the application state
@@ -40,11 +41,16 @@ type Model struct {
 	activePane Pane
 	
 	// Components
+	chat           *Chat
 	fileTree       FileTree
 	commandPalette CommandPalette
 	modal          Modal
 	settingsModal  SettingsModal
 	themeManager   *ThemeManager
+	
+	// Panel visibility
+	showFileTree   bool
+	showEditor     bool
 	
 	// Settings
 	settings       Settings
@@ -94,11 +100,12 @@ func NewModel() Model {
 	ta.SetWidth(80)
 	ta.SetHeight(20)
 	
-	// Initialize viewport for output
+	// Initialize viewport for output (deprecated, kept for compatibility)
 	vp := viewport.New(40, 20)
-	vp.SetContent("Welcome to RubberDuck TUI!\n\nPress Ctrl+H for help.")
+	vp.SetContent("")
 	
 	// Initialize components
+	chat := NewChat()
 	fileTree := NewFileTree()
 	commandPalette := NewCommandPalette()
 	modal := NewModal()
@@ -130,8 +137,9 @@ func NewModel() Model {
 	return Model{
 		editor:             ta,
 		output:             vp,
-		statusBar:          "Disconnected | Press Ctrl+C to quit",
-		activePane:         FileTreePane,
+		statusBar:          "Disconnected | Press Ctrl+C to quit | Ctrl+F: Toggle Files | Ctrl+E: Toggle Editor",
+		activePane:         ChatPane,  // Start with chat focused
+		chat:               chat,
 		fileTree:           fileTree,
 		commandPalette:     commandPalette,
 		modal:              modal,
@@ -142,6 +150,8 @@ func NewModel() Model {
 		performanceMonitor: performanceMonitor,
 		saveDebouncer:      saveDebouncer,
 		files:              []FileNode{}, // Will be populated when connected
+		showFileTree:       false,  // Start with panels hidden
+		showEditor:         false,
 	}
 }
 
