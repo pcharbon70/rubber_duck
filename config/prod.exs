@@ -5,26 +5,19 @@ import Config
 config :tower,
   reporters: [
     # Example Sentry configuration (requires tower_sentry)
-    # %{
-    #   module: TowerSentry,
-    #   dsn: System.get_env("SENTRY_DSN"),
-    #   environment: "production"
-    # },
+    # TowerSentry,
 
     # Email reporter for critical errors
-    %{
-      module: TowerEmail,
-      to: System.get_env("ERROR_EMAIL_TO"),
-      from: System.get_env("ERROR_EMAIL_FROM", "errors@rubberduck.ai"),
-      # Only email on critical errors
-      level: :critical
-    }
+    TowerEmail
 
     # Slack reporter for errors
-    # %{
-    #   module: TowerSlack,
-    #   webhook_url: System.get_env("SLACK_WEBHOOK_URL"),
-    #   channel: "#errors",
-    #   level: :error
-    # }
-  ]
+    # TowerSlack
+  ],
+  log_level: :critical
+
+# TowerEmail configuration
+config :tower_email,
+  otp_app: :rubber_duck,
+  to: System.get_env("ERROR_EMAIL_TO"),
+  from: System.get_env("ERROR_EMAIL_FROM", "errors@rubberduck.ai"),
+  environment: "production"
