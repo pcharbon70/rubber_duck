@@ -7,7 +7,7 @@ defmodule RubberDuck.CLIClient.UnifiedIntegration do
   execution through the unified system.
   """
 
-  # alias RubberDuck.Commands.{Parser, Processor, Context}
+  alias RubberDuck.Commands.{Parser, Processor, Context}
 
   @doc """
   Execute a command through the unified command system.
