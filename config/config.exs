@@ -2,7 +2,13 @@ import Config
 
 config :rubber_duck,
   ecto_repos: [RubberDuck.Repo],
-  ash_domains: [RubberDuck.Memory, RubberDuck.Workspace, RubberDuck.Context, RubberDuck.Conversations]
+  ash_domains: [
+    RubberDuck.Instructions,
+    RubberDuck.Memory,
+    RubberDuck.Workspace,
+    RubberDuck.Context,
+    RubberDuck.Conversations
+  ]
 
 config :ash,
   allow_forbidden_field_for_relationships_by_default?: true,
@@ -82,4 +88,5 @@ config :tailwind,
 import_config "telemetry.exs"
 import_config "tower.exs"
 import_config "llm.exs"
+import_config "security.exs"
 import_config "#{config_env()}.exs"

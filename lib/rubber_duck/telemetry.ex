@@ -112,6 +112,37 @@ defmodule RubberDuck.Telemetry do
       summary("rubber_duck.embedding.generation.duration",
         unit: :millisecond,
         tags: [:model]
+      ),
+      
+      # Security Metrics
+      counter("rubber_duck.instructions.security.event.count",
+        tags: [:event_type, :user_id],
+        description: "Security events in template processing"
+      ),
+      counter("rubber_duck.instructions.security.alert.count",
+        tags: [:type, :severity],
+        description: "Security alerts generated"
+      ),
+      counter("rubber_duck.instructions.rate_limiter.user.count",
+        tags: [:result],
+        description: "Rate limiter checks for users"
+      ),
+      counter("rubber_duck.instructions.rate_limiter.template.count",
+        tags: [:result],
+        description: "Rate limiter checks for templates"
+      ),
+      counter("rubber_duck.instructions.rate_limiter.global.count",
+        tags: [:result],
+        description: "Global rate limiter checks"
+      ),
+      summary("rubber_duck.instructions.sandbox.execution.duration",
+        unit: :millisecond,
+        tags: [:security_level, :result],
+        description: "Sandbox execution time"
+      ),
+      counter("rubber_duck.instructions.cache.invalidation.count",
+        tags: [:type, :reason],
+        description: "Cache invalidation events"
       )
     ]
   end

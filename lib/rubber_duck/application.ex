@@ -56,6 +56,8 @@ defmodule RubberDuck.Application do
       RubberDuckWeb.MessageQueue,
       # Command processing system
       RubberDuck.Commands.Processor,
+      # Instruction template security system
+      RubberDuck.Instructions.SecurityPipeline,
       # Web endpoint - start last
       RubberDuckWeb.Endpoint
       # Error boundary GenServer - started manually in tests

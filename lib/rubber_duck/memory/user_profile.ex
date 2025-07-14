@@ -36,6 +36,8 @@ defmodule RubberDuck.Memory.UserProfile do
     end
 
     update :add_learned_pattern do
+      require_atomic? false
+      
       argument :pattern_key, :string, allow_nil?: false
       argument :pattern_data, :map, allow_nil?: false
 

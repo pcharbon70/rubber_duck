@@ -58,5 +58,11 @@ defmodule RubberDuck.Instructions.SecurityError do
   defp format_message(:map_too_large), do: "Map variable exceeds maximum size"
   defp format_message(:invalid_value_type), do: "Invalid variable value type"
   defp format_message(:system_templates_disabled), do: "System templates are disabled in this environment"
+  defp format_message(:suspicious_content), do: "Template contains suspicious encoded or obfuscated content"
+  defp format_message(:sandbox_violation), do: "Template attempted to access restricted functionality"
+  defp format_message(:resource_limit_exceeded), do: "Template exceeded resource limits"
+  defp format_message(:timeout), do: "Template execution timed out"
+  defp format_message(:memory_limit_exceeded), do: "Template exceeded memory limits"
+  defp format_message(:user_blocked), do: "User has been blocked due to repeated security violations"
   defp format_message(reason), do: "Security error: #{inspect(reason)}"
 end
