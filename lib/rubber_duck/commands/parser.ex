@@ -10,7 +10,7 @@ defmodule RubberDuck.Commands.Parser do
   - TUI input
   """
 
-  alias RubberDuck.Commands.{Command, Context}
+  alias RubberDuck.Commands.Command
 
   @doc """
   Parses input from any client type into a standardized Command struct.

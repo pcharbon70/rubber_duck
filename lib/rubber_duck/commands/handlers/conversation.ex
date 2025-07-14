@@ -9,8 +9,7 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
   @behaviour RubberDuck.Commands.Handler
 
   alias RubberDuck.Conversations
-  alias RubberDuck.Commands.{Command, Context}
-  alias RubberDuck.LLM
+  alias RubberDuck.Commands.Command
 
   @impl true
   def execute(%Command{name: :conversation, subcommand: :start, args: args, options: options, context: context}) do

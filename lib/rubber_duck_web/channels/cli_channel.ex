@@ -9,7 +9,6 @@ defmodule RubberDuckWeb.CLIChannel do
   use RubberDuckWeb, :channel
 
   alias RubberDuck.Commands.Adapters.WebSocket, as: CommandAdapter
-  alias RubberDuck.LLM.ConnectionManager
 
   require Logger
 

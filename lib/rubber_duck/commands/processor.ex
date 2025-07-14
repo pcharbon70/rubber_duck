@@ -9,7 +9,7 @@ defmodule RubberDuck.Commands.Processor do
 
   use GenServer
   
-  alias RubberDuck.Commands.{Command, Context}
+  # No aliases needed - Command and Context are only used in type specs
 
   require Logger
 

@@ -7,7 +7,7 @@ defmodule RubberDuck.Commands.Adapters.TUI do
   terminal display.
   """
 
-  alias RubberDuck.Commands.{Parser, Processor, Command, Context}
+  alias RubberDuck.Commands.{Parser, Processor, Context}
 
   @doc """
   Execute a TUI command with the given input.
