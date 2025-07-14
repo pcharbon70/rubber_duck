@@ -481,9 +481,12 @@ defmodule RubberDuck.LLM.Service do
         request_id = request.id || generate_request_id()
         request_with_id = %{request | id: request_id, from: from}
 
+        parent = self()
         Task.start(fn ->
+          Logger.debug("[LLM Service Task] Starting request execution for #{request_id}")
           result = execute_request(request_with_id, provider_state, state)
-          send(self(), {:request_complete, request_id, result})
+          Logger.debug("[LLM Service Task] Sending completion message for #{request_id}")
+          send(parent, {:request_complete, request_id, result})
         end)
 
         # Update provider state
@@ -531,10 +534,15 @@ defmodule RubberDuck.LLM.Service do
 
   defp execute_request(request, provider_state, _state) do
     adapter = provider_state.config.adapter
+    
+    Logger.debug("[LLM Service] Executing request with adapter: #{inspect(adapter)}")
+    Logger.debug("[LLM Service] Request: #{inspect(request.model)} - #{inspect(request.provider)}")
 
     try do
       # Execute with retry logic
-      execute_with_retry(request, adapter, provider_state.config)
+      result = execute_with_retry(request, adapter, provider_state.config)
+      Logger.debug("[LLM Service] Request completed with result: #{inspect(result)}")
+      result
     rescue
       error ->
         Logger.error("LLM request failed: #{inspect(error)}")

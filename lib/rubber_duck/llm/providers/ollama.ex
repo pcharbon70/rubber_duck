@@ -53,16 +53,28 @@ defmodule RubberDuck.LLM.Providers.Ollama do
       retry: false  # Let our retry logic handle it
     ]
     
-    case Req.post(url, req_opts) do
+    Logger.debug("Ollama making HTTP request...")
+    start_time = System.monotonic_time(:millisecond)
+    
+    result = case Req.post(url, req_opts) do
       {:ok, %{status: 200, body: response_body}} ->
+        end_time = System.monotonic_time(:millisecond)
+        Logger.debug("Ollama request successful in #{end_time - start_time}ms")
+        Logger.debug("Ollama response body: #{inspect(response_body)}")
         {:ok, parse_response(response_body, request)}
 
       {:ok, response} ->
+        end_time = System.monotonic_time(:millisecond)
+        Logger.debug("Ollama request failed with status #{response.status} in #{end_time - start_time}ms")
         Provider.handle_http_error({:ok, response})
 
       {:error, reason} ->
+        end_time = System.monotonic_time(:millisecond)
+        Logger.error("Ollama request error in #{end_time - start_time}ms: #{inspect(reason)}")
         {:error, {:connection_error, reason}}
     end
+    
+    result
   end
 
   @impl true

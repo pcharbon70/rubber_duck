@@ -121,53 +121,53 @@ Create tests in `test/rubber_duck/instructions/file_manager_test.exs` to verify:
 
 ### 9.3 Caching & Performance Optimization
 
-Implement ETS-based caching with Cachex for high-performance instruction serving, including version-based invalidation and distributed synchronization.
+Implement high-performance instruction caching leveraging existing Context.Cache patterns with ETS-based storage, instruction-specific optimizations, and seamless integration with the hierarchical instruction management system.
 
 #### Tasks:
-- [ ] 9.3.1 Create `RubberDuck.Instructions.Cache`:
-  - [ ] 9.3.1.1 Initialize Cachex with limits
-  - [ ] 9.3.1.2 Configure TTL expiration
-  - [ ] 9.3.1.3 Set up fallback functions
-  - [ ] 9.3.1.4 Enable cache warming
-- [ ] 9.3.2 Implement cache key strategy:
-  - [ ] 9.3.2.1 Build context-aware keys
-  - [ ] 9.3.2.2 Include version hashing
-  - [ ] 9.3.2.3 Add user isolation
-  - [ ] 9.3.2.4 Support key namespacing
-- [ ] 9.3.3 Create invalidation system:
-  - [ ] 9.3.3.1 File change invalidation
-  - [ ] 9.3.3.2 Version-based clearing
-  - [ ] 9.3.3.3 Selective invalidation
-  - [ ] 9.3.3.4 Cascade invalidation
-- [ ] 9.3.4 Build cache warming:
-  - [ ] 9.3.4.1 Preload common instructions
-  - [ ] 9.3.4.2 Background compilation
-  - [ ] 9.3.4.3 Priority-based warming
-  - [ ] 9.3.4.4 Adaptive warming
-- [ ] 9.3.5 Implement distributed caching:
-  - [ ] 9.3.5.1 Multi-node synchronization
-  - [ ] 9.3.5.2 Cache replication
-  - [ ] 9.3.5.3 Consistency protocols
-  - [ ] 9.3.5.4 Partition handling
-- [ ] 9.3.6 Add performance monitoring:
-  - [ ] 9.3.6.1 Track hit/miss rates
-  - [ ] 9.3.6.2 Measure compilation time
-  - [ ] 9.3.6.3 Monitor memory usage
-  - [ ] 9.3.6.4 Alert on degradation
-- [ ] 9.3.7 Create cache analytics dashboard
-- [ ] 9.3.8 Implement cache compression
-- [ ] 9.3.9 Build cache export/import
-- [ ] 9.3.10 Add cache optimization tools
+- [ ] 9.3.1 Create `RubberDuck.Instructions.Cache` based on existing patterns:
+  - [ ] 9.3.1.1 Extend `RubberDuck.Context.Cache` patterns for instructions
+  - [ ] 9.3.1.2 Configure ETS with proven concurrency settings (`{:read_concurrency, true}, {:write_concurrency, true}`)
+  - [ ] 9.3.1.3 Implement adaptive TTL (dev files: 5min, global: 1hr, default: 30min)
+  - [ ] 9.3.1.4 Set up multi-layer caching (parsed content vs compiled templates)
+- [ ] 9.3.2 Implement instruction-specific cache key strategy:
+  - [ ] 9.3.2.1 Build hierarchical keys (scope:file_path:content_hash)
+  - [ ] 9.3.2.2 Include format-specific versioning (markdown, claude.md, cursorrules)
+  - [ ] 9.3.2.3 Add template compilation state tracking
+  - [ ] 9.3.2.4 Support variable context isolation
+- [ ] 9.3.3 Create intelligent invalidation system:
+  - [ ] 9.3.3.1 File system watcher integration for automatic invalidation
+  - [ ] 9.3.3.2 Hierarchical invalidation (project/workspace/global scope patterns)
+  - [ ] 9.3.3.3 Registry coordination for version-based clearing
+  - [ ] 9.3.3.4 Cascade invalidation for template inheritance chains
+- [ ] 9.3.4 Build intelligent cache warming:
+  - [ ] 9.3.4.1 Pre-compile frequently accessed instruction templates
+  - [ ] 9.3.4.2 Background warming of project-specific instructions on load
+  - [ ] 9.3.4.3 Priority-based warming using instruction registry priority scores
+  - [ ] 9.3.4.4 Adaptive warming based on usage patterns and file modification times
+- [ ] 9.3.5 Implement distributed caching coordination:
+  - [ ] 9.3.5.1 Multi-node cache synchronization using existing patterns
+  - [ ] 9.3.5.2 Instruction registry state replication across nodes
+  - [ ] 9.3.5.3 Conflict resolution for distributed instruction updates
+  - [ ] 9.3.5.4 Partition tolerance for instruction availability
+- [ ] 9.3.6 Add comprehensive performance monitoring:
+  - [ ] 9.3.6.1 Integrate with existing telemetry system for cache metrics
+  - [ ] 9.3.6.2 Track template compilation performance and optimization
+  - [ ] 9.3.6.3 Monitor instruction loading vs cache hit performance gains
+  - [ ] 9.3.6.4 Alert on cache degradation affecting instruction serving
+- [ ] 9.3.7 Create instruction cache analytics integration
+- [ ] 9.3.8 Implement template-specific cache compression
+- [ ] 9.3.9 Build instruction cache backup and restore
+- [ ] 9.3.10 Add cache optimization tools for instruction performance tuning
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/instructions/cache_test.exs` to verify:
-- [ ] 9.3.11 Test cache initialization and limits
-- [ ] 9.3.12 Test key generation and isolation
-- [ ] 9.3.13 Test invalidation mechanisms
-- [ ] 9.3.14 Test cache warming strategies
-- [ ] 9.3.15 Test distributed synchronization
-- [ ] 9.3.16 Test performance under load
-- [ ] 9.3.17 Test memory management
+- [ ] 9.3.11 Test cache initialization with existing Context.Cache patterns
+- [ ] 9.3.12 Test hierarchical key generation and format-specific versioning
+- [ ] 9.3.13 Test file-system based invalidation and registry coordination
+- [ ] 9.3.14 Test intelligent cache warming and background pre-compilation
+- [ ] 9.3.15 Test distributed instruction synchronization
+- [ ] 9.3.16 Test performance gains and telemetry integration
+- [ ] 9.3.17 Test multi-layer cache management and adaptive TTL
 
 ### 9.4 Security-First Template Processing
 
