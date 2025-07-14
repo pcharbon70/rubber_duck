@@ -24,3 +24,6 @@ rubber_duck-*.tar
 
 # Built CLI binary
 /bin/rubber_duck
+
+# Log files
+*.log

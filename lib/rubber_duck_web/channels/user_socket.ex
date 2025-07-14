@@ -25,6 +25,10 @@ defmodule RubberDuckWeb.UserSocket do
   # performing token verification on connect.
   @impl true
   def connect(params, socket, connect_info) do
+    # Log connection without sensitive data
+    safe_params = Map.drop(params, ["api_key", "token"])
+    Logger.info("WebSocket connection attempt with params: #{inspect(safe_params)}")
+    
     # Try to get API key from query params if not in params
     auth_params = case get_api_key_from_uri(connect_info) do
       {:ok, api_key} -> Map.put(params, "api_key", api_key)

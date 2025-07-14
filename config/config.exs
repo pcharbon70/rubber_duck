@@ -54,6 +54,9 @@ config :rubber_duck, RubberDuckWeb.Endpoint,
 # Configure phoenix generators
 config :phoenix, :json_library, Jason
 
+# Configure Phoenix to filter sensitive parameters from logs
+config :phoenix, :filter_parameters, ["password", "api_key", "token", "secret"]
+
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.17.11",
