@@ -30,7 +30,7 @@ defmodule RubberDuck.Instructions.HierarchicalLoader do
   """
 
   require Logger
-  alias RubberDuck.Instructions.{FileManager, FormatParser, Registry}
+  alias RubberDuck.Instructions.{FormatParser, Registry}
 
   @type loading_result :: %{
     loaded: [loaded_instruction()],

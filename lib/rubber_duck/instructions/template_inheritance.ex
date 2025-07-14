@@ -124,7 +124,7 @@ defmodule RubberDuck.Instructions.TemplateInheritance do
          ) do
       # Merge blocks: child blocks override parent blocks
       merged_blocks = Map.merge(resolved_parent.blocks, tree.blocks)
-      merged_tree = %{tree | blocks: merged_blocks, extends: nil}
+      _merged_tree = %{tree | blocks: merged_blocks, extends: nil}
       
       # Apply blocks to parent content
       apply_blocks_to_template(resolved_parent, merged_blocks, loader_fn)

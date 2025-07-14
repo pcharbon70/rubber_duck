@@ -275,7 +275,7 @@ defmodule RubberDuck.Instructions.Registry do
             Logger.info("Auto-reloaded instruction: #{instruction_id}")
             
           {:error, reason} ->
-            Logger.warn("Failed to auto-reload instruction #{instruction_id}: #{inspect(reason)}")
+            Logger.warning("Failed to auto-reload instruction #{instruction_id}: #{inspect(reason)}")
         end
         
       {:error, :not_found} ->

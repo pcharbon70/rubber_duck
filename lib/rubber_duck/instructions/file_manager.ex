@@ -250,7 +250,7 @@ defmodule RubberDuck.Instructions.FileManager do
         |> Enum.flat_map(fn entry ->
           full_path = Path.join(root_path, entry)
           
-          if File.dir?(full_path) and (follow_symlinks or not File.lstat!(full_path).type == :symlink) do
+          if File.dir?(full_path) and (follow_symlinks or File.lstat!(full_path).type != :symlink) do
             sub_files = find_files_by_patterns(full_path, patterns, max_file_size, follow_symlinks)
             deeper_files = discover_in_subdirectories(full_path, patterns, max_file_size, follow_symlinks, depth + 1)
             sub_files ++ deeper_files

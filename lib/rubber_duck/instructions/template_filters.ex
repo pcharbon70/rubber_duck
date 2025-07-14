@@ -5,7 +5,6 @@ defmodule RubberDuck.Instructions.TemplateFilters do
   Provides a set of safe, useful filters for instruction templates.
   """
 
-  @behaviour Solid.Filter
 
   @doc """
   Converts a string to uppercase.

@@ -134,22 +134,18 @@ defmodule RubberDuck.Instructions.FormatParser do
 
   defp parse_cursorrules(content) do
     # .cursorrules files typically use a specific format
-    case parse_cursorrules_content(content) do
-      {:ok, rules, metadata} ->
-        # Convert rules to markdown-like sections
-        sections = convert_rules_to_sections(rules)
-        markdown_content = rules_to_markdown(rules)
-        
-        {:ok, %{
-          format: :cursorrules,
-          metadata: metadata,
-          content: markdown_content,
-          sections: sections
-        }}
-        
-      {:error, reason} ->
-        {:error, reason}
-    end
+    {:ok, rules, metadata} = parse_cursorrules_content(content)
+    
+    # Convert rules to markdown-like sections
+    sections = convert_rules_to_sections(rules)
+    markdown_content = rules_to_markdown(rules)
+    
+    {:ok, %{
+      format: :cursorrules,
+      metadata: metadata,
+      content: markdown_content,
+      sections: sections
+    }}
   end
 
   defp parse_mdc(content) do
