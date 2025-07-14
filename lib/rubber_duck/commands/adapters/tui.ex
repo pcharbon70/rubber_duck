@@ -128,7 +128,7 @@ defmodule RubberDuck.Commands.Adapters.TUI do
   
   Provides command suggestions and validates syntax.
   """
-  def autocomplete(partial_input, session) do
+  def autocomplete(partial_input, _session) do
     # Simple autocomplete based on available commands
     available_commands = [:health, :analyze, :generate, :complete, :refactor, :test, :llm]
     
@@ -143,7 +143,7 @@ defmodule RubberDuck.Commands.Adapters.TUI do
         |> Enum.map(&to_string/1)
         |> Enum.filter(&String.starts_with?(&1, partial_command))
         
-      [command | _rest] ->
+      [_command | _rest] ->
         # Could provide subcommand or option completion here
         []
     end

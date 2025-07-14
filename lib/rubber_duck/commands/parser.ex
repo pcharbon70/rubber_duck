@@ -63,7 +63,7 @@ defmodule RubberDuck.Commands.Parser do
   end
 
   # WebSocket message parsing
-  defp parse_websocket_message(%{"event" => event, "payload" => payload} = message, context) do
+  defp parse_websocket_message(%{"event" => event, "payload" => payload} = _message, context) do
     # Handle messages from the WebSocket adapter
     try do
       name = String.to_atom(event)
