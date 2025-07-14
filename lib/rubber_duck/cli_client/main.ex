@@ -5,7 +5,7 @@ defmodule RubberDuck.CLIClient.Main do
   This module handles command-line parsing and routing to appropriate handlers.
   """
 
-  alias RubberDuck.CLIClient.{Auth, Client, UnifiedIntegration}
+  alias RubberDuck.CLIClient.{Auth, UnifiedIntegration}
   require Logger
 
   @app_name "rubber_duck"
