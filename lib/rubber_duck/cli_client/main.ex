@@ -5,7 +5,7 @@ defmodule RubberDuck.CLIClient.Main do
   This module handles command-line parsing and routing to appropriate handlers.
   """
 
-  alias RubberDuck.CLIClient.{Auth, Client, UnifiedIntegration}
+  alias RubberDuck.CLIClient.{Auth, Client, UnifiedIntegration, REPLHandler}
   require Logger
 
   @app_name "rubber_duck"
@@ -55,7 +55,8 @@ defmodule RubberDuck.CLIClient.Main do
         test: test_spec(),
         llm: llm_spec(),
         health: health_spec(),
-        conversation: conversation_spec()
+        conversation: conversation_spec(),
+        repl: repl_spec()
       ],
       flags: [
         verbose: [
@@ -164,6 +165,20 @@ defmodule RubberDuck.CLIClient.Main do
     end
   end
 
+  defp execute_command(:repl, args, opts) do
+    # Check if authenticated first
+    unless Auth.configured?() do
+      IO.puts(:stderr, """
+      Error: Not authenticated. Please run:
+        #{@app_name} auth setup
+      """)
+      System.halt(1)
+    end
+
+    # Delegate to REPL handler
+    RubberDuck.CLIClient.REPLHandler.run(args, opts)
+  end
+
   defp execute_command(command, args, opts) do
     # Check if authenticated
     unless Auth.configured?() do
@@ -237,7 +252,9 @@ defmodule RubberDuck.CLIClient.Main do
         
       :refactor ->
         file = Map.get(args.args, :file)
-        if file, do: base_args ++ [file], else: base_args
+        instruction = Map.get(args.args, :instruction)
+        base_with_file = if file, do: base_args ++ [file], else: base_args
+        if instruction, do: base_with_file ++ [instruction], else: base_with_file
         
       :test ->
         file = Map.get(args.args, :file)
@@ -294,19 +311,35 @@ defmodule RubberDuck.CLIClient.Main do
         :provider -> acc ++ ["--provider", to_string(value)]
         :conversation -> acc ++ ["--conversation", to_string(value)]
         :title -> acc ++ ["--title", to_string(value)]
+        :line -> acc ++ ["--line", to_string(value)]
+        :column -> acc ++ ["--column", to_string(value)]
+        :output -> acc ++ ["--output", to_string(value)]
+        :max_suggestions -> acc ++ ["--max", to_string(value)]
+        :context -> acc ++ ["--context", to_string(value)]
         _ -> acc
       end
     end)
     
     # Add flags
     flags_list = args.flags
-    |> Enum.reduce([], fn {key, true}, acc ->
-      case key do
-        :recursive -> acc ++ ["--recursive"]
-        :verbose -> acc ++ ["--verbose"]
-        :dry_run -> acc ++ ["--dry-run"]
-        _ -> acc
-      end
+    |> Enum.reduce([], fn 
+      {key, true}, acc ->
+        case key do
+          :recursive -> acc ++ ["--recursive"]
+          :verbose -> acc ++ ["--verbose"]
+          :dry_run -> acc ++ ["--dry-run"]
+          :include_suggestions -> acc ++ ["--include-suggestions"]
+          :include_edge_cases -> acc ++ ["--include-edge-cases"]
+          :include_property_tests -> acc ++ ["--include-property-tests"]
+          :diff -> acc ++ ["--diff"]
+          :in_place -> acc ++ ["--in-place"]
+          :interactive -> acc ++ ["--interactive"]
+          :no_cache -> acc ++ ["--no-cache"]
+          _ -> acc
+        end
+      {_key, false}, acc ->
+        # Skip false flags
+        acc
     end)
     
     args_list ++ options_list ++ flags_list
@@ -673,6 +706,49 @@ defmodule RubberDuck.CLIClient.Main do
               required: false
             ]
           ]
+        ]
+      ]
+    ]
+  end
+
+  defp repl_spec do
+    [
+      name: "repl",
+      about: "Start an interactive REPL session with the AI assistant",
+      options: [
+        type: [
+          short: "-t",
+          long: "--type",
+          help: "Type of conversation (general, coding, debugging, planning, review)",
+          parser: fn
+            t when t in ["general", "coding", "debugging", "planning", "review"] -> 
+              {:ok, t}
+            other -> 
+              {:error, "Invalid conversation type: #{other}"}
+          end,
+          default: "general",
+          required: false
+        ],
+        model: [
+          short: "-m",
+          long: "--model",
+          help: "Specific model to use for the conversation",
+          parser: :string,
+          required: false
+        ],
+        resume: [
+          short: "-r",
+          long: "--resume",
+          help: "Resume last conversation or specify conversation ID",
+          parser: :string,
+          required: false
+        ]
+      ],
+      flags: [
+        no_welcome: [
+          long: "--no-welcome",
+          help: "Skip welcome message",
+          multiple: false
         ]
       ]
     ]

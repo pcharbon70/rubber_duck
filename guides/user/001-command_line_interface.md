@@ -10,11 +10,12 @@ This comprehensive guide covers how to use RubberDuck's WebSocket-based CLI clie
 4. [LLM Provider Management](#llm-provider-management)
 5. [Dynamic Model Configuration](#dynamic-model-configuration)
 6. [Core Commands](#core-commands)
-7. [Advanced Features](#advanced-features)
-8. [Output Formats](#output-formats)
-9. [Common Workflows](#common-workflows)
-10. [Troubleshooting](#troubleshooting)
-11. [Performance Tips](#performance-tips)
+7. [Conversation and REPL Mode](#conversation-and-repl-mode)
+8. [Advanced Features](#advanced-features)
+9. [Output Formats](#output-formats)
+10. [Common Workflows](#common-workflows)
+11. [Troubleshooting](#troubleshooting)
+12. [Performance Tips](#performance-tips)
 
 ## Overview & Architecture
 
@@ -25,7 +26,7 @@ The RubberDuck CLI is a standalone client that communicates with the RubberDuck 
 - **Real-time Streaming**: Live updates for long-running operations
 - **Remote Access**: Connect to RubberDuck servers anywhere
 - **Multiple Clients**: Support for concurrent CLI sessions
-- **Dynamic LLM Configuration**: Runtime provider and model switching
+- **Dynamic LLM Configuration**: Runtime provider and model switching *(partially implemented)*
 
 ### How It Works
 
@@ -193,7 +194,7 @@ RubberDuck supports multiple LLM providers that can be managed dynamically throu
 2. **Ollama** - Run LLMs locally
 3. **OpenAI** - GPT models via OpenAI API
 4. **Anthropic** - Claude models via Anthropic API
-5. **TGI (Text Generation Inference)** - High-performance inference server
+5. **TGI (HuggingFace Text Generation Inference)** - High-performance inference server
 
 ### Provider Status and Health
 
@@ -253,6 +254,33 @@ rubber_duck llm connect ollama
 # Successfully connected to ollama
 ```
 
+### Setting Up HuggingFace Text Generation Inference (TGI)
+
+```bash
+# 1. Run TGI using Docker (on the server machine)
+docker run --gpus all --shm-size 1g -p 8080:80 \
+  -v $PWD/data:/data \
+  ghcr.io/huggingface/text-generation-inference:latest \
+  --model-id codellama/CodeLlama-13b-Instruct-hf \
+  --max-total-tokens 8192
+
+# 2. Verify TGI is running
+curl http://localhost:8080/health
+
+# 3. Connect via RubberDuck CLI
+rubber_duck llm connect tgi
+
+# 4. Check connection status
+rubber_duck llm status
+```
+
+TGI supports any HuggingFace model and provides:
+- OpenAI-compatible API endpoints
+- Flash Attention optimizations
+- Streaming responses
+- Function calling support
+- Guided generation capabilities
+
 ### Managing Provider Connections
 
 ```bash
@@ -274,328 +302,307 @@ rubber_duck llm enable mock
 
 ## Dynamic Model Configuration
 
-One of RubberDuck's most powerful features is the ability to dynamically configure LLM providers and models at runtime, both globally and per-command.
+**Note: The following dynamic model configuration commands are NOT YET IMPLEMENTED:**
+- `rubber_duck llm set-default <provider>`
+- `rubber_duck llm set-model <provider> <model>`
+- `rubber_duck llm list-models [provider]`
 
-### Setting Default Provider and Model
+Currently, model configuration must be done through:
+1. Server configuration files
+2. Environment variables at runtime
 
-```bash
-# Set the default provider for all commands
-rubber_duck llm set-default ollama
+### Current Model Configuration
 
-# Set the model for a specific provider
-rubber_duck llm set-model ollama codellama
-rubber_duck llm set-model openai gpt-4
+Models are configured in the server's `config/config.exs`:
 
-# Set multiple providers at once
-rubber_duck llm set-model anthropic claude-3-sonnet
-rubber_duck llm set-model ollama mistral
+```elixir
+config :rubber_duck, :llm,
+  providers: [
+    %{
+      name: :ollama,
+      adapter: RubberDuck.LLM.Providers.Ollama,
+      base_url: "http://localhost:11434",
+      models: ["codellama", "mistral", "phi"],
+      default_model: "codellama"
+    },
+    %{
+      name: :tgi,
+      adapter: RubberDuck.LLM.Providers.TGI,
+      base_url: "http://localhost:8080",
+      models: ["codellama-13b", "llama-3.1-8b"],
+      default_model: "codellama-13b"
+    }
+  ]
 ```
 
-### Listing Available Models
+### Environment Variable Override
+
+You can override the provider for specific commands:
 
 ```bash
-# List all available models across all providers
-rubber_duck llm list-models
-
-# Output:
-# Available Models:
-# 
-# ollama:
-#   - llama2 (7B parameters)
-#   - codellama (7B parameters, code-optimized)
-#   - mistral (7B parameters)
-#   - phi (3B parameters, fast)
-# 
-# openai:
-#   - gpt-3.5-turbo (chat optimized)
-#   - gpt-4 (advanced reasoning)
-#   - gpt-4-turbo (latest, faster)
-# 
-# anthropic:
-#   - claude-3-haiku (fast, lightweight)
-#   - claude-3-sonnet (balanced)
-#   - claude-3-opus (most capable)
-
-# List models for specific provider
-rubber_duck llm list-models ollama
-```
-
-### Configuration Priority
-
-RubberDuck uses a configuration hierarchy (highest to lowest priority):
-
-1. **Command-line environment variables**: `RUBBER_DUCK_PROVIDER=ollama`
-2. **CLI config file**: `~/.rubber_duck/config.json`
-3. **Server application config**: Default fallbacks
-
-```bash
-# Override provider for a single command
-RUBBER_DUCK_PROVIDER=openai rubber_duck generate "create a web API"
-
-# Override both provider and model
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=mistral rubber_duck analyze lib/module.ex
-```
-
-### Global vs Per-Command Configuration
-
-```bash
-# Set global defaults (affects all future commands)
-rubber_duck llm set-default ollama
-rubber_duck llm set-model ollama codellama
-
-# Use different provider for specific command
-RUBBER_DUCK_PROVIDER=openai rubber_duck generate "complex algorithm"
-
-# Check current configuration
-rubber_duck llm status
-
-# View effective configuration for debugging
-rubber_duck llm status --show-config
+# Use environment variables (if supported by server implementation)
+RUBBER_DUCK_PROVIDER=ollama rubber_duck generate "create a web API"
+RUBBER_DUCK_MODEL=mistral rubber_duck analyze lib/module.ex
 ```
 
 ## Core Commands
 
 ### 1. Code Analysis
 
-Analyze code for issues, patterns, and improvements with configurable LLM providers.
+Analyze code for issues, patterns, and improvements.
 
 ```bash
-# Basic file analysis (uses default provider/model)
+# Basic file analysis
 rubber_duck analyze lib/my_module.ex
 
-# Use specific provider for analysis
-RUBBER_DUCK_PROVIDER=openai rubber_duck analyze lib/my_module.ex --type security
+# Recursive directory analysis
+rubber_duck analyze lib/ --recursive
 
-# Recursive directory analysis with fast model
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=phi rubber_duck analyze lib/ --recursive
-
-# Include fix suggestions using powerful model
-RUBBER_DUCK_PROVIDER=anthropic rubber_duck analyze lib/my_module.ex --include-suggestions
+# Include fix suggestions (NOT YET IMPLEMENTED)
+# rubber_duck analyze lib/my_module.ex --include-suggestions
 ```
 
-**Options:**
+**Available Options:**
 - `-t, --type <all|semantic|style|security>` - Analysis type (default: all)
 - `-r, --recursive` - Analyze directories recursively
+
+**Unimplemented Options:**
 - `--include-suggestions` - Include fix suggestions
-
-**Example Output:**
-```
-Analyzing: lib/my_module.ex (using ollama:codellama)
-
-Issues Found:
-
-WARNING (2):
-  lib/my_module.ex:15:5
-  Unused variable 'result'
-  
-  lib/my_module.ex:42:1
-  Function complexity too high (cyclomatic: 12)
-
-Suggestions:
-  - Remove unused variable or prefix with underscore
-  - Break complex function into smaller functions
-
-Summary: 2 issues found
-Provider: ollama (codellama) - Response time: 1.2s
-```
 
 ### 2. Code Generation
 
-Generate code from natural language descriptions with real-time streaming.
+Generate code from natural language descriptions.
 
 ```bash
-# Generate code with live output (uses default provider)
+# Generate code
 rubber_duck generate "create a GenServer for rate limiting"
 
-# Use specific model for code generation
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=codellama rubber_duck generate "user authentication module" --output lib/auth.ex
+# Generate with output file
+rubber_duck generate "user authentication module" --output lib/auth.ex
 
-# Use powerful model for complex generation
-RUBBER_DUCK_PROVIDER=anthropic RUBBER_DUCK_MODEL=claude-3-opus rubber_duck generate "distributed system design" --language elixir
-
-# Use context files with specific provider
-RUBBER_DUCK_PROVIDER=openai rubber_duck generate "add caching to this module" --context lib/existing_module.ex
+# Specify language
+rubber_duck generate "REST API client" --language elixir
 ```
 
-**Options:**
+**Available Options:**
 - `-o, --output <file>` - Save to file
 - `-l, --language <lang>` - Target language (default: elixir)
+
+**Unimplemented Options:**
 - `--context <file>` - Context files
-
-**Real-time Output:**
-```bash
-$ rubber_duck generate "create a rate limiter using GenServer"
-Generating code using ollama:codellama... 
-defmodule RateLimiter do
-  use GenServer
-  
-  # ... code streams in real-time ...
-end
-
-Generation complete!
-Provider: ollama (codellama) - Tokens: 234 - Time: 3.4s
-```
+- `-i, --interactive` - Interactive mode for iterative refinement
 
 ### 3. Code Completion
 
-Get intelligent completions at specific positions using optimized models.
+Get intelligent completions at specific positions.
 
 ```bash
-# Get completions with fast model
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=phi rubber_duck complete lib/my_module.ex --line 25 --column 10
+# Get completions
+rubber_duck complete lib/my_module.ex --line 25 --column 10
 
-# More suggestions with powerful model
-RUBBER_DUCK_PROVIDER=openai rubber_duck complete lib/my_module.ex -l 25 -c 10 --max 10
+# More suggestions (NOT YET IMPLEMENTED - --max option not available)
+# rubber_duck complete lib/my_module.ex --line 25 --column 10 --max 10
 ```
 
-**Options:**
-- `--line <n>` - Line number (required)
-- `--column <n>` - Column number (required)
-- `--max <n>` - Maximum suggestions (default: 5)
+**Required Options:**
+- `--line <n>` - Line number
+- `--column <n>` - Column number
+
+**Unimplemented Options:**
+- `-n, --max-suggestions` - Maximum suggestions (always returns default of 5)
 
 ### 4. Code Refactoring
 
-Refactor code based on instructions using appropriate models.
+Refactor code based on instructions.
 
 ```bash
-# Refactor with preview using default provider
+# Refactor with instruction
 rubber_duck refactor lib/legacy.ex "modernize this code"
 
-# Show diff only with specific model
-RUBBER_DUCK_PROVIDER=anthropic rubber_duck refactor lib/module.ex "use pattern matching" --dry-run
+# Preview changes (NOT YET IMPLEMENTED)
+# rubber_duck refactor lib/module.ex "use pattern matching" --dry-run
 
-# Interactive refactoring with code-optimized model
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=codellama rubber_duck refactor lib/complex.ex "simplify" --interactive
+# Save to different file (NOT YET IMPLEMENTED)
+# rubber_duck refactor lib/complex.ex "simplify" --output lib/simple.ex
 ```
 
-**Options:**
+**Unimplemented Options:**
 - `--dry-run` - Preview changes without applying
-- `--interactive` - Step through changes
+- `-d, --diff` - Show diff instead of full output
+- `--in-place` - Modify the file in place
+- `-i, --interactive` - Step through changes
 - `-o, --output <file>` - Save to different file
 
 ### 5. Test Generation
 
-Generate comprehensive test suites with models optimized for testing.
+Generate comprehensive test suites.
 
 ```bash
-# Generate tests using default provider
+# Generate tests
 rubber_duck test lib/my_module.ex
 
-# Use code-specialized model for comprehensive testing
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=codellama rubber_duck test lib/calculator.ex --output test/calculator_test.exs --include-edge-cases
+# Specify framework
+rubber_duck test lib/calculator.ex --framework exunit
 
-# Generate property-based tests with powerful reasoning model
-RUBBER_DUCK_PROVIDER=anthropic rubber_duck test lib/parser.ex --include-property-tests
+# With output file
+rubber_duck test lib/parser.ex --output test/parser_test.exs
 ```
 
-**Options:**
+**Available Options:**
 - `-o, --output <file>` - Output file
 - `-f, --framework <name>` - Test framework (default: exunit)
+
+**Unimplemented Options:**
 - `--include-edge-cases` - Add edge case tests
 - `--include-property-tests` - Add property tests
 
-## Advanced Features
+### 6. Health Check
 
-### Model Selection Strategies
-
-Choose models based on task requirements and performance needs:
+Monitor the health and status of your RubberDuck server.
 
 ```bash
-# Fast completion for simple tasks
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=phi rubber_duck complete file.ex --line 10 --column 5
-
-# Balanced performance for most tasks
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=codellama rubber_duck analyze lib/
-
-# Maximum capability for complex reasoning
-RUBBER_DUCK_PROVIDER=anthropic RUBBER_DUCK_MODEL=claude-3-opus rubber_duck generate "distributed system architecture"
-
-# Cost-effective for simple generation
-RUBBER_DUCK_PROVIDER=openai RUBBER_DUCK_MODEL=gpt-3.5-turbo rubber_duck generate "helper function"
-```
-
-### Provider Failover and Fallbacks
-
-Configure automatic failover between providers:
-
-```bash
-# Set multiple providers with fallback priority
-rubber_duck llm set-default ollama
-rubber_duck llm enable openai  # Will be used if ollama fails
-rubber_duck llm enable anthropic  # Third fallback
-
-# Test provider health before important operations
-rubber_duck llm status && rubber_duck generate "critical code component"
-```
-
-### Real-time Streaming
-
-The CLI supports streaming for long-running operations:
-
-```bash
-# Watch generation progress with streaming
-rubber_duck generate "complex implementation" --verbose
-
-# Streaming output shows:
-# Generating code using anthropic:claude-3-sonnet... [█████████████░░░░░░░] 65%
-# Creating module structure...
-# Adding function definitions...
-# Implementing business logic...
-# Adding documentation...
-# Generation complete!
-```
-
-### Batch Operations with Different Models
-
-Process multiple files efficiently with optimal model selection:
-
-```bash
-# Analyze all files with fast model for overview
-for file in lib/**/*.ex; do
-  RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=phi rubber_duck analyze "$file" --format json >> quick_analysis.jsonl
-done
-
-# Deep analysis of critical files with powerful model
-for file in lib/core/*.ex; do
-  RUBBER_DUCK_PROVIDER=anthropic RUBBER_DUCK_MODEL=claude-3-opus rubber_duck analyze "$file" --include-suggestions >> deep_analysis.md
-done
-
-# Generate tests with code-specialized model
-find lib -name "*.ex" | while read module; do
-  test_file="test/${module#lib/}_test.exs"
-  if [ ! -f "$test_file" ]; then
-    RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=codellama rubber_duck test "$module" --output "$test_file"
-  fi
-done
-```
-
-### Server Health Monitoring
-
-Monitor the health and status of your RubberDuck server and LLM providers:
-
-```bash
-# Comprehensive health check including LLM providers
+# Basic health check
 rubber_duck health
 
-# Health check with table format for better readability
+# Table format
 rubber_duck health --format table
 
-# JSON output for scripting and monitoring
+# JSON output for monitoring
 rubber_duck health --format json
-
-# Monitor specific provider health
-rubber_duck health --format json | jq '.providers.ollama.health'
-
-# Get memory usage during operations
-rubber_duck health --format json | jq '.memory.total_mb'
 ```
 
 **Health Information Includes:**
 - Server status and uptime
 - Memory usage breakdown
 - Active WebSocket connections
-- LLM provider health and model status
-- Provider response times and error rates
+- LLM provider health and status
+
+## Conversation and REPL Mode
+
+RubberDuck provides two powerful interactive modes for conversing with the AI assistant.
+
+### Conversation Commands
+
+```bash
+# Start a new conversation
+rubber_duck conversation start "Project Planning"
+
+# Start with specific type
+rubber_duck conversation start --type coding
+
+# List conversations
+rubber_duck conversation list
+
+# Show conversation history
+rubber_duck conversation show <conversation-id>
+
+# Send a message
+rubber_duck conversation send "How do I implement authentication?" --conversation <id>
+
+# Delete conversation
+rubber_duck conversation delete <conversation-id>
+```
+
+### Interactive Chat Mode
+
+```bash
+# Enter chat mode
+rubber_duck conversation chat
+
+# Resume specific conversation
+rubber_duck conversation chat <conversation-id>
+
+# Start chat with title
+rubber_duck conversation chat --title "Debug Session"
+```
+
+### NEW: Enhanced REPL Mode
+
+The new REPL mode provides a superior interactive experience:
+
+```bash
+# Start REPL
+rubber_duck repl
+
+# Start with specific conversation type
+rubber_duck repl -t coding
+
+# Resume last conversation
+rubber_duck repl -r last
+
+# Resume specific conversation
+rubber_duck repl -r <conversation-id>
+
+# Skip welcome message
+rubber_duck repl --no-welcome
+```
+
+**REPL Features:**
+- Direct message input without command prefixes
+- Multi-line input with `"""` or `\`
+- Rich command set with `/` prefix
+- Context file management
+- Session auto-save
+- Model switching (when implemented on server)
+
+**REPL Commands:**
+```
+Basic:
+  /help              - Show help
+  /exit              - Exit REPL
+  /clear             - Clear screen
+  /info              - Session information
+
+Conversation:
+  /history           - Show history
+  /save [filename]   - Save conversation
+  /recent            - Show recent conversations
+  /switch <id>       - Switch conversation
+
+Context:
+  /context           - Show context files
+  /context add <file> - Add file to context
+  /context clear     - Clear context
+
+Model:
+  /model             - Show current model
+  /model <spec>      - Change model (when implemented)
+
+Integrated:
+  /analyze <file>    - Analyze in context
+  /generate <prompt> - Generate code
+  /refactor <instr>  - Refactor with context
+```
+
+## Advanced Features
+
+### Real-time Streaming
+
+The CLI supports streaming for long-running operations:
+
+```bash
+# Generation shows progress (when verbose output is enabled)
+rubber_duck generate "complex implementation" --verbose
+```
+
+### Batch Operations
+
+Process multiple files efficiently:
+
+```bash
+# Analyze all files
+for file in lib/**/*.ex; do
+  rubber_duck analyze "$file" --format json >> analysis.jsonl
+done
+
+# Generate tests for modules without tests
+find lib -name "*.ex" | while read module; do
+  test_file="test/${module#lib/}_test.exs"
+  if [ ! -f "$test_file" ]; then
+    rubber_duck test "$module" --output "$test_file"
+  fi
+done
+```
 
 ## Output Formats
 
@@ -615,14 +622,8 @@ Machine-readable for scripting and automation:
 # Pipe to jq for processing
 rubber_duck analyze lib/module.ex --format json | jq '.issues[]'
 
-# Save for later processing
-rubber_duck llm status --format json > provider_status.json
-
 # Extract provider information
 rubber_duck llm status --format json | jq '.providers[] | {name, model, health}'
-
-# Monitor health metrics
-rubber_duck health --format json | jq '{uptime: .uptime.total_seconds, memory_mb: .memory.total_mb, providers: [.providers[] | {name, health, model}]}'
 ```
 
 ### Table Format
@@ -631,121 +632,63 @@ Structured tables for status and list outputs:
 
 ```bash
 rubber_duck llm status --format table
-```
-
-Output:
-```
-┌─────────┬────────────┬─────────┬─────────┬──────────────┬────────┬─────────────┐
-│ Provider│ Status     │ Enabled │ Health  │ Model        │ Errors │ Last Used   │
-├─────────┼────────────┼─────────┼─────────┼──────────────┼────────┼─────────────┤
-│ ollama  │ connected  │ true    │ healthy │ codellama    │ 0      │ 2 mins ago  │
-│ openai  │ connected  │ true    │ healthy │ gpt-4        │ 0      │ never       │
-│ anthropic│ disconnected│ false  │ unknown │ claude-3-opus│ 0      │ 1 hour ago  │
-└─────────┴────────────┴─────────┴─────────┴──────────────┴────────┴─────────────┘
+rubber_duck health --format table
 ```
 
 ## Common Workflows
 
-### 1. Initial Project Setup with Optimal Models
+### 1. Initial Project Setup
 
 ```bash
-# Set up optimal provider configuration
-rubber_duck llm set-default ollama
-rubber_duck llm set-model ollama codellama  # Best for code
-rubber_duck llm enable openai
-rubber_duck llm set-model openai gpt-4      # Backup for complex tasks
+# 1. Set up authentication
+rubber_duck auth setup
 
-# Complete project health check with fast model
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=phi rubber_duck analyze . --recursive --format json > project_health.json
+# 2. Connect to LLM providers
+rubber_duck llm connect ollama
+rubber_duck llm connect tgi  # If using HuggingFace TGI
 
-# Extract critical issues for detailed analysis
-jq '.issues[] | select(.severity == "error")' project_health.json | \
-  while read -r issue; do
-    file=$(echo "$issue" | jq -r '.file')
-    # Use powerful model for complex issue analysis
-    RUBBER_DUCK_PROVIDER=anthropic RUBBER_DUCK_MODEL=claude-3-opus rubber_duck analyze "$file" --include-suggestions
-  done
+# 3. Check health
+rubber_duck health
+
+# 4. Analyze project
+rubber_duck analyze . --recursive
+
+# 5. Start REPL for interactive work
+rubber_duck repl
 ```
 
-### 2. Multi-Model Test-Driven Development
+### 2. Test-Driven Development
 
 ```bash
-# 1. Generate module with code-specialized model
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=codellama rubber_duck generate "user authentication service with JWT" --output lib/auth_service.ex
+# 1. Generate module
+rubber_duck generate "user authentication service with JWT" --output lib/auth_service.ex
 
-# 2. Generate comprehensive tests with testing-focused approach
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=codellama rubber_duck test lib/auth_service.ex --output test/auth_service_test.exs --include-edge-cases
+# 2. Generate tests
+rubber_duck test lib/auth_service.ex --output test/auth_service_test.exs
 
-# 3. Run tests and analyze failures with reasoning model
+# 3. Run tests and refine
 mix test test/auth_service_test.exs || {
-  RUBBER_DUCK_PROVIDER=anthropic RUBBER_DUCK_MODEL=claude-3-sonnet rubber_duck analyze test/auth_service_test.exs --include-suggestions
+  rubber_duck refactor lib/auth_service.ex "fix failing tests"
 }
-
-# 4. Refactor based on test results using balanced model
-RUBBER_DUCK_PROVIDER=anthropic RUBBER_DUCK_MODEL=claude-3-sonnet rubber_duck refactor lib/auth_service.ex "improve error handling and add logging based on test failures"
 ```
 
-### 3. Performance-Optimized Legacy Code Modernization
+### 3. Interactive Development with REPL
 
 ```bash
-# 1. Quick analysis with fast model for overview
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=phi rubber_duck analyze lib/legacy/ --recursive > legacy_overview.txt
+# Start coding session
+rubber_duck repl -t coding
 
-# 2. Deep analysis of complex modules with powerful model
-for file in lib/legacy/complex_*.ex; do
-  echo "Deep analysis of $file..."
-  RUBBER_DUCK_PROVIDER=anthropic RUBBER_DUCK_MODEL=claude-3-opus rubber_duck analyze "$file" --include-suggestions >> deep_legacy_analysis.md
-done
-
-# 3. Generate modernized versions with code-specialized model
-for file in lib/legacy/*.ex; do
-  modern_file="lib/modern/$(basename $file)"
-  echo "Modernizing $file -> $modern_file"
-  RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=codellama rubber_duck refactor "$file" "modernize to use current Elixir patterns and idioms" --output "$modern_file"
-done
-
-# 4. Generate tests for modernized versions
-for file in lib/modern/*.ex; do
-  test_file="test/modern/$(basename $file _ex)_test.exs"
-  RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=codellama rubber_duck test "$file" --include-property-tests --output "$test_file"
-done
+# In REPL:
+rd> /context add lib/my_module.ex
+rd> Please help me refactor this module to use GenServer
+rd> /save refactoring_session.md
 ```
 
-### 4. Intelligent Health Monitoring and Model Selection
-
-```bash
-# Create adaptive model selection based on server health
-create_adaptive_command() {
-  local command="$1"
-  shift
-  
-  # Check server health
-  local memory=$(rubber_duck health --format json | jq '.memory.total_mb')
-  local provider_status=$(rubber_duck llm status --format json)
-  
-  # Select optimal provider based on conditions
-  if (( $(echo "$memory > 1000" | bc -l) )); then
-    echo "High memory usage, using lightweight model"
-    RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=phi rubber_duck "$command" "$@"
-  elif echo "$provider_status" | jq -e '.providers.anthropic.health == "healthy"' > /dev/null; then
-    echo "Using high-capability model"
-    RUBBER_DUCK_PROVIDER=anthropic RUBBER_DUCK_MODEL=claude-3-opus rubber_duck "$command" "$@"
-  else
-    echo "Using default reliable model"
-    RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=codellama rubber_duck "$command" "$@"
-  fi
-}
-
-# Use adaptive selection
-create_adaptive_command generate "complex distributed system"
-create_adaptive_command analyze lib/critical_module.ex --include-suggestions
-```
-
-### 5. CI/CD Integration with Provider Management
+### 4. CI/CD Integration
 
 ```yaml
 # .github/workflows/rubber_duck.yml
-name: RubberDuck Analysis with Dynamic LLM
+name: RubberDuck Analysis
 
 on: [push, pull_request]
 
@@ -756,49 +699,26 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
-    - name: Download RubberDuck CLI
+    - name: Setup RubberDuck
       run: |
+        # Download and setup CLI
         wget https://github.com/rubber_duck/releases/latest/rubber_duck
         chmod +x rubber_duck
         
-    - name: Configure Authentication and Providers
+    - name: Configure
       env:
         RUBBER_DUCK_API_KEY: ${{ secrets.RUBBER_DUCK_API_KEY }}
         RUBBER_DUCK_URL: ${{ secrets.RUBBER_DUCK_URL }}
       run: |
         ./rubber_duck auth status
-        # Set up optimal providers for CI
-        ./rubber_duck llm set-default ollama
-        ./rubber_duck llm set-model ollama phi  # Fast model for CI
-        ./rubber_duck llm enable openai         # Fallback
         
-    - name: Health Check with Provider Status
+    - name: Health Check
       run: |
         ./rubber_duck health --format json > health.json
-        ./rubber_duck llm status --format json > providers.json
         
-        # Ensure server and at least one provider is healthy
-        jq -e '.status == "healthy"' health.json || exit 1
-        jq -e '[.providers[] | select(.health == "healthy")] | length > 0' providers.json || exit 1
-        
-    - name: Fast Analysis with Lightweight Model
+    - name: Analysis
       run: |
-        # Use fast model for CI to reduce execution time
-        RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=phi ./rubber_duck analyze lib/ --recursive --format json > analysis.json
-        
-    - name: Critical Issues Deep Analysis
-      run: |
-        # Use more powerful model for critical issues only
-        critical_files=$(jq -r '.issues[] | select(.severity == "error") | .file' analysis.json | sort -u)
-        for file in $critical_files; do
-          echo "Deep analysis of critical file: $file"
-          RUBBER_DUCK_PROVIDER=openai RUBBER_DUCK_MODEL=gpt-4 ./rubber_duck analyze "$file" --include-suggestions >> critical_analysis.md
-        done
-        
-    - name: Model Performance Metrics
-      run: |
-        # Log provider performance for optimization
-        ./rubber_duck llm status --format json | jq '.providers[] | {name, model, last_response_time_ms, error_count}' > provider_metrics.json
+        ./rubber_duck analyze lib/ --recursive --format json > analysis.json
         
     - name: Upload Results
       uses: actions/upload-artifact@v3
@@ -806,10 +726,7 @@ jobs:
         name: analysis-results
         path: |
           analysis.json
-          critical_analysis.md
           health.json
-          providers.json
-          provider_metrics.json
 ```
 
 ## Troubleshooting
@@ -820,163 +737,76 @@ jobs:
 
 1. **Verify server is running:**
    ```bash
-   # Check if server is up
    curl http://localhost:5555/api/health
    ```
 
-2. **Check WebSocket endpoint:**
-   ```bash
-   # Test WebSocket connection
-   wscat -c ws://localhost:5555/socket/websocket
-   ```
-
-3. **Verify authentication:**
+2. **Check authentication:**
    ```bash
    rubber_duck auth status
    ```
 
+3. **Test WebSocket connection:**
+   ```bash
+   wscat -c ws://localhost:5555/socket/websocket
+   ```
+
 ### LLM Provider Issues
 
-#### "Provider not available" or "Model not found"
+#### "Provider not available"
 
 1. **Check provider status:**
    ```bash
-   rubber_duck llm status --format json
+   rubber_duck llm status
    ```
 
-2. **List available models:**
-   ```bash
-   rubber_duck llm list-models
-   ```
-
-3. **Reconnect to providers:**
+2. **Reconnect to providers:**
    ```bash
    rubber_duck llm connect
    ```
 
-4. **Reset to working configuration:**
+3. **For Ollama issues:**
    ```bash
-   # Fall back to mock provider for testing
-   rubber_duck llm set-default mock
-   rubber_duck llm connect mock
+   # Check if Ollama is running
+   ollama list
+   ```
+
+4. **For TGI issues:**
+   ```bash
+   # Check TGI health
+   curl http://localhost:8080/health
    ```
 
 ### Performance Issues
 
 #### Slow Command Execution
 
-1. **Check provider health and response times:**
+1. **Check provider health:**
    ```bash
-   rubber_duck llm status --format json | jq '.providers[] | {name, health, last_response_time_ms}'
+   rubber_duck llm status --format json | jq '.providers[] | {name, health}'
    ```
 
-2. **Use faster models for development:**
+2. **Monitor server health:**
    ```bash
-   # Switch to lightweight model
-   rubber_duck llm set-model ollama phi
-   ```
-
-3. **Monitor server health:**
-   ```bash
-   rubber_duck health --format json | jq '{memory_mb: .memory.total_mb, active_connections: .connections.active}'
-   ```
-
-#### "Model response timeout"
-
-1. **Check model availability:**
-   ```bash
-   # For Ollama
-   ollama list
-   
-   # Test model directly
-   ollama run codellama "test prompt"
-   ```
-
-2. **Switch to reliable provider:**
-   ```bash
-   rubber_duck llm set-default mock  # Always available
+   rubber_duck health --format json | jq '{memory_mb: .memory.total_mb}'
    ```
 
 ### Debug Mode
 
-Enable detailed logging including provider selection:
+Enable detailed logging:
 
 ```bash
-# Verbose output with provider details
+# Verbose output
 rubber_duck analyze lib/module.ex --verbose --debug
 
-# Debug output includes:
-# - Provider selection logic
-# - Model configuration
+# Debug includes:
 # - WebSocket frame details
 # - Response timing
-# - Fallback attempts
+# - Error traces
 ```
 
 ## Performance Tips
 
-### 1. Optimal Model Selection
-
-Choose models based on task requirements:
-
-```bash
-# Lightning-fast completion (< 100ms)
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=phi rubber_duck complete file.ex --line 10 --column 5
-
-# Balanced performance for most tasks (< 2s)
-RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=codellama rubber_duck analyze lib/
-
-# Maximum quality for complex tasks (5-30s)
-RUBBER_DUCK_PROVIDER=anthropic RUBBER_DUCK_MODEL=claude-3-opus rubber_duck generate "distributed system architecture"
-
-# Cost-effective API usage
-RUBBER_DUCK_PROVIDER=openai RUBBER_DUCK_MODEL=gpt-3.5-turbo rubber_duck test lib/simple_module.ex
-```
-
-### 2. Provider Configuration Strategies
-
-```bash
-# Development setup (speed prioritized)
-rubber_duck llm set-default ollama
-rubber_duck llm set-model ollama phi
-
-# Production analysis (quality prioritized)  
-rubber_duck llm set-default anthropic
-rubber_duck llm set-model anthropic claude-3-sonnet
-
-# Hybrid setup (balanced)
-rubber_duck llm set-default ollama
-rubber_duck llm set-model ollama codellama
-rubber_duck llm enable anthropic  # Fallback for complex tasks
-```
-
-### 3. Batch Processing Optimization
-
-```bash
-# Process multiple files with optimal models
-process_files_optimally() {
-  local files=("$@")
-  
-  for file in "${files[@]}"; do
-    local size=$(wc -l < "$file")
-    
-    if (( size < 100 )); then
-      # Small files: use fast model
-      RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=phi rubber_duck analyze "$file" --format json
-    elif (( size < 500 )); then
-      # Medium files: use balanced model
-      RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=codellama rubber_duck analyze "$file" --format json  
-    else
-      # Large files: use powerful model with streaming
-      RUBBER_DUCK_PROVIDER=anthropic RUBBER_DUCK_MODEL=claude-3-sonnet rubber_duck analyze "$file" --verbose --format json
-    fi
-  done
-}
-
-process_files_optimally lib/**/*.ex
-```
-
-### 4. Connection Reuse and Caching
+### 1. Connection Reuse
 
 ```bash
 # First command establishes connection (slower)
@@ -985,101 +815,68 @@ rubber_duck llm status  # ~500ms
 # Subsequent commands reuse connection (faster)
 rubber_duck analyze file1.ex  # ~50ms
 rubber_duck analyze file2.ex  # ~50ms
-
-# Server caches analysis results
-rubber_duck analyze large_file.ex  # 2s (first time)
-rubber_duck analyze large_file.ex  # 0.1s (cached)
-
-# Force fresh analysis when needed
-rubber_duck analyze large_file.ex --no-cache
 ```
 
-## Best Practices
+### 2. Use REPL for Interactive Work
 
-1. **Provider Management Strategy**:
-   ```bash
-   # Set up reliable defaults
-   rubber_duck llm set-default ollama
-   rubber_duck llm set-model ollama codellama
-   
-   # Enable fallbacks
-   rubber_duck llm enable openai
-   rubber_duck llm enable anthropic
-   
-   # Test configuration
-   rubber_duck llm status
-   ```
+The REPL mode maintains persistent connections and context:
 
-2. **Model Selection Guidelines**:
-   - **phi**: Quick completions, simple analysis
-   - **codellama**: Code generation, refactoring, testing  
-   - **claude-3-sonnet**: Complex analysis, documentation
-   - **claude-3-opus**: Architecture design, complex reasoning
-   - **gpt-4**: Fallback for any complex task
+```bash
+# Instead of multiple commands:
+rubber_duck conversation send "question 1" -c <id>
+rubber_duck conversation send "question 2" -c <id>
 
-3. **Configuration Files**: Create project-specific settings:
-   ```json
-   # .rubber_duck.json
-   {
-     "default_provider": "ollama",
-     "providers": {
-       "ollama": {"model": "codellama"},
-       "anthropic": {"model": "claude-3-sonnet"}
-     },
-     "analysis_options": {
-       "include_suggestions": true,
-       "type": "all"
-     }
-   }
-   ```
+# Use REPL:
+rubber_duck repl
+rd> question 1
+rd> question 2
+```
 
-4. **Health Monitoring**: Always verify before critical operations:
-   ```bash
-   # Create a pre-flight check function
-   rubber_duck_safe() {
-     # Check overall health
-     if ! rubber_duck health --format json | jq -e '.status == "healthy"' > /dev/null; then
-       echo "Error: Server unhealthy"
-       return 1
-     fi
-     
-     # Check provider availability
-     if ! rubber_duck llm status --format json | jq -e '[.providers[] | select(.health == "healthy")] | length > 0' > /dev/null; then
-       echo "Error: No healthy providers"
-       return 1
-     fi
-     
-     # Execute command
-     rubber_duck "$@"
-   }
-   
-   # Use for important operations
-   rubber_duck_safe generate "critical system component"
-   ```
+### 3. Batch Processing
 
-5. **Shell Integration**: Add useful aliases and functions:
-   ```bash
-   # Add to ~/.bashrc or ~/.zshrc
-   alias rd='rubber_duck'
-   alias rda='rubber_duck analyze'
-   alias rdg='rubber_duck generate'
-   alias rdt='rubber_duck test'
-   alias rdh='rubber_duck health'
-   alias rdls='rubber_duck llm status'
-   
-   # Smart model selection
-   rd_fast() { RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=phi rubber_duck "$@"; }
-   rd_smart() { RUBBER_DUCK_PROVIDER=anthropic RUBBER_DUCK_MODEL=claude-3-sonnet rubber_duck "$@"; }
-   rd_code() { RUBBER_DUCK_PROVIDER=ollama RUBBER_DUCK_MODEL=codellama rubber_duck "$@"; }
-   ```
+For multiple files, consider using JSON output and processing in parallel:
+
+```bash
+# Process files in parallel
+find lib -name "*.ex" -print0 | \
+  xargs -0 -P 4 -I {} rubber_duck analyze {} --format json >> results.jsonl
+```
+
+## Unimplemented Features Summary
+
+The following features are documented but NOT YET IMPLEMENTED:
+
+### LLM Commands:
+- `llm set-default <provider>` - Set default provider
+- `llm set-model <provider> <model>` - Set model for provider
+- `llm list-models [provider]` - List available models
+
+### Command Options:
+- `analyze --include-suggestions` - Include fix suggestions
+- `generate --context <file>` - Add context files
+- `generate --interactive` - Interactive refinement
+- `complete --max <n>` - Set maximum suggestions
+- `refactor --dry-run` - Preview changes
+- `refactor --diff` - Show diff
+- `refactor --in-place` - Modify in place
+- `refactor --interactive` - Step through changes
+- `refactor --output <file>` - Save to different file
+- `test --include-edge-cases` - Add edge case tests
+- `test --include-property-tests` - Add property tests
+
+### Other:
+- Model switching in REPL (`/model <spec>` works but backend support varies)
+- Per-command model selection via environment variables
+- Caching for analysis results (`--no-cache` flag)
+
+Most core functionality is working, but these advanced features would enhance the user experience when implemented.
 
 ## Next Steps
 
-- Explore [Provider Integration Guide](../developer/provider_integration.md) for adding custom LLM providers
-- Read [Server Administration Guide](../admin/server_setup.md) for production deployment
-- Check [Plugin Development](../developer/plugin_development.md) to extend functionality
-- Review [Performance Tuning](../admin/performance_tuning.md) for optimization strategies
+- Use `rubber_duck repl` for an enhanced interactive experience
+- Explore the [Developer Guides](../developer/) for extending functionality
+- Check server logs if you encounter issues with unimplemented features
 
 ---
 
-*Experience the power of AI-assisted development with dynamic LLM configuration! 🦆*
+*Experience the power of AI-assisted development with RubberDuck! 🦆*
