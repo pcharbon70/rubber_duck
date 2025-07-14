@@ -44,7 +44,6 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
   # File system watcher configuration
   @watcher_name :instruction_file_watcher
   @debounce_interval 500  # milliseconds
-  @batch_invalidation_window 1000  # milliseconds
 
   @type invalidation_reason :: :file_change | :template_dependency | :registry_update | :manual
   @type invalidation_event :: %{
@@ -117,7 +116,7 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
 
   ## GenServer Implementation
 
-  def init(opts) do
+  def init(_opts) do
     # Start file system watcher (handle gracefully if not available)
     watcher_pid = case FileSystem.start_link(
       name: @watcher_name,
@@ -128,7 +127,7 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
         FileSystem.subscribe(@watcher_name)
         pid
       _ -> 
-        Logger.warn("File system watcher not available, manual invalidation only")
+        Logger.warning("File system watcher not available, manual invalidation only")
         nil
     end
 
@@ -203,7 +202,7 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
   end
 
   def handle_info({:file_event, _watcher_pid, :stop}, state) do
-    Logger.warn("File system watcher stopped")
+    Logger.warning("File system watcher stopped")
     {:noreply, state}
   end
 
@@ -212,7 +211,7 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
       nil ->
         {:noreply, state}
         
-      {events, _timer_ref} ->
+      {_events, _timer_ref} ->
         # Process accumulated events
         event = create_invalidation_event(:file_change, file_path, :file_system)
         updated_state = process_invalidation_event(event, state)
@@ -371,7 +370,7 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
     []
   end
 
-  defp update_instruction_registry(file_path) do
+  defp update_instruction_registry(_file_path) do
     # Notify registry of file change for version tracking
     case Registry.get_stats() do
       stats when is_map(stats) ->

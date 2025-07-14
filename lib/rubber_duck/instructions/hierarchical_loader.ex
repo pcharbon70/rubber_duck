@@ -541,7 +541,7 @@ defmodule RubberDuck.Instructions.HierarchicalLoader do
     """)
     
     if stats.total_errors > 0 do
-      Logger.warn("#{stats.total_errors} files failed to load")
+      Logger.warning("#{stats.total_errors} files failed to load")
     end
     
     if stats.conflicts_resolved > 0 do

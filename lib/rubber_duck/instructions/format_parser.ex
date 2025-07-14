@@ -294,16 +294,16 @@ defmodule RubberDuck.Instructions.FormatParser do
     
     cond do
       String.starts_with?(trimmed, "# ") ->
-        {:header, 1, String.slice(trimmed, 2..-1)}
+        {:header, 1, String.slice(trimmed, 2..-1//1)}
         
       String.starts_with?(trimmed, "## ") ->
-        {:header, 2, String.slice(trimmed, 3..-1)}
+        {:header, 2, String.slice(trimmed, 3..-1//1)}
         
       String.starts_with?(trimmed, "- ") ->
-        {:rule, String.slice(trimmed, 2..-1)}
+        {:rule, String.slice(trimmed, 2..-1//1)}
         
       String.starts_with?(trimmed, "* ") ->
-        {:rule, String.slice(trimmed, 2..-1)}
+        {:rule, String.slice(trimmed, 2..-1//1)}
         
       trimmed != "" ->
         {:text, trimmed}
@@ -463,22 +463,22 @@ defmodule RubberDuck.Instructions.FormatParser do
     
     cond do
       String.starts_with?(trimmed, "# ") ->
-        {:header, 1, String.slice(trimmed, 2..-1)}
+        {:header, 1, String.slice(trimmed, 2..-1//1)}
         
       String.starts_with?(trimmed, "## ") ->
-        {:header, 2, String.slice(trimmed, 3..-1)}
+        {:header, 2, String.slice(trimmed, 3..-1//1)}
         
       String.starts_with?(trimmed, "### ") ->
-        {:header, 3, String.slice(trimmed, 4..-1)}
+        {:header, 3, String.slice(trimmed, 4..-1//1)}
         
       String.starts_with?(trimmed, "#### ") ->
-        {:header, 4, String.slice(trimmed, 5..-1)}
+        {:header, 4, String.slice(trimmed, 5..-1//1)}
         
       String.starts_with?(trimmed, "##### ") ->
-        {:header, 5, String.slice(trimmed, 6..-1)}
+        {:header, 5, String.slice(trimmed, 6..-1//1)}
         
       String.starts_with?(trimmed, "###### ") ->
-        {:header, 6, String.slice(trimmed, 7..-1)}
+        {:header, 6, String.slice(trimmed, 7..-1//1)}
         
       true ->
         :not_header

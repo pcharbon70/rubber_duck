@@ -32,7 +32,7 @@ defmodule RubberDuck.Instructions.ContextBridge do
       {:ok, system_prompt} = ContextBridge.get_system_prompt(instructions, context_variables)
   """
 
-  alias RubberDuck.Instructions.{HierarchicalLoader, TemplateProcessor, Registry, Cache}
+  alias RubberDuck.Instructions.{HierarchicalLoader, TemplateProcessor, Registry, FileManager}
   require Logger
 
   @type context_options :: %{
@@ -197,7 +197,7 @@ defmodule RubberDuck.Instructions.ContextBridge do
     end
   end
 
-  defp load_user_global_instructions(user_id) do
+  defp load_user_global_instructions(_user_id) do
     # Load global instructions for specific user
     # This would typically include ~/.rubber_duck.md
     global_paths = [
@@ -222,7 +222,7 @@ defmodule RubberDuck.Instructions.ContextBridge do
       paths
       |> Enum.filter(&File.exists?/1)
       |> Enum.map(fn path ->
-        case Registry.load_instruction_file(path) do
+        case FileManager.load_file(path) do
           {:ok, instruction} -> instruction
           {:error, _reason} -> nil
         end

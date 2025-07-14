@@ -235,11 +235,11 @@ defmodule RubberDuck.Context.InstructionEnhancer do
     # Simple glob-style pattern matching
     cond do
       String.starts_with?(pattern, "*") ->
-        suffix = String.slice(pattern, 1..-1)
+        suffix = String.slice(pattern, 1..-1//1)
         String.ends_with?(file_path, suffix)
         
       String.ends_with?(pattern, "*") ->
-        prefix = String.slice(pattern, 0..-2)
+        prefix = String.slice(pattern, 0..-2//1)
         String.starts_with?(file_path, prefix)
         
       true ->

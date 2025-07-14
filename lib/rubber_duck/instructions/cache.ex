@@ -175,7 +175,7 @@ defmodule RubberDuck.Instructions.Cache do
 
   ## GenServer Implementation
 
-  def init(opts) do
+  def init(_opts) do
     # Create ETS tables with optimized settings
     tables = %{
       parsed: create_cache_table(@parsed_cache_table),
@@ -492,7 +492,7 @@ defmodule RubberDuck.Instructions.Cache do
           end)
           
         _error ->
-          Logger.warn("Failed to list instructions for cache warming")
+          Logger.warning("Failed to list instructions for cache warming")
       end
       
       send(self(), {:cache_warming_complete, root_path})
@@ -558,7 +558,8 @@ defmodule RubberDuck.Instructions.Cache do
   end
 
   defp setup_telemetry() do
-    events = [
+    # Define telemetry events that would be registered
+    _events = [
       [:rubber_duck, :instructions, :cache, :hit],
       [:rubber_duck, :instructions, :cache, :miss],
       [:rubber_duck, :instructions, :cache, :put],

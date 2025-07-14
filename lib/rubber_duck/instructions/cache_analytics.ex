@@ -75,7 +75,7 @@ defmodule RubberDuck.Instructions.CacheAnalytics do
 
   ## GenServer Implementation
 
-  def init(opts) do
+  def init(_opts) do
     state = %{
       metrics_history: [],
       monitoring_active: false,
@@ -180,7 +180,7 @@ defmodule RubberDuck.Instructions.CacheAnalytics do
   defp check_performance_alerts(snapshot) do
     hit_rate = snapshot.performance_data.hit_rate
     if hit_rate < @critical_hit_rate_threshold do
-      Logger.warn("Cache hit rate critically low: #{hit_rate}")
+      Logger.warning("Cache hit rate critically low: #{hit_rate}")
       emit_alert_telemetry(:critical_hit_rate, hit_rate)
     end
   end
