@@ -15,159 +15,159 @@ This document contains the detailed implementation plans for Phases 9-10 of the 
 
 This phase implements a composable markdown-based instruction system for project-specific AI guidance, following patterns established by Claude.md, Cursor rules, and GitHub Copilot instructions. The system leverages Elixir's strengths to provide secure, performant template processing with real-time updates and multi-client support.
 
-### 9.1 Core Template Engine Implementation
+### 9.1 Core Template Engine Implementation ✅
 
 Build the foundation for secure template processing using Solid for user templates and EEx for system templates, with comprehensive safety measures and performance optimization.
 
 #### Tasks:
-- [ ] 9.1.1 Add template engine dependencies:
-  - [ ] 9.1.1.1 Add `solid` for Liquid template processing
-  - [ ] 9.1.1.2 Add `earmark` for markdown rendering
-  - [ ] 9.1.1.3 Add `cachex` for ETS-based caching
-  - [ ] 9.1.1.4 Add `file_system` for file watching
-- [ ] 9.1.2 Create `RubberDuck.Instructions.TemplateProcessor`:
-  - [ ] 9.1.2.1 Implement Solid parser for user templates
-  - [ ] 9.1.2.2 Add EEx processor for system templates
-  - [ ] 9.1.2.3 Build markdown-to-HTML pipeline
-  - [ ] 9.1.2.4 Create template validation system
-- [ ] 9.1.3 Implement variable handling:
-  - [ ] 9.1.3.1 Define standard variable namespace
-  - [ ] 9.1.3.2 Build variable sanitization
-  - [ ] 9.1.3.3 Add variable type checking
-  - [ ] 9.1.3.4 Create variable interpolation
-- [ ] 9.1.4 Build conditional logic support:
-  - [ ] 9.1.4.1 Implement `{% if %}` blocks
-  - [ ] 9.1.4.2 Add `{% unless %}` blocks
-  - [ ] 9.1.4.3 Support `{% case %}` statements
-  - [ ] 9.1.4.4 Enable nested conditionals
-- [ ] 9.1.5 Create template inheritance system:
-  - [ ] 9.1.5.1 Implement `{% include %}` directive
-  - [ ] 9.1.5.2 Add template composition
-  - [ ] 9.1.5.3 Build partial templates
-  - [ ] 9.1.5.4 Support template overrides
-- [ ] 9.1.6 Add metadata processing:
-  - [ ] 9.1.6.1 Parse YAML frontmatter
-  - [ ] 9.1.6.2 Extract rule types and scopes
-  - [ ] 9.1.6.3 Process priority levels
-  - [ ] 9.1.6.4 Handle custom metadata
-- [ ] 9.1.7 Implement error handling:
-  - [ ] 9.1.7.1 Create detailed error messages
-  - [ ] 9.1.7.2 Add line number tracking
-  - [ ] 9.1.7.3 Build error recovery
-  - [ ] 9.1.7.4 Support partial rendering
-- [ ] 9.1.8 Add template debugging tools
-- [ ] 9.1.9 Create template benchmarking
-- [ ] 9.1.10 Build template documentation generator
+- [x] 9.1.1 Add template engine dependencies:
+  - [x] 9.1.1.1 Add `solid` for Liquid template processing
+  - [x] 9.1.1.2 Add `earmark` for markdown rendering
+  - [x] 9.1.1.3 Add `cachex` for ETS-based caching
+  - [x] 9.1.1.4 Add `file_system` for file watching
+- [x] 9.1.2 Create `RubberDuck.Instructions.TemplateProcessor`:
+  - [x] 9.1.2.1 Implement Solid parser for user templates
+  - [x] 9.1.2.2 Add EEx processor for system templates
+  - [x] 9.1.2.3 Build markdown-to-HTML pipeline
+  - [x] 9.1.2.4 Create template validation system
+- [x] 9.1.3 Implement variable handling:
+  - [x] 9.1.3.1 Define standard variable namespace
+  - [x] 9.1.3.2 Build variable sanitization
+  - [x] 9.1.3.3 Add variable type checking
+  - [x] 9.1.3.4 Create variable interpolation
+- [x] 9.1.4 Build conditional logic support:
+  - [x] 9.1.4.1 Implement `{% if %}` blocks
+  - [x] 9.1.4.2 Add `{% unless %}` blocks
+  - [x] 9.1.4.3 Support `{% case %}` statements
+  - [x] 9.1.4.4 Enable nested conditionals
+- [x] 9.1.5 Create template inheritance system:
+  - [x] 9.1.5.1 Implement `{% include %}` directive
+  - [x] 9.1.5.2 Add template composition
+  - [x] 9.1.5.3 Build partial templates
+  - [x] 9.1.5.4 Support template overrides
+- [x] 9.1.6 Add metadata processing:
+  - [x] 9.1.6.1 Parse YAML frontmatter
+  - [x] 9.1.6.2 Extract rule types and scopes
+  - [x] 9.1.6.3 Process priority levels
+  - [x] 9.1.6.4 Handle custom metadata
+- [x] 9.1.7 Implement error handling:
+  - [x] 9.1.7.1 Create detailed error messages
+  - [x] 9.1.7.2 Add line number tracking
+  - [x] 9.1.7.3 Build error recovery
+  - [x] 9.1.7.4 Support partial rendering
+- [x] 9.1.8 Add template debugging tools
+- [x] 9.1.9 Create template benchmarking
+- [x] 9.1.10 Build template documentation generator
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/instructions/template_processor_test.exs` to verify:
-- [ ] 9.1.11 Test Solid template parsing and rendering
-- [ ] 9.1.12 Test EEx template processing with safety
-- [ ] 9.1.13 Test variable interpolation and sanitization
-- [ ] 9.1.14 Test conditional logic evaluation
-- [ ] 9.1.15 Test template inheritance and composition
-- [ ] 9.1.16 Test metadata extraction and validation
-- [ ] 9.1.17 Test error handling and recovery
+- [x] 9.1.11 Test Solid template parsing and rendering
+- [x] 9.1.12 Test EEx template processing with safety
+- [x] 9.1.13 Test variable interpolation and sanitization
+- [x] 9.1.14 Test conditional logic evaluation
+- [x] 9.1.15 Test template inheritance and composition
+- [x] 9.1.16 Test metadata extraction and validation
+- [x] 9.1.17 Test error handling and recovery
 
-### 9.2 Instruction File Management System
+### 9.2 Instruction File Management System ✅
 
 Implement hierarchical file discovery and loading with support for project, workspace, and global instruction files following established naming conventions.
 
 #### Tasks:
-- [ ] 9.2.1 Create `RubberDuck.Instructions.FileManager`:
-  - [ ] 9.2.1.1 Implement file discovery algorithm
-  - [ ] 9.2.1.2 Build priority-based loading
-  - [ ] 9.2.1.3 Add file validation
-  - [ ] 9.2.1.4 Create file indexing
-- [ ] 9.2.2 Support multiple file formats:
-  - [ ] 9.2.2.1 Load `.md` instruction files
-  - [ ] 9.2.2.2 Support `.mdc` metadata files
-  - [ ] 9.2.2.3 Process `RUBBERDUCK.md` format
-  - [ ] 9.2.2.4 Handle `.cursorrules` files
-- [ ] 9.2.3 Implement hierarchical loading:
-  - [ ] 9.2.3.1 Project root RUBBERDUCK.md instructions
-  - [ ] 9.2.3.2 Workspace-level rubber_duck.md rules
-  - [ ] 9.2.3.3 Global default ~/.rubber_duck.md instructions
-  - [ ] 9.2.3.4 Directory-specific overrides
-- [ ] 9.2.4 Build instruction registry:
-  - [ ] 9.2.4.1 Track loaded instructions
-  - [ ] 9.2.4.2 Manage instruction versions
-  - [ ] 9.2.4.3 Handle duplicates
-  - [ ] 9.2.4.4 Support hot reloading
-- [ ] 9.2.5 Create rule type system:
-  - [ ] 9.2.5.1 Always-active rules
-  - [ ] 9.2.5.2 Auto-attached rules
-  - [ ] 9.2.5.3 Agent-requested rules
-  - [ ] 9.2.5.4 Manual activation rules
-- [ ] 9.2.6 Add file size management:
-  - [ ] 9.2.6.1 Enforce size limits (500 lines)
-  - [ ] 9.2.6.2 Split large instructions
-  - [ ] 9.2.6.3 Compress stored content
-  - [ ] 9.2.6.4 Track token counts
-- [ ] 9.2.7 Implement file validation
-- [ ] 9.2.8 Create file migration tools
-- [ ] 9.2.9 Build instruction linting
-- [ ] 9.2.10 Add file backup system
+- [x] 9.2.1 Create `RubberDuck.Instructions.FileManager`:
+  - [x] 9.2.1.1 Implement file discovery algorithm
+  - [x] 9.2.1.2 Build priority-based loading
+  - [x] 9.2.1.3 Add file validation
+  - [x] 9.2.1.4 Create file indexing
+- [x] 9.2.2 Support multiple file formats:
+  - [x] 9.2.2.1 Load `.md` instruction files
+  - [x] 9.2.2.2 Support `.mdc` metadata files
+  - [x] 9.2.2.3 Process `RUBBERDUCK.md` format
+  - [x] 9.2.2.4 Handle `.cursorrules` files
+- [x] 9.2.3 Implement hierarchical loading:
+  - [x] 9.2.3.1 Project root RUBBERDUCK.md instructions
+  - [x] 9.2.3.2 Workspace-level rubber_duck.md rules
+  - [x] 9.2.3.3 Global default ~/.rubber_duck.md instructions
+  - [x] 9.2.3.4 Directory-specific overrides
+- [x] 9.2.4 Build instruction registry:
+  - [x] 9.2.4.1 Track loaded instructions
+  - [x] 9.2.4.2 Manage instruction versions
+  - [x] 9.2.4.3 Handle duplicates
+  - [x] 9.2.4.4 Support hot reloading
+- [x] 9.2.5 Create rule type system:
+  - [x] 9.2.5.1 Always-active rules
+  - [x] 9.2.5.2 Auto-attached rules
+  - [x] 9.2.5.3 Agent-requested rules
+  - [x] 9.2.5.4 Manual activation rules
+- [x] 9.2.6 Add file size management:
+  - [x] 9.2.6.1 Enforce size limits (500 lines)
+  - [x] 9.2.6.2 Split large instructions
+  - [x] 9.2.6.3 Compress stored content
+  - [x] 9.2.6.4 Track token counts
+- [x] 9.2.7 Implement file validation
+- [x] 9.2.8 Create file migration tools
+- [x] 9.2.9 Build instruction linting
+- [x] 9.2.10 Add file backup system
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/instructions/file_manager_test.exs` to verify:
-- [ ] 9.2.11 Test file discovery across hierarchies
-- [ ] 9.2.12 Test priority-based loading order
-- [ ] 9.2.13 Test format compatibility
-- [ ] 9.2.14 Test rule type classification
-- [ ] 9.2.15 Test size limit enforcement
-- [ ] 9.2.16 Test hot reloading functionality
-- [ ] 9.2.17 Test version management
+- [x] 9.2.11 Test file discovery across hierarchies
+- [x] 9.2.12 Test priority-based loading order
+- [x] 9.2.13 Test format compatibility
+- [x] 9.2.14 Test rule type classification
+- [x] 9.2.15 Test size limit enforcement
+- [x] 9.2.16 Test hot reloading functionality
+- [x] 9.2.17 Test version management
 
-### 9.3 Caching & Performance Optimization
+### 9.3 Caching & Performance Optimization ✅
 
 Implement high-performance instruction caching leveraging existing Context.Cache patterns with ETS-based storage, instruction-specific optimizations, and seamless integration with the hierarchical instruction management system.
 
 #### Tasks:
-- [ ] 9.3.1 Create `RubberDuck.Instructions.Cache` based on existing patterns:
-  - [ ] 9.3.1.1 Extend `RubberDuck.Context.Cache` patterns for instructions
-  - [ ] 9.3.1.2 Configure ETS with proven concurrency settings (`{:read_concurrency, true}, {:write_concurrency, true}`)
-  - [ ] 9.3.1.3 Implement adaptive TTL (dev files: 5min, global: 1hr, default: 30min)
-  - [ ] 9.3.1.4 Set up multi-layer caching (parsed content vs compiled templates)
-- [ ] 9.3.2 Implement instruction-specific cache key strategy:
-  - [ ] 9.3.2.1 Build hierarchical keys (scope:file_path:content_hash)
-  - [ ] 9.3.2.2 Include format-specific versioning (markdown, RUBBERDUCK.md, cursorrules)
-  - [ ] 9.3.2.3 Add template compilation state tracking
-  - [ ] 9.3.2.4 Support variable context isolation
-- [ ] 9.3.3 Create intelligent invalidation system:
-  - [ ] 9.3.3.1 File system watcher integration for automatic invalidation
-  - [ ] 9.3.3.2 Hierarchical invalidation (project/workspace/global scope patterns)
-  - [ ] 9.3.3.3 Registry coordination for version-based clearing
-  - [ ] 9.3.3.4 Cascade invalidation for template inheritance chains
-- [ ] 9.3.4 Build intelligent cache warming:
-  - [ ] 9.3.4.1 Pre-compile frequently accessed instruction templates
-  - [ ] 9.3.4.2 Background warming of project-specific instructions on load
-  - [ ] 9.3.4.3 Priority-based warming using instruction registry priority scores
-  - [ ] 9.3.4.4 Adaptive warming based on usage patterns and file modification times
-- [ ] 9.3.5 Implement distributed caching coordination:
-  - [ ] 9.3.5.1 Multi-node cache synchronization using existing patterns
-  - [ ] 9.3.5.2 Instruction registry state replication across nodes
-  - [ ] 9.3.5.3 Conflict resolution for distributed instruction updates
-  - [ ] 9.3.5.4 Partition tolerance for instruction availability
-- [ ] 9.3.6 Add comprehensive performance monitoring:
-  - [ ] 9.3.6.1 Integrate with existing telemetry system for cache metrics
-  - [ ] 9.3.6.2 Track template compilation performance and optimization
-  - [ ] 9.3.6.3 Monitor instruction loading vs cache hit performance gains
-  - [ ] 9.3.6.4 Alert on cache degradation affecting instruction serving
-- [ ] 9.3.7 Create instruction cache analytics integration
-- [ ] 9.3.8 Implement template-specific cache compression
-- [ ] 9.3.9 Build instruction cache backup and restore
-- [ ] 9.3.10 Add cache optimization tools for instruction performance tuning
+- [x] 9.3.1 Create `RubberDuck.Instructions.Cache` based on existing patterns:
+  - [x] 9.3.1.1 Extend `RubberDuck.Context.Cache` patterns for instructions
+  - [x] 9.3.1.2 Configure ETS with proven concurrency settings (`{:read_concurrency, true}, {:write_concurrency, true}`)
+  - [x] 9.3.1.3 Implement adaptive TTL (dev files: 5min, global: 1hr, default: 30min)
+  - [x] 9.3.1.4 Set up multi-layer caching (parsed content vs compiled templates)
+- [x] 9.3.2 Implement instruction-specific cache key strategy:
+  - [x] 9.3.2.1 Build hierarchical keys (scope:file_path:content_hash)
+  - [x] 9.3.2.2 Include format-specific versioning (markdown, RUBBERDUCK.md, cursorrules)
+  - [x] 9.3.2.3 Add template compilation state tracking
+  - [x] 9.3.2.4 Support variable context isolation
+- [x] 9.3.3 Create intelligent invalidation system:
+  - [x] 9.3.3.1 File system watcher integration for automatic invalidation
+  - [x] 9.3.3.2 Hierarchical invalidation (project/workspace/global scope patterns)
+  - [x] 9.3.3.3 Registry coordination for version-based clearing
+  - [x] 9.3.3.4 Cascade invalidation for template inheritance chains
+- [x] 9.3.4 Build intelligent cache warming:
+  - [x] 9.3.4.1 Pre-compile frequently accessed instruction templates
+  - [x] 9.3.4.2 Background warming of project-specific instructions on load
+  - [x] 9.3.4.3 Priority-based warming using instruction registry priority scores
+  - [x] 9.3.4.4 Adaptive warming based on usage patterns and file modification times
+- [x] 9.3.5 Implement distributed caching coordination:
+  - [x] 9.3.5.1 Multi-node cache synchronization using existing patterns
+  - [x] 9.3.5.2 Instruction registry state replication across nodes
+  - [x] 9.3.5.3 Conflict resolution for distributed instruction updates
+  - [x] 9.3.5.4 Partition tolerance for instruction availability
+- [x] 9.3.6 Add comprehensive performance monitoring:
+  - [x] 9.3.6.1 Integrate with existing telemetry system for cache metrics
+  - [x] 9.3.6.2 Track template compilation performance and optimization
+  - [x] 9.3.6.3 Monitor instruction loading vs cache hit performance gains
+  - [x] 9.3.6.4 Alert on cache degradation affecting instruction serving
+- [x] 9.3.7 Create instruction cache analytics integration
+- [x] 9.3.8 Implement template-specific cache compression
+- [x] 9.3.9 Build instruction cache backup and restore
+- [x] 9.3.10 Add cache optimization tools for instruction performance tuning
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/instructions/cache_test.exs` to verify:
-- [ ] 9.3.11 Test cache initialization with existing Context.Cache patterns
-- [ ] 9.3.12 Test hierarchical key generation and format-specific versioning
-- [ ] 9.3.13 Test file-system based invalidation and registry coordination
-- [ ] 9.3.14 Test intelligent cache warming and background pre-compilation
-- [ ] 9.3.15 Test distributed instruction synchronization
-- [ ] 9.3.16 Test performance gains and telemetry integration
-- [ ] 9.3.17 Test multi-layer cache management and adaptive TTL
+- [x] 9.3.11 Test cache initialization with existing Context.Cache patterns
+- [x] 9.3.12 Test hierarchical key generation and format-specific versioning
+- [x] 9.3.13 Test file-system based invalidation and registry coordination
+- [x] 9.3.14 Test intelligent cache warming and background pre-compilation
+- [x] 9.3.15 Test distributed instruction synchronization
+- [x] 9.3.16 Test performance gains and telemetry integration
+- [x] 9.3.17 Test multi-layer cache management and adaptive TTL
 
 ### 9.4 Security-First Template Processing
 
@@ -550,16 +550,22 @@ Create final system tests in `test/integration/complete_system_test.exs` to veri
 4. **Enhanced REPL Interface** - Interactive REPL mode with multi-line input and session persistence
 5. **Chat-Focused TUI Interface** - Modern terminal UI with toggleable panels and chat focus
 6. **System Error Handling** - Tower configuration fixes and comprehensive error management
+7. **Core Template Engine Implementation** (Phase 9.1) - Secure template processing with Solid and EEx
+8. **Instruction File Management System** (Phase 9.2) - Hierarchical loading with RUBBERDUCK.md support
+9. **Caching & Performance Optimization** (Phase 9.3) - Multi-layer ETS caching with intelligent invalidation
+10. **Instruction-Context Integration** - Seamless bridge between instruction and context systems
 
 ### 🚧 In Progress:
 - **TUI Implementation** - ~90% complete, needs syntax highlighting and performance optimizations
 - **LiveView Interface** - Not started, depends on completed command system
+- **Instruction Templating System** (Phase 9) - Core implementation complete, remaining sections pending
 
 ### 📋 Planned:
 - **Conversational AI System** (Phase 6)
 - **Planning Enhancement System** (Phase 7) 
 - **MCP Integration** (Phase 8)
-- **Instruction Templating System** (Phase 9)
+- **Security-First Template Processing** (Phase 9.4)
+- **Client Integration & Real-time Updates** (Phase 9.5)
 - **Production Readiness** (Phase 10)
 
 ### 🔗 Recent Integration Highlights:
@@ -569,3 +575,7 @@ Create final system tests in `test/integration/complete_system_test.exs` to veri
 - Fixed Tower error reporting for improved system stability
 - Implemented comprehensive test coverage for all major systems
 - Created seamless integration between chat interface and command system
+- Renamed all CLAUDE.md references to RUBBERDUCK.md throughout the codebase
+- Integrated instruction system with context building for enhanced AI responses
+- Fixed all compilation warnings in the instructions directory and project-wide
+- Implemented intelligent cache invalidation with file system watching
