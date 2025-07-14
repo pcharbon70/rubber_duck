@@ -233,10 +233,17 @@ defmodule RubberDuck.Context.InstructionEnhancer do
 
   defp matches_pattern?(file_path, pattern) do
     # Simple glob-style pattern matching
-    case pattern do
-      "*" <> suffix -> String.ends_with?(file_path, suffix)
-      prefix <> "*" -> String.starts_with?(file_path, prefix)
-      exact -> file_path == exact
+    cond do
+      String.starts_with?(pattern, "*") ->
+        suffix = String.slice(pattern, 1..-1)
+        String.ends_with?(file_path, suffix)
+        
+      String.ends_with?(pattern, "*") ->
+        prefix = String.slice(pattern, 0..-2)
+        String.starts_with?(file_path, prefix)
+        
+      true ->
+        file_path == pattern
     end
   end
 
