@@ -6,7 +6,7 @@ defmodule RubberDuck.CLIClient.REPLHandler do
   session persistence, and integrated commands.
   """
 
-  alias RubberDuck.CLIClient.{Auth, Client, UnifiedIntegration, ConversationHandler}
+  alias RubberDuck.CLIClient.{Auth, Client, ConversationHandler}
   require Logger
 
   @prompt "rd> "

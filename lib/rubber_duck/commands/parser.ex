@@ -10,7 +10,7 @@ defmodule RubberDuck.Commands.Parser do
   - TUI input
   """
 
-  alias RubberDuck.Commands.{Command, Context}
+  alias RubberDuck.Commands.Command
 
   @doc """
   Parses input from any client type into a standardized Command struct.
@@ -63,7 +63,7 @@ defmodule RubberDuck.Commands.Parser do
   end
 
   # WebSocket message parsing
-  defp parse_websocket_message(%{"event" => event, "payload" => payload} = message, context) do
+  defp parse_websocket_message(%{"event" => event, "payload" => payload} = _message, context) do
     # Handle messages from the WebSocket adapter
     try do
       name = String.to_atom(event)
@@ -142,7 +142,13 @@ defmodule RubberDuck.Commands.Parser do
 
   # TUI input parsing (similar to CLI for now)
   defp parse_tui_input(input, context) when is_list(input) do
-    parse_cli_input(input, context)
+    # Parse as CLI but set client_type to :tui
+    case parse_cli_input(input, context) do
+      {:ok, command} ->
+        {:ok, %{command | client_type: :tui, format: determine_format(command.options, :tui)}}
+      error ->
+        error
+    end
   end
   
   defp parse_tui_input(_, _), do: {:error, "Invalid TUI input format"}

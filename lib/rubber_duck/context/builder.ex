@@ -12,7 +12,9 @@ defmodule RubberDuck.Context.Builder do
           metadata: map(),
           token_count: non_neg_integer(),
           strategy: atom(),
-          sources: list(map())
+          sources: list(map()),
+          instruction_context: map() | nil,
+          instruction_system_prompt: String.t() | nil
         }
 
   @type options :: keyword()
@@ -25,6 +27,9 @@ defmodule RubberDuck.Context.Builder do
   - `:user_id` - User ID for personalization
   - `:session_id` - Session ID for recent context
   - `:query_type` - Type of query (e.g., :completion, :generation, :analysis)
+  - `:project_path` - Project path for instruction loading
+  - `:workspace_path` - Workspace path for instruction scoping
+  - `:enable_instructions` - Whether to load and apply instructions (default: true)
   """
   @callback build(query :: String.t(), options :: options()) ::
               {:ok, context()} | {:error, term()}

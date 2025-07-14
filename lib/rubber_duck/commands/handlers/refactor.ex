@@ -96,7 +96,7 @@ defmodule RubberDuck.Commands.Handlers.Refactor do
     end
   end
 
-  defp handle_refactor_output(original, refactored, file, options) do
+  defp handle_refactor_output(_original, refactored, file, options) do
     dry_run = Map.get(options, :dry_run, false)
     
     if dry_run do

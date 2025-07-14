@@ -6,7 +6,7 @@ defmodule RubberDuck.Commands.Adapters.LiveView do
   the command processor, handling event parsing and response formatting.
   """
 
-  alias RubberDuck.Commands.{Parser, Processor, Command, Context}
+  alias RubberDuck.Commands.{Parser, Processor, Context}
 
   @doc """
   Handle a LiveView event.

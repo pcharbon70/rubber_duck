@@ -15,9 +15,7 @@ defmodule RubberDuck.Instructions.Security do
 
   @max_template_size 50_000
   @max_nesting_depth 10
-  @max_includes 50
   @max_variables 100
-  @max_iterations 1000
 
   @doc """
   Validates a template for security concerns before processing.

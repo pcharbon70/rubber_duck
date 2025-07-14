@@ -255,7 +255,7 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
   end
 
   defp calculate_performance_ratios(sorted_results) do
-    {fastest_name, fastest_result} = List.first(sorted_results)
+    {_fastest_name, fastest_result} = List.first(sorted_results)
     
     sorted_results
     |> Enum.map(fn {name, result} ->
@@ -344,7 +344,7 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
     """
   end
 
-  defp generate_comparison_report(results, comparison) do
+  defp generate_comparison_report(_results, comparison) do
     {fastest_name, fastest_result} = comparison.fastest
     {slowest_name, slowest_result} = comparison.slowest
     

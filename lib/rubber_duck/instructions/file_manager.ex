@@ -10,7 +10,7 @@ defmodule RubberDuck.Instructions.FileManager do
   
   - `.md` - Standard markdown instruction files
   - `.mdc` - Markdown with metadata files  
-  - `claude.md` - Claude-specific instruction format
+  - `RUBBERDUCK.md` - RubberDuck-specific instruction format
   - `.cursorrules` - Cursor IDE rules format
   
   ## Hierarchy Levels
@@ -51,9 +51,9 @@ defmodule RubberDuck.Instructions.FileManager do
 
   # Supported file patterns for instruction discovery
   @instruction_patterns [
-    "claude.md",
-    "CLAUDE.md", 
-    ".claude.md",
+    "RUBBERDUCK.md",
+    "rubber_duck.md", 
+    ".rubber_duck.md",
     "*.cursorrules",
     "instructions.md",
     "rules.md",
@@ -83,7 +83,7 @@ defmodule RubberDuck.Instructions.FileManager do
   ## Examples
   
       iex> FileManager.discover_files("/path/to/project")
-      {:ok, [%{path: "/path/to/project/claude.md", type: :auto, ...}, ...]}
+      {:ok, [%{path: "/path/to/project/RUBBERDUCK.md", type: :auto, ...}, ...]}
       
       iex> FileManager.discover_files("/path", include_global: false)
       {:ok, [...]}
@@ -223,7 +223,7 @@ defmodule RubberDuck.Instructions.FileManager do
   defp maybe_discover_global_files(true, max_file_size) do
     global_paths = [
       Path.expand("~/.config/claude/instructions.md"),
-      Path.expand("~/.claude.md"),
+      Path.expand("~/.rubber_duck.md"),
       Path.expand("~/.cursorrules"),
       "/etc/claude/instructions.md"
     ]
@@ -250,7 +250,7 @@ defmodule RubberDuck.Instructions.FileManager do
         |> Enum.flat_map(fn entry ->
           full_path = Path.join(root_path, entry)
           
-          if File.dir?(full_path) and (follow_symlinks or not File.lstat!(full_path).type == :symlink) do
+          if File.dir?(full_path) and (follow_symlinks or File.lstat!(full_path).type != :symlink) do
             sub_files = find_files_by_patterns(full_path, patterns, max_file_size, follow_symlinks)
             deeper_files = discover_in_subdirectories(full_path, patterns, max_file_size, follow_symlinks, depth + 1)
             sub_files ++ deeper_files
@@ -329,12 +329,16 @@ defmodule RubberDuck.Instructions.FileManager do
     # Boost priority for well-known files
     filename = Path.basename(file_path)
     boost = case filename do
-      "claude.md" -> 100
-      "CLAUDE.md" -> 100
-      ".claude.md" -> 90
+      "RUBBERDUCK.md" -> 100
+      "rubber_duck.md" -> 100
+      ".rubber_duck.md" -> 90
       "instructions.md" -> 80
-      file when String.ends_with?(file, ".cursorrules") -> 70
-      _ -> 0
+      _ -> 
+        if String.ends_with?(filename, ".cursorrules") do
+          70
+        else
+          0
+        end
     end
     
     base + boost

@@ -6,7 +6,7 @@ defmodule RubberDuck.Commands.Adapters.CLI do
   the command processor, handling argument parsing and result formatting.
   """
 
-  alias RubberDuck.Commands.{Parser, Processor, Command, Context}
+  alias RubberDuck.Commands.{Parser, Processor, Context}
 
   @doc """
   Execute a CLI command with the given arguments and options.

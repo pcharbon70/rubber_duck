@@ -96,7 +96,7 @@ defmodule RubberDuck.Instructions.TemplateDebugger do
   """
   @spec trace_execution(String.t(), map()) :: {:ok, [map()]} | {:error, term()}
   def trace_execution(template_content, variables) do
-    steps = []
+    _steps = []
     
     # Step 1: Parse template
     step1 = %{
@@ -117,12 +117,8 @@ defmodule RubberDuck.Instructions.TemplateDebugger do
     end
     
     # Step 3: Analyze blocks
-    step3 = case TemplateInheritance.extract_blocks(template_content) do
-      {:ok, blocks} ->
-        %{step: "blocks", description: "Found #{map_size(blocks)} blocks", blocks: blocks}
-      {:error, error} ->
-        %{step: "blocks", description: "Block extraction failed", error: error}
-    end
+    {:ok, blocks} = TemplateInheritance.extract_blocks(template_content)
+    step3 = %{step: "blocks", description: "Found #{map_size(blocks)} blocks", blocks: blocks}
     
     {:ok, [step1, step2, step3]}
   end
@@ -184,15 +180,13 @@ defmodule RubberDuck.Instructions.TemplateDebugger do
   end
 
   defp extract_blocks_info(content) do
-    case TemplateInheritance.extract_blocks(content) do
-      {:ok, blocks} -> 
-        blocks
-        |> Enum.map(fn {name, content} ->
-          %{name: name, size: String.length(content), lines: count_lines(content)}
-        end)
-      {:error, _} -> 
-        []
-    end
+    {:ok, blocks} = TemplateInheritance.extract_blocks(content)
+    
+    blocks
+    |> Map.to_list()
+    |> Enum.map(fn {name, block_content} ->
+      %{name: name, size: String.length(block_content), lines: count_lines(block_content)}
+    end)
   end
 
   defp extract_includes_info(content) do

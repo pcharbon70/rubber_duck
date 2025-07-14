@@ -7,7 +7,7 @@ defmodule RubberDuck.CLIClient.UnifiedIntegration do
   execution through the unified system.
   """
 
-  # alias RubberDuck.Commands.{Parser, Processor, Context}
+  alias RubberDuck.Commands.{Parser, Processor, Context}
 
   @doc """
   Execute a command through the unified command system.
@@ -185,26 +185,28 @@ defmodule RubberDuck.CLIClient.UnifiedIntegration do
   defp format_response(%{"message" => message, "type" => "llm_connection"}, :plain) do
     message
   end
-  defp format_response(%{"message" => message} = response, :plain) when is_binary(message) do
+  defp format_response(%{"message" => message} = _response, :plain) when is_binary(message) do
     # Handle other message responses (like conversation responses)
     message
   end
   defp format_response(%{"providers" => providers} = data, :plain) do
     # Format LLM status output
-    lines = ["LLM Provider Status:", ""]
+    base_lines = ["LLM Provider Status:", ""]
     
     provider_lines = for provider <- providers do
       status_icon = if provider["status"] == "connected", do: "✓", else: "✗"
       "#{status_icon} #{provider["name"]}: #{provider["status"]} (#{provider["health"]})"
     end
     
-    lines = lines ++ provider_lines
+    all_lines = base_lines ++ provider_lines
     
-    if summary = data["summary"] do
-      lines = lines ++ ["", "Summary: #{summary["connected"]}/#{summary["total"]} connected"]
+    final_lines = if summary = data["summary"] do
+      all_lines ++ ["", "Summary: #{summary["connected"]}/#{summary["total"]} connected"]
+    else
+      all_lines
     end
     
-    Enum.join(lines, "\n")
+    Enum.join(final_lines, "\n")
   end
   defp format_response(response, :json) when is_map(response) or is_list(response) do
     Jason.encode!(response, pretty: true)

@@ -8,7 +8,7 @@ defmodule RubberDuck.Commands.Handlers.LLM do
 
   @behaviour RubberDuck.Commands.Handler
 
-  alias RubberDuck.Commands.{Command, Handler}
+  alias RubberDuck.Commands.Command
   alias RubberDuck.LLM.{ConnectionManager, Config}
   alias RubberDuck.CLIClient.Auth
 

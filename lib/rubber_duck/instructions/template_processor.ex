@@ -18,7 +18,7 @@ defmodule RubberDuck.Instructions.TemplateProcessor do
   """
 
   require Logger
-  alias RubberDuck.Instructions.{TemplateError, SecurityError, Security, TemplateInheritance}
+  alias RubberDuck.Instructions.{Security, TemplateInheritance}
 
   @type template_type :: :user | :system
   @type template_result :: {:ok, String.t()} | {:error, term()}

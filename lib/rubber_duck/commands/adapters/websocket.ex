@@ -6,7 +6,7 @@ defmodule RubberDuck.Commands.Adapters.WebSocket do
   processor, handling message parsing and response formatting.
   """
 
-  alias RubberDuck.Commands.{Parser, Processor, Command, Context}
+  alias RubberDuck.Commands.{Parser, Processor, Context}
 
   @doc """
   Handle a WebSocket command message.

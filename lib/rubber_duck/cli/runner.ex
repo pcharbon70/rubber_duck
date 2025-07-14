@@ -4,7 +4,7 @@ defmodule RubberDuck.CLI.Runner do
   like output formatting, error handling, and progress tracking.
   """
 
-  alias RubberDuck.CLI.Commands
+  alias RubberDuck.Commands.{Command, Context, Processor}
   alias RubberDuck.CLI.Formatter
 
   @doc """
@@ -12,58 +12,66 @@ defmodule RubberDuck.CLI.Runner do
 
   Returns {:ok, output} on success or {:error, reason} on failure.
   """
-  def run(command, args, config) do
-    with {:ok, result} <- execute_command(command, args, config),
+  def run(command_name, args, config) do
+    with {:ok, command} <- build_command(command_name, args, config),
+         {:ok, result} <- Processor.execute(command),
          {:ok, formatted} <- format_output(result, config) do
       output(formatted, config)
       {:ok, formatted}
     end
   end
 
-  defp execute_command(:analyze, args, config) do
-    Commands.Analyze.run(args, config)
-  end
-
-  defp execute_command(:generate, args, config) do
-    Commands.Generate.run(args, config)
-  end
-
-  defp execute_command(:complete, args, config) do
-    Commands.Complete.run(args, config)
-  end
-
-  defp execute_command(:refactor, args, config) do
-    Commands.Refactor.run(args, config)
-  end
-
-  defp execute_command(:test, args, config) do
-    Commands.Test.run(args, config)
-  end
-
-  defp execute_command(:llm, args, config) do
-    # For llm command with nested subcommands, we need to handle it differently
-    # args will have the structure from the nested subcommand
-    case args do
-      %{subcommand: nil} ->
-        # No subcommand specified, default to status
-        Commands.LLM.run(:status, %{}, config)
-
-      %{subcommand: {subcommand, subcommand_args}} ->
-        # Pass the subcommand and its args
-        Commands.LLM.run(subcommand, subcommand_args, config)
-
-      _ ->
-        # Fallback - might be direct args
-        Commands.LLM.run(:status, args, config)
-    end
-  end
-
-  defp execute_command(nil, _args, _config) do
+  defp build_command(nil, _args, _config) do
     {:error, "No command specified. Run with --help for usage information."}
   end
 
-  defp execute_command(unknown, _args, _config) do
+  defp build_command(command_name, args, config) when is_atom(command_name) do
+    # Build context
+    context = %Context{
+      user_id: config[:user_id] || "cli_user",
+      session_id: config[:session_id] || generate_session_id(),
+      permissions: [:read, :write, :execute],
+      metadata: %{source: "cli"}
+    }
+
+    # Handle LLM subcommands
+    {name, subcommand, processed_args} = case command_name do
+      :llm -> handle_llm_subcommand(args)
+      _ -> {command_name, nil, args}
+    end
+
+    command = %Command{
+      name: name,
+      subcommand: subcommand,
+      args: processed_args,
+      options: config,
+      context: context,
+      client_type: :cli,
+      format: config[:format] || :text
+    }
+
+    {:ok, command}
+  end
+
+  defp build_command(unknown, _args, _config) do
     {:error, "Unknown command: #{unknown}"}
+  end
+
+  defp handle_llm_subcommand(args) do
+    case args do
+      %{subcommand: nil} ->
+        {:llm, :status, %{}}
+        
+      %{subcommand: {subcommand, subcommand_args}} ->
+        {:llm, subcommand, subcommand_args}
+        
+      _ ->
+        {:llm, :status, args}
+    end
+  end
+
+  defp generate_session_id do
+    "cli_#{System.system_time(:second)}_#{:rand.uniform(1000)}"
   end
 
   defp format_output(result, config) do

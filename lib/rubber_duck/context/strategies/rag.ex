@@ -10,6 +10,7 @@ defmodule RubberDuck.Context.Strategies.RAG do
 
   alias RubberDuck.Memory
   alias RubberDuck.Embeddings
+  alias RubberDuck.Context.InstructionEnhancer
 
   @default_retrieval_limit 10
 
@@ -21,20 +22,25 @@ defmodule RubberDuck.Context.Strategies.RAG do
 
   @impl true
   def build(query, opts) do
-    user_id = Keyword.get(opts, :user_id)
-    session_id = Keyword.get(opts, :session_id)
-    project_id = Keyword.get(opts, :project_id)
-    max_tokens = Keyword.get(opts, :max_tokens, 4000)
+    # Enhance options with instruction-driven preferences
+    enhanced_opts = InstructionEnhancer.create_enhanced_options(opts)
+    
+    user_id = Keyword.get(enhanced_opts, :user_id)
+    session_id = Keyword.get(enhanced_opts, :session_id)
+    project_id = Keyword.get(enhanced_opts, :project_id)
+    max_tokens = Keyword.get(enhanced_opts, :max_tokens, 4000)
 
     # Generate embedding for the query
     with {:ok, query_embedding} <- Embeddings.Service.generate(query),
          # Retrieve relevant content from all memory tiers
-         {:ok, retrieved_content} <- retrieve_relevant_content(query_embedding, user_id, project_id),
+         {:ok, retrieved_content} <- retrieve_relevant_content(query_embedding, user_id, project_id, enhanced_opts),
          # Get recent interactions for continuity
          {:ok, recent_context} <- get_recent_context(user_id, session_id),
          # Build the RAG context
-         context <- build_rag_context(query, retrieved_content, recent_context, max_tokens) do
-      {:ok, context}
+         base_context <- build_rag_context(query, retrieved_content, recent_context, max_tokens),
+         # Enhance with instruction-driven features
+         enhanced_context <- InstructionEnhancer.enhance_strategy_context(base_context, :rag, enhanced_opts) do
+      {:ok, enhanced_context}
     else
       {:error, reason} -> {:error, reason}
     end
@@ -42,19 +48,31 @@ defmodule RubberDuck.Context.Strategies.RAG do
 
   @impl true
   def estimate_quality(query, opts) do
-    # RAG is excellent for generation and knowledge-based queries
-    cond do
+    # Check if instructions prefer RAG strategy
+    base_quality = cond do
       Keyword.has_key?(opts, :project_id) -> 0.9
       String.contains?(query, ["how", "what", "why", "explain", "generate", "create"]) -> 0.8
       # Longer queries benefit from RAG
       String.length(query) > 50 -> 0.7
       true -> 0.5
     end
+    
+    # Boost quality if instructions prefer this strategy
+    instruction_boost = if Keyword.get(opts, :preferred_strategy) == :rag do
+      0.2
+    else
+      0.0
+    end
+    
+    min(base_quality + instruction_boost, 1.0)
   end
 
   # Private functions
 
-  defp retrieve_relevant_content(query_embedding, user_id, project_id) do
+  defp retrieve_relevant_content(query_embedding, user_id, project_id, opts) do
+    # Get instruction-enhanced retrieval limit
+    retrieval_limit = Keyword.get(opts, :retrieval_limit, @default_retrieval_limit)
+    
     # Retrieve from different sources in parallel
     tasks = [
       Task.async(fn -> retrieve_code_patterns(query_embedding, user_id) end),
@@ -72,7 +90,7 @@ defmodule RubberDuck.Context.Strategies.RAG do
         _ -> []
       end)
       |> rank_by_relevance()
-      |> Enum.take(@default_retrieval_limit)
+      |> Enum.take(retrieval_limit)
 
     {:ok, all_content}
   end
