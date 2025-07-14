@@ -18,11 +18,40 @@ defmodule RubberDuck.Instructions.TemplateProcessor do
   """
 
   require Logger
-  alias RubberDuck.Instructions.{Security, TemplateInheritance}
+  alias RubberDuck.Instructions.{Security, TemplateInheritance, SecurityPipeline}
 
   @type template_type :: :user | :system
   @type template_result :: {:ok, String.t()} | {:error, term()}
   @type metadata :: map()
+  
+  @doc """
+  Process a template through the security pipeline.
+  
+  This is the recommended way to process user-provided templates as it includes:
+  - Rate limiting
+  - Advanced security validation
+  - Sandboxed execution
+  - Audit logging
+  - Real-time monitoring
+  
+  ## Options
+  
+  Same as `process_template/3` plus:
+  - `:user_id` - User identifier for rate limiting and auditing
+  - `:session_id` - Session identifier
+  - `:ip_address` - IP address for audit logging
+  - `:security_level` - Security level (:strict, :balanced, :relaxed)
+  """
+  @spec process_template_secure(String.t(), map(), keyword()) :: template_result()
+  def process_template_secure(template_content, variables \\ %{}, opts \\ []) do
+    # Use SecurityPipeline for user templates
+    if Keyword.get(opts, :type, :user) == :user do
+      SecurityPipeline.process(template_content, variables, opts)
+    else
+      # System templates bypass security pipeline but still get basic validation
+      process_template(template_content, variables, opts)
+    end
+  end
 
   @doc """
   Processes a template string with the given variables and options.

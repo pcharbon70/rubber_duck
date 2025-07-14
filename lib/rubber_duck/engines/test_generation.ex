@@ -307,7 +307,7 @@ defmodule RubberDuck.Engines.TestGeneration do
   defp format_test_plan(plan) do
     sections = []
 
-    if length(plan.test_cases) > 0 do
+    sections = if length(plan.test_cases) > 0 do
       cases =
         Enum.map(plan.test_cases, fn tc ->
           "  - #{tc.description}"
@@ -315,10 +315,14 @@ defmodule RubberDuck.Engines.TestGeneration do
         |> Enum.join("\n")
 
       sections ++ ["Test cases:\n#{cases}"]
+    else
+      sections
     end
 
-    if length(plan.fixtures_needed) > 0 do
+    sections = if length(plan.fixtures_needed) > 0 do
       sections ++ ["Fixtures needed: #{Enum.join(plan.fixtures_needed, ", ")}"]
+    else
+      sections
     end
 
     Enum.join(sections, "\n\n")

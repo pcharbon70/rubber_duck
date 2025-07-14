@@ -46,6 +46,8 @@ defmodule RubberDuck.Memory.Knowledge do
     end
 
     update :increment_usage do
+      require_atomic? false
+      
       accept []
 
       change increment(:usage_count)

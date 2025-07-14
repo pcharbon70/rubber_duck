@@ -322,12 +322,16 @@ defmodule RubberDuck.Engines.Refactoring do
     # Rule-based fallback suggestions
     suggestions = []
 
-    if analysis.complexity.max_nesting > 3 do
+    suggestions = if analysis.complexity.max_nesting > 3 do
       suggestions ++ ["Reduce nesting by extracting functions or using guard clauses"]
+    else
+      suggestions
     end
 
-    if :long_parameter_list in analysis.code_smells do
+    suggestions = if :long_parameter_list in analysis.code_smells do
       suggestions ++ ["Consider using a configuration struct instead of many parameters"]
+    else
+      suggestions
     end
 
     {:ok,
