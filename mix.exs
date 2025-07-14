@@ -87,7 +87,13 @@ defmodule RubberDuck.MixProject do
 
       # WebSocket client dependencies for standalone CLI
       {:phoenix_gen_socket_client, "~> 4.0"},
-      {:websocket_client, "~> 1.5"}
+      {:websocket_client, "~> 1.5"},
+
+      # Template engine dependencies
+      {:solid, "~> 1.0.1"},
+      {:earmark, "~> 1.4.48"},
+      {:cachex, "~> 4.1.1"},
+      {:file_system, "~> 1.1.0"}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
