@@ -142,7 +142,13 @@ defmodule RubberDuck.Commands.Parser do
 
   # TUI input parsing (similar to CLI for now)
   defp parse_tui_input(input, context) when is_list(input) do
-    parse_cli_input(input, context)
+    # Parse as CLI but set client_type to :tui
+    case parse_cli_input(input, context) do
+      {:ok, command} ->
+        {:ok, %{command | client_type: :tui, format: determine_format(command.options, :tui)}}
+      error ->
+        error
+    end
   end
   
   defp parse_tui_input(_, _), do: {:error, "Invalid TUI input format"}
