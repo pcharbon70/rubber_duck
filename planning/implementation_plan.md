@@ -7,7 +7,8 @@ RubberDuck is an Elixir-based AI coding assistant system built with the Ash Fram
 This document provides the high-level overview and status tracking for the RubberDuck implementation. Detailed implementation plans for each phase are available in separate documents:
 
 - **[Phases 1-4](implementation_part_1.md)**: Foundation, Engine System, LLM Integration, and Workflow Orchestration
-- **[Phases 5-8](implementation_part_2.md)**: Real-time Communication, Planning System, MCP Integration, and Production Readiness
+- **[Phases 5-8](implementation_part_2.md)**: Real-time Communication, Conversational AI, Planning System, and MCP Integration
+- **[Phases 9-10](implementation_part_3.md)**: Instruction Templating System and Production Readiness
 
 ## Implementation Status
 
@@ -23,9 +24,11 @@ This document provides the high-level overview and status tracking for the Rubbe
 | **Phase 3** | LLM Integration & Memory System | ✅ 100% Complete | [View Details](implementation_part_1.md#phase-3-llm-integration--memory-system) |
 | **Phase 4** | Workflow Orchestration & Analysis | ✅ 100% Complete | [View Details](implementation_part_1.md#phase-4-workflow-orchestration--analysis) |
 | **Phase 5** | Real-time Communication & UI | 🔧 ~40% Complete | [View Details](implementation_part_2.md#phase-5-real-time-communication--ui) |
-| **Phase 6** | Planning Enhancement System | 🔲 0% Complete | [View Details](implementation_part_2.md#phase-6-planning-enhancement-system) |
-| **Phase 7** | MCP (Model Context Protocol) Integration | 🔲 0% Complete | [View Details](implementation_part_2.md#phase-7-mcp-model-context-protocol-integration) |
-| **Phase 8** | Advanced Features & Production Readiness | 🔲 0% Complete | [View Details](implementation_part_2.md#phase-8-advanced-features--production-readiness) |
+| **Phase 6** | Conversational AI System | 🔲 0% Complete | [View Details](implementation_part_2.md#phase-6-conversational-ai-system) |
+| **Phase 7** | Planning Enhancement System | 🔲 0% Complete | [View Details](implementation_part_2.md#phase-7-planning-enhancement-system) |
+| **Phase 8** | MCP (Model Context Protocol) Integration | 🔲 0% Complete | [View Details](implementation_part_2.md#phase-8-mcp-model-context-protocol-integration) |
+| **Phase 9** | Instruction Templating System | 🔲 0% Complete | [View Details](implementation_part_3.md#phase-9-instruction-templating-system) |
+| **Phase 10** | Advanced Features & Production Readiness | 🔲 0% Complete | [View Details](implementation_part_3.md#phase-10-advanced-features--production-readiness) |
 
 ### Recent Completions
 
@@ -70,7 +73,7 @@ This document provides the high-level overview and status tracking for the Rubbe
    - Dynamic workflow generation
    - Hybrid engine-workflow architecture
 
-### In-Progress and Future Phases (5-7)
+### In-Progress and Future Phases (5-10)
 
 5. **Phase 5: Real-time Communication & UI** ([Details](implementation_part_2.md#phase-5-real-time-communication--ui))
    - ✅ WebSocket CLI Client (completed)
@@ -78,24 +81,36 @@ This document provides the high-level overview and status tracking for the Rubbe
    - 🔲 Phoenix Channels and LiveView interface
    - 🔧 Terminal UI with Go and Bubble Tea (~90% complete)
 
-6. **Phase 6: Planning Enhancement System** ([Details](implementation_part_2.md#phase-6-planning-enhancement-system))
+6. **Phase 6: Conversational AI System** ([Details](implementation_part_2.md#phase-6-conversational-ai-system))
+   - Memory-enhanced conversation engine
+   - Multi-client Phoenix Channel architecture
+   - Conversational context management
+   - Command-chat hybrid interface
+
+7. **Phase 7: Planning Enhancement System** ([Details](implementation_part_2.md#phase-7-planning-enhancement-system))
    - LLM-Modulo framework implementation
    - Critics system (hard and soft critics)
    - ReAct-based execution
    - Repository-level planning
 
-7. **Phase 7: MCP (Model Context Protocol) Integration** ([Details](implementation_part_2.md#phase-7-mcp-model-context-protocol-integration))
+8. **Phase 8: MCP (Model Context Protocol) Integration** ([Details](implementation_part_2.md#phase-8-mcp-model-context-protocol-integration))
    - MCP client implementation with Hermes MCP
    - MCP server to expose RubberDuck capabilities
    - Tool registry and capability-based discovery
    - Integration with existing systems
    - Security and performance optimizations
 
-8. **Phase 8: Advanced Features & Production Readiness** ([Details](implementation_part_2.md#phase-8-advanced-features--production-readiness))
-   - Background job processing with Oban
-   - Security implementation
-   - Monitoring and observability
-   - Deployment and scaling strategies
+9. **Phase 9: Instruction Templating System** ([Details](implementation_part_3.md#phase-9-instruction-templating-system))
+   - Composable markdown-based instruction system
+   - Secure template processing with Solid
+   - Hierarchical file management
+   - Real-time updates and caching
+
+10. **Phase 10: Advanced Features & Production Readiness** ([Details](implementation_part_3.md#phase-10-advanced-features--production-readiness))
+    - Background job processing with Oban
+    - Security implementation
+    - Monitoring and observability
+    - Deployment and scaling strategies
 
 ## Technical Innovation Highlights
 
