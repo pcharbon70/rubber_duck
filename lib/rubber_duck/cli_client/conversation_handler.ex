@@ -232,7 +232,10 @@ defmodule RubberDuck.CLIClient.ConversationHandler do
     }
   end
 
-  @doc false
+  @doc """
+  Extracts conversation ID from a response text.
+  Used by both ConversationHandler and REPLHandler.
+  """
   def extract_conversation_id(response) do
     # Try to extract ID from response text
     case Regex.run(~r/ID:\s*([a-f0-9-]+)/i, response) do
