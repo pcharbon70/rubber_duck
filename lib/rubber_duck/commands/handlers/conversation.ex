@@ -35,7 +35,7 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
   end
 
   @impl true
-  def execute(%Command{name: :conversation, subcommand: :list, context: context}) do
+  def execute(%Command{name: :conversation, subcommand: :list, context: context, format: format}) do
     try do
       # Handle context that might be wrapped in {:ok, context} tuple
       actual_context = case context do
@@ -44,7 +44,7 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
       end
       
       conversations = Conversations.list_user_conversations!(%{user_id: actual_context.user_id})
-      format_conversation_list(conversations, :text)
+      format_conversation_list(conversations, format)
     rescue
       error -> 
         {:error, "Failed to list conversations: #{inspect(error)}"}
@@ -649,7 +649,7 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
     {:ok, "No conversations found."}
   end
 
-  defp format_conversation_list(conversations, :json) do
+  defp format_conversation_list(conversations, :json) when is_list(conversations) do
     conversation_data = Enum.map(conversations, fn conv ->
       %{
         id: conv.id,
