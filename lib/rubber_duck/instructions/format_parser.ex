@@ -5,7 +5,7 @@ defmodule RubberDuck.Instructions.FormatParser do
   Supports multiple instruction file formats including:
   - Standard Markdown (.md)
   - Markdown with metadata (.mdc)
-  - Claude-specific format (claude.md)
+  - RubberDuck-specific format (RUBBERDUCK.md)
   - Cursor IDE rules (.cursorrules)
   
   Provides format detection, content extraction, and normalization
@@ -14,7 +14,7 @@ defmodule RubberDuck.Instructions.FormatParser do
 
   alias RubberDuck.Instructions.TemplateProcessor
 
-  @type format :: :markdown | :claude_md | :cursorrules | :mdc
+  @type format :: :markdown | :rubberduck_md | :cursorrules | :mdc
   @type parsed_content :: %{
     format: format(),
     metadata: map(),
@@ -50,7 +50,7 @@ defmodule RubberDuck.Instructions.FormatParser do
   def parse_content(content, format) do
     case format do
       :markdown -> parse_markdown(content)
-      :claude_md -> parse_claude_md(content)
+      :rubberduck_md -> parse_rubberduck_md(content)
       :cursorrules -> parse_cursorrules(content)
       :mdc -> parse_mdc(content)
       _ -> {:error, {:unsupported_format, format}}
@@ -68,10 +68,10 @@ defmodule RubberDuck.Instructions.FormatParser do
     format = cond do
       String.ends_with?(filename, ".cursorrules") -> :cursorrules
       extension == ".mdc" -> :mdc
-      filename in ["claude.md", "CLAUDE.md", ".claude.md"] -> :claude_md
+      filename in ["RUBBERDUCK.md", "rubber_duck.md", ".rubber_duck.md"] -> :rubberduck_md
       extension == ".md" -> :markdown
       has_cursorrules_markers?(content) -> :cursorrules
-      has_claude_markers?(content) -> :claude_md
+      has_rubberduck_markers?(content) -> :rubberduck_md
       true -> :markdown
     end
     
@@ -113,15 +113,15 @@ defmodule RubberDuck.Instructions.FormatParser do
     end
   end
 
-  defp parse_claude_md(content) do
-    # Claude.md format often has specific sections and conventions
+  defp parse_rubberduck_md(content) do
+    # RUBBERDUCK.md format often has specific sections and conventions
     case TemplateProcessor.extract_metadata(content) do
       {:ok, metadata, markdown_content} ->
-        sections = extract_claude_sections(markdown_content)
-        enhanced_metadata = enhance_claude_metadata(metadata, sections)
+        sections = extract_rubberduck_sections(markdown_content)
+        enhanced_metadata = enhance_rubberduck_metadata(metadata, sections)
         
         {:ok, %{
-          format: :claude_md,
+          format: :rubberduck_md,
           metadata: enhanced_metadata,
           content: markdown_content,
           sections: sections
@@ -185,16 +185,17 @@ defmodule RubberDuck.Instructions.FormatParser do
     Enum.any?(cursorrules_patterns, &Regex.match?(&1, content))
   end
 
-  defp has_claude_markers?(content) do
-    # Check for Claude-specific patterns
-    claude_patterns = [
+  defp has_rubberduck_markers?(content) do
+    # Check for RubberDuck-specific patterns
+    rubberduck_patterns = [
       ~r/## About me/mi,
       ~r/CRITICAL RULES/mi,
       ~r/ABSOLUTE RULE/mi,
-      ~r/## Response Guidelines/mi
+      ~r/## Response Guidelines/mi,
+      ~r/# RubberDuck/mi
     ]
     
-    Enum.any?(claude_patterns, &Regex.match?(&1, content))
+    Enum.any?(rubberduck_patterns, &Regex.match?(&1, content))
   end
 
   defp extract_markdown_sections(content) do
@@ -250,21 +251,22 @@ defmodule RubberDuck.Instructions.FormatParser do
     Enum.reverse(final_sections)
   end
 
-  defp extract_claude_sections(content) do
-    # Enhanced section extraction for Claude.md format
+  defp extract_rubberduck_sections(content) do
+    # Enhanced section extraction for RUBBERDUCK.md format
     sections = extract_markdown_sections(content)
     
-    # Enhance with Claude-specific section types
+    # Enhance with RubberDuck-specific section types
     Enum.map(sections, fn section ->
-      enhanced_type = case String.downcase(section.title) do
-        title when title =~ "critical rules" -> :critical_rules
-        title when title =~ "absolute rule" -> :absolute_rule
-        title when title =~ "about me" -> :context
-        title when title =~ "communication" -> :communication_rules
-        title when title =~ "response" -> :response_guidelines
-        title when title =~ "workflow" -> :workflow_rules
-        title when title =~ "hierarchy" -> :rule_hierarchy
-        _ -> section.type
+      title_lower = String.downcase(section.title)
+      enhanced_type = cond do
+        String.contains?(title_lower, "critical rules") -> :critical_rules
+        String.contains?(title_lower, "absolute rule") -> :absolute_rule
+        String.contains?(title_lower, "about me") -> :context
+        String.contains?(title_lower, "communication") -> :communication_rules
+        String.contains?(title_lower, "response") -> :response_guidelines
+        String.contains?(title_lower, "workflow") -> :workflow_rules
+        String.contains?(title_lower, "hierarchy") -> :rule_hierarchy
+        true -> section.type
       end
       
       %{section | type: enhanced_type}
@@ -428,12 +430,12 @@ defmodule RubberDuck.Instructions.FormatParser do
     |> Enum.join("\n")
   end
 
-  defp enhance_claude_metadata(metadata, sections) do
-    # Enhance metadata based on Claude.md content analysis
+  defp enhance_rubberduck_metadata(metadata, sections) do
+    # Enhance metadata based on RUBBERDUCK.md content analysis
     critical_sections = Enum.filter(sections, &(&1.type == :critical_rules))
     
     enhanced = Map.merge(metadata, %{
-      "format" => "claude_md",
+      "format" => "rubberduck_md",
       "has_critical_rules" => length(critical_sections) > 0,
       "section_count" => length(sections)
     })

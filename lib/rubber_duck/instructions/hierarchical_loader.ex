@@ -17,9 +17,9 @@ defmodule RubberDuck.Instructions.HierarchicalLoader do
   ## Hierarchy Levels (in priority order)
   
   1. **Directory-specific** - `./.instructions/`, `./instructions/`
-  2. **Project root** - `./claude.md`, `./instructions.md`, etc.
+  2. **Project root** - `./RUBBERDUCK.md`, `./instructions.md`, etc.
   3. **Workspace** - `.vscode/`, `.idea/` instructions
-  4. **Global** - `~/.claude.md`, `/etc/claude/`, etc.
+  4. **Global** - `~/.rubber_duck.md`, `/etc/rubberduck/`, etc.
   
   ## Conflict Resolution
   
@@ -214,9 +214,9 @@ defmodule RubberDuck.Instructions.HierarchicalLoader do
 
   defp discover_project_instructions(root_path) do
     patterns = [
-      "claude.md",
-      "CLAUDE.md",
-      ".claude.md",
+      "RUBBERDUCK.md",
+      "rubber_duck.md",
+      ".rubber_duck.md",
       "instructions.md",
       "rules.md",
       "*.cursorrules"
@@ -244,11 +244,11 @@ defmodule RubberDuck.Instructions.HierarchicalLoader do
   defp discover_global_instructions do
     global_paths = [
       Path.expand("~/.config/claude/instructions.md"),
-      Path.expand("~/.config/claude/claude.md"),
-      Path.expand("~/.claude.md"),
+      Path.expand("~/.config/rubberduck/RUBBERDUCK.md"),
+      Path.expand("~/.rubber_duck.md"),
       Path.expand("~/.cursorrules"),
       "/etc/claude/instructions.md",
-      "/etc/claude/claude.md"
+      "/etc/rubberduck/RUBBERDUCK.md"
     ]
     
     existing_files = 
@@ -588,7 +588,7 @@ defmodule RubberDuck.Instructions.HierarchicalLoader do
     
     # Check for missing critical files
     recommendations = if not has_project_instructions?(result) do
-      ["Consider adding a claude.md or instructions.md file in the project root" | recommendations]
+      ["Consider adding a RUBBERDUCK.md or instructions.md file in the project root" | recommendations]
     else
       recommendations
     end

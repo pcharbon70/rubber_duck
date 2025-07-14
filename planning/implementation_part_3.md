@@ -82,12 +82,12 @@ Implement hierarchical file discovery and loading with support for project, work
 - [ ] 9.2.2 Support multiple file formats:
   - [ ] 9.2.2.1 Load `.md` instruction files
   - [ ] 9.2.2.2 Support `.mdc` metadata files
-  - [ ] 9.2.2.3 Process `claude.md` format
+  - [ ] 9.2.2.3 Process `RUBBERDUCK.md` format
   - [ ] 9.2.2.4 Handle `.cursorrules` files
 - [ ] 9.2.3 Implement hierarchical loading:
-  - [ ] 9.2.3.1 Project root instructions
-  - [ ] 9.2.3.2 Workspace-level rules
-  - [ ] 9.2.3.3 Global default instructions
+  - [ ] 9.2.3.1 Project root RUBBERDUCK.md instructions
+  - [ ] 9.2.3.2 Workspace-level rubber_duck.md rules
+  - [ ] 9.2.3.3 Global default ~/.rubber_duck.md instructions
   - [ ] 9.2.3.4 Directory-specific overrides
 - [ ] 9.2.4 Build instruction registry:
   - [ ] 9.2.4.1 Track loaded instructions
@@ -131,7 +131,7 @@ Implement high-performance instruction caching leveraging existing Context.Cache
   - [ ] 9.3.1.4 Set up multi-layer caching (parsed content vs compiled templates)
 - [ ] 9.3.2 Implement instruction-specific cache key strategy:
   - [ ] 9.3.2.1 Build hierarchical keys (scope:file_path:content_hash)
-  - [ ] 9.3.2.2 Include format-specific versioning (markdown, claude.md, cursorrules)
+  - [ ] 9.3.2.2 Include format-specific versioning (markdown, RUBBERDUCK.md, cursorrules)
   - [ ] 9.3.2.3 Add template compilation state tracking
   - [ ] 9.3.2.4 Support variable context isolation
 - [ ] 9.3.3 Create intelligent invalidation system:

@@ -9,6 +9,7 @@ defmodule RubberDuck.Context.Strategies.LongContext do
   @behaviour RubberDuck.Context.Builder
 
   alias RubberDuck.Memory
+  alias RubberDuck.Context.InstructionEnhancer
 
   @impl true
   def name(), do: :long_context
@@ -18,19 +19,22 @@ defmodule RubberDuck.Context.Strategies.LongContext do
 
   @impl true
   def build(query, opts) do
-    user_id = Keyword.get(opts, :user_id)
-    session_id = Keyword.get(opts, :session_id)
-    project_id = Keyword.get(opts, :project_id)
+    # Enhance options with instruction-driven preferences
+    enhanced_opts = InstructionEnhancer.create_enhanced_options(opts)
+    
+    user_id = Keyword.get(enhanced_opts, :user_id)
+    session_id = Keyword.get(enhanced_opts, :session_id)
+    project_id = Keyword.get(enhanced_opts, :project_id)
     # Default for long context models
-    max_tokens = Keyword.get(opts, :max_tokens, 32000)
-    files = Keyword.get(opts, :files, [])
+    max_tokens = Keyword.get(enhanced_opts, :max_tokens, 32000)
+    files = Keyword.get(enhanced_opts, :files, [])
 
     # Build comprehensive context
     with {:ok, user_profile} <- get_user_profile(user_id),
          {:ok, conversation_history} <- get_conversation_history(user_id, session_id),
          {:ok, project_context} <- get_project_context(user_id, project_id),
          {:ok, file_contents} <- get_file_contents(files),
-         context <-
+         base_context <-
            build_long_context(
              query,
              user_profile,
@@ -38,8 +42,10 @@ defmodule RubberDuck.Context.Strategies.LongContext do
              project_context,
              file_contents,
              max_tokens
-           ) do
-      {:ok, context}
+           ),
+         # Enhance with instruction-driven features
+         enhanced_context <- InstructionEnhancer.enhance_strategy_context(base_context, :long_context, enhanced_opts) do
+      {:ok, enhanced_context}
     else
       {:error, reason} -> {:error, reason}
       _ -> {:error, :context_building_failed}
@@ -49,7 +55,7 @@ defmodule RubberDuck.Context.Strategies.LongContext do
   @impl true
   def estimate_quality(query, opts) do
     # Long context is best for complex, multi-file operations
-    cond do
+    base_quality = cond do
       # Model supports long context
       Keyword.get(opts, :max_tokens, 4000) >= 16000 -> 0.9
       # Multi-file operation
@@ -57,6 +63,15 @@ defmodule RubberDuck.Context.Strategies.LongContext do
       String.contains?(query, ["architecture", "refactor", "analyze", "document"]) -> 0.7
       true -> 0.4
     end
+    
+    # Boost quality if instructions prefer this strategy
+    instruction_boost = if Keyword.get(opts, :preferred_strategy) == :long_context do
+      0.2
+    else
+      0.0
+    end
+    
+    min(base_quality + instruction_boost, 1.0)
   end
 
   # Private functions

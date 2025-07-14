@@ -9,6 +9,7 @@ defmodule RubberDuck.Context.Strategies.FIM do
   @behaviour RubberDuck.Context.Builder
 
   alias RubberDuck.Memory
+  alias RubberDuck.Context.InstructionEnhancer
 
   @default_prefix_tokens 1500
   @default_suffix_tokens 500
@@ -21,11 +22,14 @@ defmodule RubberDuck.Context.Strategies.FIM do
 
   @impl true
   def build(_query, opts) do
-    user_id = Keyword.get(opts, :user_id)
-    session_id = Keyword.get(opts, :session_id)
-    max_tokens = Keyword.get(opts, :max_tokens, 4000)
-    cursor_position = Keyword.get(opts, :cursor_position, 0)
-    file_content = Keyword.get(opts, :file_content, "")
+    # Enhance options with instruction-driven preferences
+    enhanced_opts = InstructionEnhancer.create_enhanced_options(opts)
+    
+    user_id = Keyword.get(enhanced_opts, :user_id)
+    session_id = Keyword.get(enhanced_opts, :session_id)
+    max_tokens = Keyword.get(enhanced_opts, :max_tokens, 4000)
+    cursor_position = Keyword.get(enhanced_opts, :cursor_position, 0)
+    file_content = Keyword.get(enhanced_opts, :file_content, "")
 
     # Extract prefix and suffix around cursor
     {prefix, suffix} = split_at_cursor(file_content, cursor_position)
@@ -34,9 +38,12 @@ defmodule RubberDuck.Context.Strategies.FIM do
     recent_context = get_recent_context(user_id, session_id)
 
     # Build FIM prompt
-    context = build_fim_context(prefix, suffix, recent_context, max_tokens)
+    base_context = build_fim_context(prefix, suffix, recent_context, max_tokens)
+    
+    # Enhance with instruction-driven features
+    enhanced_context = InstructionEnhancer.enhance_strategy_context(base_context, :fim, enhanced_opts)
 
-    {:ok, context}
+    {:ok, enhanced_context}
   rescue
     e ->
       {:error, e}
@@ -45,11 +52,20 @@ defmodule RubberDuck.Context.Strategies.FIM do
   @impl true
   def estimate_quality(query, opts) do
     # FIM is best for completion queries with cursor position
-    cond do
+    base_quality = cond do
       Keyword.has_key?(opts, :cursor_position) -> 0.9
       String.contains?(query, ["complete", "finish", "continue"]) -> 0.7
       true -> 0.3
     end
+    
+    # Boost quality if instructions prefer this strategy
+    instruction_boost = if Keyword.get(opts, :preferred_strategy) == :fim do
+      0.2
+    else
+      0.0
+    end
+    
+    min(base_quality + instruction_boost, 1.0)
   end
 
   # Private functions

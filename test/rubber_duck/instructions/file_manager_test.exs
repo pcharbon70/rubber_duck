@@ -18,35 +18,35 @@ defmodule RubberDuck.Instructions.FileManagerTest do
   describe "discover_files/2" do
     test "discovers instruction files in project root", %{tmp_dir: tmp_dir} do
       # Create test files
-      claude_md = Path.join(tmp_dir, "claude.md")
+      rubberduck_md = Path.join(tmp_dir, "RUBBERDUCK.md")
       instructions_md = Path.join(tmp_dir, "instructions.md")
       
-      File.write!(claude_md, "# Claude Instructions\nTest content")
+      File.write!(rubberduck_md, "# RubberDuck Instructions\nTest content")
       File.write!(instructions_md, "# Instructions\nOther content")
       
       {:ok, files} = FileManager.discover_files(tmp_dir, include_global: false)
       
       file_paths = Enum.map(files, & &1.path)
-      assert claude_md in file_paths
+      assert rubberduck_md in file_paths
       assert instructions_md in file_paths
       assert length(files) == 2
     end
     
     test "respects priority ordering", %{tmp_dir: tmp_dir} do
       # Create files with different priorities
-      claude_md = Path.join(tmp_dir, "claude.md")
+      rubberduck_md = Path.join(tmp_dir, "RUBBERDUCK.md")
       other_md = Path.join(tmp_dir, "other.md")
       
-      File.write!(claude_md, "# Claude")
+      File.write!(rubberduck_md, "# RubberDuck")
       File.write!(other_md, "# Other")
       
       {:ok, files} = FileManager.discover_files(tmp_dir, include_global: false)
       
-      # claude.md should have higher priority
-      claude_file = Enum.find(files, &(&1.path == claude_md))
+      # RUBBERDUCK.md should have higher priority
+      rubberduck_file = Enum.find(files, &(&1.path == rubberduck_md))
       other_file = Enum.find(files, &(&1.path == other_md))
       
-      assert claude_file.priority > other_file.priority
+      assert rubberduck_file.priority > other_file.priority
     end
     
     test "discovers files in subdirectories", %{tmp_dir: tmp_dir} do
@@ -165,17 +165,17 @@ defmodule RubberDuck.Instructions.FileManagerTest do
       """
       File.write!(high_file, high_content)
       
-      # Test claude.md boost
-      claude_file = Path.join(tmp_dir, "claude.md")
-      claude_content = "# Claude Instructions"
-      File.write!(claude_file, claude_content)
+      # Test RUBBERDUCK.md boost
+      rubberduck_file = Path.join(tmp_dir, "RUBBERDUCK.md")
+      rubberduck_content = "# RubberDuck Instructions"
+      File.write!(rubberduck_file, rubberduck_content)
       
       {:ok, high_instruction} = FileManager.load_file(high_file)
-      {:ok, claude_instruction} = FileManager.load_file(claude_file)
+      {:ok, rubberduck_instruction} = FileManager.load_file(rubberduck_file)
       
       # Both should have elevated priority
       assert high_instruction.priority > 1000  # Base + metadata boost
-      assert claude_instruction.priority > 1000  # Base + filename boost
+      assert rubberduck_instruction.priority > 1000  # Base + filename boost
     end
     
     test "handles file read errors gracefully", %{tmp_dir: tmp_dir} do
@@ -247,7 +247,7 @@ defmodule RubberDuck.Instructions.FileManagerTest do
     test "returns statistics for discovered files", %{tmp_dir: tmp_dir} do
       # Create multiple files
       files = [
-        {"claude.md", "# Claude\nContent 1"},
+        {"RUBBERDUCK.md", "# RubberDuck\nContent 1"},
         {"instructions.md", "# Instructions\nContent 2"},
         {"rules.md", "# Rules\nContent 3"}
       ]
@@ -323,16 +323,16 @@ defmodule RubberDuck.Instructions.FileManagerTest do
       assert Enum.any?(files, &(&1.path == file_path))
     end
     
-    test "supports claude.md specifically", %{tmp_dir: tmp_dir} do
-      file_path = Path.join(tmp_dir, "claude.md")
-      File.write!(file_path, "# Claude Instructions")
+    test "supports RUBBERDUCK.md specifically", %{tmp_dir: tmp_dir} do
+      file_path = Path.join(tmp_dir, "RUBBERDUCK.md")
+      File.write!(file_path, "# RubberDuck Instructions")
       
       {:ok, files} = FileManager.discover_files(tmp_dir, include_global: false)
       
-      claude_file = Enum.find(files, &(&1.path == file_path))
-      assert claude_file != nil
-      # claude.md should have higher priority than generic .md files
-      assert claude_file.priority > 1000
+      rubberduck_file = Enum.find(files, &(&1.path == file_path))
+      assert rubberduck_file != nil
+      # RUBBERDUCK.md should have higher priority than generic .md files
+      assert rubberduck_file.priority > 1000
     end
   end
   
@@ -390,13 +390,13 @@ defmodule RubberDuck.Instructions.FileManagerTest do
     end
     
     test "gives filename-based priority boosts", %{tmp_dir: tmp_dir} do
-      claude_file = Path.join(tmp_dir, "claude.md")
+      rubberduck_file = Path.join(tmp_dir, "RUBBERDUCK.md")
       generic_file = Path.join(tmp_dir, "generic.md")
       
-      File.write!(claude_file, "# Claude")
+      File.write!(rubberduck_file, "# RubberDuck")
       File.write!(generic_file, "# Generic")
       
-      {:ok, claude} = FileManager.load_file(claude_file)
+      {:ok, rubberduck} = FileManager.load_file(rubberduck_file)
       {:ok, generic} = FileManager.load_file(generic_file)
       
       assert claude.priority > generic.priority
