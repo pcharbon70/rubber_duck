@@ -72,10 +72,32 @@ defmodule RubberDuck.CLIClient.REPLHandler do
         api_key = Auth.get_api_key()
         
         {:ok, _pid} = Client.start_link(url: server_url, api_key: api_key)
-        Process.sleep(500)
+        
+        # Actually connect to the server
+        case Client.connect(server_url) do
+          {:ok, _} -> 
+            Process.sleep(500)  # Give time for channel to join
+            :ok
+          {:error, reason} ->
+            IO.puts(:stderr, "#{@error_prefix}Failed to connect to server: #{reason}")
+            System.halt(1)
+        end
         
       _pid ->
-        :ok
+        # Check if already connected
+        case Client.connected?() do
+          true -> :ok
+          false ->
+            server_url = opts[:server] || Auth.get_server_url()
+            case Client.connect(server_url) do
+              {:ok, _} -> 
+                Process.sleep(500)
+                :ok
+              {:error, reason} ->
+                IO.puts(:stderr, "#{@error_prefix}Failed to connect to server: #{reason}")
+                System.halt(1)
+            end
+        end
     end
   end
 
