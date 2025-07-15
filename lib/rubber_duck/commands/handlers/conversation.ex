@@ -10,6 +10,8 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
 
   alias RubberDuck.Conversations
   alias RubberDuck.Commands.Command
+  alias RubberDuck.CoT.ConversationManager
+  alias RubberDuck.CoT.Chains.ConversationChain
 
   @impl true
   def execute(%Command{name: :conversation, subcommand: :start, args: args, options: options, context: context}) do
@@ -295,75 +297,140 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
     Conversations.create_message(message_params)
   end
 
-  defp generate_assistant_response(conversation, user_message, _context) do
+  defp generate_assistant_response(conversation, user_message, command_context) do
     # Get conversation history for context
     messages = get_conversation_messages(conversation.id)
     conversation_context = get_conversation_context(conversation.id)
     
-    # Build LLM request with conversation history
-    llm_messages = build_llm_messages(messages ++ [user_message], conversation_context)
+    # Build CoT context with all relevant information
+    cot_context = build_cot_context(conversation, messages, user_message, conversation_context, command_context)
     
-    # Determine optimal model and provider based on message content
-    {model, temperature} = select_optimal_model_for_message(user_message, conversation_context)
-    
-    # Build options for LLM service (correct API pattern)
-    # Use longer timeout for conversation responses to allow for complex reasoning
-    opts = [
-      model: model,
-      messages: llm_messages,
-      temperature: temperature,
-      max_tokens: get_max_tokens_for_context(conversation_context),
-      timeout: 120_000  # 2 minutes for complex conversations
-    ]
-
-    # Check if LLM Service process is running before making the call
-    case Process.whereis(RubberDuck.LLM.Service) do
-      nil -> 
-        {:error, :llm_service_not_started}
-      
-      _pid ->
-        # LLM Service is running, attempt completion with timeout handling
-        try do
-          case RubberDuck.LLM.Service.completion(opts) do
-      {:ok, response} ->
-        # Extract content from response (following established pattern)
-        content = extract_response_content(response)
+    # Execute ConversationChain for reasoning
+    case ConversationManager.execute_chain(ConversationChain, user_message.content, cot_context) do
+      {:ok, cot_session} ->
+        # Extract the final formatted response from CoT session
+        response_content = extract_cot_response(cot_session)
         
-        # Create assistant message
+        # Calculate metadata from session
+        duration_ms = if cot_session[:completed_at] && cot_session[:started_at] do
+          DateTime.diff(cot_session.completed_at, cot_session.started_at, :millisecond)
+        else
+          nil
+        end
+        
+        # Create assistant message with CoT-generated content
         sequence_number = length(messages) + 2 # +1 for user message, +1 for this response
         
         assistant_params = %{
           conversation_id: conversation.id,
           role: :assistant,
-          content: content,
+          content: response_content,
           sequence_number: sequence_number,
-          model_used: extract_model_from_response(response),
-          provider_used: extract_provider_from_response(response),
-          tokens_used: extract_tokens_from_response(response),
-          generation_time_ms: extract_generation_time(response)
+          model_used: cot_context.llm_config.model,
+          provider_used: "cot",  # Indicates CoT was used
+          tokens_used: nil,  # Would need to aggregate from all CoT steps
+          generation_time_ms: duration_ms,
+          metadata: %{
+            cot_session_id: cot_session[:id],
+            reasoning_steps: length(cot_session[:steps] || []),
+            cached: cot_session[:cached] || false
+          }
         }
         
         Conversations.create_message(assistant_params)
         
-            {:error, reason} ->
-              # Provide specific error messages for common failure cases
-              case reason do
-                :timeout ->
-                  {:error, "LLM request timed out after 2 minutes. The model may be overloaded or the request too complex."}
-                :provider_not_connected ->
-                  {:error, "LLM provider is not connected. Please connect an LLM provider first using: llm connect <provider>"}
-                {:unknown_model, model} ->
-                  {:error, "Unknown model '#{model}'. Please check available models with: llm list_models"}
-                _ ->
-                  {:error, "Failed to generate response: #{inspect(reason)}"}
-              end
-          end
-        catch
-          :exit, {:noproc, _} -> 
-            {:error, :llm_service_not_available}
-          :exit, {:timeout, _} -> 
-            {:error, :llm_service_timeout}
+      {:error, reason} ->
+        # Provide specific error messages for CoT failures
+        case reason do
+          :timeout ->
+            {:error, "Chain-of-Thought reasoning timed out. The request may be too complex."}
+          {:validation_failed, errors} ->
+            {:error, "Reasoning validation failed: #{inspect(errors)}"}
+          _ ->
+            {:error, "Failed to generate response through reasoning: #{inspect(reason)}"}
         end
+    end
+  end
+  
+  defp build_cot_context(_conversation, messages, user_message, conversation_context, command_context) do
+    # Build conversation history for CoT
+    conversation_history = messages
+    |> Enum.sort_by(& &1.sequence_number)
+    |> Enum.take(-10)  # Last 10 messages for context
+    |> Enum.map(fn msg ->
+      "#{msg.role}: #{msg.content}"
+    end)
+    |> Enum.join("\n")
+    
+    # Determine optimal model based on message analysis
+    {model, temperature} = select_optimal_model_for_message(user_message, conversation_context)
+    
+    %{
+      conversation_history: conversation_history,
+      user_context: %{
+        user_id: command_context.user_id,
+        project_id: command_context.project_id,
+        session_id: command_context.session_id,
+        conversation_type: conversation_context && conversation_context.conversation_type
+      },
+      knowledge_base: %{
+        # This would be populated from memory system
+        recent_topics: conversation_context && conversation_context.active_topics || [],
+        user_preferences: conversation_context && conversation_context.llm_preferences || %{}
+      },
+      project_context: %{
+        # This would be populated from project analysis
+        current_files: [],
+        recent_changes: []
+      },
+      user_preferences: %{
+        preferred_model: model,
+        temperature: temperature,
+        style: "helpful and clear"
+      },
+      # Pass model configuration for LLM calls within CoT
+      llm_config: %{
+        model: model,
+        temperature: temperature,
+        max_tokens: get_max_tokens_for_context(conversation_context),
+        timeout: 120_000
+      }
+    }
+  end
+  
+  defp extract_cot_response(cot_session) do
+    # CoT returns a session with the formatted result in the result field
+    cond do
+      # If session has a result field with final_answer
+      is_map(cot_session) && is_map(cot_session[:result]) && Map.has_key?(cot_session.result, :final_answer) ->
+        cot_session.result.final_answer
+        
+      # If session has a direct result string
+      is_map(cot_session) && is_binary(cot_session[:result]) ->
+        cot_session.result
+        
+      # If session has steps, get the last step result (format_output step)
+      is_map(cot_session) && is_list(cot_session[:steps]) && length(cot_session.steps) > 0 ->
+        # Find the format_output step specifically
+        format_step = Enum.find(cot_session.steps, fn step ->
+          step[:name] == :format_output
+        end)
+        
+        if format_step && format_step[:result] do
+          format_step.result
+        else
+          # Fallback to last step
+          last_step = List.last(cot_session.steps)
+          if last_step && last_step[:result] do
+            last_step.result
+          else
+            "I apologize, but I couldn't generate a proper response."
+          end
+        end
+        
+      # Fallback
+      true ->
+        "I apologize, but I couldn't generate a proper response."
     end
   end
 
