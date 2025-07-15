@@ -29,6 +29,10 @@ defmodule RubberDuck.Commands.Parser do
     try do
       parsed = optimus_spec() |> Optimus.parse!(args)
       
+      # Debug logging to see what we're getting
+      require Logger
+      Logger.debug("CLI parsed result: #{inspect(parsed)}")
+      
       case extract_command_from_parsed(parsed) do
         {:ok, name, command_args, options} ->
           format = determine_format(options, :cli)
@@ -63,20 +67,29 @@ defmodule RubberDuck.Commands.Parser do
   end
 
   # WebSocket message parsing
-  defp parse_websocket_message(%{"event" => event, "payload" => payload} = _message, context) do
+  defp parse_websocket_message(%{"event" => event, "payload" => payload} = message, context) do
     # Handle messages from the WebSocket adapter
     try do
+      require Logger
+      Logger.debug("WebSocket parser - event/payload format: #{inspect(message)}")
+      
       name = String.to_atom(event)
       {args, options} = extract_websocket_args_and_options(payload, name)
       format = determine_format(options, :websocket)
       
       # Handle subcommands for LLM and conversation
+      # Check both payload["subcommand"] and payload["params"]["subcommand"]
       {name, subcommand} = case name do
         :llm -> 
-          subcommand = payload["subcommand"] && String.to_atom(payload["subcommand"])
+          subcommand = payload["subcommand"] || 
+                      (payload["params"] && payload["params"]["subcommand"])
+          subcommand = subcommand && String.to_atom(subcommand)
+          Logger.debug("WebSocket parser - LLM subcommand: #{inspect(subcommand)}")
           {:llm, subcommand}
         :conversation ->
-          subcommand = payload["subcommand"] && String.to_atom(payload["subcommand"])
+          subcommand = payload["subcommand"] || 
+                      (payload["params"] && payload["params"]["subcommand"])
+          subcommand = subcommand && String.to_atom(subcommand)
           {:conversation, subcommand}
         _ -> {name, nil}
       end
@@ -98,6 +111,9 @@ defmodule RubberDuck.Commands.Parser do
   defp parse_websocket_message(%{"command" => command_name} = message, context) do
     # Handle direct command format (CLIChannel format)
     try do
+      require Logger
+      Logger.debug("WebSocket parser - command format: #{inspect(message)}")
+      
       name = String.to_atom(command_name)
       
       # Handle both direct args/options format and CLIChannel params format
@@ -105,6 +121,7 @@ defmodule RubberDuck.Commands.Parser do
         %{"params" => params} ->
           # CLIChannel format: %{"command" => "llm", "params" => %{"subcommand" => "status", ...}}
           subcommand = params["subcommand"] && String.to_atom(params["subcommand"])
+          Logger.debug("WebSocket parser - CLIChannel subcommand: #{inspect(subcommand)}")
           args = Map.get(params, "args", %{}) |> atomize_keys()
           options = Map.drop(params, ["subcommand", "args"]) |> atomize_keys()
           {args, options, subcommand}
@@ -173,15 +190,25 @@ defmodule RubberDuck.Commands.Parser do
   defp extract_command_from_parsed(%{subcommand: nil}), do: {:error, "No command specified"}
   
   defp extract_command_from_parsed({[name], parsed}) do
+    require Logger
+    Logger.debug("Extracting single command: #{inspect(name)}")
     args = extract_args(parsed, name)
     options = extract_options(parsed)
     {:ok, name, args, options}
   end
   
   defp extract_command_from_parsed({[name, subcmd], parsed}) do
+    require Logger
+    Logger.debug("Extracting command with subcommand: #{inspect(name)}, #{inspect(subcmd)}")
     args = extract_args(parsed, name, subcmd)
     options = extract_options(parsed)
     {:ok, name, subcmd, args, options}
+  end
+  
+  defp extract_command_from_parsed(other) do
+    require Logger
+    Logger.debug("Unknown parsed format: #{inspect(other)}")
+    {:error, "Unknown command format"}
   end
 
   # Extract arguments based on command type
@@ -287,35 +314,47 @@ defmodule RubberDuck.Commands.Parser do
   
   defp extract_websocket_args_and_options(payload, :llm) do
     # For LLM commands, extract based on subcommand
-    subcommand = payload["subcommand"] && String.to_atom(payload["subcommand"])
+    # Check both direct payload and nested params
+    subcommand = payload["subcommand"] || 
+                (payload["params"] && payload["params"]["subcommand"])
+    subcommand = subcommand && String.to_atom(subcommand)
+    
+    # Get the actual data source (either payload or params)
+    data_source = if payload["params"], do: payload["params"], else: payload
     
     args = case subcommand do
       :set_model -> %{
-        provider: Map.get(payload, "provider"),
-        model: Map.get(payload, "model")
+        provider: Map.get(data_source, "provider"),
+        model: Map.get(data_source, "model")
       }
       subcmd when subcmd in [:connect, :disconnect, :enable, :disable, :set_default, :list_models] ->
-        %{provider: Map.get(payload, "provider")}
+        %{provider: Map.get(data_source, "provider")}
       _ -> %{}
     end
     
-    options = Map.drop(payload, ["subcommand", "provider", "model"]) |> atomize_keys()
+    options = Map.drop(data_source, ["subcommand", "provider", "model"]) |> atomize_keys()
     {args, options}
   end
   
   defp extract_websocket_args_and_options(payload, :conversation) do
     # For conversation commands, extract based on subcommand
-    subcommand = payload["subcommand"] && String.to_atom(payload["subcommand"])
+    # Check both direct payload and nested params
+    subcommand = payload["subcommand"] || 
+                (payload["params"] && payload["params"]["subcommand"])
+    subcommand = subcommand && String.to_atom(subcommand)
+    
+    # Get the actual data source (either payload or params)
+    data_source = if payload["params"], do: payload["params"], else: payload
     
     {args, options} = case subcommand do
       :start -> 
-        {[], Map.take(payload, ["title", "type"]) |> atomize_keys()}
+        {[], Map.take(data_source, ["title", "type"]) |> atomize_keys()}
       :show -> 
-        {Map.get(payload, "args", []), %{}}
+        {Map.get(data_source, "args", []), %{}}
       :send -> 
-        {Map.get(payload, "args", []), Map.take(payload, ["conversation"]) |> atomize_keys()}
+        {Map.get(data_source, "args", []), Map.take(data_source, ["conversation"]) |> atomize_keys()}
       :delete -> 
-        {Map.get(payload, "args", []), %{}}
+        {Map.get(data_source, "args", []), %{}}
       _ -> 
         {[], %{}}
     end

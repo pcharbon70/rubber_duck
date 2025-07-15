@@ -136,6 +136,9 @@ defmodule RubberDuck.Commands.Adapters.WebSocket do
 
   defp parse_websocket_message(event, payload, context) do
     # Convert WebSocket message to unified input format
+    require Logger
+    Logger.debug("WebSocket adapter - event: #{inspect(event)}, payload: #{inspect(payload)}")
+    
     input = %{
       "event" => event,
       "payload" => payload,
@@ -143,7 +146,12 @@ defmodule RubberDuck.Commands.Adapters.WebSocket do
       "params" => Map.get(payload, "params", %{})
     }
     
-    Parser.parse(input, :websocket, context)
+    Logger.debug("WebSocket adapter - input for parser: #{inspect(input)}")
+    
+    result = Parser.parse(input, :websocket, context)
+    Logger.debug("WebSocket adapter - parser result: #{inspect(result)}")
+    
+    result
   end
 
   defp get_user_id(socket) do

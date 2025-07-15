@@ -75,7 +75,7 @@ defmodule RubberDuck.CLIClient.REPLHandler do
         
         # Actually connect to the server
         case Client.connect(server_url) do
-          {:ok, _} -> 
+          :ok -> 
             wait_for_connection()
           {:error, reason} ->
             IO.puts(:stderr, "#{@error_prefix}Failed to connect to server: #{reason}")
