@@ -76,8 +76,7 @@ defmodule RubberDuck.CLIClient.REPLHandler do
         # Actually connect to the server
         case Client.connect(server_url) do
           {:ok, _} -> 
-            Process.sleep(500)  # Give time for channel to join
-            :ok
+            wait_for_connection()
           {:error, reason} ->
             IO.puts(:stderr, "#{@error_prefix}Failed to connect to server: #{reason}")
             System.halt(1)
@@ -91,13 +90,26 @@ defmodule RubberDuck.CLIClient.REPLHandler do
             server_url = opts[:server] || Auth.get_server_url()
             case Client.connect(server_url) do
               {:ok, _} -> 
-                Process.sleep(500)
-                :ok
+                wait_for_connection()
               {:error, reason} ->
                 IO.puts(:stderr, "#{@error_prefix}Failed to connect to server: #{reason}")
                 System.halt(1)
             end
         end
+    end
+  end
+  
+  defp wait_for_connection(attempts \\ 0) do
+    if attempts >= 20 do  # 10 seconds max
+      IO.puts(:stderr, "#{@error_prefix}Timeout waiting for WebSocket connection")
+      System.halt(1)
+    end
+    
+    case Client.connected?() do
+      true -> :ok
+      false ->
+        Process.sleep(500)
+        wait_for_connection(attempts + 1)
     end
   end
 
