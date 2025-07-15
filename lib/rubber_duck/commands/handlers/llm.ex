@@ -272,24 +272,49 @@ defmodule RubberDuck.Commands.Handlers.LLM do
     # Validate model is available for provider
     :ok = Config.validate_model(provider, model)
     
-    # Update the model in CLI config
-    case Auth.update_provider_model(provider, model) do
+    # Update both system and CLI config
+    with :ok <- update_system_model(provider, model),
+         :ok <- Auth.update_provider_model(provider, model) do
+      {:ok, %{
+        type: "llm_config",
+        message: "Model set successfully",
+        provider: provider,
+        model: model,
+        timestamp: DateTime.utc_now()
+      }}
+    else
+      {:error, reason} ->
+        {:error, "Failed to save model configuration: #{inspect(reason)}"}
+    end
+  end
+  
+  # Set default model (no provider specified)
+  defp set_model(%{model: model}, _options) when not is_nil(model) do
+    # Set as system default model
+    case RubberDuck.LLM.ModelConfig.set_default_model(model) do
       :ok ->
         {:ok, %{
           type: "llm_config",
-          message: "Model set successfully",
-          provider: provider,
+          message: "Default model set to: #{model}",
           model: model,
           timestamp: DateTime.utc_now()
         }}
-      
       error ->
-        {:error, "Failed to save model configuration: #{inspect(error)}"}
+        {:error, "Failed to set default model: #{inspect(error)}"}
     end
   end
   
   defp set_model(_, _) do
-    {:error, "Provider and model required for set_model command"}
+    {:error, "Model required for set_model command. Usage: llm set_model <model> or llm set_model <provider> <model>"}
+  end
+  
+  defp update_system_model(provider, model) do
+    # Update system model config
+    try do
+      RubberDuck.LLM.ModelConfig.set_provider_model(provider, model)
+    catch
+      _, _ -> :ok  # ModelConfig might not be running
+    end
   end
   
   defp set_default_provider(%{provider: provider}, _options) when not is_nil(provider) do

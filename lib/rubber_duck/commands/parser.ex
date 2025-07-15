@@ -252,7 +252,12 @@ defmodule RubberDuck.Commands.Parser do
       :disconnect -> %{provider: Map.get(args, :provider)}
       :enable -> %{provider: Map.get(args, :provider)}
       :disable -> %{provider: Map.get(args, :provider)}
-      :set_model -> %{provider: Map.get(args, :provider), model: Map.get(args, :model)}
+      :set_model -> 
+        # Handle two different argument patterns
+        case {Map.get(args, :arg1), Map.get(args, :arg2)} do
+          {model, nil} -> %{model: model}  # Only model provided
+          {provider, model} -> %{provider: provider, model: model}  # Both provider and model
+        end
       :set_default -> %{provider: Map.get(args, :provider)}
       :list_models -> %{provider: Map.get(args, :provider)}
       _ -> %{}

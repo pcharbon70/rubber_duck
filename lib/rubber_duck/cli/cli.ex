@@ -396,6 +396,48 @@ defmodule RubberDuck.CLI do
               parser: :string
             ]
           ]
+        ],
+        set_model: [
+          name: "set_model",
+          about: "Set the LLM model to use. Usage: set_model <model> OR set_model <provider> <model>",
+          args: [
+            arg1: [
+              value_name: "MODEL_OR_PROVIDER",
+              help: "Model name (if only one arg) or Provider name (if two args)",
+              required: true,
+              parser: :string
+            ],
+            arg2: [
+              value_name: "MODEL",
+              help: "Model name (when provider is specified)",
+              required: false,
+              parser: :string
+            ]
+          ]
+        ],
+        list_models: [
+          name: "list_models",
+          about: "List available LLM models",
+          args: [
+            provider: [
+              value_name: "PROVIDER",
+              help: "Provider name (optional - if not specified, lists all models)",
+              required: false,
+              parser: :string
+            ]
+          ]
+        ],
+        set_default: [
+          name: "set_default",
+          about: "Set the default LLM provider",
+          args: [
+            provider: [
+              value_name: "PROVIDER",
+              help: "Provider name to set as default",
+              required: true,
+              parser: :string
+            ]
+          ]
         ]
       ]
     ]

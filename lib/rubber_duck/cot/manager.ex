@@ -187,10 +187,25 @@ defmodule RubberDuck.CoT.Manager do
   end
   
   defp call_llm(prompt, step, session) do
+    # Get LLM config from context, with fallbacks
+    llm_config = get_in(session, [:context, :llm_config]) || %{}
+    
+    # Get default model from ModelConfig if available
+    default_model = case Process.whereis(RubberDuck.LLM.ModelConfig) do
+      nil -> "codellama"
+      _pid -> 
+        try do
+          RubberDuck.LLM.ModelConfig.get_default_model()
+        catch
+          _, _ -> "codellama"
+        end
+    end
+    
     options = %{
-      max_tokens: Map.get(step, :max_tokens, 2000),
-      temperature: Map.get(step, :temperature, 0.7),
-      timeout: Map.get(step, :timeout, 30_000)
+      model: Map.get(llm_config, :model) || default_model,
+      max_tokens: Map.get(step, :max_tokens, Map.get(llm_config, :max_tokens, 2000)),
+      temperature: Map.get(step, :temperature, Map.get(llm_config, :temperature, 0.7)),
+      timeout: Map.get(step, :timeout, Map.get(llm_config, :timeout, 30_000))
     }
     
     messages = [
@@ -198,7 +213,7 @@ defmodule RubberDuck.CoT.Manager do
       %{role: "user", content: prompt}
     ]
     
-    Logger.debug("Executing step #{step.name} with prompt: #{String.slice(prompt, 0, 100)}...")
+    Logger.debug("Executing step #{step.name} with model #{options.model}, prompt: #{String.slice(prompt, 0, 100)}...")
     
     # Convert map to keyword list for Service.completion/1
     opts = %{messages: messages} |> Map.merge(options) |> Map.to_list()
