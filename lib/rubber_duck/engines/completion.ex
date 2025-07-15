@@ -37,6 +37,8 @@ defmodule RubberDuck.Engines.Completion do
 
   alias RubberDuck.LLM
   alias RubberDuck.LLM.Config
+  alias RubberDuck.CoT.Manager, as: ConversationManager
+  alias RubberDuck.CoT.Chains.CompletionChain
 
   # Default configuration
   @default_max_suggestions 5
@@ -89,22 +91,80 @@ defmodule RubberDuck.Engines.Completion do
 
   @impl true
   def execute(input, state) do
+    with {:ok, validated_input} <- validate_input(input) do
+      # Check cache first
+      cache_key = generate_cache_key(validated_input)
+      
+      case get_from_cache_cot(state, cache_key) do
+        {:ok, cached_completions} ->
+          {:ok, %{completions: cached_completions, state: state}}
+          
+        :miss ->
+          # Build CoT context
+          cot_context = %{
+            prefix: validated_input.prefix,
+            suffix: validated_input.suffix,
+            current_file: validated_input.file_path,
+            cursor_position: validated_input.cursor_position,
+            language: to_string(validated_input.language),
+            recent_edits: extract_recent_edits(validated_input),
+            project_patterns: extract_project_patterns(validated_input.project_context),
+            user_preferences: get_user_preferences(state)
+          }
+          
+          Logger.debug("Executing CoT completion chain")
+          
+          # Execute CoT completion chain
+          case ConversationManager.execute_chain(CompletionChain, format_completion_query(validated_input), cot_context) do
+            {:ok, cot_session} ->
+              completion_result = extract_completion_result_from_cot(cot_session)
+              
+              # Format completions
+              completions = format_completions(completion_result, validated_input)
+              
+              # Apply confidence filtering
+              filtered = filter_by_confidence(completions, state.config[:min_confidence])
+              
+              # Update cache
+              updated_state = update_cache(state, cache_key, filtered)
+              
+              # Emit telemetry
+              :telemetry.execute(
+                [:rubber_duck, :completion, :generated],
+                %{count: length(filtered), cot: true},
+                %{language: validated_input.language}
+              )
+              
+              {:ok, %{completions: filtered, state: updated_state}}
+              
+            {:error, reason} ->
+              Logger.error("CoT completion chain error: #{inspect(reason)}")
+              Logger.warning("Falling back to legacy completion")
+              
+              # Fallback to existing implementation
+              legacy_complete(input, state)
+          end
+      end
+    end
+  end
+  
+  # Legacy completion function for fallback
+  defp legacy_complete(input, state) do
     with {:ok, validated_input} <- validate_input(input),
          {:ok, fim_context} <- build_fim_context(validated_input, state),
          {:ok, completions} <- generate_completions(fim_context, validated_input, state),
          {:ok, ranked} <- rank_completions(completions, validated_input, state),
          {:ok, filtered} <- filter_completions(ranked, state) do
-      # Cache successful completions
+      
       cache_key = generate_cache_key(validated_input)
       updated_state = update_cache(state, cache_key, filtered)
-
-      # Emit telemetry
+      
       :telemetry.execute(
         [:rubber_duck, :completion, :generated],
-        %{count: length(filtered)},
+        %{count: length(filtered), fallback: true},
         %{language: validated_input.language}
       )
-
+      
       {:ok, %{completions: filtered, state: updated_state}}
     end
   end
@@ -725,5 +785,136 @@ defmodule RubberDuck.Engines.Completion do
         suggest_docstrings: true
       }
     })
+  end
+  
+  # CoT integration helpers
+  
+  defp get_from_cache_cot(state, cache_key) do
+    case Map.get(state.cache, cache_key) do
+      nil -> 
+        :miss
+      cached ->
+        # Check if cache is still valid
+        expiry = Map.get(state.cache_expiry, cache_key)
+        if expiry && DateTime.compare(DateTime.utc_now(), expiry) == :lt do
+          {:ok, cached}
+        else
+          :miss
+        end
+    end
+  end
+  
+  defp extract_recent_edits(validated_input) do
+    # Extract recent edit patterns from the prefix
+    validated_input.prefix
+    |> String.split("\n")
+    |> Enum.take(-5)
+    |> Enum.join("\n")
+  end
+  
+  defp extract_project_patterns(project_context) do
+    Map.get(project_context, :patterns, [])
+  end
+  
+  defp get_user_preferences(state) do
+    Map.get(state, :user_preferences, %{})
+  end
+  
+  defp format_completion_query(validated_input) do
+    "Complete the code at cursor position (#{elem(validated_input.cursor_position, 0)}, #{elem(validated_input.cursor_position, 1)})"
+  end
+  
+  defp extract_completion_result_from_cot(cot_session) do
+    # Extract results from the CoT session steps
+    context_analysis = get_cot_step_result(cot_session, :analyze_context)
+    intent = get_cot_step_result(cot_session, :determine_intent)
+    patterns = get_cot_step_result(cot_session, :identify_patterns)
+    completions = get_cot_step_result(cot_session, :generate_completions)
+    ranked_completions = get_cot_step_result(cot_session, :rank_completions)
+    validation = get_cot_step_result(cot_session, :validate_fit)
+    suggestions = get_cot_step_result(cot_session, :format_suggestions)
+    
+    %{
+      context: context_analysis,
+      intent: intent,
+      patterns: patterns,
+      completions: parse_cot_completions(suggestions || ranked_completions || completions),
+      validation: validation
+    }
+  end
+  
+  defp get_cot_step_result(cot_session, step_name) do
+    case Map.get(cot_session.steps, step_name) do
+      %{result: result} -> result
+      _ -> nil
+    end
+  end
+  
+  defp parse_cot_completions(completions_text) when is_binary(completions_text) do
+    # Extract completions from the text
+    # Look for numbered completions or code blocks
+    
+    # First try to extract code blocks
+    code_blocks = Regex.scan(~r/```(?:elixir|ex|javascript|js|python|py)?\n(.*?)```/s, completions_text)
+    |> Enum.map(fn [_, code] -> String.trim(code) end)
+    
+    if length(code_blocks) > 0 do
+      code_blocks
+    else
+      # Try to extract numbered items
+      completions_text
+      |> String.split(~r/\d+\./)
+      |> Enum.drop(1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.filter(&(String.length(&1) > 0))
+    end
+  end
+  defp parse_cot_completions(_), do: []
+  
+  defp format_completions(completion_result, validated_input) do
+    completion_result.completions
+    |> Enum.with_index()
+    |> Enum.map(fn {text, idx} ->
+      %{
+        text: text,
+        score: calculate_completion_score_cot(text, completion_result, idx),
+        type: infer_completion_type(text, completion_result.intent, validated_input.language),
+        metadata: %{
+          intent: completion_result.intent,
+          patterns_used: completion_result.patterns,
+          from_cot: true
+        }
+      }
+    end)
+  end
+  
+  defp calculate_completion_score_cot(_text, completion_result, index) do
+    # Base score decreases with index (first suggestions are ranked higher)
+    base_score = 1.0 - (index * 0.1)
+    
+    # Adjust based on validation results
+    validation_boost = if String.contains?(completion_result.validation || "", "correct"), do: 0.1, else: 0.0
+    
+    # Ensure score is between 0 and 1
+    min(max(base_score + validation_boost, 0.0), 1.0)
+  end
+  
+  defp infer_completion_type(text, intent, language) do
+    cond do
+      String.contains?(intent || "", "function") -> :function
+      String.contains?(intent || "", "import") -> :import
+      String.contains?(intent || "", "variable") -> :variable
+      String.contains?(intent || "", "pattern") -> :pattern
+      String.contains?(text, "def") && language == :elixir -> :function
+      String.contains?(text, "function") && language == :javascript -> :function
+      String.contains?(text, "import") || String.contains?(text, "require") -> :import
+      true -> :other
+    end
+  end
+  
+  defp filter_by_confidence(completions, min_confidence) do
+    Enum.filter(completions, fn completion ->
+      completion.score >= min_confidence
+    end)
   end
 end

@@ -40,6 +40,8 @@ defmodule RubberDuck.Engines.Generation do
   require Logger
   
   alias RubberDuck.LLM.Config
+  alias RubberDuck.CoT.Manager, as: ConversationManager
+  alias RubberDuck.CoT.Chains.GenerationChain
 
   # Default configuration
   @default_max_context_items 10
@@ -105,31 +107,90 @@ defmodule RubberDuck.Engines.Generation do
   def execute(input, state) do
     Logger.debug("Generation engine execute called with input: #{inspect(input)}")
     
-    with {:ok, validated_input} <- validate_input(input),
-         _ = Logger.debug("Validated input: #{inspect(validated_input)}"),
-         {:ok, rag_context} <- retrieve_context(validated_input, state),
-         _ = Logger.debug("Retrieved RAG context with #{length(rag_context.items)} items"),
-         {:ok, prompt} <- build_generation_prompt(validated_input, rag_context, state),
-         _ = Logger.debug("Built prompt (#{String.length(prompt)} chars)"),
-         {:ok, generated} <- generate_code(prompt, validated_input, state),
-         _ = Logger.debug("Generated code: #{inspect(generated)}"),
-         {:ok, validated} <- validate_generated_code(generated, validated_input, state),
-         {:ok, enhanced} <- enhance_with_imports(validated, validated_input, state) do
-      # Update history
-      _updated_state = update_history(state, validated_input.prompt, enhanced.code)
-
-      # Emit telemetry
-      :telemetry.execute(
-        [:rubber_duck, :generation, :completed],
-        %{confidence: enhanced.confidence},
-        %{language: validated_input.language}
-      )
-
-      {:ok, enhanced}
+    with {:ok, validated_input} <- validate_input(input) do
+      # Build CoT context
+      cot_context = %{
+        query: validated_input.prompt,
+        language: to_string(validated_input.language),
+        context: %{
+          project_files: Map.get(validated_input.context, :project_files, []),
+          current_file: Map.get(validated_input.context, :current_file),
+          imports: Map.get(validated_input.context, :imports, []),
+          partial_code: validated_input.partial_code,
+          style: validated_input.style,
+          constraints: validated_input.constraints
+        },
+        similar_patterns: get_similar_patterns_from_state(validated_input, state),
+        available_libraries: get_language_libraries(validated_input.language)
+      }
+      
+      Logger.debug("Executing CoT generation chain")
+      
+      # Execute CoT generation chain
+      case ConversationManager.execute_chain(GenerationChain, validated_input.prompt, cot_context) do
+        {:ok, cot_session} ->
+          generation_result = extract_generation_result_from_cot(cot_session)
+          
+          # Build final result
+          enhanced = %{
+            code: generation_result.code,
+            language: validated_input.language,
+            imports: generation_result.dependencies.imports,
+            explanation: generation_result.requirements || "Generated code based on requirements",
+            confidence: calculate_confidence_from_validation(generation_result.validation),
+            alternatives: generation_result.alternatives,
+            metadata: %{
+              prompt_length: String.length(validated_input.prompt),
+              generation_time: DateTime.utc_now(),
+              cot_session_id: cot_session[:id],
+              validation: generation_result.validation
+            }
+          }
+          
+          # Update history
+          _updated_state = update_history(state, validated_input.prompt, enhanced.code)
+          
+          # Emit telemetry
+          :telemetry.execute(
+            [:rubber_duck, :generation, :completed],
+            %{confidence: enhanced.confidence},
+            %{language: validated_input.language}
+          )
+          
+          {:ok, enhanced}
+          
+        {:error, reason} ->
+          Logger.error("CoT generation chain error: #{inspect(reason)}")
+          Logger.warning("Falling back to legacy generation")
+          
+          # Fallback to existing implementation
+          legacy_generate(input, state)
+      end
     else
       error ->
-        Logger.error("Generation engine error: #{inspect(error)}")
+        Logger.error("Generation engine validation error: #{inspect(error)}")
         error
+    end
+  end
+  
+  # Legacy generation function for fallback
+  defp legacy_generate(input, state) do
+    with {:ok, validated_input} <- validate_input(input),
+         {:ok, rag_context} <- retrieve_context(validated_input, state),
+         {:ok, prompt} <- build_generation_prompt(validated_input, rag_context, state),
+         {:ok, generated} <- generate_code(prompt, validated_input, state),
+         {:ok, validated} <- validate_generated_code(generated, validated_input, state),
+         {:ok, enhanced} <- enhance_with_imports(validated, validated_input, state) do
+      
+      _updated_state = update_history(state, validated_input.prompt, enhanced.code)
+      
+      :telemetry.execute(
+        [:rubber_duck, :generation, :completed],
+        %{confidence: enhanced.confidence, fallback: true},
+        %{language: validated_input.language}
+      )
+      
+      {:ok, enhanced}
     end
   end
 
@@ -1206,6 +1267,162 @@ defmodule RubberDuck.Engines.Generation do
 
   defp load_python_templates do
     default_prompt_template()
+  end
+
+  # CoT integration helpers
+  
+  defp get_similar_patterns_from_state(input, state) do
+    # Get similar patterns from history and cache
+    keywords = extract_keywords(input.prompt)
+    
+    state.history
+    |> Enum.filter(fn record ->
+      record_keywords = extract_keywords(record.prompt)
+      keyword_overlap(keywords, record_keywords) > 0.5
+    end)
+    |> Enum.map(fn record ->
+      %{
+        prompt: record.prompt,
+        code: record.generated_code,
+        similarity: calculate_similarity(input.prompt, record.prompt)
+      }
+    end)
+    |> Enum.take(5)
+  end
+  
+  defp get_language_libraries(language) do
+    case language do
+      :elixir -> ["GenServer", "Enum", "Task", "Process", "Ecto", "Phoenix", "Plug"]
+      :javascript -> ["React", "Express", "Lodash", "Axios", "Jest"]
+      :python -> ["os", "sys", "json", "datetime", "requests", "pandas", "numpy"]
+      _ -> []
+    end
+  end
+  
+  defp extract_generation_result_from_cot(cot_session) do
+    # Extract results from the CoT session steps
+    requirements = get_cot_step_result(cot_session, :understand_requirements)
+    _context_review = get_cot_step_result(cot_session, :review_context)
+    structure = get_cot_step_result(cot_session, :plan_structure)
+    dependencies = get_cot_step_result(cot_session, :identify_dependencies)
+    implementation = get_cot_step_result(cot_session, :generate_implementation)
+    documentation = get_cot_step_result(cot_session, :add_documentation)
+    tests = get_cot_step_result(cot_session, :generate_tests)
+    validation = get_cot_step_result(cot_session, :validate_output)
+    alternatives = get_cot_step_result(cot_session, :provide_alternatives)
+    
+    %{
+      code: extract_code_from_cot(documentation || implementation),
+      dependencies: parse_cot_dependencies(dependencies),
+      documentation: extract_cot_documentation(documentation),
+      tests: extract_cot_tests(tests),
+      alternatives: parse_cot_alternatives(alternatives),
+      validation: parse_cot_validation(validation),
+      structure: structure,
+      requirements: requirements
+    }
+  end
+  
+  defp get_cot_step_result(cot_session, step_name) do
+    case Map.get(cot_session.steps, step_name) do
+      %{result: result} -> result
+      _ -> nil
+    end
+  end
+  
+  defp extract_code_from_cot(text) when is_binary(text) do
+    # Extract code blocks from the text
+    case Regex.scan(~r/```(?:elixir|ex|javascript|js|python|py)?\n(.*?)```/s, text) do
+      [[_, code] | _] -> String.trim(code)
+      _ -> 
+        # If no code block found, try to extract from the text
+        text
+        |> String.split("\n")
+        |> Enum.drop_while(&(!String.starts_with?(&1, "defmodule") && 
+                             !String.starts_with?(&1, "def ") &&
+                             !String.starts_with?(&1, "function") &&
+                             !String.starts_with?(&1, "class ")))
+        |> Enum.join("\n")
+        |> String.trim()
+    end
+  end
+  defp extract_code_from_cot(_), do: ""
+  
+  defp parse_cot_dependencies(deps_text) when is_binary(deps_text) do
+    # Extract imports and dependencies from CoT output
+    imports = Regex.scan(~r/(?:import|alias|use|require|from)\s+([A-Z][\w.]+)/, deps_text)
+    |> Enum.map(fn [_, module] -> module end)
+    |> Enum.uniq()
+    
+    deps = Regex.scan(~r/{:(\w+),\s*"~> ([\d.]+)"}/, deps_text)
+    |> Enum.map(fn [_, name, version] -> {name, version} end)
+    
+    %{imports: imports, dependencies: deps}
+  end
+  defp parse_cot_dependencies(_), do: %{imports: [], dependencies: []}
+  
+  defp extract_cot_documentation(doc_text) when is_binary(doc_text) do
+    # Extract documentation sections
+    doc_text
+    |> String.split("\n")
+    |> Enum.filter(&String.contains?(&1, ["@doc", "@moduledoc", "@spec", "\"\"\"", "/**"]))
+    |> Enum.join("\n")
+  end
+  defp extract_cot_documentation(_), do: ""
+  
+  defp extract_cot_tests(tests_text) when is_binary(tests_text) do
+    # Extract test code
+    case Regex.scan(~r/```(?:elixir|ex|javascript|js|python|py)?\n(.*?)```/s, tests_text) do
+      [_ | _] = codes ->
+        codes
+        |> Enum.map(fn [_, code] -> String.trim(code) end)
+        |> Enum.join("\n\n")
+      _ -> tests_text || ""
+    end
+  end
+  defp extract_cot_tests(_), do: ""
+  
+  defp parse_cot_alternatives(alt_text) when is_binary(alt_text) do
+    # Extract alternative approaches
+    alt_text
+    |> String.split(~r/\d+\./)
+    |> Enum.drop(1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.filter(&(String.length(&1) > 10))
+  end
+  defp parse_cot_alternatives(_), do: []
+  
+  defp parse_cot_validation(val_text) when is_binary(val_text) do
+    # Extract validation results
+    %{
+      passed: !String.contains?(String.downcase(val_text || ""), ["error", "fail", "issue"]),
+      checks: extract_validation_checks(val_text),
+      warnings: extract_validation_warnings(val_text)
+    }
+  end
+  defp parse_cot_validation(_), do: %{passed: true, checks: [], warnings: []}
+  
+  defp extract_validation_checks(text) when is_binary(text) do
+    text
+    |> String.split("\n")
+    |> Enum.filter(&String.match?(&1, ~r/^\d+\./))
+    |> Enum.map(&String.replace(&1, ~r/^\d+\.\s*/, ""))
+  end
+  defp extract_validation_checks(_), do: []
+  
+  defp extract_validation_warnings(text) when is_binary(text) do
+    text
+    |> String.split("\n")
+    |> Enum.filter(&String.contains?(String.downcase(&1), ["warning", "note", "caution"]))
+    |> Enum.map(&String.trim/1)
+  end
+  defp extract_validation_warnings(_), do: []
+  
+  defp calculate_confidence_from_validation(validation) do
+    base = if validation.passed, do: 0.9, else: 0.6
+    warning_penalty = length(validation.warnings) * 0.05
+    
+    max(base - warning_penalty, 0.5)
   end
 
   defp extract_code_from_prompt(prompt) do

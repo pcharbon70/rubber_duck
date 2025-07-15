@@ -165,9 +165,12 @@ defmodule RubberDuck.CoT.Executor do
       session_id: session.id
     ]
 
+    # Get LLM config from session opts
+    llm_config = session.opts[:llm_config] || %{}
+
     # Execute with retries
     max_retries = Map.get(step, :retries, 2)
-    execute_with_retries(prompt, step, context_opts, max_retries)
+    execute_with_retries(prompt, step, context_opts, llm_config, max_retries)
   end
 
   defp build_step_prompt(step, session, chain_config) do
@@ -181,14 +184,23 @@ defmodule RubberDuck.CoT.Executor do
     # Build context from previous steps
     previous_results = build_previous_results_context(session.steps)
 
-    # Interpolate variables
-    variables = %{
+    # Build variables map including step-specific results
+    base_variables = %{
       "query" => session.query,
       "previous_result" => get_last_result(session.steps),
       "previous_results" => previous_results,
       "step_name" => Atom.to_string(step.name),
       "context" => Map.get(session, :context, %{})
     }
+    
+    # Add specific step results by name (e.g., {{understand_code_result}})
+    step_results = Enum.reduce(session.steps, %{}, fn step_record, acc ->
+      Map.put(acc, "#{step_record.name}_result", step_record.result)
+    end)
+    
+    # Merge all variables, also include session opts for access to context
+    variables = Map.merge(base_variables, step_results)
+    |> Map.merge(session.opts || %{})
 
     # Combine base template with step prompt
     full_prompt = """
@@ -203,7 +215,15 @@ defmodule RubberDuck.CoT.Executor do
 
   defp interpolate_template(template, variables) do
     Enum.reduce(variables, template, fn {key, value}, acc ->
-      String.replace(acc, "{{#{key}}}", to_string(value))
+      # Handle different value types
+      string_value = case value do
+        v when is_binary(v) -> v
+        v when is_map(v) -> Jason.encode!(v)
+        v when is_list(v) and length(v) > 0 and is_binary(hd(v)) -> Enum.join(v, "\n")
+        v -> inspect(v)
+      end
+      
+      String.replace(acc, "{{#{key}}}", string_value)
     end)
   end
 
@@ -218,22 +238,27 @@ defmodule RubberDuck.CoT.Executor do
   defp get_last_result([]), do: ""
 
   defp get_last_result(steps) do
-    List.last(steps).result
+    last_step = List.last(steps)
+    if last_step && Map.has_key?(last_step, :result) do
+      last_step.result
+    else
+      ""
+    end
   end
 
-  defp execute_with_retries(prompt, step, context_opts, retries_left) do
-    # Build LLM request
-    request = %{
-      # Could be configurable
-      model: "gpt-4",
+  defp execute_with_retries(prompt, step, context_opts, llm_config, retries_left) do
+    # Build LLM request using config from context
+    opts = [
+      model: llm_config[:model] || "codellama",
       messages: [
         %{role: "user", content: prompt}
       ],
-      temperature: Map.get(step, :temperature, 0.7),
-      max_tokens: Map.get(step, :max_tokens, 1000)
-    }
+      temperature: Map.get(step, :temperature, llm_config[:temperature] || 0.7),
+      max_tokens: Map.get(step, :max_tokens, llm_config[:max_tokens] || 1000),
+      timeout: llm_config[:timeout] || 30_000
+    ]
 
-    case LLMService.completion(request) do
+    case LLMService.completion(opts) do
       {:ok, response} ->
         result = extract_result(response)
 
@@ -248,7 +273,7 @@ defmodule RubberDuck.CoT.Executor do
             enhanced_prompt =
               prompt <> "\n\nPrevious attempt failed validation: #{validation_error}\nPlease correct and try again."
 
-            execute_with_retries(enhanced_prompt, step, context_opts, retries_left - 1)
+            execute_with_retries(enhanced_prompt, step, context_opts, llm_config, retries_left - 1)
 
           {:error, validation_error} ->
             {:error, {:validation_failed, validation_error}}
@@ -258,7 +283,7 @@ defmodule RubberDuck.CoT.Executor do
         Logger.warning("LLM request failed, retrying: #{inspect(reason)}")
         # Brief delay before retry
         Process.sleep(1000)
-        execute_with_retries(prompt, step, context_opts, retries_left - 1)
+        execute_with_retries(prompt, step, context_opts, llm_config, retries_left - 1)
 
       {:error, reason} ->
         {:error, {:llm_request_failed, reason}}
@@ -266,70 +291,76 @@ defmodule RubberDuck.CoT.Executor do
   end
 
   defp extract_result(response) do
-    # Extract the actual result from LLM response
-    case response do
-      %{choices: [%{message: %{content: content}} | _]} ->
-        String.trim(content)
-
-      _ ->
+    # Extract the actual result from LLM response - handle RubberDuck.LLM.Response struct
+    cond do
+      # Handle RubberDuck.LLM.Response struct
+      is_struct(response, RubberDuck.LLM.Response) and is_list(response.choices) ->
+        response.choices
+        |> List.first()
+        |> case do
+          %{message: %{content: content}} when is_binary(content) -> String.trim(content)
+          %{message: %{"content" => content}} when is_binary(content) -> String.trim(content)
+          _ -> ""
+        end
+        
+      # Handle plain maps with choices
+      is_map(response) and Map.has_key?(response, :choices) and is_list(response.choices) ->
+        response.choices
+        |> List.first()
+        |> case do
+          %{message: %{content: content}} -> String.trim(content)
+          %{"message" => %{"content" => content}} -> String.trim(content)
+          %{text: content} -> String.trim(content)
+          %{"text" => content} -> String.trim(content)
+          _ -> ""
+        end
+        
+      # Direct content
+      is_map(response) and Map.has_key?(response, :content) ->
+        String.trim(response.content)
+        
+      # String response
+      is_binary(response) ->
+        String.trim(response)
+        
+      true ->
         ""
     end
   end
 
   defp validate_step_result(result, step) do
-    # Get validation rules
-    validators =
-      case Map.get(step, :validates) do
-        nil -> []
-        atom when is_atom(atom) -> [atom]
-        list when is_list(list) -> list
-      end
-
-    # Run each validator
-    Enum.reduce_while(validators, :ok, fn validator, _acc ->
-      case apply_validator(validator, result) do
-        :ok -> {:cont, :ok}
-        error -> {:halt, error}
-      end
-    end)
-  end
-
-  defp apply_validator(:has_problem_statement, result) do
-    if String.contains?(result, ["problem", "issue", "question", "challenge"]) do
+    # Get validation function names
+    validators = case Map.get(step, :validates) do
+      nil -> []
+      atom when is_atom(atom) -> [atom]
+      list when is_list(list) -> list
+    end
+    
+    if Enum.empty?(validators) do
       :ok
     else
-      {:error, "Result must contain a clear problem statement"}
+      # Get the chain module from the step
+      chain_module = Map.get(step, :__chain_module__)
+      
+      # Run each validator
+      Enum.reduce_while(validators, :ok, fn validator_name, _acc ->
+        if chain_module && function_exported?(chain_module, validator_name, 1) do
+          # Call the validation function with result in a map
+          validation_context = %{result: result}
+          
+          if apply(chain_module, validator_name, [validation_context]) do
+            {:cont, :ok}
+          else
+            {:halt, {:error, "Validation '#{validator_name}' failed"}}
+          end
+        else
+          # No validation function found, skip this validator
+          {:cont, :ok}
+        end
+      end)
     end
   end
 
-  defp apply_validator(:has_solution, result) do
-    if String.contains?(result, ["solution", "answer", "approach", "resolve"]) do
-      :ok
-    else
-      {:error, "Result must contain a solution"}
-    end
-  end
-
-  defp apply_validator(:has_code, result) do
-    if Regex.match?(~r/```[\s\S]*?```/, result) do
-      :ok
-    else
-      {:error, "Result must contain code blocks"}
-    end
-  end
-
-  defp apply_validator(:has_explanation, result) do
-    if String.length(result) > 100 do
-      :ok
-    else
-      {:error, "Result must contain a detailed explanation"}
-    end
-  end
-
-  defp apply_validator(validator, _result) do
-    Logger.warning("Unknown validator: #{validator}")
-    :ok
-  end
 
   defp add_step_result(session, step, result) do
     step_record = %{

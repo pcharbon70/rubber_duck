@@ -11,6 +11,8 @@ defmodule RubberDuck.Enhancement.Coordinator do
 
   alias RubberDuck.Enhancement.{TechniqueSelector, PipelineBuilder, MetricsCollector}
   alias RubberDuck.SelfCorrection.Engine, as: SelfCorrectionEngine
+  alias RubberDuck.CoT.Manager, as: CoTManager
+  alias RubberDuck.CoT.Chains.{ConversationChain, AnalysisChain, GenerationChain, ProblemSolverChain}
 
   @type task :: %{
           type: atom(),
@@ -406,26 +408,77 @@ defmodule RubberDuck.Enhancement.Coordinator do
 
   # Simplified CoT application for now
   defp apply_cot_reasoning(content, config) do
-    # In production, this would use the actual CoT system
-    # For now, return a simulated enhancement
+    # Use the actual CoT system based on chain type
     chain_type = config[:chain_type] || :default
-
-    enhanced =
-      case chain_type do
-        :explanation -> "Let me explain step by step:\n\n#{content}\n\nIn conclusion..."
-        :generation -> "Based on the requirements:\n\n#{content}\n\nImplementation details..."
-        :analysis -> "Analyzing the following:\n\n#{content}\n\nKey findings..."
-        _ -> "Reasoning about: #{content}"
-      end
-
-    {:ok,
-     %{
-       output: enhanced,
-       chain: %{
-         steps: [:understand, :analyze, :conclude],
-         chain_type: chain_type
-       }
-     }}
+    
+    # Select appropriate chain module
+    chain_module = case chain_type do
+      :explanation -> ConversationChain
+      :generation -> GenerationChain
+      :analysis -> AnalysisChain
+      :problem_solving -> ProblemSolverChain
+      _ -> ConversationChain  # Default fallback
+    end
+    
+    # Build context for CoT
+    cot_context = %{
+      enhancement_mode: true,
+      chain_type: chain_type,
+      config: config,
+      original_content: content
+    }
+    
+    Logger.debug("[Enhancement Coordinator] Applying CoT with chain: #{inspect(chain_module)}")
+    
+    # Execute the CoT chain
+    case CoTManager.execute_chain(chain_module, content, cot_context) do
+      {:ok, cot_session} ->
+        # Extract enhanced content from the session
+        enhanced_content = extract_enhanced_content(cot_session)
+        
+        {:ok,
+         %{
+           output: enhanced_content,
+           chain: %{
+             steps: extract_executed_steps(cot_session),
+             chain_type: chain_type,
+             chain_module: chain_module,
+             session_id: cot_session[:id]
+           }
+         }}
+        
+      {:error, reason} ->
+        Logger.error("[Enhancement Coordinator] CoT execution failed: #{inspect(reason)}")
+        # Fallback to simple enhancement
+        {:ok,
+         %{
+           output: "Enhanced: #{content}",
+           chain: %{
+             steps: [:fallback],
+             chain_type: chain_type,
+             error: reason
+           }
+         }}
+    end
+  end
+  
+  defp extract_enhanced_content(cot_session) do
+    # Get the final result from the CoT session
+    cot_session.steps
+    |> Map.values()
+    |> Enum.sort_by(& &1.executed_at)
+    |> List.last()
+    |> case do
+      %{result: result} -> result
+      _ -> "Unable to enhance content through CoT"
+    end
+  end
+  
+  defp extract_executed_steps(cot_session) do
+    # Extract the names of executed steps
+    cot_session.steps
+    |> Map.keys()
+    |> Enum.sort()
   end
 
   # Simplified RAG enhancement for now

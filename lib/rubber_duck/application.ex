@@ -37,6 +37,7 @@ defmodule RubberDuck.Application do
       RubberDuck.Embeddings.Service,
       # Chain-of-Thought system
       RubberDuck.CoT.ConversationManager,
+      RubberDuck.CoT.ChainRegistry,
       # RAG (Retrieval Augmented Generation) system
       RubberDuck.RAG.Supervisor,
       # Self-Correction system

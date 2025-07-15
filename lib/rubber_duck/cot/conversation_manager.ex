@@ -153,11 +153,14 @@ defmodule RubberDuck.CoT.ConversationManager do
         # Execute the chain
         Logger.info("Starting CoT reasoning chain: #{chain_config.name}")
 
-        # Get steps from chain configuration
+        # Get steps from chain configuration and add chain module reference
         steps = chain_config.entities[:step] || []
+        steps_with_module = Enum.map(steps, fn step ->
+          Map.put(step, :__chain_module__, session.chain_module)
+        end)
 
         # Execute steps
-        case Executor.execute_steps(steps, session, chain_config) do
+        case Executor.execute_steps(steps_with_module, session, chain_config) do
           {:ok, final_result, executed_session} ->
             # Validate the result
             case Validator.validate_chain_result(final_result, executed_session) do
