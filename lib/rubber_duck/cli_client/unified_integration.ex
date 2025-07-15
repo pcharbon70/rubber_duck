@@ -31,8 +31,8 @@ defmodule RubberDuck.CLIClient.UnifiedIntegration do
     # Add format to params
     params = Map.put(params, :format, config[:format] || :plain)
     
-    
-    
+    # Special handling for llm commands that need argument transformation
+    params = transform_llm_params(command, params)
     
     # Send through WebSocket client
     case RubberDuck.CLIClient.Client.send_command(command, params) do
@@ -266,6 +266,44 @@ defmodule RubberDuck.CLIClient.UnifiedIntegration do
     flag_name = String.trim_leading(flag, "--")
     Map.put(params, String.to_atom(flag_name), true)
   end
+
+  defp transform_llm_params("llm", params) do
+    # Transform args array into proper param structure for LLM commands
+    case Map.get(params, :subcommand) do
+      "set_model" ->
+        args = Map.get(params, :args, [])
+        transformed = case args do
+          [model] -> 
+            # Only model provided - set as default
+            Map.put(params, :model, model)
+          [provider, model] ->
+            # Both provider and model provided
+            params
+            |> Map.put(:provider, provider)
+            |> Map.put(:model, model)
+          _ ->
+            params
+        end
+        Map.delete(transformed, :args)
+        
+      subcmd when subcmd in ["connect", "disconnect", "enable", "disable", "set_default", "list_models"] ->
+        # These commands expect provider as a direct param
+        args = Map.get(params, :args, [])
+        case args do
+          [provider | _] ->
+            params
+            |> Map.put(:provider, provider)
+            |> Map.delete(:args)
+          _ ->
+            Map.delete(params, :args)
+        end
+        
+      _ ->
+        params
+    end
+  end
+  
+  defp transform_llm_params(_command, params), do: params
 
   defp start_stream_monitor(request_id, handler, _config) do
     # Start a task to monitor the async request and call handler with results
