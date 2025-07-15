@@ -225,7 +225,9 @@ defmodule RubberDuck.CoT.Manager do
     opts = %{messages: messages} |> Map.merge(options) |> Map.to_list()
     case Service.completion(opts) do
       {:ok, response} ->
-        {:ok, extract_content(response)}
+        content = extract_content(response)
+        Logger.debug("Step #{step.name} LLM response content: #{inspect(content)}")
+        {:ok, content}
         
       {:error, reason} = error ->
         Logger.error("LLM call failed for step #{step.name}: #{inspect(reason)}")
@@ -283,6 +285,8 @@ defmodule RubberDuck.CoT.Manager do
       session: session,
       step: step
     }
+    
+    Logger.debug("Validation context for step #{step.name}: result=#{inspect(result)}")
     
     chain_module = Map.get(step, :__chain_module__, session.chain)
     
