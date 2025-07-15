@@ -312,8 +312,8 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
         response_content = extract_cot_response(cot_session)
         
         # Calculate metadata from session
-        duration_ms = if cot_session[:completed_at] && cot_session[:started_at] do
-          DateTime.diff(cot_session.completed_at, cot_session.started_at, :millisecond)
+        duration_ms = if is_map(cot_session) && Map.get(cot_session, :completed_at) && Map.get(cot_session, :started_at) do
+          DateTime.diff(Map.get(cot_session, :completed_at), Map.get(cot_session, :started_at), :millisecond)
         else
           nil
         end
@@ -331,9 +331,9 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
           tokens_used: nil,  # Would need to aggregate from all CoT steps
           generation_time_ms: duration_ms,
           metadata: %{
-            cot_session_id: cot_session[:id],
-            reasoning_steps: length(cot_session[:steps] || []),
-            cached: cot_session[:cached] || false
+            cot_session_id: if(is_map(cot_session), do: Map.get(cot_session, :id), else: nil),
+            reasoning_steps: if(is_map(cot_session), do: length(Map.get(cot_session, :steps, [])), else: 0),
+            cached: if(is_map(cot_session), do: Map.get(cot_session, :cached, false), else: false)
           }
         }
         
@@ -399,30 +399,35 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
   end
   
   defp extract_cot_response(cot_session) do
-    # CoT returns a session with the formatted result in the result field
+    # CoT returns a session with the formatted result
     cond do
+      # If the entire session is a string (direct result from CoT)
+      is_binary(cot_session) ->
+        cot_session
+        
       # If session has a result field with final_answer
-      is_map(cot_session) && is_map(cot_session[:result]) && Map.has_key?(cot_session.result, :final_answer) ->
-        cot_session.result.final_answer
+      is_map(cot_session) && is_map(Map.get(cot_session, :result)) && Map.has_key?(Map.get(cot_session, :result), :final_answer) ->
+        Map.get(Map.get(cot_session, :result), :final_answer)
         
       # If session has a direct result string
-      is_map(cot_session) && is_binary(cot_session[:result]) ->
-        cot_session.result
+      is_map(cot_session) && is_binary(Map.get(cot_session, :result)) ->
+        Map.get(cot_session, :result)
         
       # If session has steps, get the last step result (format_output step)
-      is_map(cot_session) && is_list(cot_session[:steps]) && length(cot_session.steps) > 0 ->
+      is_map(cot_session) && is_list(Map.get(cot_session, :steps)) && length(Map.get(cot_session, :steps, [])) > 0 ->
+        steps = Map.get(cot_session, :steps, [])
         # Find the format_output step specifically
-        format_step = Enum.find(cot_session.steps, fn step ->
-          step[:name] == :format_output
+        format_step = Enum.find(steps, fn step ->
+          Map.get(step, :name) == :format_output
         end)
         
-        if format_step && format_step[:result] do
-          format_step.result
+        if format_step && Map.get(format_step, :result) do
+          Map.get(format_step, :result)
         else
           # Fallback to last step
-          last_step = List.last(cot_session.steps)
-          if last_step && last_step[:result] do
-            last_step.result
+          last_step = List.last(steps)
+          if last_step && Map.get(last_step, :result) do
+            Map.get(last_step, :result)
           else
             "I apologize, but I couldn't generate a proper response."
           end
