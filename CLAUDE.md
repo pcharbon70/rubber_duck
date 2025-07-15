@@ -187,3 +187,6 @@ _
 
 ## Design Rules
 - IMPORTANT: Follow the feature.md rules when asked to implement a feature
+
+## Interaction Rules
+- You must always ask me to start or restart the server for you.

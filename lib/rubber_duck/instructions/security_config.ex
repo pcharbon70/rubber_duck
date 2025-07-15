@@ -10,7 +10,14 @@ defmodule RubberDuck.Instructions.SecurityConfig do
   Gets the current security configuration.
   """
   def get_config do
-    Application.get_env(:rubber_duck, :security, %{})
+    config = Application.get_env(:rubber_duck, :security, %{})
+    
+    # Convert keyword list to map if needed
+    if is_list(config) do
+      Enum.into(config, %{})
+    else
+      config
+    end
   end
   
   @doc """

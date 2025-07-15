@@ -120,10 +120,20 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
 
   ## Server Callbacks
 
-  def init(opts) do
+  def init(_opts) do
     # Initialize components
     {:ok, _} = RateLimiter.start_link()
     {:ok, _} = SecurityMonitor.start_link()
+    
+    # Get security configuration from application environment
+    security_config = Application.get_env(:rubber_duck, :security, [])
+    
+    # Convert keyword list to map if needed
+    config = if is_list(security_config) do
+      Enum.into(security_config, %{})
+    else
+      security_config
+    end
     
     state = %{
       metrics: %{
@@ -131,7 +141,7 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
         total_violations: 0,
         total_errors: 0
       },
-      config: Keyword.get(opts, :config, %{}),
+      config: config,
       started_at: DateTime.utc_now()
     }
     
