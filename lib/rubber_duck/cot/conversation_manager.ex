@@ -11,7 +11,7 @@ defmodule RubberDuck.CoT.ConversationManager do
 
   alias RubberDuck.CoT.{Executor, Validator, Formatter}
 
-  @default_timeout 30_000
+  @default_timeout 120_000
 
   # Client API
 

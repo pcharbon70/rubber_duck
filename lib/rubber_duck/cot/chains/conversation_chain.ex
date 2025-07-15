@@ -13,7 +13,7 @@ defmodule RubberDuck.CoT.Chains.ConversationChain do
       name: :conversation,
       description: "Conversational reasoning with context awareness",
       max_steps: 8,
-      timeout: 30_000,
+      timeout: 120_000,
       template: :default,
       cache_ttl: 300  # 5 minutes - shorter for conversations
     }

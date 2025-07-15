@@ -844,11 +844,11 @@ defmodule RubberDuck.LLM.Service do
   
   defp should_use_cot?(request) do
     # Determine if this request should use CoT based on its characteristics
-    messages = Map.get(request.request_opts, :messages, [])
+    messages = request.messages || []
     
     cond do
       # Skip CoT for internal chain requests to avoid infinite recursion
-      Map.get(request.request_opts, :from_cot, false) ->
+      Map.get(request.options, :from_cot, false) ->
         false
         
       # Skip CoT for simple single-message requests
@@ -911,7 +911,7 @@ defmodule RubberDuck.LLM.Service do
   end
   
   defp execute_with_cot(request, chain_module, provider_state) do
-    messages = Map.get(request.request_opts, :messages, [])
+    messages = request.messages || []
     
     # Extract query and context
     {query, context} = extract_query_and_context(messages)
@@ -920,7 +920,7 @@ defmodule RubberDuck.LLM.Service do
     enhanced_context = Map.merge(context, %{
       provider: provider_state.config.name,
       model: request.model,
-      request_opts: Map.put(request.request_opts, :from_cot, true)
+      request_opts: Map.put(request.options, :from_cot, true)
     })
     
     Logger.debug("[LLM Service] Executing CoT chain with query: #{String.slice(query, 0, 100)}...")
