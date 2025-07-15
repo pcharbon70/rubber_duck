@@ -37,8 +37,14 @@ defmodule RubberDuckWeb.CLIChannel do
     socket = increment_request_count(socket)
     request_id = Map.get(params, "request_id")
 
+    # Build the proper payload format for WebSocket adapter
+    websocket_payload = %{
+      "command" => command,
+      "params" => params
+    }
+
     Task.start_link(fn ->
-      case CommandAdapter.handle_async_message(command, params, socket) do
+      case CommandAdapter.handle_async_message(command, websocket_payload, socket) do
         {:ok, %{request_id: async_request_id}} ->
           # Monitor the async request and push updates
           monitor_async_command(command, async_request_id, request_id, socket)
@@ -62,8 +68,14 @@ defmodule RubberDuckWeb.CLIChannel do
     socket = increment_request_count(socket)
     request_id = Map.get(params, "request_id")
 
+    # Build the proper payload format for WebSocket adapter
+    websocket_payload = %{
+      "command" => "llm",
+      "params" => params
+    }
+
     # Handle synchronously for LLM commands as they are typically quick
-    case CommandAdapter.handle_message("llm", params, socket) do
+    case CommandAdapter.handle_message("llm", websocket_payload, socket) do
       {:ok, result} ->
         # Handle formatted results - decode JSON strings back to maps
         parsed_result = parse_formatted_result(result)
@@ -82,8 +94,14 @@ defmodule RubberDuckWeb.CLIChannel do
     socket = increment_request_count(socket)
     request_id = Map.get(params, "request_id")
 
+    # Build the proper payload format for WebSocket adapter
+    websocket_payload = %{
+      "command" => "conversation",
+      "params" => params
+    }
+
     # Handle synchronously but with longer timeout to prevent WebSocket timeouts
-    case CommandAdapter.handle_message("conversation", params, socket) do
+    case CommandAdapter.handle_message("conversation", websocket_payload, socket) do
       {:ok, result} ->
         # Handle formatted results - decode JSON strings back to maps
         parsed_result = parse_formatted_result(result)
@@ -122,7 +140,13 @@ defmodule RubberDuckWeb.CLIChannel do
     socket = increment_request_count(socket)
     request_id = Map.get(params, "request_id")
 
-    case CommandAdapter.handle_message("health", params, socket) do
+    # Build the proper payload format for WebSocket adapter
+    websocket_payload = %{
+      "command" => "health",
+      "params" => params
+    }
+
+    case CommandAdapter.handle_message("health", websocket_payload, socket) do
       {:ok, result} ->
         # Handle formatted results - decode JSON strings back to maps
         parsed_result = parse_formatted_result(result)
