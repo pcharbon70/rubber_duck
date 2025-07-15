@@ -263,7 +263,36 @@ defmodule RubberDuck.CLIClient.Main do
       :llm ->
         # LLM command has subcommands
         case Map.get(args, :subcommand) do
-          {subcmd, _} -> base_args ++ [to_string(subcmd)]
+          {subcmd, subcmd_args} -> 
+            subcmd_base = base_args ++ [to_string(subcmd)]
+            # Add subcommand-specific args
+            case subcmd do
+              :connect ->
+                provider = Map.get(subcmd_args.args, :provider)
+                if provider, do: subcmd_base ++ [provider], else: subcmd_base
+              :disconnect ->
+                provider = Map.get(subcmd_args.args, :provider)
+                if provider, do: subcmd_base ++ [provider], else: subcmd_base
+              :enable ->
+                provider = Map.get(subcmd_args.args, :provider)
+                if provider, do: subcmd_base ++ [provider], else: subcmd_base
+              :disable ->
+                provider = Map.get(subcmd_args.args, :provider)
+                if provider, do: subcmd_base ++ [provider], else: subcmd_base
+              :set_model ->
+                arg1 = Map.get(subcmd_args.args, :arg1)
+                arg2 = Map.get(subcmd_args.args, :arg2)
+                args_list = if arg1, do: subcmd_base ++ [arg1], else: subcmd_base
+                if arg2, do: args_list ++ [arg2], else: args_list
+              :list_models ->
+                provider = Map.get(subcmd_args.args, :provider)
+                if provider, do: subcmd_base ++ [provider], else: subcmd_base
+              :set_default ->
+                provider = Map.get(subcmd_args.args, :provider)
+                if provider, do: subcmd_base ++ [provider], else: subcmd_base
+              _ ->
+                subcmd_base
+            end
           _ -> base_args
         end
         
