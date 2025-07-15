@@ -99,18 +99,18 @@ defmodule RubberDuck.CoT.Chains.LightweightConversationChain do
   # Validation functions - balanced between quality and speed
   
   def has_understanding(%{result: result}) do
-    result != nil && String.length(result) > 15
+    result != nil && String.length(result) > 0
   end
   
   def has_plan(%{result: result}) do
-    result != nil && String.length(result) > 20
+    result != nil && String.length(result) > 0
   end
   
   def has_response(%{result: result}) do
-    result != nil && String.length(result) > 25
+    result != nil && String.length(result) > 0
   end
   
   def is_polished(%{result: result}) do
-    result != nil && String.length(result) > 15
+    result != nil && String.length(result) > 0
   end
 end

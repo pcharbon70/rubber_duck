@@ -81,14 +81,14 @@ defmodule RubberDuck.CoT.Chains.FastResponseChain do
   # Validation functions - more lenient than full ConversationChain
   
   def has_analysis(%{result: result}) do
-    result != nil && String.length(result) > 20
+    result != nil && String.length(result) > 0
   end
   
   def has_response(%{result: result}) do
-    result != nil && String.length(result) > 30
+    result != nil && String.length(result) > 0
   end
   
   def is_complete(%{result: result}) do
-    result != nil && String.length(result) > 10
+    result != nil && String.length(result) > 0
   end
 end

@@ -43,8 +43,13 @@ defmodule RubberDuck.CoT.Manager do
         {:ok, completed_session} ->
           {:ok, %{completed_session | status: :completed, completed_at: DateTime.utc_now()}}
           
-        {:error, reason, partial_session} ->
-          {:error, reason, %{partial_session | status: :failed, completed_at: DateTime.utc_now()}}
+        {:error, reason, _partial_session} ->
+          # Return simple error without trying to modify session
+          {:error, reason}
+          
+        {:error, reason} ->
+          # Handle case where execute_steps returns 2-tuple error
+          {:error, reason}
       end
     end
   end
