@@ -46,17 +46,11 @@ defmodule RubberDuck.CoT.Chains.FastResponseChain do
       %{
         name: :generate_response,
         prompt: """
-        Based on my analysis, I'll provide a direct response:
-        
-        Analysis: {{previous_result}}
         Question: {{query}}
         
-        I'll provide:
-        1. A clear, direct answer
-        2. Essential information only
-        3. Practical guidance if needed
+        Based on my analysis: {{previous_result}}
         
-        Response:
+        Provide the direct answer to the question. Be factual and concise:
         """,
         depends_on: :quick_analysis,
         validates: [:has_response],
@@ -65,11 +59,11 @@ defmodule RubberDuck.CoT.Chains.FastResponseChain do
       %{
         name: :finalize_answer,
         prompt: """
-        Let me finalize and format my response:
+        Based on the question "{{query}}" and my analysis, here is the direct answer:
         
-        Draft response: {{previous_result}}
+        {{previous_result}}
         
-        Final answer (clear, concise, and helpful):
+        Now, provide ONLY the final answer without any reasoning or explanation. Be direct and concise:
         """,
         depends_on: :generate_response,
         validates: [:is_complete],

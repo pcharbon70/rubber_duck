@@ -41,7 +41,10 @@ defmodule RubberDuck.CoT.Manager do
       # Execute steps
       case execute_steps(steps, session) do
         {:ok, completed_session} ->
-          {:ok, %{completed_session | status: :completed, completed_at: DateTime.utc_now()}}
+          final_session = completed_session
+          |> Map.put(:status, :completed)
+          |> Map.put(:completed_at, DateTime.utc_now())
+          {:ok, final_session}
           
         {:error, reason, _partial_session} ->
           # Return simple error without trying to modify session
@@ -250,25 +253,40 @@ defmodule RubberDuck.CoT.Manager do
   
   defp extract_content(response) do
     cond do
-      is_binary(response) -> response
-      is_struct(response, RubberDuck.LLM.Response) -> extract_llm_response_content(response)
-      is_map(response) and Map.has_key?(response, :content) -> response.content
-      is_map(response) and Map.has_key?(response, :choices) -> extract_choices_content(response.choices)
-      true -> inspect(response)
+      is_binary(response) -> 
+        response
+      is_struct(response, RubberDuck.LLM.Response) -> 
+        extract_llm_response_content(response)
+      is_map(response) and Map.has_key?(response, :content) -> 
+        response.content
+      is_map(response) and Map.has_key?(response, :choices) -> 
+        extract_choices_content(response.choices)
+      true -> 
+        ""
     end
   end
   
   defp extract_llm_response_content(%{choices: choices}) when is_list(choices) do
-    extract_choices_content(choices)
+    Logger.debug("Extracting from choices: #{inspect(choices)}")
+    result = extract_choices_content(choices)
+    Logger.debug("Extracted content: #{inspect(result)}")
+    result
   end
   defp extract_llm_response_content(%{content: content}), do: content
-  defp extract_llm_response_content(_), do: ""
+  defp extract_llm_response_content(response) do
+    Logger.error("Unknown LLM response format: #{inspect(response)}")
+    ""
+  end
   
   defp extract_choices_content([%{message: %{content: content}} | _]), do: content
+  defp extract_choices_content([%{message: %{"content" => content}} | _]), do: content
   defp extract_choices_content([%{"message" => %{"content" => content}} | _]), do: content
   defp extract_choices_content([%{text: content} | _]), do: content
   defp extract_choices_content([%{"text" => content} | _]), do: content
-  defp extract_choices_content(_), do: ""
+  defp extract_choices_content(choices) do
+    Logger.error("Failed to extract content from choices: #{inspect(choices)}")
+    ""
+  end
   
   defp validate_result(step, result, session) do
     case Map.get(step, :validates) do

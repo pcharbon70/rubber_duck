@@ -895,13 +895,18 @@ defmodule RubberDuck.LLM.Service do
     question_type = QuestionClassifier.determine_question_type(content, context)
     
     case {question_type, length(messages)} do
+      # Factual questions bypass CoT entirely for direct answers
+      {:factual, _} ->
+        Logger.debug("[LLM Service] Bypassing CoT for factual question")
+        false
+        
       # Single message simple questions use fast response
       {_, 1} ->
         Logger.debug("[LLM Service] Using FastResponseChain for single message")
         {true, FastResponseChain}
         
       # Simple questions in ongoing conversations use lightweight chain
-      {type, _} when type in [:factual, :basic_code, :straightforward] and length(messages) > 1 ->
+      {type, _} when type in [:basic_code, :straightforward] and length(messages) > 1 ->
         Logger.debug("[LLM Service] Using LightweightConversationChain for ongoing conversation")
         {true, LightweightConversationChain}
         
@@ -1047,14 +1052,82 @@ defmodule RubberDuck.LLM.Service do
   end
   
   defp get_final_cot_result(cot_session) do
-    # Get the result from the last executed step
-    cot_session[:steps]
-    |> Map.values()
-    |> Enum.sort_by(& &1.executed_at)
-    |> List.last()
-    |> case do
-      %{result: result} -> result
-      _ -> "I apologize, but I couldn't generate a proper response."
+    # Handle different CoT session structures
+    cond do
+      # If session has a direct result field
+      is_map(cot_session) && Map.has_key?(cot_session, :result) ->
+        cot_session.result
+        
+      # If session has steps as a map
+      is_map(cot_session) && is_map(Map.get(cot_session, :steps)) ->
+        # Get the finalize_answer or last step result
+        steps = Map.get(cot_session, :steps, %{})
+        
+        # Try to find the final answer step first
+        final_step = Map.get(steps, :finalize_answer) || 
+                    Map.get(steps, :format_output) ||
+                    Map.get(steps, :generate_response)
+                    
+        if final_step && Map.has_key?(final_step, :result) do
+          extract_answer_from_step(final_step.result)
+        else
+          # Fallback to last step by finding the one with highest executed_at
+          steps
+          |> Map.values()
+          |> Enum.filter(&is_map/1)
+          |> Enum.filter(&Map.has_key?(&1, :result))
+          |> Enum.max_by(&Map.get(&1, :executed_at, 0), fn -> nil end)
+          |> case do
+            %{result: result} -> extract_answer_from_step(result)
+            _ -> "I apologize, but I couldn't generate a proper response."
+          end
+        end
+        
+      # If session is a string (direct result)
+      is_binary(cot_session) ->
+        cot_session
+        
+      true ->
+        "I apologize, but I couldn't generate a proper response."
+    end
+  end
+  
+  defp extract_answer_from_step(text) when is_binary(text) do
+    # Extract just the answer, removing CoT reasoning artifacts
+    text
+    |> String.trim()
+    |> extract_final_answer()
+  end
+  defp extract_answer_from_step(_), do: "I apologize, but I couldn't generate a proper response."
+  
+  defp extract_final_answer(text) do
+    # Remove common CoT patterns and extract the actual answer
+    patterns = [
+      # Match "The capital of France is Paris" type responses
+      ~r/(?:the\s+)?capital\s+of\s+\w+\s+is\s+(\w+)/i,
+      # Match direct answers after "Final answer:" or similar
+      ~r/(?:final\s+answer|answer|response):\s*(.+)/is,
+      # Match answers in a clear sentence
+      ~r/(?:Based\s+on\s+.+?,\s*)?(.+?)\s*(?:is\s+the\s+answer|is\s+correct)/i
+    ]
+    
+    # Try each pattern
+    result = Enum.reduce_while(patterns, nil, fn pattern, _acc ->
+      case Regex.run(pattern, text) do
+        [_, answer] -> {:halt, String.trim(answer)}
+        _ -> {:cont, nil}
+      end
+    end)
+    
+    # If no pattern matched, try to extract a clean response
+    if result do
+      result
+    else
+      # Remove reasoning prefixes and clean up
+      text
+      |> String.replace(~r/^(?:Based\s+on\s+.+?[,:]?\s*|Let\s+me\s+.+?[,:]?\s*|I'll\s+.+?[,:]?\s*)/i, "")
+      |> String.replace(~r/^(?:The\s+answer\s+is[,:]?\s*|Here's\s+the\s+answer[,:]?\s*)/i, "")
+      |> String.trim()
     end
   end
   

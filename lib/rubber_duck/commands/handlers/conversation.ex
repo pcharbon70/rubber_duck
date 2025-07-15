@@ -10,8 +10,6 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
 
   alias RubberDuck.Conversations
   alias RubberDuck.Commands.Command
-  alias RubberDuck.CoT.ConversationManager
-  alias RubberDuck.CoT.Chains.ConversationChain
 
   @impl true
   def execute(%Command{name: :conversation, subcommand: :start, args: args, options: options, context: context}) do
@@ -302,23 +300,40 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
     messages = get_conversation_messages(conversation.id)
     conversation_context = get_conversation_context(conversation.id)
     
-    # Build CoT context with all relevant information
-    cot_context = build_cot_context(conversation, messages, user_message, conversation_context, command_context)
+    # Build conversation history as formatted messages for LLM
+    history_messages = messages
+    |> Enum.sort_by(& &1.sequence_number)
+    |> Enum.take(-10)  # Last 10 messages for context
+    |> Enum.map(fn msg ->
+      %{role: String.to_atom(to_string(msg.role)), content: msg.content}
+    end)
     
-    # Execute ConversationChain for reasoning
-    case ConversationManager.execute_chain(ConversationChain, user_message.content, cot_context) do
-      {:ok, cot_session} ->
-        # Extract the final formatted response from CoT session
-        response_content = extract_cot_response(cot_session)
+    # Add the current user message to the history
+    all_messages = history_messages ++ [%{role: :user, content: user_message.content}]
+    
+    # Determine optimal model based on message analysis
+    {model, temperature} = select_optimal_model_for_message(user_message, conversation_context)
+    
+    # Build LLM options
+    llm_options = [
+      model: model,
+      messages: all_messages,
+      temperature: temperature,
+      max_tokens: get_max_tokens_for_context(conversation_context),
+      timeout: 120_000,
+      # Include conversation context for CoT if needed
+      conversation_history: format_conversation_history(messages),
+      conversation_type: conversation_context && conversation_context.conversation_type,
+      user_preferences: conversation_context && conversation_context.llm_preferences || %{}
+    ]
+    
+    # Use LLM Service which will intelligently decide whether to use CoT
+    case RubberDuck.LLM.Service.completion(llm_options) do
+      {:ok, response} ->
+        # Extract response content
+        response_content = extract_llm_response(response)
         
-        # Calculate metadata from session
-        duration_ms = if is_map(cot_session) && Map.get(cot_session, :completed_at) && Map.get(cot_session, :started_at) do
-          DateTime.diff(Map.get(cot_session, :completed_at), Map.get(cot_session, :started_at), :millisecond)
-        else
-          nil
-        end
-        
-        # Create assistant message with CoT-generated content
+        # Create assistant message with the response
         sequence_number = length(messages) + 2 # +1 for user message, +1 for this response
         
         assistant_params = %{
@@ -326,152 +341,119 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
           role: :assistant,
           content: response_content,
           sequence_number: sequence_number,
-          model_used: cot_context.llm_config.model,
-          provider_used: "cot",  # Indicates CoT was used
-          tokens_used: nil,  # Would need to aggregate from all CoT steps
-          generation_time_ms: duration_ms,
+          model_used: model,
+          provider_used: get_provider_from_response(response),
+          tokens_used: get_tokens_from_response(response),
+          generation_time_ms: get_duration_from_response(response),
           metadata: %{
-            cot_session_id: if(is_map(cot_session), do: Map.get(cot_session, :id), else: nil),
-            reasoning_steps: if(is_map(cot_session), do: length(Map.get(cot_session, :steps, [])), else: 0),
-            cached: if(is_map(cot_session), do: Map.get(cot_session, :cached, false), else: false)
+            used_cot: was_cot_used(response),
+            temperature: temperature
           }
         }
         
         Conversations.create_message(assistant_params)
         
       {:error, reason} ->
-        # Provide specific error messages for CoT failures
+        # Handle errors
         case reason do
           :timeout ->
-            {:error, "Chain-of-Thought reasoning timed out. The request may be too complex."}
-          {:validation_failed, errors} ->
-            {:error, "Reasoning validation failed: #{inspect(errors)}"}
+            {:error, "Request timed out. Please try again with a simpler question."}
+          :model_required ->
+            {:error, "No model configured. Please set a model using: llm set_model <model>"}
           _ ->
-            {:error, "Failed to generate response through reasoning: #{inspect(reason)}"}
+            {:error, "Failed to generate response: #{inspect(reason)}"}
         end
     end
   end
   
-  defp build_cot_context(_conversation, messages, user_message, conversation_context, command_context) do
-    # Build conversation history for CoT
-    conversation_history = messages
+  defp format_conversation_history(messages) do
+    messages
     |> Enum.sort_by(& &1.sequence_number)
     |> Enum.take(-10)  # Last 10 messages for context
     |> Enum.map(fn msg ->
       "#{msg.role}: #{msg.content}"
     end)
     |> Enum.join("\n")
-    
-    # Determine optimal model based on message analysis
-    {model, temperature} = select_optimal_model_for_message(user_message, conversation_context)
-    
-    %{
-      conversation_history: conversation_history,
-      user_context: %{
-        user_id: command_context.user_id,
-        project_id: command_context.project_id,
-        session_id: command_context.session_id,
-        conversation_type: conversation_context && conversation_context.conversation_type
-      },
-      knowledge_base: %{
-        # This would be populated from memory system
-        recent_topics: conversation_context && conversation_context.active_topics || [],
-        user_preferences: conversation_context && conversation_context.llm_preferences || %{}
-      },
-      project_context: %{
-        # This would be populated from project analysis
-        current_files: [],
-        recent_changes: []
-      },
-      user_preferences: %{
-        preferred_model: model,
-        temperature: temperature,
-        style: "helpful and clear"
-      },
-      # Pass model configuration for LLM calls within CoT
-      llm_config: %{
-        model: model,
-        temperature: temperature,
-        max_tokens: get_max_tokens_for_context(conversation_context),
-        timeout: 120_000
-      }
-    }
   end
   
-  defp extract_cot_response(cot_session) do
-    # CoT returns a session with the formatted result
+  defp extract_llm_response(response) do
     cond do
-      # If the entire session is a string (direct result from CoT)
-      is_binary(cot_session) ->
-        extract_final_answer(cot_session)
-        
-      # If session has a result field with final_answer
-      is_map(cot_session) && is_map(Map.get(cot_session, :result)) && Map.has_key?(Map.get(cot_session, :result), :final_answer) ->
-        extract_final_answer(Map.get(Map.get(cot_session, :result), :final_answer))
-        
-      # If session has a direct result string
-      is_map(cot_session) && is_binary(Map.get(cot_session, :result)) ->
-        extract_final_answer(Map.get(cot_session, :result))
-        
-      # If session has steps, get the last step result (format_output step)
-      is_map(cot_session) && is_list(Map.get(cot_session, :steps)) && length(Map.get(cot_session, :steps, [])) > 0 ->
-        steps = Map.get(cot_session, :steps, [])
-        # Find the format_output step specifically
-        format_step = Enum.find(steps, fn step ->
-          Map.get(step, :name) in [:format_output, :finalize_answer, :polish_response]
-        end)
-        
-        if format_step && Map.get(format_step, :result) do
-          extract_final_answer(Map.get(format_step, :result))
-        else
-          # Fallback to last step
-          last_step = List.last(steps)
-          if last_step && Map.get(last_step, :result) do
-            extract_final_answer(Map.get(last_step, :result))
-          else
-            "I apologize, but I couldn't generate a proper response."
-          end
+      # Handle LLM.Response struct
+      is_struct(response, RubberDuck.LLM.Response) and is_list(response.choices) ->
+        response.choices
+        |> List.first()
+        |> case do
+          # Handle both atom and string keys
+          %{message: %{content: content}} when is_binary(content) -> 
+            String.trim(content)
+          %{message: %{"content" => content}} when is_binary(content) -> 
+            String.trim(content)
+          %{"message" => %{"content" => content}} when is_binary(content) -> 
+            String.trim(content)
+          _ -> 
+            "I apologize, but I couldn't generate a response."
         end
         
-      # Fallback
+      # Handle plain map response
+      is_map(response) and Map.has_key?(response, :content) ->
+        String.trim(response.content)
+        
+      # Handle plain map with string key
+      is_map(response) and Map.has_key?(response, "content") ->
+        String.trim(response["content"])
+        
+      # Handle string response
+      is_binary(response) ->
+        String.trim(response)
+        
       true ->
-        "I apologize, but I couldn't generate a proper response."
+        "I apologize, but I couldn't generate a response."
     end
   end
   
-  defp extract_final_answer(text) when is_binary(text) do
-    # Clean up the response to extract just the final answer
-    text
-    |> String.trim()
-    |> remove_reasoning_artifacts()
-    |> ensure_complete_sentences()
-  end
-  defp extract_final_answer(_), do: "I apologize, but I couldn't generate a proper response."
-  
-  defp remove_reasoning_artifacts(text) do
-    # Remove common reasoning artifacts and meta-commentary
-    text
-    |> String.replace(~r/^(Analysis|Understanding|Context|Response|Final answer|Let me|I'll|Now I'll|Based on|From the|Given that):\s*/im, "")
-    |> String.replace(~r/^(Step \d+|Phase \d+|Part \d+):\s*/im, "")
-    |> String.replace(~r/^\d+\.\s+/m, "")
-    |> String.replace(~r/\*\*(Analysis|Understanding|Context|Response|Final answer|Let me|I'll|Now I'll|Based on|From the|Given that)\*\*:\s*/im, "")
-    |> String.replace(~r/\n\s*\n\s*\n/m, "\n\n")  # Normalize multiple line breaks
-    |> String.trim()
+  defp get_provider_from_response(response) do
+    cond do
+      is_struct(response, RubberDuck.LLM.Response) ->
+        response.provider || "unknown"
+      is_map(response) && Map.has_key?(response, :provider) ->
+        response.provider
+      true ->
+        "unknown"
+    end
   end
   
-  defp ensure_complete_sentences(text) do
-    # Ensure the response ends with proper punctuation
-    text = String.trim(text)
-    
-    if String.length(text) > 0 do
-      last_char = String.last(text)
-      if last_char in [".", "!", "?"] do
-        text
-      else
-        text <> "."
-      end
-    else
-      text
+  defp get_tokens_from_response(response) do
+    cond do
+      is_struct(response, RubberDuck.LLM.Response) && is_map(response.usage) ->
+        response.usage.total_tokens
+      is_map(response) && is_map(Map.get(response, :usage)) ->
+        response.usage.total_tokens
+      true ->
+        nil
+    end
+  end
+  
+  defp get_duration_from_response(response) do
+    cond do
+      is_struct(response, RubberDuck.LLM.Response) && is_map(response.metadata) && Map.has_key?(response.metadata, :reasoning_time) ->
+        response.metadata.reasoning_time
+      is_struct(response, RubberDuck.LLM.Response) && Map.has_key?(response, :processing_time_ms) ->
+        Map.get(response, :processing_time_ms)
+      is_map(response) && Map.has_key?(response, :processing_time_ms) ->
+        response.processing_time_ms
+      true ->
+        nil
+    end
+  end
+  
+  defp was_cot_used(response) do
+    cond do
+      is_struct(response, RubberDuck.LLM.Response) && is_map(response.metadata) ->
+        Map.get(response.metadata, :used_cot, false)
+      is_map(response) && is_map(Map.get(response, :metadata)) ->
+        get_in(response, [:metadata, :used_cot]) || false
+      true ->
+        false
     end
   end
 

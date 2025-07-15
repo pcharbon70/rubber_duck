@@ -19,6 +19,7 @@ defmodule RubberDuck.CoT.QuestionClassifier do
   
   @simple_patterns [
     # Direct questions
+    ~r/^what\s+is\s+the\s+capital\s+of\s+/i,
     ~r/^what\s+is\s+/i,
     ~r/^how\s+do\s+i\s+/i,
     ~r/^where\s+is\s+/i,
@@ -157,6 +158,10 @@ defmodule RubberDuck.CoT.QuestionClassifier do
     question_lower = String.downcase(clean_question)
     
     cond do
+      # Skip CoT if this is already a CoT-generated message
+      is_cot_generated?(question_lower) ->
+        :factual  # Treat as simple to bypass CoT
+        
       # Check for complex indicators first (override simple patterns)
       has_complex_indicators?(question_lower) ->
         :complex_problem
@@ -248,9 +253,14 @@ defmodule RubberDuck.CoT.QuestionClassifier do
   end
   
   defp has_complex_indicators?(question_lower) do
-    Enum.any?(@complex_indicators, fn indicator ->
-      String.contains?(question_lower, indicator)
-    end)
+    # Skip CoT if this is already a CoT-generated message
+    if String.contains?(question_lower, ["current step:", "i'll work through this step-by-step"]) do
+      false
+    else
+      Enum.any?(@complex_indicators, fn indicator ->
+        String.contains?(question_lower, indicator)
+      end)
+    end
   end
   
   defp is_multi_step_from_context?(context) do
@@ -285,4 +295,16 @@ defmodule RubberDuck.CoT.QuestionClassifier do
     Map.get(msg, "content", "") || Map.get(msg, :content, "")
   end
   defp get_message_content(_), do: ""
+  
+  defp is_cot_generated?(question_lower) do
+    String.contains?(question_lower, [
+      "current step:",
+      "i'll work through this step-by-step",
+      "let me understand",
+      "i'll analyze:",
+      "context understanding:",
+      "relevant knowledge:",
+      "user intent:"
+    ])
+  end
 end
