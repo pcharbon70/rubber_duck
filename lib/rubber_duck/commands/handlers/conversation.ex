@@ -442,24 +442,6 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
     end
   end
 
-  defp build_llm_messages(messages, context) do
-    system_message = if context && context.system_prompt do
-      [%{role: "system", content: context.system_prompt}]
-    else
-      []
-    end
-    
-    conversation_messages = messages
-    |> Enum.sort_by(& &1.sequence_number)
-    |> Enum.map(fn msg ->
-      %{
-        role: to_string(msg.role),
-        content: msg.content
-      }
-    end)
-    
-    system_message ++ conversation_messages
-  end
 
   defp get_conversation_model(nil), do: "codellama"
   defp get_conversation_model(context) do
@@ -606,79 +588,6 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
     Enum.any?(keywords, fn keyword -> String.contains?(content, keyword) end)
   end
 
-  # Response processing helpers following established patterns
-  defp extract_response_content(response) do
-    cond do
-      is_binary(response) -> response
-      
-      # Handle RubberDuck.LLM.Response struct
-      is_struct(response, RubberDuck.LLM.Response) and is_list(response.choices) ->
-        response.choices
-        |> List.first()
-        |> case do
-          %{message: %{content: content}} when is_binary(content) -> content
-          %{message: %{"content" => content}} when is_binary(content) -> content
-          _ -> "I apologize, but I couldn't generate a proper response."
-        end
-        
-      # Handle plain maps with choices
-      is_map(response) and Map.has_key?(response, :choices) and is_list(response.choices) ->
-        response.choices
-        |> List.first()
-        |> case do
-          %{message: %{content: content}} -> content
-          %{"message" => %{"content" => content}} -> content
-          %{text: content} -> content
-          %{"text" => content} -> content
-          _ -> "I apologize, but I couldn't generate a proper response."
-        end
-        
-      is_map(response) and Map.has_key?(response, :content) ->
-        response.content
-        
-      true ->
-        "I apologize, but I couldn't generate a proper response."
-    end
-  end
-
-  defp extract_model_from_response(response) do
-    cond do
-      is_struct(response, RubberDuck.LLM.Response) -> response.model
-      is_map(response) and Map.has_key?(response, :model) -> response.model
-      is_map(response) and Map.has_key?(response, "model") -> response["model"]
-      true -> "unknown"
-    end
-  end
-
-  defp extract_provider_from_response(response) do
-    cond do
-      is_struct(response, RubberDuck.LLM.Response) -> to_string(response.provider)
-      is_map(response) and Map.has_key?(response, :provider) -> to_string(response.provider)
-      is_map(response) and Map.has_key?(response, "provider") -> response["provider"]
-      true -> "unknown"
-    end
-  end
-
-  defp extract_tokens_from_response(response) do
-    cond do
-      is_struct(response, RubberDuck.LLM.Response) and response.usage -> response.usage.total_tokens
-      is_map(response) and is_map(response[:usage]) -> response.usage.total_tokens
-      is_map(response) and is_map(response["usage"]) -> response["usage"]["total_tokens"]
-      true -> nil
-    end
-  end
-
-  defp extract_generation_time(response) do
-    cond do
-      is_struct(response, RubberDuck.LLM.Response) and response.metadata -> 
-        response.metadata[:generation_time_ms] || response.metadata[:total_duration]
-      is_map(response) and is_map(response[:metadata]) -> 
-        response.metadata[:generation_time_ms] || response.metadata[:total_duration]
-      is_map(response) and is_map(response["metadata"]) -> 
-        response["metadata"]["generation_time_ms"] || response["metadata"]["total_duration"]
-      true -> nil
-    end
-  end
 
   defp get_max_tokens_for_context(nil), do: 4096
   defp get_max_tokens_for_context(context) do

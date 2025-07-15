@@ -51,6 +51,10 @@ defmodule RubberDuck.LLM.Service do
     CostTracker,
     HealthMonitor
   }
+  
+  alias RubberDuck.CoT.Manager, as: CoTManager
+  alias RubberDuck.CoT.Chains.{ConversationChain, AnalysisChain, GenerationChain, ProblemSolverChain}
+  alias RubberDuck.CoT.ChainRegistry
 
   @type provider_name :: atom()
   @type model_name :: String.t()
@@ -533,20 +537,29 @@ defmodule RubberDuck.LLM.Service do
   end
 
   defp execute_request(request, provider_state, _state) do
-    adapter = provider_state.config.adapter
-    
-    Logger.debug("[LLM Service] Executing request with adapter: #{inspect(adapter)}")
-    Logger.debug("[LLM Service] Request: #{inspect(request.model)} - #{inspect(request.provider)}")
+    # Check if this request should use CoT
+    case should_use_cot?(request) do
+      {true, chain_module} ->
+        Logger.debug("[LLM Service] Using CoT chain: #{inspect(chain_module)}")
+        execute_with_cot(request, chain_module, provider_state)
+        
+      false ->
+        # Direct LLM call without CoT
+        adapter = provider_state.config.adapter
+        
+        Logger.debug("[LLM Service] Executing direct request with adapter: #{inspect(adapter)}")
+        Logger.debug("[LLM Service] Request: #{inspect(request.model)} - #{inspect(request.provider)}")
 
-    try do
-      # Execute with retry logic
-      result = execute_with_retry(request, adapter, provider_state.config)
-      Logger.debug("[LLM Service] Request completed with result: #{inspect(result)}")
-      result
-    rescue
-      error ->
-        Logger.error("LLM request failed: #{inspect(error)}")
-        {:error, error}
+        try do
+          # Execute with retry logic
+          result = execute_with_retry(request, adapter, provider_state.config)
+          Logger.debug("[LLM Service] Request completed with result: #{inspect(result)}")
+          result
+        rescue
+          error ->
+            Logger.error("LLM request failed: #{inspect(error)}")
+            {:error, error}
+        end
     end
   end
 
@@ -824,6 +837,192 @@ defmodule RubberDuck.LLM.Service do
       pid ->
         send(pid, {:update_last_used, provider_name})
         :ok
+    end
+  end
+  
+  # CoT Integration Functions
+  
+  defp should_use_cot?(request) do
+    # Determine if this request should use CoT based on its characteristics
+    messages = Map.get(request.request_opts, :messages, [])
+    
+    cond do
+      # Skip CoT for internal chain requests to avoid infinite recursion
+      Map.get(request.request_opts, :from_cot, false) ->
+        false
+        
+      # Skip CoT for simple single-message requests
+      length(messages) == 1 ->
+        false
+        
+      # Detect request patterns and map to appropriate chains
+      true ->
+        detect_chain_from_messages(messages)
+    end
+  end
+  
+  defp detect_chain_from_messages(messages) do
+    # Use ChainRegistry for intelligent chain selection
+    last_message = List.last(messages) || %{}
+    content = Map.get(last_message, "content", "") || Map.get(last_message, :content, "")
+    
+    # Build context from message history
+    context = %{
+      message_count: length(messages),
+      has_code: String.contains?(content, ["```", "def", "function", "class"]),
+      conversation_depth: length(messages)
+    }
+    
+    # Try to get chain from registry first
+    case ChainRegistry.select_chain(content, context) do
+      {:ok, chain_module} ->
+        Logger.debug("[LLM Service] ChainRegistry selected: #{inspect(chain_module)}")
+        {true, chain_module}
+        
+      {:error, _reason} ->
+        # Fallback to manual detection
+        Logger.debug("[LLM Service] ChainRegistry unavailable, using fallback detection")
+        fallback_chain_detection(content, messages)
+    end
+  end
+  
+  defp fallback_chain_detection(content, messages) do
+    cond do
+      # Code generation requests
+      String.contains?(String.downcase(content), ["generate", "create", "implement", "write code"]) ->
+        {true, GenerationChain}
+        
+      # Code analysis requests
+      String.contains?(String.downcase(content), ["analyze", "review", "check", "find issues"]) ->
+        {true, AnalysisChain}
+        
+      # Problem solving requests
+      String.contains?(String.downcase(content), ["solve", "fix", "debug", "help me with"]) ->
+        {true, ProblemSolverChain}
+        
+      # General conversation with context
+      length(messages) > 2 ->
+        {true, ConversationChain}
+        
+      # Default: no CoT for simple requests
+      true ->
+        false
+    end
+  end
+  
+  defp execute_with_cot(request, chain_module, provider_state) do
+    messages = Map.get(request.request_opts, :messages, [])
+    
+    # Extract query and context
+    {query, context} = extract_query_and_context(messages)
+    
+    # Add provider info to context
+    enhanced_context = Map.merge(context, %{
+      provider: provider_state.config.name,
+      model: request.model,
+      request_opts: Map.put(request.request_opts, :from_cot, true)
+    })
+    
+    Logger.debug("[LLM Service] Executing CoT chain with query: #{String.slice(query, 0, 100)}...")
+    
+    # Execute the CoT chain
+    case CoTManager.execute_chain(chain_module, query, enhanced_context) do
+      {:ok, cot_session} ->
+        # Convert CoT session result to LLM response format
+        convert_cot_to_response(cot_session, request)
+        
+      {:error, reason} ->
+        Logger.error("[LLM Service] CoT execution failed: #{inspect(reason)}")
+        # Fallback to direct execution
+        adapter = provider_state.config.adapter
+        execute_with_retry(request, adapter, provider_state.config)
+    end
+  end
+  
+  defp extract_query_and_context(messages) do
+    # Extract the main query (last user message) and build context from history
+    last_message = List.last(messages) || %{}
+    query = Map.get(last_message, "content", "") || Map.get(last_message, :content, "")
+    
+    # Build context from message history
+    context = %{
+      messages: messages,
+      message_count: length(messages),
+      has_system_prompt: Enum.any?(messages, fn m -> 
+        Map.get(m, "role", "") == "system" || Map.get(m, :role, "") == "system"
+      end)
+    }
+    
+    {query, context}
+  end
+  
+  defp convert_cot_to_response(cot_session, request) do
+    # Extract the final result from the CoT session
+    final_result = get_final_cot_result(cot_session)
+    
+    # Build response in the expected format
+    response = %Response{
+      id: "cot-#{cot_session[:id] || generate_request_id()}",
+      provider: request.provider,
+      model: request.model,
+      choices: [
+        %{
+          index: 0,
+          message: %{
+            "role" => "assistant",
+            "content" => final_result
+          },
+          finish_reason: "stop"
+        }
+      ],
+      usage: %{
+        prompt_tokens: estimate_tokens(cot_session),
+        completion_tokens: estimate_tokens(final_result),
+        total_tokens: estimate_tokens(cot_session) + estimate_tokens(final_result)
+      },
+      created_at: DateTime.utc_now(),
+      metadata: %{
+        cot_session_id: cot_session[:id],
+        chain_used: cot_session.chain,
+        steps_completed: map_size(cot_session.steps || %{}),
+        reasoning_time: calculate_reasoning_time(cot_session)
+      }
+    }
+    
+    {:ok, response}
+  end
+  
+  defp get_final_cot_result(cot_session) do
+    # Get the result from the last executed step
+    cot_session.steps
+    |> Map.values()
+    |> Enum.sort_by(& &1.executed_at)
+    |> List.last()
+    |> case do
+      %{result: result} -> result
+      _ -> "I apologize, but I couldn't generate a proper response."
+    end
+  end
+  
+  defp estimate_tokens(text) when is_binary(text) do
+    # Simple token estimation: ~4 characters per token
+    div(String.length(text), 4)
+  end
+  defp estimate_tokens(cot_session) when is_map(cot_session) do
+    # Estimate tokens from all step results
+    cot_session.steps
+    |> Map.values()
+    |> Enum.map(fn step -> estimate_tokens(Map.get(step, :result, "")) end)
+    |> Enum.sum()
+  end
+  defp estimate_tokens(_), do: 0
+  
+  defp calculate_reasoning_time(cot_session) do
+    case {cot_session[:started_at], cot_session[:completed_at]} do
+      {%DateTime{} = started, %DateTime{} = completed} ->
+        DateTime.diff(completed, started, :millisecond)
+      _ ->
+        0
     end
   end
 end
