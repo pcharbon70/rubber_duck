@@ -17,7 +17,7 @@ defmodule RubberDuck.CoT.Chains.FastResponseChain do
       name: :fast_response,
       description: "Fast reasoning chain for moderately complex questions",
       max_steps: 3,
-      timeout: 30_000,  # 30 seconds vs 2 minutes
+      timeout: 60_000,  # 60 seconds to accommodate longer step timeouts
       template: :streamlined,
       cache_ttl: 900  # 15 minutes
     }
@@ -41,7 +41,7 @@ defmodule RubberDuck.CoT.Chains.FastResponseChain do
         Quick analysis:
         """,
         validates: [:has_analysis],
-        timeout: 8_000
+        timeout: 15_000
       },
       %{
         name: :generate_response,
@@ -60,7 +60,7 @@ defmodule RubberDuck.CoT.Chains.FastResponseChain do
         """,
         depends_on: :quick_analysis,
         validates: [:has_response],
-        timeout: 15_000
+        timeout: 20_000
       },
       %{
         name: :finalize_answer,
@@ -73,7 +73,7 @@ defmodule RubberDuck.CoT.Chains.FastResponseChain do
         """,
         depends_on: :generate_response,
         validates: [:is_complete],
-        timeout: 7_000
+        timeout: 15_000
       }
     ]
   end

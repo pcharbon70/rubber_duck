@@ -16,7 +16,7 @@ defmodule RubberDuck.CoT.Chains.LightweightConversationChain do
       name: :lightweight_conversation,
       description: "Streamlined conversational reasoning",
       max_steps: 4,
-      timeout: 45_000,  # 45 seconds vs 2 minutes
+      timeout: 75_000,  # 75 seconds to accommodate longer step timeouts
       template: :conversational,
       cache_ttl: 600  # 10 minutes
     }
@@ -40,7 +40,7 @@ defmodule RubberDuck.CoT.Chains.LightweightConversationChain do
         Understanding:
         """,
         validates: [:has_understanding],
-        timeout: 6_000
+        timeout: 15_000
       },
       %{
         name: :plan_response,
@@ -59,7 +59,7 @@ defmodule RubberDuck.CoT.Chains.LightweightConversationChain do
         """,
         depends_on: :understand_request,
         validates: [:has_plan],
-        timeout: 8_000
+        timeout: 15_000
       },
       %{
         name: :generate_response,
@@ -78,7 +78,7 @@ defmodule RubberDuck.CoT.Chains.LightweightConversationChain do
         """,
         depends_on: :plan_response,
         validates: [:has_response],
-        timeout: 20_000
+        timeout: 25_000
       },
       %{
         name: :polish_response,
@@ -91,7 +91,7 @@ defmodule RubberDuck.CoT.Chains.LightweightConversationChain do
         """,
         depends_on: :generate_response,
         validates: [:is_polished],
-        timeout: 8_000
+        timeout: 15_000
       }
     ]
   end
