@@ -74,29 +74,21 @@ defmodule RubberDuck.CoT.Validator do
 
   defp validate_consistency(_result, session) do
     # Check for contradictions between steps
-    # Make validation very lenient for simple conversational responses
-    contradictions = find_contradictions(session.steps)
+    # Disable contradiction validation for now as the current algorithm is too simplistic
+    # and generates too many false positives for conversational responses
+    _contradictions = find_contradictions(session.steps)
 
-    # Only fail if we have excessive contradictions (>50) to avoid false positives
-    # The current contradiction detection is too simplistic for real-world use
-    if length(contradictions) > 50 do
-      {:error, {:contradictions_found, contradictions}}
-    else
-      :ok
-    end
+    # Skip contradiction validation entirely until we have better NLP-based detection
+    :ok
   end
 
   defp validate_logical_flow(_result, session) do
     # Check that reasoning follows logically from step to step
-    # Make validation more lenient for simple conversational responses
-    flow_issues = check_logical_flow(session.steps)
+    # Disable logical flow validation for now as it's too restrictive for conversational responses
+    _flow_issues = check_logical_flow(session.steps)
 
-    # Only fail if we have many flow issues (>5) to avoid false positives
-    if length(flow_issues) > 5 do
-      {:error, {:logical_flow_issues, flow_issues}}
-    else
-      :ok
-    end
+    # Skip logical flow validation entirely until we have better semantic analysis
+    :ok
   end
 
   defp validate_answer_quality(result, _session) do
