@@ -53,8 +53,9 @@ defmodule RubberDuck.LLM.Service do
   }
   
   alias RubberDuck.CoT.Manager, as: CoTManager
-  alias RubberDuck.CoT.Chains.{ConversationChain, AnalysisChain, GenerationChain, ProblemSolverChain}
+  alias RubberDuck.CoT.Chains.{ConversationChain, AnalysisChain, GenerationChain, ProblemSolverChain, FastResponseChain, LightweightConversationChain}
   alias RubberDuck.CoT.ChainRegistry
+  alias RubberDuck.CoT.QuestionClassifier
 
   @type provider_name :: atom()
   @type model_name :: String.t()
@@ -851,28 +852,60 @@ defmodule RubberDuck.LLM.Service do
       Map.get(request.options, :from_cot, false) ->
         false
         
-      # Skip CoT for simple single-message requests
-      length(messages) == 1 ->
-        false
+      # Use question classifier for intelligent CoT decision
+      length(messages) > 0 ->
+        # Get the last message content for classification
+        last_message = List.last(messages) || %{}
+        content = Map.get(last_message, "content", "") || Map.get(last_message, :content, "")
         
-      # Detect request patterns and map to appropriate chains
+        # Build context for classification
+        context = %{
+          messages: messages,
+          message_count: length(messages),
+          has_code: String.contains?(content, ["`", "```", "def", "function", "class"]),
+          conversation_depth: length(messages)
+        }
+        
+        # Classify the question and select appropriate chain
+        case QuestionClassifier.classify(content, context) do
+          :simple ->
+            # Simple questions now use optimized chains instead of bypassing CoT
+            Logger.debug("[LLM Service] Question classified as simple, using optimized chain")
+            select_optimized_chain(content, messages, context)
+            
+          :complex ->
+            Logger.debug("[LLM Service] Question classified as complex, using full CoT")
+            detect_chain_from_messages(messages, content, context)
+        end
+        
+      # Default: no CoT for empty messages
       true ->
-        detect_chain_from_messages(messages)
+        false
     end
   end
   
-  defp detect_chain_from_messages(messages) do
-    # Use ChainRegistry for intelligent chain selection
-    last_message = List.last(messages) || %{}
-    content = Map.get(last_message, "content", "") || Map.get(last_message, :content, "")
+  defp select_optimized_chain(content, messages, context) do
+    question_type = QuestionClassifier.determine_question_type(content, context)
     
-    # Build context from message history
-    context = %{
-      message_count: length(messages),
-      has_code: String.contains?(content, ["```", "def", "function", "class"]),
-      conversation_depth: length(messages)
-    }
-    
+    case {question_type, length(messages)} do
+      # Single message simple questions use fast response
+      {_, 1} ->
+        Logger.debug("[LLM Service] Using FastResponseChain for single message")
+        {true, FastResponseChain}
+        
+      # Simple questions in ongoing conversations use lightweight chain
+      {type, _} when type in [:factual, :basic_code, :straightforward] and length(messages) > 1 ->
+        Logger.debug("[LLM Service] Using LightweightConversationChain for ongoing conversation")
+        {true, LightweightConversationChain}
+        
+      # Default to fast response for other simple cases
+      _ ->
+        Logger.debug("[LLM Service] Using FastResponseChain as default for simple questions")
+        {true, FastResponseChain}
+    end
+  end
+
+  defp detect_chain_from_messages(messages, content, context) do
     # Try to get chain from registry first
     case ChainRegistry.select_chain(content, context) do
       {:ok, chain_module} ->
@@ -880,33 +913,47 @@ defmodule RubberDuck.LLM.Service do
         {true, chain_module}
         
       {:error, _reason} ->
-        # Fallback to manual detection
-        Logger.debug("[LLM Service] ChainRegistry unavailable, using fallback detection")
-        fallback_chain_detection(content, messages)
+        # Fallback to manual detection with optimized chains
+        Logger.debug("[LLM Service] ChainRegistry unavailable, using optimized fallback detection")
+        fallback_chain_detection(content, messages, context)
     end
   end
   
-  defp fallback_chain_detection(content, messages) do
-    cond do
-      # Code generation requests
-      String.contains?(String.downcase(content), ["generate", "create", "implement", "write code"]) ->
-        {true, GenerationChain}
+  defp fallback_chain_detection(content, messages, context) do
+    # We already know this is a complex question, so determine the best chain
+    question_type = QuestionClassifier.determine_question_type(content, context)
+    
+    case question_type do
+      :complex_problem ->
+        cond do
+          # Code generation requests
+          String.contains?(String.downcase(content), ["generate", "create", "implement", "write code"]) ->
+            {true, GenerationChain}
+            
+          # Code analysis requests
+          String.contains?(String.downcase(content), ["analyze", "review", "check", "find issues"]) ->
+            {true, AnalysisChain}
+            
+          # Problem solving requests
+          String.contains?(String.downcase(content), ["solve", "fix", "debug", "help me with"]) ->
+            {true, ProblemSolverChain}
+            
+          # Default to full conversation chain for complex problems
+          true ->
+            {true, ConversationChain}
+        end
         
-      # Code analysis requests
-      String.contains?(String.downcase(content), ["analyze", "review", "check", "find issues"]) ->
-        {true, AnalysisChain}
-        
-      # Problem solving requests
-      String.contains?(String.downcase(content), ["solve", "fix", "debug", "help me with"]) ->
-        {true, ProblemSolverChain}
-        
-      # General conversation with context
-      length(messages) > 2 ->
+      :multi_step ->
+        # Multi-step processes always use full conversation chain
         {true, ConversationChain}
         
-      # Default: no CoT for simple requests
-      true ->
-        false
+      # For conversation contexts, use lightweight or full chain based on complexity
+      _ ->
+        if length(messages) > 3 do
+          {true, ConversationChain}
+        else
+          {true, LightweightConversationChain}
+        end
     end
   end
   
@@ -983,8 +1030,8 @@ defmodule RubberDuck.LLM.Service do
       created_at: DateTime.utc_now(),
       metadata: %{
         cot_session_id: cot_session[:id],
-        chain_used: cot_session.chain,
-        steps_completed: map_size(cot_session.steps || %{}),
+        chain_used: cot_session[:chain],
+        steps_completed: map_size(cot_session[:steps] || %{}),
         reasoning_time: calculate_reasoning_time(cot_session)
       }
     }
@@ -994,7 +1041,7 @@ defmodule RubberDuck.LLM.Service do
   
   defp get_final_cot_result(cot_session) do
     # Get the result from the last executed step
-    cot_session.steps
+    cot_session[:steps]
     |> Map.values()
     |> Enum.sort_by(& &1.executed_at)
     |> List.last()
@@ -1010,7 +1057,7 @@ defmodule RubberDuck.LLM.Service do
   end
   defp estimate_tokens(cot_session) when is_map(cot_session) do
     # Estimate tokens from all step results
-    cot_session.steps
+    cot_session[:steps]
     |> Map.values()
     |> Enum.map(fn step -> estimate_tokens(Map.get(step, :result, "")) end)
     |> Enum.sum()

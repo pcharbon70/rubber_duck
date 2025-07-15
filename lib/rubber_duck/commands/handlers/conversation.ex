@@ -403,31 +403,31 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
     cond do
       # If the entire session is a string (direct result from CoT)
       is_binary(cot_session) ->
-        cot_session
+        extract_final_answer(cot_session)
         
       # If session has a result field with final_answer
       is_map(cot_session) && is_map(Map.get(cot_session, :result)) && Map.has_key?(Map.get(cot_session, :result), :final_answer) ->
-        Map.get(Map.get(cot_session, :result), :final_answer)
+        extract_final_answer(Map.get(Map.get(cot_session, :result), :final_answer))
         
       # If session has a direct result string
       is_map(cot_session) && is_binary(Map.get(cot_session, :result)) ->
-        Map.get(cot_session, :result)
+        extract_final_answer(Map.get(cot_session, :result))
         
       # If session has steps, get the last step result (format_output step)
       is_map(cot_session) && is_list(Map.get(cot_session, :steps)) && length(Map.get(cot_session, :steps, [])) > 0 ->
         steps = Map.get(cot_session, :steps, [])
         # Find the format_output step specifically
         format_step = Enum.find(steps, fn step ->
-          Map.get(step, :name) == :format_output
+          Map.get(step, :name) in [:format_output, :finalize_answer, :polish_response]
         end)
         
         if format_step && Map.get(format_step, :result) do
-          Map.get(format_step, :result)
+          extract_final_answer(Map.get(format_step, :result))
         else
           # Fallback to last step
           last_step = List.last(steps)
           if last_step && Map.get(last_step, :result) do
-            Map.get(last_step, :result)
+            extract_final_answer(Map.get(last_step, :result))
           else
             "I apologize, but I couldn't generate a proper response."
           end
@@ -436,6 +436,42 @@ defmodule RubberDuck.Commands.Handlers.Conversation do
       # Fallback
       true ->
         "I apologize, but I couldn't generate a proper response."
+    end
+  end
+  
+  defp extract_final_answer(text) when is_binary(text) do
+    # Clean up the response to extract just the final answer
+    text
+    |> String.trim()
+    |> remove_reasoning_artifacts()
+    |> ensure_complete_sentences()
+  end
+  defp extract_final_answer(_), do: "I apologize, but I couldn't generate a proper response."
+  
+  defp remove_reasoning_artifacts(text) do
+    # Remove common reasoning artifacts and meta-commentary
+    text
+    |> String.replace(~r/^(Analysis|Understanding|Context|Response|Final answer|Let me|I'll|Now I'll|Based on|From the|Given that):\s*/im, "")
+    |> String.replace(~r/^(Step \d+|Phase \d+|Part \d+):\s*/im, "")
+    |> String.replace(~r/^\d+\.\s+/m, "")
+    |> String.replace(~r/\*\*(Analysis|Understanding|Context|Response|Final answer|Let me|I'll|Now I'll|Based on|From the|Given that)\*\*:\s*/im, "")
+    |> String.replace(~r/\n\s*\n\s*\n/m, "\n\n")  # Normalize multiple line breaks
+    |> String.trim()
+  end
+  
+  defp ensure_complete_sentences(text) do
+    # Ensure the response ends with proper punctuation
+    text = String.trim(text)
+    
+    if String.length(text) > 0 do
+      last_char = String.last(text)
+      if last_char in [".", "!", "?"] do
+        text
+      else
+        text <> "."
+      end
+    else
+      text
     end
   end
 
