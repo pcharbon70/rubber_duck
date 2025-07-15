@@ -102,20 +102,34 @@ defmodule RubberDuck.CLIClient.REPLHandler do
   defp wait_for_connection(attempts \\ 0) do
     if attempts >= 20 do  # 10 seconds max
       IO.puts(:stderr, "#{@error_prefix}Timeout waiting for WebSocket connection")
+      IO.puts(:stderr, "#{@error_prefix}Debug: Final connection status: #{inspect(Client.connected?())}")
       System.halt(1)
     end
     
-    case Client.connected?() do
-      true -> :ok
+    connected = Client.connected?()
+    if attempts == 0 do
+      IO.puts(:stderr, "#{@system_prefix}Establishing WebSocket connection...")
+    end
+    
+    case connected do
+      true -> 
+        IO.puts(:stderr, "#{@success_prefix}WebSocket connection established")
+        :ok
       false ->
+        if rem(attempts, 4) == 0 and attempts > 0 do
+          IO.puts(:stderr, "#{@system_prefix}Still waiting for connection... (#{attempts}/20)")
+        end
         Process.sleep(500)
         wait_for_connection(attempts + 1)
     end
   end
 
   defp check_llm_connection do
+    IO.puts(:stderr, "#{@system_prefix}Checking LLM connection...")
+    
     case send_command(["llm", "status"]) do
       {:ok, status} ->
+        IO.puts(:stderr, "#{@system_prefix}LLM status response: #{String.slice(status, 0, 100)}...")
         unless String.contains?(status, "connected") && 
                not String.contains?(status, "No providers") do
           IO.puts(:stderr, """
@@ -126,8 +140,10 @@ defmodule RubberDuck.CLIClient.REPLHandler do
           """)
           System.halt(1)
         end
+        IO.puts(:stderr, "#{@success_prefix}LLM connection verified")
       {:error, reason} ->
-        IO.puts(:stderr, "#{@error_prefix}Error checking LLM status: #{reason}")
+        IO.puts(:stderr, "#{@error_prefix}Error checking LLM status: #{inspect(reason)}")
+        IO.puts(:stderr, "#{@error_prefix}WebSocket connected: #{inspect(Client.connected?())}")
         System.halt(1)
     end
   end
