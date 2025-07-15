@@ -205,7 +205,8 @@ defmodule RubberDuck.CoT.Manager do
       model: Map.get(llm_config, :model) || default_model,
       max_tokens: Map.get(step, :max_tokens, Map.get(llm_config, :max_tokens, 2000)),
       temperature: Map.get(step, :temperature, Map.get(llm_config, :temperature, 0.7)),
-      timeout: Map.get(step, :timeout, Map.get(llm_config, :timeout, 30_000))
+      timeout: Map.get(step, :timeout, Map.get(llm_config, :timeout, 30_000)),
+      from_cot: true
     }
     
     messages = [
