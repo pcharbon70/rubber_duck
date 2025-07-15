@@ -436,7 +436,8 @@ defmodule RubberDuck.LLM.Service do
       max_tokens: Keyword.get(opts, :max_tokens),
       stream: Keyword.get(opts, :stream, false),
       timeout: Keyword.get(opts, :timeout, 30_000),
-      priority: Keyword.get(opts, :priority, :normal)
+      priority: Keyword.get(opts, :priority, :normal),
+      from_cot: Keyword.get(opts, :from_cot, false)
     }
 
     {:ok, validated}
