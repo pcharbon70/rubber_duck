@@ -720,9 +720,15 @@ defmodule RubberDuck.LLM.Service do
     ("req_" <> :crypto.strong_rand_bytes(16)) |> Base.encode16(case: :lower)
   end
 
-  defp timeout(opts) do
+  defp timeout(opts) when is_list(opts) do
     Keyword.get(opts, :timeout, 30_000)
   end
+  
+  defp timeout(opts) when is_map(opts) do
+    Map.get(opts, :timeout, 30_000)
+  end
+  
+  defp timeout(_), do: 30_000
 
   defp schedule_health_check do
     Process.send_after(self(), :health_check, 30_000)

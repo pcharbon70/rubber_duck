@@ -200,7 +200,9 @@ defmodule RubberDuck.CoT.Manager do
     
     Logger.debug("Executing step #{step.name} with prompt: #{String.slice(prompt, 0, 100)}...")
     
-    case Service.completion(%{messages: messages} |> Map.merge(options)) do
+    # Convert map to keyword list for Service.completion/1
+    opts = %{messages: messages} |> Map.merge(options) |> Map.to_list()
+    case Service.completion(opts) do
       {:ok, response} ->
         {:ok, extract_content(response)}
         
