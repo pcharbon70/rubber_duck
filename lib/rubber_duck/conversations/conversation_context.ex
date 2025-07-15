@@ -16,6 +16,8 @@ defmodule RubberDuck.Conversations.ConversationContext do
     table "conversation_contexts"
     repo RubberDuck.Repo
     
+    migration_types total_tokens_used: :bigint
+    
     references do
       reference :conversation, on_delete: :delete
     end
@@ -118,6 +120,7 @@ defmodule RubberDuck.Conversations.ConversationContext do
       default 0
       public? true
       description "Total tokens used in this conversation across all messages"
+      constraints [min: 0]
     end
 
     create_timestamp :inserted_at

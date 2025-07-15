@@ -464,7 +464,7 @@ defmodule RubberDuck.Enhancement.Coordinator do
   
   defp extract_enhanced_content(cot_session) do
     # Get the final result from the CoT session
-    cot_session.steps
+    cot_session[:steps]
     |> Map.values()
     |> Enum.sort_by(& &1.executed_at)
     |> List.last()
@@ -476,7 +476,7 @@ defmodule RubberDuck.Enhancement.Coordinator do
   
   defp extract_executed_steps(cot_session) do
     # Extract the names of executed steps
-    cot_session.steps
+    cot_session[:steps]
     |> Map.keys()
     |> Enum.sort()
   end

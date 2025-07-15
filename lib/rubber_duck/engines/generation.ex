@@ -1324,7 +1324,7 @@ defmodule RubberDuck.Engines.Generation do
   end
   
   defp get_cot_step_result(cot_session, step_name) do
-    case Map.get(cot_session.steps, step_name) do
+    case Map.get(cot_session[:steps], step_name) do
       %{result: result} -> result
       _ -> nil
     end

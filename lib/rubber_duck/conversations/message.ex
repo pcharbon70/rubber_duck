@@ -15,6 +15,8 @@ defmodule RubberDuck.Conversations.Message do
     table "conversation_messages"
     repo RubberDuck.Repo
     
+    migration_types tokens_used: :bigint
+    
     references do
       reference :conversation, on_delete: :delete
     end
@@ -83,6 +85,7 @@ defmodule RubberDuck.Conversations.Message do
       allow_nil? true
       public? true
       description "Number of tokens used to generate this message"
+      constraints [min: 0]
     end
 
     attribute :generation_time_ms, :integer do
