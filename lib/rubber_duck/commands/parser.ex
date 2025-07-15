@@ -96,15 +96,31 @@ defmodule RubberDuck.Commands.Parser do
   end
   
   defp parse_websocket_message(%{"command" => command_name} = message, context) do
-    # Handle direct command format
+    # Handle direct command format (CLIChannel format)
     try do
       name = String.to_atom(command_name)
-      args = Map.get(message, "args", %{}) |> atomize_keys()
-      options = Map.get(message, "options", %{}) |> atomize_keys()
+      
+      # Handle both direct args/options format and CLIChannel params format
+      {args, options, subcommand} = case message do
+        %{"params" => params} ->
+          # CLIChannel format: %{"command" => "llm", "params" => %{"subcommand" => "status", ...}}
+          subcommand = params["subcommand"] && String.to_atom(params["subcommand"])
+          args = Map.get(params, "args", %{}) |> atomize_keys()
+          options = Map.drop(params, ["subcommand", "args"]) |> atomize_keys()
+          {args, options, subcommand}
+          
+        _ ->
+          # Direct format: %{"command" => "llm", "args" => {...}, "options" => {...}}
+          args = Map.get(message, "args", %{}) |> atomize_keys()
+          options = Map.get(message, "options", %{}) |> atomize_keys()
+          {args, options, nil}
+      end
+      
       format = determine_format(options, :websocket)
       
       Command.new(%{
         name: name,
+        subcommand: subcommand,
         args: args,
         options: options,
         context: context,
