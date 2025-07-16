@@ -6,6 +6,24 @@ defmodule RubberDuck.MCP.Server.Tools.ConversationManager do
   query conversations, maintaining context across interactions.
   """
   
+  @category :conversation
+  @tags [:context_management, :conversation, :messages, :search]
+  @capabilities [:create, :update, :query, :message_management, :search]
+  @examples [
+    %{
+      description: "Create a new conversation",
+      params: %{action: "create", title: "Design Discussion", metadata: %{project: "webapp"}}
+    },
+    %{
+      description: "Add message to conversation",
+      params: %{action: "add_message", conversation_id: "conv_123", message: %{role: "user", content: "Hello"}}
+    },
+    %{
+      description: "Search conversations",
+      params: %{action: "search", query: "authentication", limit: 5}
+    }
+  ]
+  
   use Hermes.Server.Component, type: :tool
   
   alias Hermes.Server.Frame

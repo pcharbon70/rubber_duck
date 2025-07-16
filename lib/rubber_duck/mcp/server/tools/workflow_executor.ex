@@ -6,6 +6,24 @@ defmodule RubberDuck.MCP.Server.Tools.WorkflowExecutor do
   providing access to RubberDuck's powerful workflow orchestration capabilities.
   """
   
+  @category :workflow
+  @tags [:execution, :async, :monitoring, :orchestration]
+  @capabilities [:workflow_execution, :async_execution, :progress_streaming]
+  @examples [
+    %{
+      description: "Execute a simple workflow",
+      params: %{workflow_name: "test_workflow", params: %{}, async: false}
+    },
+    %{
+      description: "Execute workflow with streaming progress",
+      params: %{workflow_name: "data_processing", params: %{input: "data.csv"}, stream_progress: true}
+    },
+    %{
+      description: "Start async workflow execution",
+      params: %{workflow_name: "long_running_task", params: %{}, async: true, timeout: 60_000}
+    }
+  ]
+  
   use Hermes.Server.Component, type: :tool
   
   alias RubberDuck.Workflows.Engine

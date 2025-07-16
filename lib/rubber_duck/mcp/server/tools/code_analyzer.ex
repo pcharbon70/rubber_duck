@@ -7,6 +7,24 @@ defmodule RubberDuck.MCP.Server.Tools.CodeAnalyzer do
   and potential issues.
   """
   
+  @category :analysis
+  @tags [:code_analysis, :ast, :complexity, :dependencies]
+  @capabilities [:ast_analysis, :dependency_extraction, :complexity_metrics]
+  @examples [
+    %{
+      description: "Analyze a file's structure",
+      params: %{file_path: "lib/my_module.ex", analysis_type: "structure"}
+    },
+    %{
+      description: "Get full analysis with AST",
+      params: %{file_path: "lib/complex_module.ex", analysis_type: "all", include_ast: true}
+    },
+    %{
+      description: "Analyze module dependencies",
+      params: %{module_name: "MyApp.Core", analysis_type: "dependencies"}
+    }
+  ]
+  
   use Hermes.Server.Component, type: :tool
   
   alias Hermes.Server.Frame
