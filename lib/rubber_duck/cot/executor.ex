@@ -7,7 +7,7 @@ defmodule RubberDuck.CoT.Executor do
 
   require Logger
 
-  alias RubberDuck.LLM.Service, as: LLMService
+  alias RubberDuck.Engine.Manager, as: EngineManager
   alias RubberDuck.CoT.Templates
 
   @doc """
@@ -167,10 +167,13 @@ defmodule RubberDuck.CoT.Executor do
 
     # Get LLM config from session opts
     llm_config = session.opts[:llm_config] || %{}
+    
+    # Get engine name from session or use default
+    engine_name = session.opts[:engine_name] || :simple_conversation
 
     # Execute with retries
     max_retries = Map.get(step, :retries, 2)
-    execute_with_retries(prompt, step, context_opts, llm_config, max_retries)
+    execute_with_retries(prompt, step, context_opts, llm_config, engine_name, max_retries)
   end
 
   defp build_step_prompt(step, session, chain_config) do
@@ -246,21 +249,28 @@ defmodule RubberDuck.CoT.Executor do
     end
   end
 
-  defp execute_with_retries(prompt, step, context_opts, llm_config, retries_left) do
-    # Build LLM request using config from context
-    opts = [
-      model: llm_config[:model] || "codellama",
-      messages: [
-        %{role: "user", content: prompt}
-      ],
-      temperature: Map.get(step, :temperature, llm_config[:temperature] || 0.7),
-      max_tokens: Map.get(step, :max_tokens, llm_config[:max_tokens] || 1000),
-      timeout: llm_config[:timeout] || 30_000
-    ]
+  defp execute_with_retries(prompt, step, context_opts, llm_config, engine_name, retries_left) do
+    # Build engine input
+    engine_input = %{
+      query: prompt,
+      context: Map.merge(context_opts, %{
+        step_name: step.name,
+        chain_step: true,
+        messages: [%{role: "user", content: prompt}]
+      }),
+      options: %{
+        temperature: Map.get(step, :temperature, llm_config[:temperature] || 0.7),
+        max_tokens: Map.get(step, :max_tokens, llm_config[:max_tokens] || 1000)
+      },
+      llm_config: llm_config
+    }
+    
+    timeout = llm_config[:timeout] || 30_000
 
-    case LLMService.completion(opts) do
+    case EngineManager.execute(engine_name, engine_input, timeout) do
       {:ok, response} ->
-        result = extract_result(response)
+        # Extract result from engine response
+        result = extract_engine_result(response)
 
         # Validate if needed
         case validate_step_result(result, step) do
@@ -273,20 +283,37 @@ defmodule RubberDuck.CoT.Executor do
             enhanced_prompt =
               prompt <> "\n\nPrevious attempt failed validation: #{validation_error}\nPlease correct and try again."
 
-            execute_with_retries(enhanced_prompt, step, context_opts, llm_config, retries_left - 1)
+            execute_with_retries(enhanced_prompt, step, context_opts, llm_config, engine_name, retries_left - 1)
 
           {:error, validation_error} ->
             {:error, {:validation_failed, validation_error}}
         end
 
       {:error, reason} when retries_left > 0 ->
-        Logger.warning("LLM request failed, retrying: #{inspect(reason)}")
+        Logger.warning("Engine request failed, retrying: #{inspect(reason)}")
         # Brief delay before retry
         Process.sleep(1000)
-        execute_with_retries(prompt, step, context_opts, llm_config, retries_left - 1)
+        execute_with_retries(prompt, step, context_opts, llm_config, engine_name, retries_left - 1)
 
       {:error, reason} ->
-        {:error, {:llm_request_failed, reason}}
+        {:error, {:engine_request_failed, reason}}
+    end
+  end
+
+  defp extract_engine_result(response) do
+    # Handle responses from conversation engines
+    cond do
+      # Handle conversation engine response format
+      is_map(response) and Map.has_key?(response, :response) ->
+        response.response
+        
+      # Handle raw response
+      is_binary(response) ->
+        response
+        
+      # Handle other formats by delegating to extract_result
+      true ->
+        extract_result(response)
     end
   end
 
