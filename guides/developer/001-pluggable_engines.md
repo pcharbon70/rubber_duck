@@ -34,7 +34,12 @@ The engine system follows a layered architecture:
 ```
 ┌─────────────────────────────────────────────────┐
 │            Application Layer                    │
-│         (LiveView, CLI, API, etc.)             │
+│    (Phoenix Channels, LiveView, API, etc.)     │
+└─────────────────────┬───────────────────────────┘
+                      │
+┌─────────────────────┴───────────────────────────┐
+│         ConversationChannel Layer                │
+│    (WebSocket Interface, Session Management)     │
 └─────────────────────┬───────────────────────────┘
                       │
 ┌─────────────────────┴───────────────────────────┐
@@ -45,6 +50,7 @@ The engine system follows a layered architecture:
 ┌─────────────────────┴───────────────────────────┐
 │             Engine Layer                         │
 │  (Individual Engines with Spark DSL Config)     │
+│  Including: Conversation Engines, Code Engines  │
 └─────────────────────┬───────────────────────────┘
                       │
 ┌─────────────────────┴───────────────────────────┐
@@ -54,7 +60,7 @@ The engine system follows a layered architecture:
                       │
 ┌─────────────────────┴───────────────────────────┐
 │            LLM Service Layer                     │
-│    (Providers, Memory, Context Building)         │
+│    (Provider Management, Rate Limiting)          │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -551,6 +557,90 @@ end
 ```
 
 ## Built-in Engines
+
+### Conversation Engines
+
+The system includes seven specialized conversation engines for different interaction patterns:
+
+#### ConversationRouter
+Routes queries to appropriate conversation engines based on classification:
+
+```elixir
+# Automatically routes to the right engine
+{:ok, result} = RubberDuck.Engine.Manager.execute(:conversation_router, %{
+  query: "How do I implement a GenServer?",
+  context: %{messages: previous_messages}
+})
+```
+
+#### SimpleConversation
+Handles straightforward queries without complex reasoning:
+
+```elixir
+# Direct questions get quick responses
+{:ok, result} = RubberDuck.Engine.Manager.execute(:simple_conversation, %{
+  query: "What is pattern matching?",
+  context: %{}
+})
+```
+
+#### ComplexConversation
+Uses Chain-of-Thought for complex reasoning:
+
+```elixir
+# Complex problems get step-by-step reasoning
+{:ok, result} = RubberDuck.Engine.Manager.execute(:complex_conversation, %{
+  query: "Design a distributed cache with eventual consistency",
+  context: %{project_type: "distributed_system"}
+})
+```
+
+#### AnalysisConversation
+Specialized for code analysis and review:
+
+```elixir
+{:ok, result} = RubberDuck.Engine.Manager.execute(:analysis_conversation, %{
+  query: "Review this code for performance issues",
+  code: "def slow_function(list) do...",
+  context: %{analysis_type: "performance"}
+})
+```
+
+#### GenerationConversation
+Handles code generation with planning:
+
+```elixir
+{:ok, result} = RubberDuck.Engine.Manager.execute(:generation_conversation, %{
+  query: "Generate a REST API for user management",
+  context: %{framework: "phoenix", database: "postgresql"}
+})
+```
+
+#### ProblemSolver
+Debugging and troubleshooting assistance:
+
+```elixir
+{:ok, result} = RubberDuck.Engine.Manager.execute(:problem_solver, %{
+  query: "My GenServer keeps timing out",
+  error_details: %{error: "GenServer.call timeout after 5000ms"},
+  context: %{}
+})
+```
+
+#### MultiStepConversation
+Maintains context across multiple exchanges:
+
+```elixir
+{:ok, result} = RubberDuck.Engine.Manager.execute(:multi_step_conversation, %{
+  query: "Now add error handling to that function",
+  context: %{
+    messages: [
+      %{role: "user", content: "Write a file reader"},
+      %{role: "assistant", content: "Here's a file reader function..."}
+    ]
+  }
+})
+```
 
 ### Code Completion Engine
 

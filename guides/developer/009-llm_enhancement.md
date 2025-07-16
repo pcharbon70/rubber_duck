@@ -38,15 +38,19 @@ The RubberDuck LLM Integration Enhancement System represents a sophisticated, mu
 ```mermaid
 graph TB
     subgraph "User Interface Layer"
-        CLI[CLI/TUI]
-        WEB[Web Interface]
+        WEB[Web Interface/Phoenix Channels]
         API[API Endpoints]
     end
     
-    subgraph "Enhancement Coordinator"
-        EC[Enhancement.Coordinator]
-        TS[Technique Selection]
-        PB[Pipeline Builder]
+    subgraph "Conversation Layer"
+        CHAN[ConversationChannel]
+        ROUTER[ConversationRouter]
+    end
+    
+    subgraph "Engine System"
+        EM[Engine Manager]
+        CE[Conversation Engines]
+        EE[Enhancement Engines]
     end
     
     subgraph "Enhancement Techniques"
@@ -65,23 +69,27 @@ graph TB
     subgraph "Provider Layer"
         OAI[OpenAI Adapter]
         ANT[Anthropic Adapter]
-        MOCK[Mock Provider]
+        LOCAL[Local Models]
     end
     
-    CLI --> EC
-    WEB --> EC
-    API --> EC
+    WEB --> CHAN
+    API --> CHAN
     
-    EC --> TS
-    TS --> PB
+    CHAN --> EM
+    EM --> ROUTER
+    ROUTER --> CE
     
-    PB --> COT
-    PB --> RAG
-    PB --> SC
+    CE --> COT
+    CE --> EE
     
-    COT --> LLM
-    RAG --> LLM
-    SC --> LLM
+    EE --> RAG
+    EE --> SC
+    
+    COT --> EM
+    RAG --> EM
+    SC --> EM
+    
+    EM --> LLM
     
     COT --> MEM
     RAG --> MEM
@@ -89,7 +97,7 @@ graph TB
     
     LLM --> OAI
     LLM --> ANT
-    LLM --> MOCK
+    LLM --> LOCAL
     
     MEM --> CTX
     CTX --> CACHE
@@ -502,54 +510,63 @@ history = SelfCorrection.Engine.get_correction_history(corrected.id)
 
 ## Enhancement Integration and Coordination
 
-The Enhancement Coordinator orchestrates multiple techniques:
+Enhancement techniques are now integrated through the conversation engine system:
 
-### Technique Selection
+### Engine-Based Enhancement
 
 ```elixir
-# Automatic technique selection
-{:ok, techniques} = Enhancement.Coordinator.select_techniques(%{
-  task_type: :code_generation,
-  complexity: :high,
-  user_preferences: user_prefs,
-  available_techniques: [:cot, :rag, :self_correction]
+# Conversation engines automatically select enhancement techniques
+{:ok, result} = EngineManager.execute(:conversation_router, %{
+  query: "Create a distributed rate limiter",
+  context: %{project_id: project_id}
 })
 
-# Manual pipeline creation
-pipeline = Enhancement.Coordinator.build_pipeline([
-  {:cot, %{template: :problem_solving}},
-  {:rag, %{retrieval_strategy: :hybrid}},
-  {:self_correction, %{max_iterations: 3}}
-])
+# Complex queries automatically use CoT through ComplexConversation engine
+{:ok, result} = EngineManager.execute(:complex_conversation, %{
+  query: "Design a fault-tolerant system",
+  context: %{requirements: requirements}
+})
+
+# Analysis uses specialized enhancement
+{:ok, result} = EngineManager.execute(:analysis_conversation, %{
+  query: "Review this code for performance",
+  code: code_content,
+  context: %{analysis_type: :performance}
+})
 ```
 
-### Pipeline Execution
+### Direct Enhancement Usage
 
 ```elixir
-# Sequential enhancement
-{:ok, result} = Enhancement.Coordinator.enhance(:sequential, %{
-  input: "Create a distributed rate limiter",
-  techniques: [:cot, :rag, :self_correction],
-  context: project_context
+# Use specific engines for enhancement
+# RAG enhancement through generation engine
+{:ok, result} = EngineManager.execute(:generation, %{
+  prompt: "Generate based on patterns",
+  context: %{similar_code: retrieved_examples}
 })
 
-# Parallel enhancement with voting
-{:ok, result} = Enhancement.Coordinator.enhance(:parallel, %{
-  input: query,
-  techniques: [:technique_a, :technique_b],
-  aggregation: :weighted_vote,
-  weights: %{technique_a: 0.6, technique_b: 0.4}
+# Self-correction through problem solver
+{:ok, result} = EngineManager.execute(:problem_solver, %{
+  query: "Fix this implementation",
+  error_details: %{code: buggy_code, error: error_msg}
 })
+```
 
-# Conditional enhancement
-{:ok, result} = Enhancement.Coordinator.enhance(:conditional, %{
-  input: query,
-  conditions: [
-    {&high_complexity?/1, [:cot, :rag]},
-    {&needs_correction?/1, [:self_correction]},
-    {:default, [:rag]}
+### Enhancement Configuration
+
+```elixir
+# Configure engines with enhancement preferences
+config :rubber_duck, :engines,
+  complex_conversation: [
+    use_cot: true,
+    cot_chain: ConversationChain,
+    max_reasoning_steps: 10
+  ],
+  generation_conversation: [
+    use_rag: true,
+    retrieval_strategy: :hybrid,
+    self_correct: true
   ]
-})
 ```
 
 ### A/B Testing Framework
@@ -583,23 +600,19 @@ pipeline = Enhancement.Coordinator.build_pipeline([
 
 ```elixir
 defmodule MyApp.CodeAssistant do
-  alias RubberDuck.{LLM, Context, Enhancement}
+  alias RubberDuck.Engine.Manager, as: EngineManager
   
   def complete_code(prefix, suffix, options \\ %{}) do
-    # Build FIM context
-    context = Context.Builder.build(:fim, %{
+    # Build input for completion engine
+    input = %{
       prefix: prefix,
       suffix: suffix,
       language: options[:language] || "elixir",
-      max_tokens: options[:max_tokens] || 500
-    })
+      max_suggestions: options[:max_suggestions] || 3
+    }
     
-    # Enhance with basic techniques
-    Enhancement.Coordinator.enhance(:sequential, %{
-      input: context,
-      techniques: [:rag],  # Just RAG for simple completions
-      context: %{project_id: options[:project_id]}
-    })
+    # Completion engine handles RAG enhancement internally
+    EngineManager.execute(:completion, input, 30_000)
   end
 end
 ```
@@ -608,50 +621,57 @@ end
 
 ```elixir
 defmodule MyApp.CodeGenerator do
-  alias RubberDuck.{Enhancement, Memory, CoT}
+  alias RubberDuck.Engine.Manager, as: EngineManager
+  alias RubberDuck.Memory.Manager, as: MemoryManager
   
   def generate_complex_code(description, project_id) do
     # Store the request in memory
-    Memory.Manager.store_interaction(%{
+    MemoryManager.store_interaction(%{
       type: :generation_request,
       input: description,
       project_id: project_id
     })
     
-    # Build sophisticated pipeline
-    pipeline = Enhancement.Coordinator.build_pipeline([
-      {:cot, %{
-        template: :problem_solving,
-        steps: [:understand, :design, :implement, :verify]
-      }},
-      {:rag, %{
-        retrieval_strategy: :hybrid,
-        include_patterns: true,
-        rerank: true
-      }},
-      {:self_correction, %{
-        strategies: [:syntax, :logic, :best_practices],
-        max_iterations: 3
-      }}
-    ])
+    # Use generation conversation engine with full enhancements
+    input = %{
+      query: description,
+      context: %{
+        project_id: project_id,
+        requirements: parse_requirements(description),
+        existing_patterns: get_project_patterns(project_id)
+      },
+      options: %{
+        include_tests: true,
+        include_docs: true
+      }
+    }
     
-    # Execute enhancement
-    case Enhancement.Coordinator.execute_pipeline(pipeline, description) do
-      {:ok, enhanced_result} ->
+    # GenerationConversation engine handles CoT, RAG, and self-correction
+    case EngineManager.execute(:generation_conversation, input, 60_000) do
+      {:ok, result} ->
         # Store successful result
-        Memory.Manager.store_interaction(%{
+        MemoryManager.store_interaction(%{
           type: :generation_result,
-          output: enhanced_result.code,
+          output: result.generated_code,
           project_id: project_id,
-          quality_score: enhanced_result.metrics.quality
+          quality_score: calculate_quality_score(result)
         })
         
-        {:ok, enhanced_result}
+        {:ok, result}
         
       {:error, reason} ->
         Logger.error("Code generation failed: #{inspect(reason)}")
         {:error, reason}
     end
+  end
+  
+  defp parse_requirements(description) do
+    # Extract requirements from natural language description
+    %{
+      features: extract_features(description),
+      constraints: extract_constraints(description),
+      technology: detect_technology_stack(description)
+    }
   end
 end
 ```
