@@ -1367,20 +1367,35 @@ Create RubberDuck's own MCP server to expose its capabilities as standardized to
   - [ ] 8.2.6.1 Per-tool permissions
   - [ ] 8.2.6.2 Resource access control
   - [ ] 8.2.6.3 Rate limiting per client
-- [ ] 8.2.7 Create server health endpoints
-- [ ] 8.2.8 Implement server-side logging
-- [ ] 8.2.9 Add connection management
-- [ ] 8.2.10 Build server configuration DSL
+- [ ] 8.2.7 Implement streaming and progress:
+  - [ ] 8.2.7.1 Server-sent events for progress updates
+  - [ ] 8.2.7.2 Chunked responses for large results
+  - [ ] 8.2.7.3 Binary data streaming support
+  - [ ] 8.2.7.4 Backpressure handling for slow clients
+- [ ] 8.2.8 Build MCP extensions:
+  - [ ] 8.2.8.1 Tool composition via MCP
+  - [ ] 8.2.8.2 Custom result types
+  - [ ] 8.2.8.3 Event subscriptions
+  - [ ] 8.2.8.4 Batch operations
+- [ ] 8.2.9 Create server health endpoints
+- [ ] 8.2.10 Implement server-side logging
+- [ ] 8.2.11 Add connection management
+- [ ] 8.2.12 Build server configuration DSL
+- [ ] 8.2.13 Create MCP compliance validator
+- [ ] 8.2.14 Implement MCP metrics and monitoring
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/mcp/server_test.exs` to verify:
-- [ ] 8.2.11 Test server initialization and startup
-- [ ] 8.2.12 Test tool registration and exposure
-- [ ] 8.2.13 Test resource provider functionality
-- [ ] 8.2.14 Test authorization enforcement
-- [ ] 8.2.15 Test concurrent client handling
-- [ ] 8.2.16 Test rate limiting behavior
-- [ ] 8.2.17 Test health check responses
+- [ ] 8.2.15 Test server initialization and startup
+- [ ] 8.2.16 Test tool registration and exposure
+- [ ] 8.2.17 Test resource provider functionality
+- [ ] 8.2.18 Test authorization enforcement
+- [ ] 8.2.19 Test concurrent client handling
+- [ ] 8.2.20 Test rate limiting behavior
+- [ ] 8.2.21 Test health check responses
+- [ ] 8.2.22 Test streaming and backpressure
+- [ ] 8.2.23 Test MCP extensions functionality
+- [ ] 8.2.24 Test protocol compliance
 
 ### 8.3 MCP Tool Registry
 

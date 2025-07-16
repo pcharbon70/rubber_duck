@@ -385,55 +385,55 @@ Create tests in `test/rubber_duck/tools/executor_test.exs` to verify:
 - [ ] 10.2.16 Test result processing pipeline
 - [ ] 10.2.17 Test concurrent execution safety
 
-### 10.3 MCP Server Implementation
+### 10.3 Tool-MCP Integration Bridge
 
-Build a complete MCP server that exposes RubberDuck's tools to external clients with full protocol compliance, authentication, and streaming support.
+Connect the tool definition system with the MCP server from Phase 8, enabling automatic exposure of tools through MCP protocol and seamless integration between the two systems.
 
 #### Tasks:
-- [ ] 10.3.1 Create `RubberDuck.MCP.Server`:
-  - [ ] 10.3.1.1 Implement JSON-RPC 2.0 message handling
-  - [ ] 10.3.1.2 Add WebSocket transport with connection management
-  - [ ] 10.3.1.3 Build HTTP/2 transport for high-performance clients
-  - [ ] 10.3.1.4 Create connection pooling and load balancing
-- [ ] 10.3.2 Implement MCP protocol handlers:
-  - [ ] 10.3.2.1 Tool discovery (`tools/list`) with filtering
-  - [ ] 10.3.2.2 Tool execution (`tools/call`) with streaming
-  - [ ] 10.3.2.3 Resource management (`resources/*` methods)
-  - [ ] 10.3.2.4 Capability negotiation and version handling
-- [ ] 10.3.3 Add authentication and authorization:
-  - [ ] 10.3.3.1 OAuth 2.1 implementation for remote access
-  - [ ] 10.3.3.2 API key authentication for simple clients
-  - [ ] 10.3.3.3 mTLS support for enterprise deployments
-  - [ ] 10.3.3.4 Session management with refresh tokens
-- [ ] 10.3.4 Create client SDK generators:
-  - [ ] 10.3.4.1 TypeScript SDK with full type safety
-  - [ ] 10.3.4.2 Python SDK for data science workflows
-  - [ ] 10.3.4.3 Go SDK for cloud-native integrations
-  - [ ] 10.3.4.4 OpenAPI specification generation
-- [ ] 10.3.5 Implement streaming and progress:
-  - [ ] 10.3.5.1 Server-sent events for progress updates
-  - [ ] 10.3.5.2 Chunked responses for large results
-  - [ ] 10.3.5.3 Binary data streaming support
-  - [ ] 10.3.5.4 Backpressure handling for slow clients
-- [ ] 10.3.6 Build MCP extensions:
-  - [ ] 10.3.6.1 Tool composition via MCP
-  - [ ] 10.3.6.2 Custom result types
-  - [ ] 10.3.6.3 Event subscriptions
-  - [ ] 10.3.6.4 Batch operations
-- [ ] 10.3.7 Create MCP testing framework
-- [ ] 10.3.8 Build MCP compliance validator
-- [ ] 10.3.9 Implement MCP metrics and monitoring
-- [ ] 10.3.10 Add MCP documentation generator
+- [ ] 10.3.1 Create `RubberDuck.Tool.MCPAdapter`:
+  - [ ] 10.3.1.1 Build tool-to-MCP metadata converter
+  - [ ] 10.3.1.2 Generate MCP tool descriptions from Spark DSL
+  - [ ] 10.3.1.3 Map tool parameters to MCP input schemas
+  - [ ] 10.3.1.4 Convert tool results to MCP response format
+- [ ] 10.3.2 Implement automatic tool registration:
+  - [ ] 10.3.2.1 Scan tool registry on startup
+  - [ ] 10.3.2.2 Register tools with MCP server from Phase 8
+  - [ ] 10.3.2.3 Handle tool versioning and updates
+  - [ ] 10.3.2.4 Support hot reloading of tools in MCP
+- [ ] 10.3.3 Build tool execution routing:
+  - [ ] 10.3.3.1 Route MCP tool calls to tool executor
+  - [ ] 10.3.3.2 Handle tool authorization via MCP context
+  - [ ] 10.3.3.3 Map MCP parameters to tool inputs
+  - [ ] 10.3.3.4 Stream tool execution progress to MCP
+- [ ] 10.3.4 Add tool capability advertisement:
+  - [ ] 10.3.4.1 Expose tool capabilities via MCP
+  - [ ] 10.3.4.2 Advertise tool composition support
+  - [ ] 10.3.4.3 Publish tool quality metrics
+  - [ ] 10.3.4.4 Announce tool dependencies
+- [ ] 10.3.5 Create tool-specific MCP features:
+  - [ ] 10.3.5.1 Tool result streaming adapter
+  - [ ] 10.3.5.2 Tool composition via MCP protocol
+  - [ ] 10.3.5.3 Tool state persistence across MCP sessions
+  - [ ] 10.3.5.4 Tool execution history via MCP
+- [ ] 10.3.6 Implement tool discovery enhancements:
+  - [ ] 10.3.6.1 Semantic tool search via MCP
+  - [ ] 10.3.6.2 Tool recommendation based on context
+  - [ ] 10.3.6.3 Tool compatibility checking
+  - [ ] 10.3.6.4 Tool performance profiling
+- [ ] 10.3.7 Build integration testing framework
+- [ ] 10.3.8 Create tool-MCP debugging tools
+- [ ] 10.3.9 Implement bidirectional sync
+- [ ] 10.3.10 Add integration documentation
 
 #### Unit Tests:
-Create tests in `test/rubber_duck/mcp/server_test.exs` to verify:
-- [ ] 10.3.11 Test protocol compliance with MCP spec
-- [ ] 10.3.12 Test authentication flows
-- [ ] 10.3.13 Test streaming and backpressure
-- [ ] 10.3.14 Test error handling and recovery
-- [ ] 10.3.15 Test concurrent client handling
-- [ ] 10.3.16 Test SDK generation accuracy
-- [ ] 10.3.17 Test extension compatibility
+Create tests in `test/rubber_duck/tools/mcp_adapter_test.exs` to verify:
+- [ ] 10.3.11 Test tool-to-MCP metadata conversion
+- [ ] 10.3.12 Test automatic tool registration
+- [ ] 10.3.13 Test tool execution routing
+- [ ] 10.3.14 Test capability advertisement
+- [ ] 10.3.15 Test tool result streaming
+- [ ] 10.3.16 Test tool discovery features
+- [ ] 10.3.17 Test bidirectional synchronization
 
 ### 10.4 Security and Sandboxing
 
