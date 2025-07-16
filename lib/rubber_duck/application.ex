@@ -61,6 +61,8 @@ defmodule RubberDuck.Application do
       # MCP (Model Context Protocol) system
       {Registry, keys: :unique, name: RubberDuck.MCP.ClientRegistry},
       RubberDuck.MCP.ClientSupervisor,
+      # MCP Tool Registry
+      RubberDuck.MCP.Registry,
       # Web endpoint - start last
       RubberDuckWeb.Endpoint
       # Error boundary GenServer - started manually in tests

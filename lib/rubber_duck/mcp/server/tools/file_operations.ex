@@ -6,6 +6,24 @@ defmodule RubberDuck.MCP.Server.Tools.FileOperations do
   within the project directory, with appropriate access controls and validation.
   """
   
+  @category :file_system
+  @tags [:file_operations, :io, :safe_access, :validation]
+  @capabilities [:read, :write, :list, :delete, :move, :copy]
+  @examples [
+    %{
+      description: "Read a text file",
+      params: %{operation: "read", path: "config/config.exs", encoding: "utf8"}
+    },
+    %{
+      description: "Write content to file",
+      params: %{operation: "write", path: "tmp/output.txt", content: "Hello, world!"}
+    },
+    %{
+      description: "List directory contents recursively",
+      params: %{operation: "list", path: "lib", recursive: true}
+    }
+  ]
+  
   use Hermes.Server.Component, type: :tool
   
   alias Hermes.Server.Frame
