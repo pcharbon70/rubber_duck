@@ -390,6 +390,12 @@ defmodule RubberDuck.CLIClient.REPLHandler do
         Task.shutdown(typing_task, :brutal_kill)
         IO.write("\r\e[K")
         
+        # Debug: log what we received
+        if state.debug do
+          IO.puts("\n[DEBUG] Response type: #{inspect(type_of(response))}")
+          IO.puts("[DEBUG] Response: #{inspect(response, limit: 200)}")
+        end
+        
         # Extract and display assistant response
         display_assistant_response(response)
         
@@ -401,6 +407,15 @@ defmodule RubberDuck.CLIClient.REPLHandler do
         IO.write("\r\e[K")
         IO.puts(:stderr, "#{@error_prefix}Error: #{reason}")
         state
+    end
+  end
+  
+  defp type_of(value) do
+    cond do
+      is_binary(value) -> :string
+      is_map(value) -> :map
+      is_list(value) -> :list
+      true -> :other
     end
   end
 
@@ -433,9 +448,22 @@ defmodule RubberDuck.CLIClient.REPLHandler do
   end
 
   defp display_assistant_response(response) do
-    # Extract the actual message content from the response
-    content = extract_assistant_content(response)
-    IO.puts("#{@assistant_prefix}#{content}")
+    # Debug what type we received
+    case response do
+      str when is_binary(str) ->
+        # It's already a string (formatted by UnifiedIntegration)
+        IO.puts("#{@assistant_prefix}#{str}")
+        
+      map when is_map(map) ->
+        # It's still a map - extract content
+        content = extract_assistant_content(map)
+        IO.puts("#{@assistant_prefix}#{content}")
+        
+      other ->
+        # Unexpected type
+        IO.puts("#{@error_prefix}Unexpected response type: #{inspect(other)}")
+    end
+    :ok  # Return :ok to avoid showing the response value
   end
 
   defp extract_assistant_content(response) when is_binary(response) do
@@ -444,6 +472,39 @@ defmodule RubberDuck.CLIClient.REPLHandler do
       [_, content] -> String.trim(content)
       _ -> response
     end
+  end
+  
+  defp extract_assistant_content(%{"assistant_message" => %{"content" => content}}) when is_binary(content) do
+    String.trim(content)
+  end
+  
+  defp extract_assistant_content(%{assistant_message: %{content: content}}) when is_binary(content) do
+    String.trim(content)
+  end
+  
+  defp extract_assistant_content(response) when is_map(response) do
+    # Try to find content in various possible locations
+    cond do
+      # Check for direct response map from server
+      match?(%{"response" => %{"assistant_message" => %{"content" => _}}}, response) ->
+        String.trim(response["response"]["assistant_message"]["content"])
+        
+      # Already extracted assistant message
+      match?(%{"assistant_message" => %{"content" => _}}, response) ->
+        String.trim(response["assistant_message"]["content"])
+        
+      # Atom keys
+      match?(%{assistant_message: %{content: _}}, response) ->
+        String.trim(response.assistant_message.content)
+        
+      true ->
+        # Last resort - the response might be the full server response
+        "I couldn't extract the assistant's response."
+    end
+  end
+  
+  defp extract_assistant_content(response) do
+    "Unexpected response format: #{inspect(type_of(response))}"
   end
 
   defp show_welcome(state) do
@@ -666,9 +727,19 @@ defmodule RubberDuck.CLIClient.REPLHandler do
   defp send_command(args) do
     config = build_config()
     
-    case RubberDuck.CLIClient.UnifiedIntegration.execute_command(args, config) do
-      {:ok, output} -> {:ok, output}
-      {:error, reason} -> {:error, reason}
+    result = RubberDuck.CLIClient.UnifiedIntegration.execute_command(args, config)
+    
+    # Debug: Check what we're getting back
+    case result do
+      {:ok, output} when is_binary(output) -> 
+        # Good - it's already formatted as a string
+        {:ok, output}
+      {:ok, output} -> 
+        # Not a string - this might be the issue
+        IO.puts("[DEBUG] Non-string output from UnifiedIntegration: #{inspect(output, limit: 100)}")
+        {:ok, output}
+      {:error, reason} -> 
+        {:error, reason}
     end
   end
 

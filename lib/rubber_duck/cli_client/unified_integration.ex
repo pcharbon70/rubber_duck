@@ -37,7 +37,21 @@ defmodule RubberDuck.CLIClient.UnifiedIntegration do
     # Send through WebSocket client
     case RubberDuck.CLIClient.Client.send_command(command, params) do
       {:ok, %{"status" => "ok", "response" => response}} -> 
-        {:ok, format_response(response, config[:format] || :plain)}
+        # Special handling for conversation responses that have assistant_message
+        formatted = if match?(%{"assistant_message" => %{"content" => _}}, response) and config[:format] == :text do
+          String.trim(response["assistant_message"]["content"])
+        else
+          format_response(response, config[:format] || :plain)
+        end
+        {:ok, formatted}
+      
+      # Also handle the case where the entire result is the response we want to format
+      {:ok, result = %{"assistant_message" => %{"content" => content}, "status" => "ok"}} ->
+        if config[:format] == :text do
+          {:ok, String.trim(content)}
+        else
+          {:ok, format_response(result, config[:format] || :plain)}
+        end
       {:ok, %{"status" => "error", "error" => reason}} -> 
         {:error, format_error(reason)}
       {:ok, result} -> 
@@ -188,6 +202,10 @@ defmodule RubberDuck.CLIClient.UnifiedIntegration do
   defp format_response(%{"message" => message} = _response, :plain) when is_binary(message) do
     # Handle other message responses (like conversation responses)
     message
+  end
+  defp format_response(%{"assistant_message" => %{"content" => content}}, :plain) when is_binary(content) do
+    # Handle conversation send responses - just return the assistant's content
+    content
   end
   defp format_response(%{"providers" => providers} = data, :plain) do
     # Format LLM status output
