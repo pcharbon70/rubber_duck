@@ -28,7 +28,7 @@ defmodule RubberDuck.Instructions.Cache do
       {:ok, _pid} = RubberDuck.Instructions.Cache.start_link()
       
       # Cache parsed instruction content
-      cache_key = Cache.build_key(:parsed, "/path/to/RUBBERDUCK.md", "content_hash")
+      cache_key = Cache.build_key(:parsed, "/path/to/AGENTS.md", "content_hash")
       Cache.put(cache_key, parsed_content, ttl: :timer.minutes(30))
       
       # Retrieve with fallback
@@ -88,11 +88,11 @@ defmodule RubberDuck.Instructions.Cache do
   
   ## Examples
   
-      iex> Cache.build_key(:parsed, :project, "/path/to/RUBBERDUCK.md", "abc123")
-      {:parsed, :project, "/path/to/RUBBERDUCK.md", "abc123"}
+      iex> Cache.build_key(:parsed, :project, "/path/to/AGENTS.md", "abc123")
+      {:parsed, :project, "/path/to/AGENTS.md", "abc123"}
       
-      iex> Cache.build_key(:compiled, :global, "~/.rubber_duck.md", "def456")
-      {:compiled, :global, "~/.rubber_duck.md", "def456"}
+      iex> Cache.build_key(:compiled, :global, "~/.agents.md", "def456")
+      {:compiled, :global, "~/.agents.md", "def456"}
   """
   @spec build_key(cache_layer(), scope(), String.t(), String.t()) :: cache_key()
   def build_key(layer, scope, file_path, content_hash) do
@@ -126,7 +126,7 @@ defmodule RubberDuck.Instructions.Cache do
   ## Examples
   
       # Invalidate all entries for a specific file
-      Cache.invalidate_file("/path/to/RUBBERDUCK.md")
+      Cache.invalidate_file("/path/to/AGENTS.md")
       
       # Invalidate all entries for a project scope
       Cache.invalidate_scope(:project, "/path/to/project")

@@ -76,12 +76,12 @@ defmodule RubberDuck.Instructions.CacheTest do
   
   describe "Hierarchical key generation and format-specific versioning" do
     test "builds hierarchical keys correctly" do
-      key = Cache.build_key(:parsed, :project, "/path/to/RUBBERDUCK.md", "abc123")
+      key = Cache.build_key(:parsed, :project, "/path/to/AGENTS.md", "abc123")
       
-      assert key == {:parsed, :project, "/path/to/RUBBERDUCK.md", "abc123"}
+      assert key == {:parsed, :project, "/path/to/AGENTS.md", "abc123"}
       assert elem(key, 0) == :parsed
       assert elem(key, 1) == :project
-      assert elem(key, 2) == "/path/to/RUBBERDUCK.md"
+      assert elem(key, 2) == "/path/to/AGENTS.md"
       assert elem(key, 3) == "abc123"
     end
     
@@ -224,8 +224,8 @@ defmodule RubberDuck.Instructions.CacheTest do
       File.mkdir_p!(tmp_dir)
       
       # Create test instruction files
-      rubberduck_file = Path.join(tmp_dir, "RUBBERDUCK.md")
-      File.write!(rubberduck_file, """
+      agents_file = Path.join(tmp_dir, "AGENTS.md")
+      File.write!(agents_file, """
       ---
       title: Test Instructions
       priority: high
@@ -385,7 +385,7 @@ defmodule RubberDuck.Instructions.CacheTest do
       dev_key = Cache.build_key(:parsed, :project, "/src/lib/module.ex", "hash1")
       
       # Global file (should have longer TTL)  
-      global_key = Cache.build_key(:parsed, :global, "~/.rubber_duck.md", "hash2")
+      global_key = Cache.build_key(:parsed, :global, "~/.agents.md", "hash2")
       
       # Store with default TTL (should be determined automatically)
       Cache.put(dev_key, %{content: "dev content"})

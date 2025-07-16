@@ -9,7 +9,7 @@ defmodule RubberDuck.Context.InstructionEnhancer do
   ## Features
   
   - **Strategy Enhancement**: Enhance any context strategy with instructions
-  - **Preference Application**: Apply user preferences from RUBBERDUCK.md files
+  - **Preference Application**: Apply user preferences from AGENTS.md files
   - **Dynamic System Prompts**: Generate context-aware system prompts
   - **Rule Application**: Apply project-specific context building rules
   - **Performance Optimization**: Cache instruction processing for speed

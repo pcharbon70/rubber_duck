@@ -5,7 +5,7 @@ defmodule RubberDuck.Instructions.FormatParser do
   Supports multiple instruction file formats including:
   - Standard Markdown (.md)
   - Markdown with metadata (.mdc)
-  - RubberDuck-specific format (RUBBERDUCK.md)
+  - RubberDuck-specific format (AGENTS.md)
   - Cursor IDE rules (.cursorrules)
   
   Provides format detection, content extraction, and normalization
@@ -68,7 +68,7 @@ defmodule RubberDuck.Instructions.FormatParser do
     format = cond do
       String.ends_with?(filename, ".cursorrules") -> :cursorrules
       extension == ".mdc" -> :mdc
-      filename in ["RUBBERDUCK.md", "rubber_duck.md", ".rubber_duck.md"] -> :rubberduck_md
+      filename in ["AGENTS.md", "agents.md", ".agents.md"] -> :rubberduck_md
       extension == ".md" -> :markdown
       has_cursorrules_markers?(content) -> :cursorrules
       has_rubberduck_markers?(content) -> :rubberduck_md
@@ -114,7 +114,7 @@ defmodule RubberDuck.Instructions.FormatParser do
   end
 
   defp parse_rubberduck_md(content) do
-    # RUBBERDUCK.md format often has specific sections and conventions
+    # AGENTS.md format often has specific sections and conventions
     case TemplateProcessor.extract_metadata(content) do
       {:ok, metadata, markdown_content} ->
         sections = extract_rubberduck_sections(markdown_content)
@@ -248,7 +248,7 @@ defmodule RubberDuck.Instructions.FormatParser do
   end
 
   defp extract_rubberduck_sections(content) do
-    # Enhanced section extraction for RUBBERDUCK.md format
+    # Enhanced section extraction for AGENTS.md format
     sections = extract_markdown_sections(content)
     
     # Enhance with RubberDuck-specific section types
@@ -427,7 +427,7 @@ defmodule RubberDuck.Instructions.FormatParser do
   end
 
   defp enhance_rubberduck_metadata(metadata, sections) do
-    # Enhance metadata based on RUBBERDUCK.md content analysis
+    # Enhance metadata based on AGENTS.md content analysis
     critical_sections = Enum.filter(sections, &(&1.type == :critical_rules))
     
     enhanced = Map.merge(metadata, %{

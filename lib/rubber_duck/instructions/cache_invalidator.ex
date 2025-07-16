@@ -32,7 +32,7 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
       CacheInvalidator.watch_directory("/path/to/project")
       
       # Manual invalidation
-      CacheInvalidator.invalidate_file("/path/to/RUBBERDUCK.md")
+      CacheInvalidator.invalidate_file("/path/to/AGENTS.md")
       CacheInvalidator.invalidate_cascade("base_template.md")
   """
 
@@ -343,7 +343,7 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
 
   defp is_instruction_file?(file_path) do
     instruction_extensions = [".md", ".mdc", ".cursorrules"]
-    instruction_names = ["RUBBERDUCK.md", "rubber_duck.md", ".rubber_duck.md"]
+    instruction_names = ["AGENTS.md", "agents.md", ".agents.md"]
     
     extension = Path.extname(file_path)
     filename = Path.basename(file_path)

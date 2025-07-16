@@ -10,7 +10,7 @@ defmodule RubberDuck.Instructions.FileManager do
   
   - `.md` - Standard markdown instruction files
   - `.mdc` - Markdown with metadata files  
-  - `RUBBERDUCK.md` - RubberDuck-specific instruction format
+  - `AGENTS.md` - RubberDuck-specific instruction format
   - `.cursorrules` - Cursor IDE rules format
   
   ## Hierarchy Levels
@@ -51,13 +51,14 @@ defmodule RubberDuck.Instructions.FileManager do
 
   # Supported file patterns for instruction discovery
   @instruction_patterns [
-    "RUBBERDUCK.md",
-    "rubber_duck.md", 
-    ".rubber_duck.md",
+    "AGENTS.md",
+    "agents.md", 
+    ".agents.md",
     "*.cursorrules",
     "instructions.md",
     "rules.md",
     "*.mdc",
+    ".rules/*.md",
     "instructions/*.md"
   ]
 
@@ -83,7 +84,7 @@ defmodule RubberDuck.Instructions.FileManager do
   ## Examples
   
       iex> FileManager.discover_files("/path/to/project")
-      {:ok, [%{path: "/path/to/project/RUBBERDUCK.md", type: :auto, ...}, ...]}
+      {:ok, [%{path: "/path/to/project/AGENTS.md", type: :auto, ...}, ...]}
       
       iex> FileManager.discover_files("/path", include_global: false)
       {:ok, [...]}
@@ -223,7 +224,7 @@ defmodule RubberDuck.Instructions.FileManager do
   defp maybe_discover_global_files(true, max_file_size) do
     global_paths = [
       Path.expand("~/.config/claude/instructions.md"),
-      Path.expand("~/.rubber_duck.md"),
+      Path.expand("~/.agents.md"),
       Path.expand("~/.cursorrules"),
       "/etc/claude/instructions.md"
     ]
@@ -329,9 +330,9 @@ defmodule RubberDuck.Instructions.FileManager do
     # Boost priority for well-known files
     filename = Path.basename(file_path)
     boost = case filename do
-      "RUBBERDUCK.md" -> 100
-      "rubber_duck.md" -> 100
-      ".rubber_duck.md" -> 90
+      "AGENTS.md" -> 100
+      "agents.md" -> 100
+      ".agents.md" -> 90
       "instructions.md" -> 80
       _ -> 
         if String.ends_with?(filename, ".cursorrules") do

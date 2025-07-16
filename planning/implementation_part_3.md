@@ -82,12 +82,12 @@ Implement hierarchical file discovery and loading with support for project, work
 - [x] 9.2.2 Support multiple file formats:
   - [x] 9.2.2.1 Load `.md` instruction files
   - [x] 9.2.2.2 Support `.mdc` metadata files
-  - [x] 9.2.2.3 Process `RUBBERDUCK.md` format
+  - [x] 9.2.2.3 Process `AGENTS.md` format
   - [x] 9.2.2.4 Handle `.cursorrules` files
 - [x] 9.2.3 Implement hierarchical loading:
-  - [x] 9.2.3.1 Project root RUBBERDUCK.md instructions
-  - [x] 9.2.3.2 Workspace-level rubber_duck.md rules
-  - [x] 9.2.3.3 Global default ~/.rubber_duck.md instructions
+  - [x] 9.2.3.1 Project root AGENTS.md instructions
+  - [x] 9.2.3.2 Workspace-level agents.md rules
+  - [x] 9.2.3.3 Global default ~/.agents.md instructions
   - [x] 9.2.3.4 Directory-specific overrides
 - [x] 9.2.4 Build instruction registry:
   - [x] 9.2.4.1 Track loaded instructions
@@ -131,7 +131,7 @@ Implement high-performance instruction caching leveraging existing Context.Cache
   - [x] 9.3.1.4 Set up multi-layer caching (parsed content vs compiled templates)
 - [x] 9.3.2 Implement instruction-specific cache key strategy:
   - [x] 9.3.2.1 Build hierarchical keys (scope:file_path:content_hash)
-  - [x] 9.3.2.2 Include format-specific versioning (markdown, RUBBERDUCK.md, cursorrules)
+  - [x] 9.3.2.2 Include format-specific versioning (markdown, AGENTS.md, cursorrules)
   - [x] 9.3.2.3 Add template compilation state tracking
   - [x] 9.3.2.4 Support variable context isolation
 - [x] 9.3.3 Create intelligent invalidation system:
@@ -546,7 +546,7 @@ Create final system tests in `test/integration/complete_system_test.exs` to veri
 5. **Chat-Focused TUI Interface** - Modern terminal UI with toggleable panels and chat focus
 6. **System Error Handling** - Tower configuration fixes and comprehensive error management
 7. **Core Template Engine Implementation** (Phase 9.1) - Secure template processing with Solid and EEx
-8. **Instruction File Management System** (Phase 9.2) - Hierarchical loading with RUBBERDUCK.md support
+8. **Instruction File Management System** (Phase 9.2) - Hierarchical loading with AGENTS.md support
 9. **Caching & Performance Optimization** (Phase 9.3) - Multi-layer ETS caching with intelligent invalidation
 10. **Instruction-Context Integration** - Seamless bridge between instruction and context systems
 
@@ -570,7 +570,7 @@ Create final system tests in `test/integration/complete_system_test.exs` to veri
 - Fixed Tower error reporting for improved system stability
 - Implemented comprehensive test coverage for all major systems
 - Created seamless integration between chat interface and command system
-- Renamed all CLAUDE.md references to RUBBERDUCK.md throughout the codebase
+- Renamed all CLAUDE.md references to AGENTS.md throughout the codebase
 - Integrated instruction system with context building for enhanced AI responses
 - Fixed all compilation warnings in the instructions directory and project-wide
 - Implemented intelligent cache invalidation with file system watching

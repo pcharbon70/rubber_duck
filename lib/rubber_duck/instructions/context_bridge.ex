@@ -5,7 +5,7 @@ defmodule RubberDuck.Instructions.ContextBridge do
   This module coordinates between the hierarchical instruction loading system
   and the context building strategies, enabling instruction-driven context
   enhancement with dynamic system prompts, user preferences, and project-specific
-  context rules from RUBBERDUCK.md files.
+  context rules from AGENTS.md files.
   
   ## Features
   
@@ -199,10 +199,10 @@ defmodule RubberDuck.Instructions.ContextBridge do
 
   defp load_user_global_instructions(_user_id) do
     # Load global instructions for specific user
-    # This would typically include ~/.rubber_duck.md
+    # This would typically include ~/.agents.md
     global_paths = [
-      Path.expand("~/.rubber_duck.md"),
-      Path.expand("~/.config/rubberduck/RUBBERDUCK.md")
+      Path.expand("~/.agents.md"),
+      Path.expand("~/.config/rubberduck/AGENTS.md")
     ]
     
     load_instructions_from_paths(global_paths)
@@ -211,7 +211,7 @@ defmodule RubberDuck.Instructions.ContextBridge do
   defp load_default_instructions() do
     # Load system-wide default instructions
     system_paths = [
-      "/etc/rubberduck/RUBBERDUCK.md"
+      "/etc/rubberduck/AGENTS.md"
     ]
     
     load_instructions_from_paths(system_paths)
