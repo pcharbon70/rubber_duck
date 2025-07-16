@@ -18,8 +18,7 @@ defmodule RubberDuck.MixProject do
         "coveralls.post": :test,
         "coveralls.html": :test,
         "coveralls.github": :test
-      ],
-      escript: escript()
+      ]
     ]
   end
 
@@ -82,13 +81,6 @@ defmodule RubberDuck.MixProject do
       {:gettext, "~> 0.20"},
       {:plug_cowboy, "~> 2.7"},
 
-      # CLI dependencies
-      {:optimus, "~> 0.2"},
-
-      # WebSocket client dependencies for standalone CLI
-      {:phoenix_gen_socket_client, "~> 4.0"},
-      {:websocket_client, "~> 1.5"},
-
       # Template engine dependencies
       {:solid, "~> 1.0.1"},
       {:earmark, "~> 1.4.48"},
@@ -108,14 +100,4 @@ defmodule RubberDuck.MixProject do
 
   defp elixirc_paths(_),
     do: ["lib"]
-
-  defp escript do
-    [
-      main_module: RubberDuck.CLIClient.Main,
-      name: "rubber_duck",
-      path: "bin/rubber_duck",
-      app: nil,
-      embed_elixir: true
-    ]
-  end
 end
