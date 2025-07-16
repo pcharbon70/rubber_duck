@@ -181,6 +181,19 @@ _
 
 [ash_phoenix usage rules](deps/ash_phoenix/usage-rules.md)
 <!-- ash_phoenix-end -->
+<!-- reactor-start -->
+## reactor usage
+_An asynchronous, graph-based execution engine_
+
+[reactor usage rules](deps/reactor/usage-rules.md)
+<!-- reactor-end -->
+<!-- ash_postgres-start -->
+## ash_postgres usage
+_The PostgreSQL data layer for Ash Framework
+_
+
+[ash_postgres usage rules](deps/ash_postgres/usage-rules.md)
+<!-- ash_postgres-end -->
 <!-- usage-rules-end -->
 
 # Memories
