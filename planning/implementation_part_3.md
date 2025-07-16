@@ -1,13 +1,14 @@
-# RubberDuck Implementation Plan - Part 3 (Phases 9-10)
+# RubberDuck Implementation Plan - Part 3 (Phases 9-11)
 
-This document contains the detailed implementation plans for Phases 9-10 of the RubberDuck project. For the overall project status and earlier phases, see:
+This document contains the detailed implementation plans for Phases 9-11 of the RubberDuck project. For the overall project status and earlier phases, see:
 - [Main implementation plan](implementation_plan.md) - Overview and status
 - [Part 1](implementation_part_1.md) - Phases 1-4 (Foundation through Workflow Orchestration)
 - [Part 2](implementation_part_2.md) - Phases 5-8 (Real-time Communication through MCP Integration)
 
 ## Table of Contents
 9. [Phase 9: Instruction Templating System](#phase-9-instruction-templating-system)
-10. [Phase 10: Advanced Features & Production Readiness](#phase-10-advanced-features--production-readiness)
+10. [Phase 10: LLM Tool Definition System](#phase-10-llm-tool-definition-system)
+11. [Phase 11: Advanced Features & Production Readiness](#phase-11-advanced-features--production-readiness)
 
 ---
 
@@ -280,11 +281,281 @@ Create comprehensive integration tests in `test/integration/phase_9_test.exs` to
 
 ---
 
-## Phase 10: Advanced Features & Production Readiness
+## Phase 10: LLM Tool Definition System
+
+This phase implements a comprehensive tool definition system that leverages RubberDuck's Ash Framework foundation to create a sophisticated, declarative tool system. The system provides unified tool access for both internal engines and external MCP clients, with robust security, type safety, and workflow integration.
+
+### 10.1 Core Tool Infrastructure
+
+Build the foundation for tool definition and registration using Spark DSL for declarative configuration, with compile-time validation and code generation capabilities.
+
+#### Tasks:
+- [ ] 10.1.1 Create `RubberDuck.Tool` Spark DSL extension:
+  - [ ] 10.1.1.1 Define tool metadata section (name, description, category, version)
+  - [ ] 10.1.1.2 Implement parameter definition entities with type specifications
+  - [ ] 10.1.1.3 Add execution configuration section (handler, timeout, async, retries)
+  - [ ] 10.1.1.4 Build security configuration section (sandbox, capabilities, rate limits)
+- [ ] 10.1.2 Implement `RubberDuck.Tool.Registry`:
+  - [ ] 10.1.2.1 Create ETS-backed tool storage with concurrent access
+  - [ ] 10.1.2.2 Build tool discovery and loading from application modules
+  - [ ] 10.1.2.3 Implement tool versioning and compatibility checking
+  - [ ] 10.1.2.4 Add hot reloading support for development
+- [ ] 10.1.3 Build JSON Schema generation:
+  - [ ] 10.1.3.1 Convert Spark DSL parameter definitions to JSON Schema
+  - [ ] 10.1.3.2 Support complex types (arrays, objects, unions)
+  - [ ] 10.1.3.3 Generate validation constraints from DSL specifications
+  - [ ] 10.1.3.4 Include examples and documentation in schemas
+- [ ] 10.1.4 Create tool compilation pipeline:
+  - [ ] 10.1.4.1 Validate tool definitions at compile time
+  - [ ] 10.1.4.2 Generate execution modules from DSL specifications
+  - [ ] 10.1.4.3 Create MCP-compatible tool descriptions
+  - [ ] 10.1.4.4 Build TypeScript type definitions for client SDKs
+- [ ] 10.1.5 Implement tool lifecycle management:
+  - [ ] 10.1.5.1 Tool initialization with dependency injection
+  - [ ] 10.1.5.2 Graceful shutdown and cleanup procedures
+  - [ ] 10.1.5.3 Health checking and availability monitoring
+  - [ ] 10.1.5.4 Resource usage tracking per tool
+- [ ] 10.1.6 Add tool documentation generator:
+  - [ ] 10.1.6.1 Extract documentation from DSL definitions
+  - [ ] 10.1.6.2 Generate markdown documentation
+  - [ ] 10.1.6.3 Create interactive API documentation
+  - [ ] 10.1.6.4 Build example usage snippets
+- [ ] 10.1.7 Create tool migration system
+- [ ] 10.1.8 Build tool dependency resolution
+- [ ] 10.1.9 Implement tool feature flags
+- [ ] 10.1.10 Add tool metrics collection
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/tools/registry_test.exs` to verify:
+- [ ] 10.1.11 Test Spark DSL compilation and validation
+- [ ] 10.1.12 Test tool registration and discovery
+- [ ] 10.1.13 Test JSON Schema generation accuracy
+- [ ] 10.1.14 Test hot reloading functionality
+- [ ] 10.1.15 Test versioning and compatibility
+- [ ] 10.1.16 Test lifecycle management
+- [ ] 10.1.17 Test concurrent registry access
+
+### 10.2 Multi-Layer Execution Architecture
+
+Implement a sophisticated execution pipeline with validation, authorization, sandboxing, and result processing layers for secure and reliable tool execution.
+
+#### Tasks:
+- [ ] 10.2.1 Create `RubberDuck.Tool.Validator`:
+  - [ ] 10.2.1.1 Implement JSON Schema validation for parameters
+  - [ ] 10.2.1.2 Add custom validation rules from DSL constraints
+  - [ ] 10.2.1.3 Build detailed error messages with suggestions
+  - [ ] 10.2.1.4 Support partial validation for progressive UIs
+- [ ] 10.2.2 Build `RubberDuck.Tool.Authorizer`:
+  - [ ] 10.2.2.1 Integrate with Ash policy framework
+  - [ ] 10.2.2.2 Implement capability-based authorization
+  - [ ] 10.2.2.3 Add role-based tool access control
+  - [ ] 10.2.2.4 Create audit logging for authorization decisions
+- [ ] 10.2.3 Implement `RubberDuck.Tool.Executor`:
+  - [ ] 10.2.3.1 Create supervised GenServer for each execution
+  - [ ] 10.2.3.2 Implement configurable resource limits (memory, CPU)
+  - [ ] 10.2.3.3 Add timeout handling with graceful termination
+  - [ ] 10.2.3.4 Build cancellation support for long-running tools
+- [ ] 10.2.4 Create execution sandboxing:
+  - [ ] 10.2.4.1 Process-level isolation using OTP supervisors
+  - [ ] 10.2.4.2 File system access restrictions
+  - [ ] 10.2.4.3 Network access control
+  - [ ] 10.2.4.4 Environment variable filtering
+- [ ] 10.2.5 Build result processing pipeline:
+  - [ ] 10.2.5.1 Output validation against expected schemas
+  - [ ] 10.2.5.2 Sensitive data filtering and redaction
+  - [ ] 10.2.5.3 Result transformation for different clients
+  - [ ] 10.2.5.4 Streaming support for large outputs
+- [ ] 10.2.6 Implement execution monitoring:
+  - [ ] 10.2.6.1 Real-time execution status tracking
+  - [ ] 10.2.6.2 Performance metrics collection
+  - [ ] 10.2.6.3 Resource usage monitoring
+  - [ ] 10.2.6.4 Anomaly detection for unusual patterns
+- [ ] 10.2.7 Create execution replay system
+- [ ] 10.2.8 Build distributed execution support
+- [ ] 10.2.9 Implement execution caching
+- [ ] 10.2.10 Add execution debugging tools
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/tools/executor_test.exs` to verify:
+- [ ] 10.2.11 Test parameter validation with edge cases
+- [ ] 10.2.12 Test authorization enforcement
+- [ ] 10.2.13 Test sandbox isolation effectiveness
+- [ ] 10.2.14 Test resource limit enforcement
+- [ ] 10.2.15 Test timeout and cancellation handling
+- [ ] 10.2.16 Test result processing pipeline
+- [ ] 10.2.17 Test concurrent execution safety
+
+### 10.3 MCP Server Implementation
+
+Build a complete MCP server that exposes RubberDuck's tools to external clients with full protocol compliance, authentication, and streaming support.
+
+#### Tasks:
+- [ ] 10.3.1 Create `RubberDuck.MCP.Server`:
+  - [ ] 10.3.1.1 Implement JSON-RPC 2.0 message handling
+  - [ ] 10.3.1.2 Add WebSocket transport with connection management
+  - [ ] 10.3.1.3 Build HTTP/2 transport for high-performance clients
+  - [ ] 10.3.1.4 Create connection pooling and load balancing
+- [ ] 10.3.2 Implement MCP protocol handlers:
+  - [ ] 10.3.2.1 Tool discovery (`tools/list`) with filtering
+  - [ ] 10.3.2.2 Tool execution (`tools/call`) with streaming
+  - [ ] 10.3.2.3 Resource management (`resources/*` methods)
+  - [ ] 10.3.2.4 Capability negotiation and version handling
+- [ ] 10.3.3 Add authentication and authorization:
+  - [ ] 10.3.3.1 OAuth 2.1 implementation for remote access
+  - [ ] 10.3.3.2 API key authentication for simple clients
+  - [ ] 10.3.3.3 mTLS support for enterprise deployments
+  - [ ] 10.3.3.4 Session management with refresh tokens
+- [ ] 10.3.4 Create client SDK generators:
+  - [ ] 10.3.4.1 TypeScript SDK with full type safety
+  - [ ] 10.3.4.2 Python SDK for data science workflows
+  - [ ] 10.3.4.3 Go SDK for cloud-native integrations
+  - [ ] 10.3.4.4 OpenAPI specification generation
+- [ ] 10.3.5 Implement streaming and progress:
+  - [ ] 10.3.5.1 Server-sent events for progress updates
+  - [ ] 10.3.5.2 Chunked responses for large results
+  - [ ] 10.3.5.3 Binary data streaming support
+  - [ ] 10.3.5.4 Backpressure handling for slow clients
+- [ ] 10.3.6 Build MCP extensions:
+  - [ ] 10.3.6.1 Tool composition via MCP
+  - [ ] 10.3.6.2 Custom result types
+  - [ ] 10.3.6.3 Event subscriptions
+  - [ ] 10.3.6.4 Batch operations
+- [ ] 10.3.7 Create MCP testing framework
+- [ ] 10.3.8 Build MCP compliance validator
+- [ ] 10.3.9 Implement MCP metrics and monitoring
+- [ ] 10.3.10 Add MCP documentation generator
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/mcp/server_test.exs` to verify:
+- [ ] 10.3.11 Test protocol compliance with MCP spec
+- [ ] 10.3.12 Test authentication flows
+- [ ] 10.3.13 Test streaming and backpressure
+- [ ] 10.3.14 Test error handling and recovery
+- [ ] 10.3.15 Test concurrent client handling
+- [ ] 10.3.16 Test SDK generation accuracy
+- [ ] 10.3.17 Test extension compatibility
+
+### 10.4 Security and Sandboxing
+
+Implement comprehensive security measures leveraging BEAM's process isolation with defense-in-depth strategies.
+
+#### Tasks:
+- [ ] 10.4.1 Create `RubberDuck.Tool.Security`:
+  - [ ] 10.4.1.1 Build capability declaration system
+  - [ ] 10.4.1.2 Implement runtime capability enforcement
+  - [ ] 10.4.1.3 Add security policy DSL integration
+  - [ ] 10.4.1.4 Create security audit trail
+- [ ] 10.4.2 Implement input sanitization:
+  - [ ] 10.4.2.1 Path traversal prevention with canonicalization
+  - [ ] 10.4.2.2 Command injection protection
+  - [ ] 10.4.2.3 SQL injection prevention for database tools
+  - [ ] 10.4.2.4 Template injection protection
+- [ ] 10.4.3 Build process-level sandboxing:
+  - [ ] 10.4.3.1 Memory limits using max_heap_size
+  - [ ] 10.4.3.2 CPU time limits with reductions tracking
+  - [ ] 10.4.3.3 Message queue size limits
+  - [ ] 10.4.3.4 File descriptor limits
+- [ ] 10.4.4 Add advanced sandboxing options:
+  - [ ] 10.4.4.1 Container-based isolation (Docker/Firecracker)
+  - [ ] 10.4.4.2 WASM runtime for untrusted code
+  - [ ] 10.4.4.3 Network namespace isolation
+  - [ ] 10.4.4.4 Seccomp filters for system calls
+- [ ] 10.4.5 Implement rate limiting:
+  - [ ] 10.4.5.1 Token bucket per user/tool combination
+  - [ ] 10.4.5.2 Adaptive rate limiting based on resource usage
+  - [ ] 10.4.5.3 Priority queues for different user tiers
+  - [ ] 10.4.5.4 Circuit breakers for failing tools
+- [ ] 10.4.6 Create security monitoring:
+  - [ ] 10.4.6.1 Anomaly detection using statistical analysis
+  - [ ] 10.4.6.2 Pattern matching for known attack signatures
+  - [ ] 10.4.6.3 Real-time alerting for security events
+  - [ ] 10.4.6.4 Integration with SIEM systems
+- [ ] 10.4.7 Build security testing suite
+- [ ] 10.4.8 Implement penetration testing framework
+- [ ] 10.4.9 Create security compliance reports
+- [ ] 10.4.10 Add vulnerability scanning automation
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/tools/security_test.exs` to verify:
+- [ ] 10.4.11 Test capability enforcement
+- [ ] 10.4.12 Test input sanitization effectiveness
+- [ ] 10.4.13 Test sandbox escape prevention
+- [ ] 10.4.14 Test resource limit enforcement
+- [ ] 10.4.15 Test rate limiting accuracy
+- [ ] 10.4.16 Test security monitoring alerts
+- [ ] 10.4.17 Test audit trail completeness
+
+### 10.5 Tool Composition System
+
+Enable complex tool workflows through Reactor integration, allowing tools to be composed into sophisticated pipelines with conditional logic and error handling.
+
+#### Tasks:
+- [ ] 10.5.1 Create `RubberDuck.Tool.Workflow`:
+  - [ ] 10.5.1.1 Extend Reactor for tool-specific steps
+  - [ ] 10.5.1.2 Build tool composition DSL
+  - [ ] 10.5.1.3 Add conditional execution support
+  - [ ] 10.5.1.4 Implement parallel tool execution
+- [ ] 10.5.2 Implement workflow patterns:
+  - [ ] 10.5.2.1 Sequential tool chaining with data flow
+  - [ ] 10.5.2.2 Parallel tool execution with result merging
+  - [ ] 10.5.2.3 Conditional branching based on results
+  - [ ] 10.5.2.4 Loop constructs for batch processing
+- [ ] 10.5.3 Build data transformation:
+  - [ ] 10.5.3.1 Automatic type conversion between tools
+  - [ ] 10.5.3.2 JSONPath/JMESPath for result extraction
+  - [ ] 10.5.3.3 Template-based data mapping
+  - [ ] 10.5.3.4 Custom transformation functions
+- [ ] 10.5.4 Add error handling strategies:
+  - [ ] 10.5.4.1 Retry policies with exponential backoff
+  - [ ] 10.5.4.2 Fallback tools for failure scenarios
+  - [ ] 10.5.4.3 Partial success handling
+  - [ ] 10.5.4.4 Compensation actions for rollback
+- [ ] 10.5.5 Create workflow monitoring:
+  - [ ] 10.5.5.1 Visual workflow execution tracking
+  - [ ] 10.5.5.2 Performance bottleneck identification
+  - [ ] 10.5.5.3 Resource usage aggregation
+  - [ ] 10.5.5.4 Success rate analytics
+- [ ] 10.5.6 Implement workflow persistence:
+  - [ ] 10.5.6.1 Save and resume long-running workflows
+  - [ ] 10.5.6.2 Workflow versioning and migration
+  - [ ] 10.5.6.3 Distributed workflow execution
+  - [ ] 10.5.6.4 Workflow state replication
+- [ ] 10.5.7 Build workflow testing framework
+- [ ] 10.5.8 Create workflow debugging tools
+- [ ] 10.5.9 Implement workflow optimization
+- [ ] 10.5.10 Add workflow template library
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/tools/workflow_test.exs` to verify:
+- [ ] 10.5.11 Test sequential composition
+- [ ] 10.5.12 Test parallel execution
+- [ ] 10.5.13 Test conditional branching
+- [ ] 10.5.14 Test error handling strategies
+- [ ] 10.5.15 Test data transformation
+- [ ] 10.5.16 Test workflow persistence
+- [ ] 10.5.17 Test distributed execution
+
+### 10.6 Phase 10 Integration Tests
+
+Create comprehensive integration tests in `test/integration/phase_11_test.exs` to verify:
+- [ ] 10.6.1 Test complete tool definition and registration pipeline
+- [ ] 10.6.2 Test tool execution through all layers
+- [ ] 10.6.3 Test MCP server with real clients
+- [ ] 10.6.4 Test security isolation effectiveness
+- [ ] 10.6.5 Test complex workflow execution
+- [ ] 10.6.6 Test tool system performance under load
+- [ ] 10.6.7 Test error propagation and handling
+- [ ] 10.6.8 Test tool hot reloading in development
+- [ ] 10.6.9 Test distributed tool execution
+- [ ] 10.6.10 Test complete tool lifecycle from definition to execution
+
+---
+
+## Phase 11: Advanced Features & Production Readiness
 
 This final phase implements production-critical features including background job processing, security measures, deployment configurations, and performance optimizations. This phase ensures the system is ready for real-world usage at scale.
 
-### 10.1 Background Job Processing with Oban
+### 11.1 Background Job Processing with Oban
 
 Implement asynchronous job processing for resource-intensive operations like project indexing and batch analysis.
 
@@ -319,7 +590,7 @@ Create tests in `test/rubber_duck/workers/` directory to verify:
 - [ ] 10.1.15 Test file change detection
 - [ ] 10.1.16 Test concurrent indexing safety
 
-### 10.2 Security Implementation
+### 11.2 Security Implementation
 
 Implement comprehensive security measures including authentication, authorization, input validation, and rate limiting.
 
@@ -374,7 +645,7 @@ Create tests in `test/rubber_duck/security/` directory:
 - [ ] 10.2.24 Test file type validation
 - [ ] 10.2.25 Test rate limiting
 
-### 10.3 Monitoring and Observability
+### 11.3 Monitoring and Observability
 
 Implement comprehensive monitoring, logging, and observability features for production operations.
 
@@ -438,7 +709,7 @@ Create tests in `test/rubber_duck/monitoring/` directory:
 - [ ] 10.3.27 Test dashboard data aggregation
 - [ ] 10.3.28 Test alert triggering
 
-### 10.4 Deployment and Scaling
+### 11.4 Deployment and Scaling
 
 Implement deployment configurations and scaling strategies for production environments.
 
@@ -500,9 +771,9 @@ Create tests in `test/rubber_duck/deployment/` directory:
 - [ ] 10.4.27 Test A/B testing support
 - [ ] 10.4.28 Test flag inheritance
 
-### 10.5 Phase 10 Integration Tests
+### 11.5 Phase 11 Integration Tests
 
-Create comprehensive integration tests in `test/integration/phase_10_test.exs` to verify:
+Create comprehensive integration tests in `test/integration/phase_11_test.exs` to verify:
 - [ ] 10.5.1 Test end-to-end secure workflow with monitoring
 - [ ] 10.5.2 Test high load handling with rate limiting
 - [ ] 10.5.3 Test monitoring captures system health
@@ -514,7 +785,7 @@ Create comprehensive integration tests in `test/integration/phase_10_test.exs` t
 - [ ] 10.5.9 Test security controls with MCP
 - [ ] 10.5.10 Test production readiness criteria
 
-### 10.6 Final System Integration Tests
+### 11.6 Final System Integration Tests
 
 Create final system tests in `test/integration/complete_system_test.exs` to verify:
 - [ ] 10.6.1 Test full coding assistant workflow from project creation to code generation
@@ -561,7 +832,8 @@ Create final system tests in `test/integration/complete_system_test.exs` to veri
 - **MCP Integration** (Phase 8)
 - **Security-First Template Processing** (Phase 9.4)
 - **Client Integration & Real-time Updates** (Phase 9.5)
-- **Production Readiness** (Phase 10)
+- **LLM Tool Definition System** (Phase 10)
+- **Production Readiness** (Phase 11)
 
 ### 🔗 Recent Integration Highlights:
 - Successfully integrated dynamic LLM configuration across all AI engines
