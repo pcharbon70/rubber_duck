@@ -15,6 +15,14 @@ config :rubber_duck, :instructions,
   default_rules_directory: ".rules",
   discovery_priority: [".rules", "instructions", ".instructions"]
 
+# MCP (Model Context Protocol) configuration
+config :rubber_duck, :mcp_server_enabled, false
+
+config :rubber_duck, :mcp_server,
+  transport: :stdio,
+  port: 8080,
+  path: "/mcp"
+
 config :ash,
   allow_forbidden_field_for_relationships_by_default?: true,
   include_embedded_source_by_default?: false,
