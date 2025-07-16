@@ -58,23 +58,11 @@ defmodule RubberDuck.Application do
       RubberDuckWeb.MessageQueue,
       # Instruction template security system
       RubberDuck.Instructions.SecurityPipeline,
-      # MCP (Model Context Protocol) system
-      {Registry, keys: :unique, name: RubberDuck.MCP.ClientRegistry},
-      RubberDuck.MCP.ClientSupervisor,
-      # MCP Tool Registry
-      RubberDuck.MCP.Registry,
       # Web endpoint - start last
       RubberDuckWeb.Endpoint
       # Error boundary GenServer - started manually in tests
       # RubberDuck.ErrorBoundary
     ]
-    
-    # Conditionally add MCP server
-    children = if Application.get_env(:rubber_duck, :mcp_server_enabled, false) do
-      List.insert_at(children, -2, {RubberDuck.MCP.ServerSupervisor, [transport: :stdio]})
-    else
-      children
-    end
 
     opts = [strategy: :one_for_one, name: RubberDuck.Supervisor]
     result = Supervisor.start_link(children, opts)
