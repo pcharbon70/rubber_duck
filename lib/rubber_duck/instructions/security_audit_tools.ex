@@ -327,7 +327,7 @@ defmodule RubberDuck.Instructions.SecurityAuditTools do
     risk_factors
   end
   
-  defp generate_user_recommendations(events, threat_assessment) do
+  defp generate_user_recommendations(_events, threat_assessment) do
     recommendations = []
     
     case threat_assessment do
@@ -422,7 +422,7 @@ defmodule RubberDuck.Instructions.SecurityAuditTools do
   end
   
   # Trend analysis functions
-  defp analyze_injection_trends(days_back) do
+  defp analyze_injection_trends(_days_back) do
     # Implementation would analyze injection attempts over time
     %{
       trend: "stable",
@@ -431,7 +431,7 @@ defmodule RubberDuck.Instructions.SecurityAuditTools do
     }
   end
   
-  defp analyze_rate_limiting_trends(days_back) do
+  defp analyze_rate_limiting_trends(_days_back) do
     # Implementation would analyze rate limiting over time
     %{
       trend: "increasing",
@@ -440,7 +440,7 @@ defmodule RubberDuck.Instructions.SecurityAuditTools do
     }
   end
   
-  defp analyze_sandbox_violation_trends(days_back) do
+  defp analyze_sandbox_violation_trends(_days_back) do
     # Implementation would analyze sandbox violations over time
     %{
       trend: "decreasing",
@@ -449,7 +449,7 @@ defmodule RubberDuck.Instructions.SecurityAuditTools do
     }
   end
   
-  defp analyze_user_activity_trends(days_back) do
+  defp analyze_user_activity_trends(_days_back) do
     # Implementation would analyze user activity patterns
     %{
       active_users: 45,
@@ -530,12 +530,12 @@ defmodule RubberDuck.Instructions.SecurityAuditTools do
     {:ok, json_data}
   end
   
-  defp export_as_csv(events) do
+  defp export_as_csv(_events) do
     # Implementation would convert events to CSV format
     {:ok, "CSV data placeholder"}
   end
   
-  defp export_as_excel(events) do
+  defp export_as_excel(_events) do
     # Implementation would convert events to Excel format
     {:ok, "Excel data placeholder"}
   end
