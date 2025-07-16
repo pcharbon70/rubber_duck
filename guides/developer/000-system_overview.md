@@ -34,15 +34,30 @@ The data layer uses **Ash Framework** to define resources declaratively, automat
 
 **Hot Code Loading**: Spark's compilation model works with Elixir's hot code swapping, allowing plugins to be updated without system restart. The plugin supervisor manages lifecycle events, gracefully upgrading running plugin instances.
 
-## LLM integration uses enhancement techniques
+## Conversation engine system powers intelligent interactions
 
-The LLM integration layer implements several enhancement techniques to improve code generation quality and reliability.
+The conversation system uses specialized engines to handle different types of queries efficiently.
 
-**Chain of Thought Prompting**: Complex coding tasks use CoT prompting, breaking down problems into steps: requirement analysis, architecture planning, implementation, testing, and review. Each step feeds into the next, building comprehensive solutions.
+**Engine Types**: Seven specialized conversation engines handle different interaction patterns:
+- **SimpleConversation**: Direct responses to straightforward queries without complex reasoning
+- **ComplexConversation**: Multi-step reasoning using Chain-of-Thought for intricate problems
+- **AnalysisConversation**: Code review and architecture analysis with detailed recommendations
+- **GenerationConversation**: Code generation with implementation planning and scaffolding
+- **ProblemSolver**: Debugging assistance with root cause analysis
+- **MultiStepConversation**: Context-aware conversations maintaining state across exchanges
+- **ConversationRouter**: Intelligent routing based on query classification
+
+**LLM Integration**: The LLM Service manages provider connections, rate limiting, and failover, while conversation engines handle the AI logic. This separation ensures clean architecture where the LLM Service focuses purely on provider management without embedded business logic.
+
+## Enhancement techniques improve response quality
+
+The conversation engines implement several enhancement techniques to improve response quality and reliability.
+
+**Chain of Thought Prompting**: Complex queries route to engines that use CoT prompting, breaking down problems into steps: requirement analysis, architecture planning, implementation, testing, and review. Each step feeds into the next, building comprehensive solutions.
 
 **Retrieval Augmented Generation**: A RAG pipeline indexes project codebases using tree-sitter for parsing and Bumblebee for embeddings. When generating code, the system retrieves relevant context from existing files, ensuring consistency with project patterns.
 
-**Self-Correction Loop**: Generated code undergoes iterative refinement through a self-correction pipeline. The system analyzes output for syntax errors, style violations, and logical issues, then prompts the LLM to fix identified problems.
+**Self-Correction Loop**: Generated code undergoes iterative refinement through a self-correction pipeline. The system analyzes output for syntax errors, style violations, and logical issues, then prompts for corrections.
 
 **Memory Management**: Conversation context uses a sliding window approach, maintaining recent messages while summarizing older interactions. This balances context relevance with token limits.
 
@@ -50,13 +65,13 @@ The LLM integration layer implements several enhancement techniques to improve c
 
 Understanding how data flows through the system reveals the coordination between components.
 
-**Request Flow**: User input arrives via Phoenix LiveView, creating a Message resource through Ash actions. The message triggers an event published to the EventBus, which notifies relevant plugins and the AI processor.
+**Request Flow**: User input arrives via Phoenix Channels (WebSocket), creating conversation messages through the ConversationChannel. The channel routes requests to the EngineManager, which delegates to specialized conversation engines based on query type.
 
-**Context Assembly**: The AI processor assembles context by querying the conversation history, retrieving relevant code files, and gathering project metadata. This context feeds into the LLM prompt template.
+**Context Assembly**: The conversation engines assemble context by accessing conversation history, retrieving relevant code files through the memory system, and gathering project metadata. The ConversationRouter intelligently selects the appropriate engine (SimpleConversation, ComplexConversation, AnalysisConversation, etc.) based on query classification.
 
-**Response Generation**: LLM responses stream back through Phoenix Channels, updating the UI in real-time. Simultaneously, the system analyzes responses for actionable suggestions, creating CodeSuggestion resources.
+**Response Generation**: The selected engine processes the request, potentially using Chain-of-Thought reasoning for complex queries. Responses stream back through Phoenix Channels, updating the UI in real-time. The engine system ensures proper routing to LLM providers while maintaining conversation context.
 
-**Feedback Loop**: Users can accept, modify, or reject suggestions. This feedback updates the conversation context and trains the system's understanding of user preferences.
+**Feedback Loop**: Each conversation maintains context across messages, allowing for multi-turn interactions. The conversation engines track user preferences and conversation history to provide contextually relevant responses.
 
 ## Plugin architecture ensures extensibility
 

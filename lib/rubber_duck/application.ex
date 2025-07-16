@@ -56,8 +56,6 @@ defmodule RubberDuck.Application do
       RubberDuckWeb.Presence,
       # Message queue for offline users
       RubberDuckWeb.MessageQueue,
-      # Command processing system
-      RubberDuck.Commands.Processor,
       # Instruction template security system
       RubberDuck.Instructions.SecurityPipeline,
       # Web endpoint - start last
@@ -86,10 +84,6 @@ defmodule RubberDuck.Application do
     ============================================
     HTTP Endpoint: http://#{host}:#{port}
     WebSocket Endpoint: ws://#{host}:#{port}/socket/websocket
-    
-    CLI Client Configuration:
-    - Run: ./bin/rubber_duck auth setup --server ws://#{host}:#{port}/socket/websocket
-    - Use API key: test_key (for development)
     ============================================
     """)
   end

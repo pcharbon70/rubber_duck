@@ -37,13 +37,15 @@ In the context of a coding assistant, CoT is crucial for:
 
 ## 2. Architecture Overview {#architecture}
 
-The RubberDuck CoT system consists of several interconnected components:
+The RubberDuck CoT system is now integrated with the conversation engine system:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         CoT System                          │
+│                    Conversation Engines                      │
+│        (ComplexConversation, AnalysisConversation, etc.)    │
 ├─────────────────────────────────────────────────────────────┤
-│                                                             │
+│                              │                              │
+│                              ▼                              │
 │  ┌─────────────┐    ┌──────────────────┐   ┌─────────────┐│
 │  │   CoT DSL   │───▶│ ConversationMgr  │──▶│   Caching   ││
 │  │  (Spark)    │    │   (GenServer)    │   │    (ETS)    ││
@@ -52,24 +54,31 @@ The RubberDuck CoT system consists of several interconnected components:
 │         ▼                    ▼                      │       │
 │  ┌─────────────┐    ┌──────────────────┐          │       │
 │  │   Steps &   │    │    Execution     │          │       │
-│  │  Templates  │    │     Engine       │◀─────────┘       │
+│  │  Templates  │    │   Engine (CoT)   │◀─────────┘       │
 │  └─────────────┘    └──────────────────┘                  │
 │                              │                             │
 │                              ▼                             │
 │                     ┌──────────────────┐                  │
+│                     │  Engine Manager  │                  │
+│                     └──────────────────┘                  │
+│                              │                             │
+│                              ▼                             │
+│                     ┌──────────────────┐                  │
 │                     │   LLM Service    │                  │
-│                     │   Integration    │                  │
+│                     │ (Provider Mgmt)  │                  │
 │                     └──────────────────┘                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Component Responsibilities
 
+- **Conversation Engines**: High-level engines that use CoT for complex reasoning
 - **CoT DSL**: Declarative configuration of reasoning chains
 - **ConversationManager**: Manages CoT sessions and state
-- **Execution Engine**: Processes reasoning steps sequentially
+- **Execution Engine**: Processes reasoning steps sequentially, now calls EngineManager
 - **Caching Layer**: Optimizes performance with ETS-based caching
-- **LLM Integration**: Interfaces with the LLM service for completions
+- **Engine Manager**: Routes requests to appropriate engines
+- **LLM Service**: Manages provider connections without embedded CoT logic
 
 ## 3. Core Components {#core-components}
 
@@ -383,18 +392,58 @@ end
 
 ## 7. Integration with Other Systems {#integration}
 
-### Integration with LLM Service
+### Integration with Conversation Engines
+
+CoT is now primarily used by conversation engines for complex reasoning:
 
 ```elixir
-# The CoT system automatically integrates with the LLM service
-# Custom LLM configuration per step
-step :complex_analysis do
-  template :deep_analysis
-  llm_config %{
-    model: "gpt-4",
-    temperature: 0.2,
-    max_tokens: 2000
+# ComplexConversation engine uses CoT internally
+defmodule RubberDuck.Engines.Conversation.ComplexConversation do
+  def execute(input, state) do
+    # Uses ConversationChain with CoT reasoning
+    case ConversationManager.execute_chain(ConversationChain, input.query, context) do
+      {:ok, result} -> format_cot_response(result)
+      {:error, reason} -> handle_error(reason)
+    end
+  end
+end
+
+# AnalysisConversation uses AnalysisChain
+defmodule RubberDuck.Engines.Conversation.AnalysisConversation do
+  def execute(input, state) do
+    case ConversationManager.execute_chain(AnalysisChain, input.query, context) do
+      {:ok, result} -> extract_analysis_insights(result)
+      {:error, reason} -> handle_error(reason)
+    end
+  end
+end
+```
+
+### Integration with Engine System
+
+The CoT Executor now routes through EngineManager instead of calling LLM Service directly:
+
+```elixir
+# In CoT Executor - calls EngineManager
+defp execute_with_retries(prompt, step, context_opts, llm_config, engine_name, retries_left) do
+  engine_input = %{
+    query: prompt,
+    context: context_opts,
+    options: %{
+      temperature: Map.get(step, :temperature, 0.7),
+      max_tokens: Map.get(step, :max_tokens, 1000)
+    },
+    llm_config: llm_config
   }
+  
+  # Routes through EngineManager
+  case EngineManager.execute(engine_name, engine_input, timeout) do
+    {:ok, response} -> 
+      result = extract_engine_result(response)
+      validate_step_result(result, step)
+    {:error, reason} -> 
+      handle_retry(reason, retries_left)
+  end
 end
 ```
 

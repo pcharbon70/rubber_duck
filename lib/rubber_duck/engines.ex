@@ -79,5 +79,105 @@ defmodule RubberDuck.Engines do
         tags: [:testing, :llm, :test_generation]
       )
     end
+
+    # Conversation Engines
+    engine :simple_conversation do
+      module RubberDuck.Engines.Conversation.SimpleConversation
+      description "Handles simple, straightforward conversational queries"
+      priority(95)
+      timeout 15_000
+
+      config(
+        max_tokens: 1000,
+        temperature: 0.7,
+        capabilities: [:simple_questions, :factual_queries, :basic_code, :quick_reference],
+        tags: [:conversation, :simple, :direct_response]
+      )
+    end
+
+    engine :complex_conversation do
+      module RubberDuck.Engines.Conversation.ComplexConversation
+      description "Handles complex queries requiring chain-of-thought reasoning"
+      priority(85)
+      timeout 45_000
+
+      config(
+        max_tokens: 2000,
+        temperature: 0.5,
+        capabilities: [:complex_reasoning, :multi_step_analysis, :deep_understanding, :cot_reasoning],
+        tags: [:conversation, :complex, :cot_enabled]
+      )
+    end
+
+    engine :conversation_router do
+      module RubberDuck.Engines.Conversation.ConversationRouter
+      description "Routes conversation queries to appropriate specialized engines"
+      priority(100)
+      timeout 5_000
+
+      config(
+        max_tokens: 500,
+        temperature: 0.0,
+        capabilities: [:query_classification, :routing, :engine_selection],
+        tags: [:conversation, :router, :dispatcher]
+      )
+    end
+
+    engine :multi_step_conversation do
+      module RubberDuck.Engines.Conversation.MultiStepConversation
+      description "Manages multi-step conversational processes with context"
+      priority(75)
+      timeout 30_000
+
+      config(
+        max_tokens: 1500,
+        temperature: 0.5,
+        max_context_messages: 10,
+        capabilities: [:multi_step_conversation, :context_aware, :follow_up_questions, :iterative_solving],
+        tags: [:conversation, :multi_step, :contextual]
+      )
+    end
+
+    engine :analysis_conversation do
+      module RubberDuck.Engines.Conversation.AnalysisConversation
+      description "Specialized in code analysis discussions and reviews"
+      priority(80)
+      timeout 45_000
+
+      config(
+        max_tokens: 2000,
+        temperature: 0.3,
+        capabilities: [:code_review, :architecture_analysis, :performance_analysis, :security_review, :best_practices],
+        tags: [:conversation, :analysis, :code_review]
+      )
+    end
+
+    engine :generation_conversation do
+      module RubberDuck.Engines.Conversation.GenerationConversation
+      description "Handles code generation conversations and planning"
+      priority(85)
+      timeout 60_000
+
+      config(
+        max_tokens: 3000,
+        temperature: 0.6,
+        capabilities: [:code_generation, :implementation_planning, :api_design, :feature_development, :scaffolding],
+        tags: [:conversation, :generation, :planning]
+      )
+    end
+
+    engine :problem_solver do
+      module RubberDuck.Engines.Conversation.ProblemSolver
+      description "Specialized for debugging and problem-solving conversations"
+      priority(90)
+      timeout 60_000
+
+      config(
+        max_tokens: 2500,
+        temperature: 0.4,
+        capabilities: [:debugging, :troubleshooting, :error_analysis, :root_cause_analysis, :solution_generation],
+        tags: [:conversation, :problem_solving, :debugging]
+      )
+    end
   end
 end

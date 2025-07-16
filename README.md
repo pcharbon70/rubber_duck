@@ -55,32 +55,12 @@ mix test
 mix phx.server
 ```
 
-### Using the CLI
-
-```bash
-# Connect to an LLM provider (e.g., Ollama)
-mix rubber_duck llm connect ollama
-
-# Generate code
-mix rubber_duck generate "create a hello world function"
-
-# Analyze code
-mix rubber_duck analyze lib/my_module.ex
-
-# See all commands
-mix rubber_duck --help
-```
-
-For detailed CLI usage, see the [Command Line Interface Guide](guides/user/001-command_line_interface.md).
 
 ## 📖 Documentation
 
 Comprehensive documentation is available in the [**Documentation Guide**](guides/README.md).
 
 ### Quick Links
-
-**For Users:**
-- [**Command Line Interface Guide**](guides/user/001-command_line_interface.md) - Complete CLI usage including LLM setup
 
 **For Developers:**
 - [**Development Guidelines**](CLAUDE.md) - Project conventions and rules

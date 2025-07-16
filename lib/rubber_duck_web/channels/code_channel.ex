@@ -1,18 +1,18 @@
 defmodule RubberDuckWeb.CodeChannel do
   @moduledoc """
   Channel for real-time code-related operations including streaming
-  completions, live analysis, and collaborative features.
+  completions, generation, refactoring, and collaborative features.
+  
+  This channel now works directly with the various code engines,
+  bypassing the removed commands system.
   """
 
   use RubberDuckWeb, :channel
 
-  alias RubberDuck.Commands.{Parser, Processor, Context}
+  alias RubberDuck.Engine.Manager, as: EngineManager
   alias RubberDuck.Workspace
 
   require Logger
-
-  # 1MB
-  @max_message_size 1_000_000
 
   @impl true
   def join("code:project:" <> project_id, params, socket) do
@@ -48,118 +48,212 @@ defmodule RubberDuckWeb.CodeChannel do
 
       {:ok, %{status: "joined", file_id: file_id}, socket}
     else
+      {:error, :unauthorized} ->
+        {:error, %{reason: "Unauthorized access to file"}}
+
       {:error, reason} ->
         {:error, %{reason: to_string(reason)}}
     end
   end
 
-  # Handle completion requests
-  @impl true
-  def handle_in("complete", params, socket) do
-    with {:ok, context} <- build_context(socket, params),
-         {:ok, command} <- Parser.parse(["complete"] ++ build_args(params), :websocket, context),
-         {:ok, result} <- Processor.execute_async(command) do
-      
-      # Monitor the async execution
-      monitor_completion(result.request_id, socket)
-      
-      {:reply, {:ok, %{request_id: result.request_id}}, socket}
-    else
-      {:error, reason} ->
-        {:reply, {:error, %{reason: to_string(reason)}}, socket}
-    end
-  end
-
-  # Handle analysis requests
-  def handle_in("analyze", params, socket) do
-    with {:ok, context} <- build_context(socket, params),
-         {:ok, command} <- Parser.parse(["analyze"] ++ build_args(params), :websocket, context),
-         {:ok, result} <- Processor.execute_async(command) do
-      
-      # Monitor the async execution
-      monitor_analysis(result.request_id, socket)
-      
-      {:reply, {:ok, %{request_id: result.request_id}}, socket}
-    else
-      {:error, reason} ->
-        {:reply, {:error, %{reason: to_string(reason)}}, socket}
-    end
-  end
-
-  # Handle cursor position updates for collaborative features
-  def handle_in("cursor_position", %{"position" => position}, socket) do
-    socket = assign(socket, :cursor_position, position)
-
-    # Broadcast to other users in the same file/project
-    broadcast_from!(socket, "cursor_update", %{
-      user_id: socket.assigns.user_id,
-      position: position,
-      timestamp: DateTime.utc_now()
-    })
-
-    {:noreply, socket}
-  end
-
-  # Handle code changes for collaborative editing
-  def handle_in("code_change", %{"changes" => changes}, socket) do
-    # Validate changes
-    with :ok <- validate_changes(changes, socket) do
-      # Broadcast changes to other users
-      broadcast_from!(socket, "code_updated", %{
-        user_id: socket.assigns.user_id,
-        changes: changes,
-        timestamp: DateTime.utc_now()
-      })
-
-      {:reply, :ok, socket}
-    else
-      {:error, reason} ->
-        {:reply, {:error, %{reason: reason}}, socket}
-    end
-  end
-
-  # Cancel an active completion
-  def handle_in("cancel_completion", %{"completion_id" => _completion_id}, socket) do
-    # TODO: Implement completion cancellation
-    {:reply, :ok, socket}
-  end
-
-  # Intercept outgoing messages to add user-specific data
-  intercept(["completion_chunk", "analysis_result", "cursor_update", "code_updated"])
-
-  @impl true
-  def handle_out(event, payload, socket) do
-    # Add user context to outgoing messages
-    enhanced_payload = Map.put(payload, :from_user_id, socket.assigns.user_id)
-    push(socket, event, enhanced_payload)
-    {:noreply, socket}
-  end
-
+  # Handle presence tracking after join
   @impl true
   def handle_info(:after_join, socket) do
-    # Set up presence tracking
-    {:ok, _} =
-      RubberDuckWeb.Presence.track(
-        socket,
-        socket.assigns.user_id,
-        %{
-          online_at: DateTime.utc_now(),
-          cursor_position: socket.assigns[:cursor_position] || %{}
-        }
-      )
+    # Track presence for collaborative features
+    if project_id = socket.assigns[:project_id] do
+      {:ok, _} =
+        RubberDuckWeb.Presence.track(socket, socket.assigns.user_id, %{
+          online_at: inspect(System.system_time(:second)),
+          project_id: project_id
+        })
 
-    # Push current presence state
-    push(socket, "presence_state", RubberDuckWeb.Presence.list(socket))
+      push(socket, "presence_state", RubberDuckWeb.Presence.list(socket))
+    end
 
     {:noreply, socket}
   end
 
+  # Handle code generation
+  @impl true
+  def handle_in("generate", params, socket) do
+    prompt = params["prompt"] || ""
+    language = params["language"] || "elixir"
+    context = build_generation_context(params, socket)
+    
+    # Build input for generation engine
+    input = %{
+      prompt: prompt,
+      language: String.to_atom(language),
+      context: context,
+      partial_code: params["partial_code"],
+      style: params["style"] && String.to_atom(params["style"])
+    }
+    
+    # Create a unique request ID
+    request_id = generate_request_id()
+    
+    # Start async generation
+    Task.start_link(fn ->
+      case EngineManager.execute(:generation, input, 30_000) do
+        {:ok, result} ->
+          push(socket, "generation_complete", %{
+            request_id: request_id,
+            code: result.code,
+            language: result.language,
+            imports: result.imports,
+            explanation: result.explanation,
+            alternatives: Map.get(result, :alternatives, [])
+          })
+          
+        {:error, reason} ->
+          push(socket, "generation_error", %{
+            request_id: request_id,
+            error: format_error(reason)
+          })
+      end
+    end)
+    
+    {:reply, {:ok, %{request_id: request_id}}, socket}
+  end
+
+  # Handle code completion
+  @impl true
+  def handle_in("complete", params, socket) do
+    prefix = params["prefix"] || ""
+    suffix = params["suffix"] || ""
+    cursor_position = parse_cursor_position(params["cursor_position"])
+    file_path = params["file_path"] || get_in(socket.assigns, [:file, :path])
+    language = params["language"] || detect_language_from_file(file_path)
+    
+    # Build input for completion engine
+    input = %{
+      prefix: prefix,
+      suffix: suffix,
+      language: String.to_atom(language),
+      cursor_position: cursor_position,
+      file_path: file_path,
+      project_context: build_project_context(socket)
+    }
+    
+    # Create a unique request ID
+    request_id = generate_request_id()
+    
+    # Execute completion synchronously for faster response
+    case EngineManager.execute(:completion, input, 5_000) do
+      {:ok, suggestions} ->
+        {:reply, {:ok, %{
+          request_id: request_id,
+          suggestions: format_suggestions(suggestions)
+        }}, socket}
+        
+      {:error, reason} ->
+        {:reply, {:error, %{
+          request_id: request_id,
+          error: format_error(reason)
+        }}, socket}
+    end
+  end
+
+  # Handle code refactoring
+  @impl true
+  def handle_in("refactor", params, socket) do
+    code = params["code"] || ""
+    refactor_type = params["type"] || "general"
+    language = params["language"] || "elixir"
+    
+    # Build input for refactoring engine
+    input = %{
+      code: code,
+      language: String.to_atom(language),
+      refactor_type: String.to_atom(refactor_type),
+      options: params["options"] || %{},
+      context: build_refactoring_context(params, socket)
+    }
+    
+    # Create a unique request ID
+    request_id = generate_request_id()
+    
+    # Start async refactoring
+    Task.start_link(fn ->
+      case EngineManager.execute(:refactoring, input, 30_000) do
+        {:ok, result} ->
+          push(socket, "refactor_complete", %{
+            request_id: request_id,
+            refactored_code: result.refactored_code,
+            changes: result.changes,
+            explanation: result.explanation
+          })
+          
+        {:error, reason} ->
+          push(socket, "refactor_error", %{
+            request_id: request_id,
+            error: format_error(reason)
+          })
+      end
+    end)
+    
+    {:reply, {:ok, %{request_id: request_id}}, socket}
+  end
+
+  # Handle code analysis (delegates to analysis channel functionality)
+  @impl true
+  def handle_in("analyze", params, socket) do
+    code = params["code"] || ""
+    analysis_type = params["type"] || "general"
+    file_path = params["file_path"] || "temp_file"
+    language = params["language"] || detect_language_from_file(file_path)
+    
+    # Build input for analysis engine
+    input = %{
+      file_path: file_path,
+      content: code,
+      language: String.to_atom(language),
+      options: %{
+        analysis_type: String.to_atom(analysis_type),
+        project_context: params["context"] || %{}
+      }
+    }
+    
+    # Create a unique request ID
+    request_id = generate_request_id()
+    
+    # Start async analysis
+    Task.start_link(fn ->
+      case EngineManager.execute(:analysis, input, 30_000) do
+        {:ok, result} ->
+          push(socket, "analysis_complete", %{
+            request_id: request_id,
+            result: format_analysis_result(result)
+          })
+          
+        {:error, reason} ->
+          push(socket, "analysis_error", %{
+            request_id: request_id,
+            error: format_error(reason)
+          })
+      end
+    end)
+    
+    {:reply, {:ok, %{request_id: request_id}}, socket}
+  end
+
+  # Placeholder handlers
+  @impl true
+  def handle_in("cancel", %{"request_id" => _request_id}, socket) do
+    # TODO: Implement request cancellation
+    {:reply, {:error, %{reason: "Cancellation not yet implemented"}}, socket}
+  end
+
+  @impl true
+  def handle_in("get_status", %{"request_id" => _request_id}, socket) do
+    # TODO: Implement status tracking
+    {:reply, {:error, %{reason: "Status tracking not yet implemented"}}, socket}
+  end
 
   # Private functions
 
   defp authorize_project_access(project_id, _user_id) do
-    # TODO: Implement real authorization logic
-    # For now, just verify the project exists
+    # TODO: Implement proper authorization
     case Workspace.get_project(project_id) do
       {:ok, project} -> {:ok, project}
       _ -> {:error, :unauthorized}
@@ -167,117 +261,112 @@ defmodule RubberDuckWeb.CodeChannel do
   end
 
   defp authorize_file_access(file_id, _user_id) do
-    # TODO: Implement real authorization logic
-    # For now, just verify the file exists
+    # TODO: Implement proper authorization
     case Workspace.get_code_file(file_id) do
       {:ok, file} -> {:ok, file}
       _ -> {:error, :unauthorized}
     end
   end
 
-  defp validate_join_params(_params) do
-    # Add any parameter validation logic here
-    :ok
-  end
-
-  defp validate_changes(changes, _socket) do
-    # Validate change format and size
-    if byte_size(:erlang.term_to_binary(changes)) > @max_message_size do
-      {:error, "Changes exceed maximum message size"}
-    else
-      :ok
+  defp validate_join_params(params) do
+    cond do
+      is_map(params) -> :ok
+      true -> {:error, "Invalid join parameters"}
     end
   end
-
-  defp build_context(socket, params) do
-    context_data = %{
-      user_id: socket.assigns[:user_id] || "websocket_user_#{socket.id}",
-      project_id: socket.assigns[:project_id],
-      session_id: "websocket_session_#{socket.id}_#{System.system_time(:millisecond)}",
-      permissions: [:read, :write, :execute],
-      metadata: %{
-        socket_id: socket.id,
-        transport: "websocket",
-        channel_topic: socket.topic,
-        params: params
-      }
+  
+  defp generate_request_id do
+    "req_#{:crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)}"
+  end
+  
+  defp build_generation_context(params, socket) do
+    %{
+      project_files: params["project_files"] || [],
+      current_file: params["current_file"] || get_in(socket.assigns, [:file, :path]),
+      imports: params["imports"] || [],
+      dependencies: params["dependencies"] || [],
+      examples: params["examples"] || []
     }
-    
-    Context.new(context_data)
   end
-
-  defp build_args(params) do
-    args = []
-    
-    # Add file path if present
-    args = if params["file_path"], do: args ++ [params["file_path"]], else: args
-    
-    # Add type if present
-    args = if params["type"], do: args ++ ["--type", params["type"]], else: args
-    
-    # Add line and column for completions
-    args = if params["line"] do
-      args ++ ["--line", to_string(params["line"])]
-    else
-      args
-    end
-    
-    args = if params["column"] do
-      args ++ ["--column", to_string(params["column"])]
-    else
-      args
-    end
-    
-    args
+  
+  defp build_project_context(socket) do
+    %{
+      project_id: socket.assigns[:project_id],
+      project_path: get_in(socket.assigns, [:project, :path]),
+      current_file: get_in(socket.assigns, [:file, :path])
+    }
   end
-
-  defp monitor_completion(request_id, socket) do
-    Task.start_link(fn ->
-      poll_status(request_id, socket, "completion", 0)
+  
+  defp build_refactoring_context(params, socket) do
+    %{
+      project_context: build_project_context(socket),
+      target_patterns: params["patterns"] || [],
+      preserve_behavior: params["preserve_behavior"] != false
+    }
+  end
+  
+  defp parse_cursor_position(nil), do: {0, 0}
+  defp parse_cursor_position(%{"line" => line, "column" => col}) do
+    {line || 0, col || 0}
+  end
+  defp parse_cursor_position(_), do: {0, 0}
+  
+  defp detect_language_from_file(nil), do: "unknown"
+  defp detect_language_from_file(file_path) do
+    case Path.extname(file_path) do
+      ".ex" -> "elixir"
+      ".exs" -> "elixir"
+      ".js" -> "javascript"
+      ".jsx" -> "javascript"
+      ".ts" -> "typescript"
+      ".tsx" -> "typescript"
+      ".py" -> "python"
+      ".rb" -> "ruby"
+      ".go" -> "go"
+      ".rs" -> "rust"
+      ".java" -> "java"
+      _ -> "unknown"
+    end
+  end
+  
+  defp format_suggestions(suggestions) when is_list(suggestions) do
+    Enum.map(suggestions, fn suggestion ->
+      %{
+        text: suggestion.text,
+        score: suggestion.score,
+        type: suggestion.type,
+        description: Map.get(suggestion, :description),
+        metadata: Map.get(suggestion, :metadata, %{})
+      }
     end)
   end
-
-  defp monitor_analysis(request_id, socket) do
-    Task.start_link(fn ->
-      poll_status(request_id, socket, "analysis", 0)
+  defp format_suggestions(_), do: []
+  
+  defp format_analysis_result(result) do
+    %{
+      file: result.file,
+      language: result.language,
+      issues: format_issues(result.issues),
+      metrics: result.metrics || %{},
+      summary: result.summary || %{}
+    }
+  end
+  
+  defp format_issues(issues) when is_list(issues) do
+    Enum.map(issues, fn issue ->
+      %{
+        type: issue.type || :info,
+        category: issue.category || :general,
+        message: issue.message || "Unknown issue",
+        line: issue.line || 0,
+        column: issue.column || 0,
+        severity: issue.severity || :low
+      }
     end)
   end
-
-  defp poll_status(request_id, socket, type, attempts) do
-    case Processor.get_status(request_id) do
-      {:ok, %{status: :completed, result: result}} ->
-        push(socket, "#{type}_result", %{
-          request_id: request_id,
-          result: result,
-          timestamp: DateTime.utc_now()
-        })
-
-      {:ok, %{status: :failed, result: {:error, reason}}} ->
-        push(socket, "#{type}_error", %{
-          request_id: request_id,
-          error: to_string(reason),
-          timestamp: DateTime.utc_now()
-        })
-
-      {:ok, %{status: status}} when status in [:pending, :running] ->
-        # Continue polling
-        if attempts < 120 do  # Max 60 seconds
-          Process.sleep(500)
-          poll_status(request_id, socket, type, attempts + 1)
-        else
-          push(socket, "#{type}_error", %{
-            request_id: request_id,
-            error: "Request timed out",
-            timestamp: DateTime.utc_now()
-          })
-        end
-
-      {:error, reason} ->
-        push(socket, "#{type}_error", %{
-          request_id: request_id,
-          error: to_string(reason),
-          timestamp: DateTime.utc_now()
-        })
-    end
-  end
+  defp format_issues(_), do: []
+  
+  defp format_error(reason) when is_binary(reason), do: reason
+  defp format_error(reason) when is_atom(reason), do: to_string(reason)
+  defp format_error(reason), do: inspect(reason)
 end

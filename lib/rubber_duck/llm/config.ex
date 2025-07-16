@@ -2,29 +2,16 @@ defmodule RubberDuck.LLM.Config do
   @moduledoc """
   Configuration management for LLM providers and models.
   
-  Handles merging CLI configuration with application configuration,
-  providing a unified interface for accessing LLM settings.
+  Provides a unified interface for accessing LLM settings from
+  application configuration.
   """
-
-  alias RubberDuck.CLIClient.Auth
 
   @doc """
   Get the model for a specific provider.
-  
-  CLI config takes precedence over application config.
   """
-  def get_provider_model(provider, cli_config \\ nil) do
+  def get_provider_model(provider, _cli_config \\ nil) do
     provider_atom = ensure_atom(provider)
-    cli_config = cli_config || Auth.get_llm_config()
-    
-    # First check CLI config
-    model = if cli_config do
-      provider_str = to_string(provider_atom)
-      get_in(cli_config, ["providers", provider_str, "model"])
-    end
-    
-    # Fall back to app config if no CLI config
-    model || get_app_provider_model(provider_atom)
+    get_app_provider_model(provider_atom)
   end
 
   @doc """
@@ -32,35 +19,8 @@ defmodule RubberDuck.LLM.Config do
   
   Returns {provider, model} tuple.
   """
-  def get_current_provider_and_model(cli_config \\ nil) do
-    cli_config = cli_config || Auth.get_llm_config()
-    
-    if cli_config do
-      # Use CLI config
-      provider = cli_config["default_provider"]
-      
-      if provider do
-        model = cli_config["default_model"] || 
-                get_in(cli_config, ["providers", provider, "model"])
-        {ensure_atom(provider), model}
-      else
-        # No default provider, get first from CLI config
-        case cli_config["providers"] do
-          nil -> 
-            # No providers in CLI config, fall back to app config
-            get_app_default_provider_and_model()
-          providers when map_size(providers) > 0 ->
-            {provider_str, config} = Enum.at(providers, 0)
-            {ensure_atom(provider_str), config["model"]}
-          _ ->
-            # Empty providers, fall back to app config
-            get_app_default_provider_and_model()
-        end
-      end
-    else
-      # Fall back to app config
-      get_app_default_provider_and_model()
-    end
+  def get_current_provider_and_model(_cli_config \\ nil) do
+    get_app_default_provider_and_model()
   end
 
   @doc """
@@ -68,26 +28,8 @@ defmodule RubberDuck.LLM.Config do
   
   Returns a map of %{provider => [models]}
   """
-  def list_available_models(cli_config \\ nil) do
-    cli_config = cli_config || Auth.get_llm_config()
-    
-    # Get models from app config
-    app_models = get_app_models()
-    
-    # Get models from CLI config
-    cli_models = if cli_config && cli_config["providers"] do
-      cli_config["providers"]
-      |> Enum.map(fn {provider, config} ->
-        model = config["model"]
-        {ensure_atom(provider), [model]}
-      end)
-      |> Enum.into(%{})
-    else
-      %{}
-    end
-    
-    # Merge with CLI config taking precedence
-    Map.merge(app_models, cli_models)
+  def list_available_models(_cli_config \\ nil) do
+    get_app_models()
   end
 
   @doc """
