@@ -58,6 +58,9 @@ defmodule RubberDuck.Application do
       RubberDuckWeb.MessageQueue,
       # Instruction template security system
       RubberDuck.Instructions.SecurityPipeline,
+      # MCP (Model Context Protocol) system
+      {Registry, keys: :unique, name: RubberDuck.MCP.ClientRegistry},
+      RubberDuck.MCP.ClientSupervisor,
       # Web endpoint - start last
       RubberDuckWeb.Endpoint
       # Error boundary GenServer - started manually in tests
