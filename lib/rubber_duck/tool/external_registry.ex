@@ -18,7 +18,7 @@ defmodule RubberDuck.Tool.ExternalRegistry do
   require Logger
   
   @registry_interval 5_000  # Check for updates every 5 seconds in dev
-  @external_services [:openapi, :anthropic, :openai, :langchain]
+  # @external_services [:openapi, :anthropic, :openai, :langchain]
   
   # Client API
   

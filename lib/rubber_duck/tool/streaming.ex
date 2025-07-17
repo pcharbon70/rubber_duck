@@ -174,7 +174,7 @@ defmodule RubberDuck.Tool.Streaming do
     :ok
   end
   
-  defp stream_as_chunks(request_id, result, opts) do
+  defp stream_as_chunks(_request_id, result, opts) do
     # HTTP chunked transfer encoding
     conn = Keyword.get(opts, :conn)
     

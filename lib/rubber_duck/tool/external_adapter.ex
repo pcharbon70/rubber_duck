@@ -11,7 +11,7 @@ defmodule RubberDuck.Tool.ExternalAdapter do
   
   alias RubberDuck.Tool
   alias RubberDuck.Tool.{Registry, Executor, Validator}
-  alias RubberDuck.Tool.SchemaGenerator
+  # alias RubberDuck.Tool.SchemaGenerator
   
   require Logger
   
@@ -81,7 +81,7 @@ defmodule RubberDuck.Tool.ExternalAdapter do
   @doc """
   Converts internal tool results to external response format.
   """
-  def convert_result(result, tool_module, format \\ :json) do
+  def convert_result(result, _tool_module, format \\ :json) do
     case format do
       :json -> 
         Jason.encode(standardize_result(result))
@@ -373,7 +373,7 @@ defmodule RubberDuck.Tool.ExternalAdapter do
   defp openapi_type(:integer), do: "integer"
   defp openapi_type(:float), do: "number"
   defp openapi_type(:boolean), do: "boolean"
-  defp openapi_type({:array, type}), do: "array"
+  defp openapi_type({:array, _type}), do: "array"
   defp openapi_type({:map, _}), do: "object"
   defp openapi_type(_), do: "string"
   
@@ -420,7 +420,11 @@ defmodule RubberDuck.Tool.ExternalAdapter do
   defp get_tool_examples(tool_module) do
     # Try to get examples, fallback to empty list
     try do
-      Tool.examples(tool_module) || []
+      if function_exported?(tool_module, :examples, 0) do
+        tool_module.examples() || []
+      else
+        []
+      end
     rescue
       _ -> []
     end

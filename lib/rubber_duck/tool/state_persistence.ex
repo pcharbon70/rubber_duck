@@ -150,36 +150,6 @@ defmodule RubberDuck.Tool.StatePersistence do
   end
   
   @impl true
-  def handle_cast({:save_execution, execution_record}, state) do
-    # Add to history
-    history_key = history_key(execution_record.tool_name)
-    
-    # Get current history
-    history = case :ets.lookup(@table_name, history_key) do
-      [{^history_key, records}] -> records
-      [] -> []
-    end
-    
-    # Add new record and limit size
-    updated_history = [execution_record | history]
-    |> Enum.take(state.history_limit)
-    
-    # Save to ETS
-    :ets.insert(@table_name, {history_key, updated_history})
-    
-    # Also save individual execution for quick lookup
-    exec_key = execution_key(execution_record.request_id)
-    :ets.insert(@table_name, {exec_key, execution_record})
-    
-    # Persist if enabled
-    if state.persist_to_disk do
-      persist_execution(execution_record, state)
-    end
-    
-    {:noreply, state}
-  end
-  
-  @impl true
   def handle_call({:get_history, filter}, _from, state) do
     history = get_filtered_history(filter)
     {:reply, {:ok, history}, state}
@@ -212,6 +182,36 @@ defmodule RubberDuck.Tool.StatePersistence do
   def handle_call({:get_statistics, tool_name}, _from, state) do
     stats = calculate_statistics(tool_name)
     {:reply, {:ok, stats}, state}
+  end
+  
+  @impl true
+  def handle_cast({:save_execution, execution_record}, state) do
+    # Add to history
+    history_key = history_key(execution_record.tool_name)
+    
+    # Get current history
+    history = case :ets.lookup(@table_name, history_key) do
+      [{^history_key, records}] -> records
+      [] -> []
+    end
+    
+    # Add new record and limit size
+    updated_history = [execution_record | history]
+    |> Enum.take(state.history_limit)
+    
+    # Save to ETS
+    :ets.insert(@table_name, {history_key, updated_history})
+    
+    # Also save individual execution for quick lookup
+    exec_key = execution_key(execution_record.request_id)
+    :ets.insert(@table_name, {exec_key, execution_record})
+    
+    # Persist if enabled
+    if state.persist_to_disk do
+      persist_execution(execution_record, state)
+    end
+    
+    {:noreply, state}
   end
   
   @impl true

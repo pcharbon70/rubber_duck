@@ -10,7 +10,7 @@ defmodule RubberDuck.Tool.CapabilityAPI do
   """
   
   alias RubberDuck.Tool
-  alias RubberDuck.Tool.{Registry, ExternalAdapter, Monitoring}
+  alias RubberDuck.Tool.{Registry, ExternalAdapter}
   
   @doc """
   Lists all available tool capabilities.
@@ -45,8 +45,13 @@ defmodule RubberDuck.Tool.CapabilityAPI do
   Gets quality metrics for a tool.
   """
   def get_tool_metrics(tool_name) do
-    with {:ok, tool_module} <- Registry.get(tool_name) do
-      metrics = Monitoring.get_tool_metrics(Tool.metadata(tool_module).name)
+    with {:ok, _tool_module} <- Registry.get(tool_name) do
+      # Mock metrics for now - Monitoring.get_tool_metrics not yet implemented
+      metrics = %{
+        success_rate: 0.95,
+        average_duration_ms: 100,
+        total_executions: 1000
+      }
       {:ok, metrics}
     end
   end
@@ -206,7 +211,12 @@ defmodule RubberDuck.Tool.CapabilityAPI do
     end
     
     if include_examples do
-      Map.put(info, :examples, Tool.examples(tool_module) || [])
+      examples = if function_exported?(tool_module, :examples, 0) do
+        tool_module.examples() || []
+      else
+        []
+      end
+      Map.put(info, :examples, examples)
     else
       info
     end
@@ -332,7 +342,7 @@ defmodule RubberDuck.Tool.CapabilityAPI do
     }
   end
   
-  defp get_cached_metrics(tool_name) do
+  defp get_cached_metrics(_tool_name) do
     # Simple mock metrics for now
     # In production, this would fetch from monitoring system
     %{

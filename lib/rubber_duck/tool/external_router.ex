@@ -324,7 +324,7 @@ defmodule RubberDuck.Tool.ExternalRouter do
     
     # Execute through adapter
     ExternalAdapter.execute(
-      Tool.metadata(tool_module).name,
+      RubberDuck.Tool.metadata(tool_module).name,
       params,
       enhanced_context,
       opts
