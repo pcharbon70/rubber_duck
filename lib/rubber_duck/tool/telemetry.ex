@@ -302,6 +302,7 @@ defmodule RubberDuck.Tool.Telemetry.Poller do
   """
   
   use GenServer
+  require Logger
   
   @polling_interval 10_000 # 10 seconds
   

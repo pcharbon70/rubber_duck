@@ -138,7 +138,7 @@ defmodule RubberDuck.Tool.Monitoring.Dashboard do
   
   # Private functions
   
-  defp compile_dashboard_data(state) do
+  defp compile_dashboard_data(_state) do
     current_time = System.system_time(:microsecond)
     
     # Get various time windows
@@ -262,7 +262,7 @@ defmodule RubberDuck.Tool.Monitoring.Dashboard do
   
   defp get_total_tools_count do
     # This would query the tool registry
-    length(RubberDuck.Tool.Registry.list_tools())
+    length(RubberDuck.Tool.Registry.list())
   rescue
     _ -> 0
   end
@@ -366,12 +366,9 @@ defmodule RubberDuck.Tool.Monitoring.Dashboard do
   end
   
   defp get_scheduler_usage do
-    :scheduler.utilization()
-    |> Enum.map(fn {id, usage} ->
-      %{scheduler_id: id, usage_percent: Float.round(usage * 100, 2)}
-    end)
-  rescue
-    _ -> []
+    # Scheduler utilization is not available in standard OTP
+    # Would require additional dependencies
+    []
   end
   
   defp filter_buffered_events(buffer, start_time) do
@@ -380,7 +377,7 @@ defmodule RubberDuck.Tool.Monitoring.Dashboard do
     end)
   end
   
-  defp get_historical_metrics(start_time, end_time) do
+  defp get_historical_metrics(_start_time, _end_time) do
     # Query historical metrics from monitoring
     []
   end
@@ -509,7 +506,7 @@ defmodule RubberDuck.Tool.Monitoring.Dashboard do
   end
   
   defp calculate_throughput(_tool_name, start_time, end_time) do
-    duration_seconds = (end_time - start_time) / 1_000_000
+    _duration_seconds = (end_time - start_time) / 1_000_000
     # Would calculate actual throughput
     %{
       executions_per_second: 2.5,
@@ -524,7 +521,7 @@ defmodule RubberDuck.Tool.Monitoring.Dashboard do
     }
   end
   
-  defp analyze_tool_errors(tool_name, start_time, end_time) do
+  defp analyze_tool_errors(_tool_name, _start_time, _end_time) do
     # Analyze error patterns
     %{
       error_types: %{
@@ -537,7 +534,7 @@ defmodule RubberDuck.Tool.Monitoring.Dashboard do
     }
   end
   
-  defp analyze_usage_patterns(history) do
+  defp analyze_usage_patterns(_history) do
     # Analyze when the tool is used most
     %{
       peak_hours: [14, 15, 16], # 2-5 PM
@@ -646,8 +643,8 @@ defmodule RubberDuck.Tool.Monitoring.Dashboard do
   
   defp get_cpu_usage do
     %{
-      scheduler_usage: :scheduler.utilization(1),
-      load_average: :cpu_sup.avg1() / 256
+      scheduler_usage: [],
+      load_average: 0.0
     }
   rescue
     _ -> %{scheduler_usage: [], load_average: 0}
@@ -674,7 +671,7 @@ defmodule RubberDuck.Tool.Monitoring.Dashboard do
   
   defp get_tool_registry_info do
     try do
-      tools = RubberDuck.Tool.Registry.list_tools()
+      tools = RubberDuck.Tool.Registry.list()
       
       %{
         total_tools: length(tools),

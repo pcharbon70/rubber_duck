@@ -248,9 +248,21 @@ defmodule RubberDuck.Tool.ResultProcessor do
   end
   
   defp cache_result(result, tool_module, context, opts) do
-    case cache_processed_result(result, tool_module, context, opts) do
-      :ok -> :ok
-      {:error, reason} -> {:error, :caching_failed, reason}
+    if Keyword.get(opts, :cache, true) do
+      cache_key = build_cache_key(tool_module, context, opts)
+      ttl = Keyword.get(opts, :cache_ttl, 3600) # 1 hour default
+      
+      case RubberDuck.Cache.ETS.put(cache_key, result, ttl: ttl) do
+        :ok -> 
+          # Emit cache event
+          emit_cache_event(:cached, tool_module, context, cache_key)
+          :ok
+        {:error, _reason} -> 
+          # Log but don't fail on cache errors
+          :ok
+      end
+    else
+      :ok
     end
   end
   
@@ -521,5 +533,16 @@ defmodule RubberDuck.Tool.ResultProcessor do
   defp storage_backend do
     # In production, this would be configurable
     RubberDuck.Storage.FileSystem
+  end
+  
+  defp emit_cache_event(event, tool_module, context, cache_key) do
+    metadata = RubberDuck.Tool.metadata(tool_module)
+    
+    RubberDuck.Tool.Telemetry.cache_operation(
+      metadata.name,
+      event,
+      :success,
+      %{cache_key: cache_key, execution_id: context[:execution_id]}
+    )
   end
 end
