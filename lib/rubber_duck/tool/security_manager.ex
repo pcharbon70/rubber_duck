@@ -11,7 +11,6 @@ defmodule RubberDuck.Tool.SecurityManager do
   
   use GenServer
   
-  alias RubberDuck.Tool.Registry
   
   require Logger
   
