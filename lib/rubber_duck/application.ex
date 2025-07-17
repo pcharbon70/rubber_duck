@@ -52,6 +52,14 @@ defmodule RubberDuck.Application do
       RubberDuck.Workflows.Metrics.Aggregator,
       # Phoenix PubSub for channels
       {Phoenix.PubSub, name: RubberDuck.PubSub},
+      # Task supervisor for async tool executions
+      {Task.Supervisor, name: RubberDuck.TaskSupervisor},
+      # Result processing components
+      RubberDuck.Cache.ETS,
+      # Monitoring and observability components
+      RubberDuck.Tool.Monitoring,
+      RubberDuck.Tool.Monitoring.Dashboard,
+      RubberDuck.Tool.Telemetry.Poller,
       # Phoenix Presence for tracking users
       RubberDuckWeb.Presence,
       # Message queue for offline users

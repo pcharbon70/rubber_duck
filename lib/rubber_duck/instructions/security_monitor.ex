@@ -373,7 +373,7 @@ defmodule RubberDuck.Instructions.SecurityMonitor do
     end
   end
   
-  defp cleanup_old_data do
+  def cleanup_old_data do
     monitoring_config = SecurityConfig.get_monitoring_config()
     window_size = Map.get(monitoring_config, :window_size, 3600)
     cutoff = System.system_time(:second) - window_size

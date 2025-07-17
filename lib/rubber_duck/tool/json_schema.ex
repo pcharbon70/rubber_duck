@@ -96,9 +96,14 @@ defmodule RubberDuck.Tool.JsonSchema do
   end
   
   defp build_parameter_schema(param) do
-    base_schema = %{
-      "description" => param.description
-    }
+    base_schema = %{}
+    
+    # Only add description if it's not nil
+    base_schema = if param.description do
+      Map.put(base_schema, "description", param.description)
+    else
+      base_schema
+    end
     
     base_schema
     |> add_type(param.type)
