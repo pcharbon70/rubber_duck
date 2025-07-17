@@ -285,55 +285,64 @@ Create comprehensive integration tests in `test/integration/phase_8_test.exs` to
 
 This phase implements a comprehensive tool definition system that leverages RubberDuck's Ash Framework foundation to create a sophisticated, declarative tool system. The system provides unified tool access for internal engines and external clients, with robust security, type safety, and workflow integration.
 
-### 9.1 Core Tool Infrastructure
+### 9.1 Core Tool Infrastructure ✅
 
 Build the foundation for tool definition and registration using Spark DSL for declarative configuration, with compile-time validation and code generation capabilities.
 
 #### Tasks:
-- [ ] 9.1.1 Create `RubberDuck.Tool` Spark DSL extension:
-  - [ ] 9.1.1.1 Define tool metadata section (name, description, category, version)
-  - [ ] 9.1.1.2 Implement parameter definition entities with type specifications
-  - [ ] 9.1.1.3 Add execution configuration section (handler, timeout, async, retries)
-  - [ ] 9.1.1.4 Build security configuration section (sandbox, capabilities, rate limits)
-- [ ] 9.1.2 Implement `RubberDuck.Tool.Registry`:
-  - [ ] 9.1.2.1 Create ETS-backed tool storage with concurrent access
-  - [ ] 9.1.2.2 Build tool discovery and loading from application modules
-  - [ ] 9.1.2.3 Implement tool versioning and compatibility checking
-  - [ ] 9.1.2.4 Add hot reloading support for development
-- [ ] 9.1.3 Build JSON Schema generation:
-  - [ ] 9.1.3.1 Convert Spark DSL parameter definitions to JSON Schema
-  - [ ] 9.1.3.2 Support complex types (arrays, objects, unions)
-  - [ ] 9.1.3.3 Generate validation constraints from DSL specifications
-  - [ ] 9.1.3.4 Include examples and documentation in schemas
-- [ ] 9.1.4 Create tool compilation pipeline:
-  - [ ] 9.1.4.1 Validate tool definitions at compile time
-  - [ ] 9.1.4.2 Generate execution modules from DSL specifications
-  - [ ] 9.1.4.3 Create standardized tool descriptions
-  - [ ] 9.1.4.4 Build TypeScript type definitions for client SDKs
-- [ ] 9.1.5 Implement tool lifecycle management:
-  - [ ] 9.1.5.1 Tool initialization with dependency injection
-  - [ ] 9.1.5.2 Graceful shutdown and cleanup procedures
-  - [ ] 9.1.5.3 Health checking and availability monitoring
-  - [ ] 9.1.5.4 Resource usage tracking per tool
-- [ ] 9.1.6 Add tool documentation generator:
-  - [ ] 9.1.6.1 Extract documentation from DSL definitions
-  - [ ] 9.1.6.2 Generate markdown documentation
-  - [ ] 9.1.6.3 Create interactive API documentation
-  - [ ] 9.1.6.4 Build example usage snippets
-- [ ] 9.1.7 Create tool migration system
-- [ ] 9.1.8 Build tool dependency resolution
-- [ ] 9.1.9 Implement tool feature flags
-- [ ] 9.1.10 Add tool metrics collection
+- [x] 9.1.1 Create `RubberDuck.Tool` Spark DSL extension:
+  - [x] 9.1.1.1 Define tool metadata section (name, description, category, version)
+  - [x] 9.1.1.2 Implement parameter definition entities with type specifications
+  - [x] 9.1.1.3 Add execution configuration section (handler, timeout, async, retries)
+  - [x] 9.1.1.4 Build security configuration section (sandbox, capabilities, rate limits)
+- [x] 9.1.2 Implement `RubberDuck.Tool.Registry`:
+  - [x] 9.1.2.1 Create ETS-backed tool storage with concurrent access
+  - [x] 9.1.2.2 Build tool discovery and loading from application modules
+  - [x] 9.1.2.3 Implement tool versioning and compatibility checking
+  - [x] 9.1.2.4 Add hot reloading support for development
+- [x] 9.1.3 Build JSON Schema generation:
+  - [x] 9.1.3.1 Convert Spark DSL parameter definitions to JSON Schema
+  - [x] 9.1.3.2 Support complex types (arrays, objects, unions)
+  - [x] 9.1.3.3 Generate validation constraints from DSL specifications
+  - [x] 9.1.3.4 Include examples and documentation in schemas
+- [x] 9.1.4 Create tool compilation pipeline:
+  - [x] 9.1.4.1 Validate tool definitions at compile time
+  - [x] 9.1.4.2 Generate execution modules from DSL specifications
+  - [x] 9.1.4.3 Create standardized tool descriptions
+  - [ ] 9.1.4.4 Build TypeScript type definitions for client SDKs (deferred)
+- [x] 9.1.5 Implement tool lifecycle management:
+  - [x] 9.1.5.1 Tool initialization with dependency injection
+  - [x] 9.1.5.2 Graceful shutdown and cleanup procedures
+  - [x] 9.1.5.3 Health checking and availability monitoring
+  - [x] 9.1.5.4 Resource usage tracking per tool
+- [x] 9.1.6 Add tool documentation generator:
+  - [x] 9.1.6.1 Extract documentation from DSL definitions
+  - [x] 9.1.6.2 Generate markdown documentation
+  - [x] 9.1.6.3 Create interactive API documentation
+  - [x] 9.1.6.4 Build example usage snippets
+- [x] 9.1.7 Create tool migration system
+- [x] 9.1.8 Build tool dependency resolution
+- [x] 9.1.9 Implement tool feature flags
+- [x] 9.1.10 Add tool metrics collection
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/tools/registry_test.exs` to verify:
-- [ ] 9.1.11 Test Spark DSL compilation and validation
-- [ ] 9.1.12 Test tool registration and discovery
-- [ ] 9.1.13 Test JSON Schema generation accuracy
-- [ ] 9.1.14 Test hot reloading functionality
-- [ ] 9.1.15 Test versioning and compatibility
-- [ ] 9.1.16 Test lifecycle management
-- [ ] 9.1.17 Test concurrent registry access
+- [x] 9.1.11 Test Spark DSL compilation and validation
+- [x] 9.1.12 Test tool registration and discovery
+- [x] 9.1.13 Test JSON Schema generation accuracy
+- [x] 9.1.14 Test hot reloading functionality
+- [x] 9.1.15 Test versioning and compatibility
+- [x] 9.1.16 Test lifecycle management
+- [x] 9.1.17 Test concurrent registry access
+
+#### Implementation Notes:
+- Complete Spark DSL extension with metadata, parameters, execution, and security sections
+- ETS-backed registry with concurrent access and hot reloading
+- Full JSON Schema generation supporting complex types
+- Compile-time validation and code generation
+- Complete lifecycle management with health checks and monitoring
+- Documentation generator with markdown and interactive API docs
+- TypeScript definitions deferred for future client SDK work
 
 ### 9.2 Multi-Layer Execution Architecture ✅
 

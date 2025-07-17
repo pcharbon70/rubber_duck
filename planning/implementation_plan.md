@@ -27,11 +27,19 @@ This document provides the high-level overview and status tracking for the Rubbe
 | **Phase 6** | Conversational AI System | 🔲 0% Complete | [View Details](implementation_part_2.md#phase-6-conversational-ai-system) |
 | **Phase 7** | Planning Enhancement System | 🔲 0% Complete | [View Details](implementation_part_2.md#phase-7-planning-enhancement-system) |
 | **Phase 8** | Instruction Templating System | 🔲 0% Complete | [View Details](implementation_part_3.md#phase-8-instruction-templating-system) |
-| **Phase 9** | LLM Tool Definition System | 🔧 ~15% Complete | [View Details](implementation_part_3.md#phase-9-llm-tool-definition-system) |
+| **Phase 9** | LLM Tool Definition System | 🔧 ~30% Complete | [View Details](implementation_part_3.md#phase-9-llm-tool-definition-system) |
 | **Phase 10** | Advanced Features & Production Readiness | 🔲 0% Complete | [View Details](implementation_part_3.md#phase-10-advanced-features--production-readiness) |
 
 ### Recent Completions
 
+- ✅ **Core Tool Infrastructure** (Section 9.1): Complete implementation with:
+  - Spark DSL extension for declarative tool definitions
+  - ETS-backed registry with concurrent access and hot reloading
+  - JSON Schema generation from DSL specifications
+  - Compile-time validation and code generation pipeline
+  - Tool lifecycle management with health checks
+  - Documentation generator for markdown and API docs
+  - Comprehensive test coverage
 - ✅ **Multi-Layer Execution Architecture** (Section 9.2): Complete implementation with:
   - Parameter validation layer with JSON Schema and custom constraints
   - Authorization layer with capability and role-based access control
