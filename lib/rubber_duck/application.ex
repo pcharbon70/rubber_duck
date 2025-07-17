@@ -54,6 +54,8 @@ defmodule RubberDuck.Application do
       {Phoenix.PubSub, name: RubberDuck.PubSub},
       # Task supervisor for async tool executions
       {Task.Supervisor, name: RubberDuck.TaskSupervisor},
+      # Result processing components
+      RubberDuck.Cache.ETS,
       # Phoenix Presence for tracking users
       RubberDuckWeb.Presence,
       # Message queue for offline users

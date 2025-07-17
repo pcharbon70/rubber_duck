@@ -13,7 +13,7 @@ defmodule RubberDuck.Tool.Executor do
   
   require Logger
   
-  alias RubberDuck.Tool.{Validator, Authorizer, Sandbox}
+  alias RubberDuck.Tool.{Validator, Authorizer, Sandbox, ResultProcessor}
   
   @type execution_result :: %{
     output: any(),
@@ -227,18 +227,33 @@ defmodule RubberDuck.Tool.Executor do
     
     case result do
       {:ok, output} ->
-        {:ok, %{
+        raw_result = %{
           output: output,
           status: :success,
           execution_time: execution_time,
           metadata: build_result_metadata(tool_module, context, start_time, end_time),
           retry_count: (final_context[:attempt] || 1) - 1
-        }}
+        }
+        
+        # Process result through pipeline
+        processing_opts = Map.get(context, :processing, [])
+        case ResultProcessor.process_result(raw_result, tool_module, context, processing_opts) do
+          {:ok, processed_result} ->
+            emit_execution_event(:completed, tool_module, context.user, processed_result)
+            {:ok, processed_result}
+          {:error, reason, details} ->
+            Logger.error("Result processing failed: #{inspect(reason)} - #{inspect(details)}")
+            # Return raw result if processing fails
+            emit_execution_event(:completed, tool_module, context.user, raw_result)
+            {:ok, raw_result}
+        end
       
       {:error, reason} ->
+        emit_execution_event(:failed, tool_module, context.user, reason)
         {:error, reason}
       
       {:error, reason, details} ->
+        emit_execution_event(:failed, tool_module, context.user, {reason, details})
         {:error, reason, details}
     end
   end
