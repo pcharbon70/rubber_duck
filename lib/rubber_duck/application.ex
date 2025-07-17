@@ -66,6 +66,10 @@ defmodule RubberDuck.Application do
       RubberDuck.Tool.ExternalRegistry,
       RubberDuck.Tool.ExternalRouter,
       RubberDuck.Tool.StatePersistence,
+      # Tool security system
+      RubberDuck.Tool.SecurityManager,
+      RubberDuck.Tool.Security.RateLimiter,
+      RubberDuck.Tool.Security.Monitor,
       # Phoenix Presence for tracking users
       RubberDuckWeb.Presence,
       # Message queue for offline users
