@@ -27,3 +27,6 @@ rubber_duck-*.tar
 
 # Log files
 *.log
+
+# Storage directory for results and other runtime data
+/priv/storage/
