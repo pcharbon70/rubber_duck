@@ -13,7 +13,7 @@ defmodule RubberDuck.Tool.Executor do
   
   require Logger
   
-  alias RubberDuck.Tool.{Validator, Authorizer}
+  alias RubberDuck.Tool.{Validator, Authorizer, Sandbox}
   
   @type execution_result :: %{
     output: any(),
@@ -260,12 +260,18 @@ defmodule RubberDuck.Tool.Executor do
             execution_config = RubberDuck.Tool.execution(tool_module)
             handler = execution_config.handler
             
-            # Execute the tool
-            try do
-              handler.(params, Map.put(context, :attempt, attempt))
-            rescue
-              error ->
-                {:error, :execution_failed, Exception.message(error)}
+            # Execute the tool in sandbox
+            execution_context = Map.put(context, :attempt, attempt)
+            
+            # Use sandbox for secure execution
+            case Sandbox.execute_in_sandbox(tool_module, handler, params, execution_context) do
+              {:ok, result} -> result
+              {:error, :timeout, details} -> {:error, :timeout, details}
+              {:error, :memory_limit_exceeded, details} -> {:error, :memory_limit_exceeded, details}
+              {:error, :cpu_limit_exceeded, details} -> {:error, :cpu_limit_exceeded, details}
+              {:error, :sandbox_violation, details} -> {:error, :sandbox_violation, details}
+              {:error, reason, details} -> {:error, reason, details}
+              {:error, reason} -> {:error, :execution_failed, reason}
             end
           end)
           

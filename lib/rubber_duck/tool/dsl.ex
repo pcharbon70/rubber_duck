@@ -82,8 +82,8 @@ defmodule RubberDuck.Tool.Dsl do
     target: RubberDuck.Tool.Security,
     schema: [
       sandbox: [
-        type: {:in, [:none, :restricted, :isolated]},
-        default: :none,
+        type: {:in, [:none, :strict, :balanced, :relaxed]},
+        default: :balanced,
         doc: "Sandboxing level for tool execution"
       ],
       capabilities: [
@@ -95,6 +95,26 @@ defmodule RubberDuck.Tool.Dsl do
         type: :keyword_list,
         required: false,
         doc: "Rate limiting configuration (e.g., [per_minute: 10])"
+      ],
+      file_access: [
+        type: {:list, :string},
+        required: false,
+        doc: "List of allowed file paths for sandbox execution"
+      ],
+      network_access: [
+        type: :boolean,
+        required: false,
+        doc: "Whether network access is allowed in sandbox"
+      ],
+      allowed_modules: [
+        type: {:list, :atom},
+        required: false,
+        doc: "List of allowed Elixir modules for sandbox execution"
+      ],
+      allowed_functions: [
+        type: {:list, :atom},
+        required: false,
+        doc: "List of allowed function names for sandbox execution"
       ]
     ]
   }
