@@ -1,6 +1,6 @@
-# RubberDuck Implementation Plan - Part 3 (Phases 8-9)
+# RubberDuck Implementation Plan - Part 3 (Phases 8-10)
 
-This document contains the detailed implementation plans for Phases 8-9 of the RubberDuck project. For the overall project status and earlier phases, see:
+This document contains the detailed implementation plans for Phases 8-10 of the RubberDuck project. For the overall project status and earlier phases, see:
 - [Main implementation plan](implementation_plan.md) - Overview and status
 - [Part 1](implementation_part_1.md) - Phases 1-4 (Foundation through Workflow Orchestration)
 - [Part 2](implementation_part_2.md) - Phases 5-7 (Real-time Communication through Planning System)
@@ -8,6 +8,7 @@ This document contains the detailed implementation plans for Phases 8-9 of the R
 ## Table of Contents
 8. [Phase 8: Instruction Templating System](#phase-8-instruction-templating-system)
 9. [Phase 9: LLM Tool Definition System](#phase-9-llm-tool-definition-system)
+10. [Phase 10: Advanced Features & Production Readiness](#phase-10-advanced-features--production-readiness)
 
 ---
 
@@ -550,259 +551,259 @@ Create comprehensive integration tests in `test/integration/phase_9_test.exs` to
 
 ---
 
-### Phase 9 Part 2: Advanced Features & Production Readiness
+## Phase 10: Advanced Features & Production Readiness
 
-This section of Phase 9 implements production-critical features including background job processing, security measures, deployment configurations, and performance optimizations. These features ensure the system is ready for real-world usage at scale.
+This final phase implements production-critical features including background job processing, security measures, deployment configurations, and performance optimizations. This phase ensures the system is ready for real-world usage at scale.
 
-### 9.8 Background Job Processing with Oban
+### 10.1 Background Job Processing with Oban
 
 Implement asynchronous job processing for resource-intensive operations like project indexing and batch analysis.
 
 #### Tasks:
-- [ ] 9.8.1 Add Oban dependency and configuration
-- [ ] 9.8.2 Create Oban database migrations
-- [ ] 9.8.3 Set up job queues:
-  - [ ] 9.8.3.1 `:indexing` - File and project indexing
-  - [ ] 9.8.3.2 `:analysis` - Code analysis jobs
-  - [ ] 9.8.3.3 `:generation` - Batch code generation
-  - [ ] 9.8.3.4 `:notification` - User notifications
-- [ ] 9.8.4 Implement job workers:
-  - [ ] 9.8.4.1 `ProjectIndexer` - Index entire projects
-  - [ ] 9.8.4.2 `FileAnalyzer` - Analyze individual files
-  - [ ] 9.8.4.3 `BatchGenerator` - Generate multiple files
-  - [ ] 9.8.4.4 `ReportGenerator` - Create analysis reports
-- [ ] 9.8.5 Add job scheduling for periodic tasks
-- [ ] 9.8.6 Implement job progress tracking
-- [ ] 9.8.7 Create job retry strategies
-- [ ] 9.8.8 Build job monitoring dashboard
-- [ ] 9.8.9 Add job priority system
-- [ ] 9.8.10 Set up job telemetry
+- [ ] 10.1.1 Add Oban dependency and configuration
+- [ ] 10.1.2 Create Oban database migrations
+- [ ] 10.1.3 Set up job queues:
+  - [ ] 10.1.3.1 `:indexing` - File and project indexing
+  - [ ] 10.1.3.2 `:analysis` - Code analysis jobs
+  - [ ] 10.1.3.3 `:generation` - Batch code generation
+  - [ ] 10.1.3.4 `:notification` - User notifications
+- [ ] 10.1.4 Implement job workers:
+  - [ ] 10.1.4.1 `ProjectIndexer` - Index entire projects
+  - [ ] 10.1.4.2 `FileAnalyzer` - Analyze individual files
+  - [ ] 10.1.4.3 `BatchGenerator` - Generate multiple files
+  - [ ] 10.1.4.4 `ReportGenerator` - Create analysis reports
+- [ ] 10.1.5 Add job scheduling for periodic tasks
+- [ ] 10.1.6 Implement job progress tracking
+- [ ] 10.1.7 Create job retry strategies
+- [ ] 10.1.8 Build job monitoring dashboard
+- [ ] 10.1.9 Add job priority system
+- [ ] 10.1.10 Set up job telemetry
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/workers/` directory to verify:
 
 **ProjectIndexer Tests** (`project_indexer_test.exs`):
-- [ ] 9.8.11 Test indexing all project files
-- [ ] 9.8.12 Test handling large projects with batching
-- [ ] 9.8.13 Test recovery from partial failures
-- [ ] 9.8.14 Test progress tracking updates
-- [ ] 9.8.15 Test file change detection
-- [ ] 9.8.16 Test concurrent indexing safety
+- [ ] 10.1.11 Test indexing all project files
+- [ ] 10.1.12 Test handling large projects with batching
+- [ ] 10.1.13 Test recovery from partial failures
+- [ ] 10.1.14 Test progress tracking updates
+- [ ] 10.1.15 Test file change detection
+- [ ] 10.1.16 Test concurrent indexing safety
 
-### 9.9 Security Implementation
+### 10.2 Security Implementation
 
 Implement comprehensive security measures including authentication, authorization, input validation, and rate limiting.
 
 #### Tasks:
-- [ ] 9.9.1 Implement authentication system:
-  - [ ] 9.9.1.1 JWT token generation
-  - [ ] 9.9.1.2 API key management
-  - [ ] 9.9.1.3 OAuth2 integration
-  - [ ] 9.9.1.4 Session management
-- [ ] 9.9.2 Add authorization layer:
-  - [ ] 9.9.2.1 Role-based access control (RBAC)
-  - [ ] 9.9.2.2 Project-level permissions
-  - [ ] 9.9.2.3 Resource-level authorization
-- [ ] 9.9.3 Create input validation:
-  - [ ] 9.9.3.1 Code injection prevention
-  - [ ] 9.9.3.2 Path traversal protection
-  - [ ] 9.9.3.3 Size limits enforcement
-- [ ] 9.9.4 Implement rate limiting:
-  - [ ] 9.9.4.1 Token bucket per user
-  - [ ] 9.9.4.2 Endpoint-specific limits
-  - [ ] 9.9.4.3 DDoS protection
-- [ ] 9.9.5 Add security scanning:
-  - [ ] 9.9.5.1 Dependency vulnerability checks
-  - [ ] 9.9.5.2 Code security analysis
-- [ ] 9.9.6 Set up audit logging
-- [ ] 9.9.7 Implement data encryption at rest
+- [ ] 10.2.1 Implement authentication system:
+  - [ ] 10.2.1.1 JWT token generation
+  - [ ] 10.2.1.2 API key management
+  - [ ] 10.2.1.3 OAuth2 integration
+  - [ ] 10.2.1.4 Session management
+- [ ] 10.2.2 Add authorization layer:
+  - [ ] 10.2.2.1 Role-based access control (RBAC)
+  - [ ] 10.2.2.2 Project-level permissions
+  - [ ] 10.2.2.3 Resource-level authorization
+- [ ] 10.2.3 Create input validation:
+  - [ ] 10.2.3.1 Code injection prevention
+  - [ ] 10.2.3.2 Path traversal protection
+  - [ ] 10.2.3.3 Size limits enforcement
+- [ ] 10.2.4 Implement rate limiting:
+  - [ ] 10.2.4.1 Token bucket per user
+  - [ ] 10.2.4.2 Endpoint-specific limits
+  - [ ] 10.2.4.3 DDoS protection
+- [ ] 10.2.5 Add security scanning:
+  - [ ] 10.2.5.1 Dependency vulnerability checks
+  - [ ] 10.2.5.2 Code security analysis
+- [ ] 10.2.6 Set up audit logging
+- [ ] 10.2.7 Implement data encryption at rest
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/security/` directory:
 
 **Authentication Tests** (`authentication_test.exs`):
-- [ ] 9.9.8 Test JWT token generation and verification
-- [ ] 9.9.9 Test token expiration handling
-- [ ] 9.9.10 Test API key validation
-- [ ] 9.9.11 Test OAuth2 flow
-- [ ] 9.9.12 Test session management
-- [ ] 9.9.13 Test multi-factor authentication
+- [ ] 10.2.8 Test JWT token generation and verification
+- [ ] 10.2.9 Test token expiration handling
+- [ ] 10.2.10 Test API key validation
+- [ ] 10.2.11 Test OAuth2 flow
+- [ ] 10.2.12 Test session management
+- [ ] 10.2.13 Test multi-factor authentication
 
 **Authorization Tests** (`authorization_test.exs`):
-- [ ] 9.9.14 Test project permission enforcement
-- [ ] 9.9.15 Test role-based access
-- [ ] 9.9.16 Test resource-level permissions
-- [ ] 9.9.17 Test permission inheritance
-- [ ] 9.9.18 Test cross-project isolation
-- [ ] 9.9.19 Test admin overrides
+- [ ] 10.2.14 Test project permission enforcement
+- [ ] 10.2.15 Test role-based access
+- [ ] 10.2.16 Test resource-level permissions
+- [ ] 10.2.17 Test permission inheritance
+- [ ] 10.2.18 Test cross-project isolation
+- [ ] 10.2.19 Test admin overrides
 
 **Input Validation Tests** (`validation_test.exs`):
-- [ ] 9.9.20 Test path traversal prevention
-- [ ] 9.9.21 Test code input sanitization
-- [ ] 9.9.22 Test size limit enforcement
-- [ ] 9.9.23 Test injection attack prevention
-- [ ] 9.9.24 Test file type validation
-- [ ] 9.9.25 Test rate limiting
+- [ ] 10.2.20 Test path traversal prevention
+- [ ] 10.2.21 Test code input sanitization
+- [ ] 10.2.22 Test size limit enforcement
+- [ ] 10.2.23 Test injection attack prevention
+- [ ] 10.2.24 Test file type validation
+- [ ] 10.2.25 Test rate limiting
 
-### 9.10 Monitoring and Observability
+### 10.3 Monitoring and Observability
 
 Implement comprehensive monitoring, logging, and observability features for production operations.
 
 #### Tasks:
-- [ ] 9.10.1 Set up Telemetry integration:
-  - [ ] 9.10.1.1 Define telemetry events
-  - [ ] 9.10.1.2 Create metric reporters
-  - [ ] 9.10.1.3 Add custom measurements
-- [ ] 9.10.2 Implement structured logging:
-  - [ ] 9.10.2.1 JSON log formatting
-  - [ ] 9.10.2.2 Log aggregation setup
-  - [ ] 9.10.2.3 Correlation ID tracking
-- [ ] 9.10.3 Create health check endpoints:
-  - [ ] 9.10.3.1 Database connectivity
-  - [ ] 9.10.3.2 LLM provider status with dynamic configuration
-  - [ ] 9.10.3.3 Memory usage
-  - [ ] 9.10.3.4 Job queue health
-- [ ] 9.10.4 Add performance monitoring:
-  - [ ] 9.10.4.1 Request duration tracking
-  - [ ] 9.10.4.2 Database query analysis
-  - [ ] 9.10.4.3 Memory profiling
-- [ ] 9.10.5 Set up error tracking:
-  - [ ] 9.10.5.1 Tower integration with proper configuration
-  - [ ] 9.10.5.2 Error aggregation
-  - [ ] 9.10.5.3 Alert configuration
-- [ ] 9.10.6 Build metrics dashboard
-- [ ] 9.10.7 Implement distributed tracing
-- [ ] 9.10.8 Create SLO monitoring
-- [ ] 9.10.9 Add LLM enhancement metrics:
-  - [ ] 9.10.9.1 CoT reasoning quality tracking
-  - [ ] 9.10.9.2 RAG retrieval precision monitoring
-  - [ ] 9.10.9.3 Self-correction effectiveness metrics
-  - [ ] 9.10.9.4 Enhancement technique A/B testing
-  - [ ] 9.10.9.5 Dynamic configuration usage analytics
+- [ ] 10.3.1 Set up Telemetry integration:
+  - [ ] 10.3.1.1 Define telemetry events
+  - [ ] 10.3.1.2 Create metric reporters
+  - [ ] 10.3.1.3 Add custom measurements
+- [ ] 10.3.2 Implement structured logging:
+  - [ ] 10.3.2.1 JSON log formatting
+  - [ ] 10.3.2.2 Log aggregation setup
+  - [ ] 10.3.2.3 Correlation ID tracking
+- [ ] 10.3.3 Create health check endpoints:
+  - [ ] 10.3.3.1 Database connectivity
+  - [ ] 10.3.3.2 LLM provider status with dynamic configuration
+  - [ ] 10.3.3.3 Memory usage
+  - [ ] 10.3.3.4 Job queue health
+- [ ] 10.3.4 Add performance monitoring:
+  - [ ] 10.3.4.1 Request duration tracking
+  - [ ] 10.3.4.2 Database query analysis
+  - [ ] 10.3.4.3 Memory profiling
+- [ ] 10.3.5 Set up error tracking:
+  - [ ] 10.3.5.1 Tower integration with proper configuration
+  - [ ] 10.3.5.2 Error aggregation
+  - [ ] 10.3.5.3 Alert configuration
+- [ ] 10.3.6 Build metrics dashboard
+- [ ] 10.3.7 Implement distributed tracing
+- [ ] 10.3.8 Create SLO monitoring
+- [ ] 10.3.9 Add LLM enhancement metrics:
+  - [ ] 10.3.9.1 CoT reasoning quality tracking
+  - [ ] 10.3.9.2 RAG retrieval precision monitoring
+  - [ ] 10.3.9.3 Self-correction effectiveness metrics
+  - [ ] 10.3.9.4 Enhancement technique A/B testing
+  - [ ] 10.3.9.5 Dynamic configuration usage analytics
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/monitoring/` directory:
 
 **Telemetry Tests** (`telemetry_test.exs`):
-- [ ] 9.10.10 Test completion event emission
-- [ ] 9.10.11 Test LLM request latency tracking
-- [ ] 9.10.12 Test custom metric recording
-- [ ] 9.10.13 Test event metadata inclusion
-- [ ] 9.10.14 Test metric aggregation
-- [ ] 9.10.15 Test performance measurements
-- [ ] 9.10.16 Test LLM enhancement metrics
+- [ ] 10.3.10 Test completion event emission
+- [ ] 10.3.11 Test LLM request latency tracking
+- [ ] 10.3.12 Test custom metric recording
+- [ ] 10.3.13 Test event metadata inclusion
+- [ ] 10.3.14 Test metric aggregation
+- [ ] 10.3.15 Test performance measurements
+- [ ] 10.3.16 Test LLM enhancement metrics
 
 **Health Check Tests** (`health_test.exs`):
-- [ ] 9.10.17 Test comprehensive health endpoint
-- [ ] 9.10.18 Test detailed health with issues
-- [ ] 9.10.19 Test individual component checks
-- [ ] 9.10.20 Test health status aggregation
-- [ ] 9.10.21 Test timeout handling
-- [ ] 9.10.22 Test graceful degradation
+- [ ] 10.3.17 Test comprehensive health endpoint
+- [ ] 10.3.18 Test detailed health with issues
+- [ ] 10.3.19 Test individual component checks
+- [ ] 10.3.20 Test health status aggregation
+- [ ] 10.3.21 Test timeout handling
+- [ ] 10.3.22 Test graceful degradation
 
 **Metrics Tests** (`metrics_test.exs`):
-- [ ] 9.10.23 Test request metric tracking
-- [ ] 9.10.24 Test memory usage monitoring
-- [ ] 9.10.25 Test business metric collection
-- [ ] 9.10.26 Test metric persistence
-- [ ] 9.10.27 Test dashboard data aggregation
-- [ ] 9.10.28 Test alert triggering
+- [ ] 10.3.23 Test request metric tracking
+- [ ] 10.3.24 Test memory usage monitoring
+- [ ] 10.3.25 Test business metric collection
+- [ ] 10.3.26 Test metric persistence
+- [ ] 10.3.27 Test dashboard data aggregation
+- [ ] 10.3.28 Test alert triggering
 
-### 9.11 Deployment and Scaling
+### 10.4 Deployment and Scaling
 
 Implement deployment configurations and scaling strategies for production environments.
 
 #### Tasks:
-- [ ] 9.11.1 Create Docker configuration:
-  - [ ] 9.11.1.1 Multi-stage Dockerfile
-  - [ ] 9.11.1.2 Docker Compose setup
-  - [ ] 9.11.1.3 Health check configuration
-  - [ ] 9.11.1.4 Volume management
-  - [ ] 9.11.1.5 Tool server containerization
-- [ ] 9.11.2 Set up Kubernetes deployment:
-  - [ ] 9.11.2.1 Deployment manifests
-  - [ ] 9.11.2.2 Service configuration
-  - [ ] 9.11.2.3 Ingress rules
-  - [ ] 9.11.2.4 ConfigMaps and Secrets
-  - [ ] 9.11.2.5 Service mesh integration
-- [ ] 9.11.3 Implement clustering:
-  - [ ] 9.11.3.1 libcluster configuration
-  - [ ] 9.11.3.2 Node discovery
-  - [ ] 9.11.3.3 Distributed Erlang setup
-  - [ ] 9.11.3.4 State synchronization
-  - [ ] 9.11.3.5 Tool registry distribution
-- [ ] 9.11.4 Add horizontal scaling:
-  - [ ] 9.11.4.1 Load balancer configuration
-  - [ ] 9.11.4.2 Session affinity
-  - [ ] 9.11.4.3 Autoscaling rules
-  - [ ] 9.11.4.4 Connection pooling
-- [ ] 9.11.5 Create database migrations strategy
-- [ ] 9.11.6 Set up blue-green deployment
-- [ ] 9.11.7 Implement feature flags
-- [ ] 9.11.8 Add CDN configuration
-- [ ] 9.11.9 Create backup and restore procedures
-- [ ] 9.11.10 Build disaster recovery plan
+- [ ] 10.4.1 Create Docker configuration:
+  - [ ] 10.4.1.1 Multi-stage Dockerfile
+  - [ ] 10.4.1.2 Docker Compose setup
+  - [ ] 10.4.1.3 Health check configuration
+  - [ ] 10.4.1.4 Volume management
+  - [ ] 10.4.1.5 Tool server containerization
+- [ ] 10.4.2 Set up Kubernetes deployment:
+  - [ ] 10.4.2.1 Deployment manifests
+  - [ ] 10.4.2.2 Service configuration
+  - [ ] 10.4.2.3 Ingress rules
+  - [ ] 10.4.2.4 ConfigMaps and Secrets
+  - [ ] 10.4.2.5 Service mesh integration
+- [ ] 10.4.3 Implement clustering:
+  - [ ] 10.4.3.1 libcluster configuration
+  - [ ] 10.4.3.2 Node discovery
+  - [ ] 10.4.3.3 Distributed Erlang setup
+  - [ ] 10.4.3.4 State synchronization
+  - [ ] 10.4.3.5 Tool registry distribution
+- [ ] 10.4.4 Add horizontal scaling:
+  - [ ] 10.4.4.1 Load balancer configuration
+  - [ ] 10.4.4.2 Session affinity
+  - [ ] 10.4.4.3 Autoscaling rules
+  - [ ] 10.4.4.4 Connection pooling
+- [ ] 10.4.5 Create database migrations strategy
+- [ ] 10.4.6 Set up blue-green deployment
+- [ ] 10.4.7 Implement feature flags
+- [ ] 10.4.8 Add CDN configuration
+- [ ] 10.4.9 Create backup and restore procedures
+- [ ] 10.4.10 Build disaster recovery plan
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/deployment/` directory:
 
 **Clustering Tests** (`clustering_test.exs`):
-- [ ] 9.11.11 Test node discovery and connection
-- [ ] 9.11.12 Test state synchronization across nodes
-- [ ] 9.11.13 Test node failure handling
-- [ ] 9.11.14 Test load distribution
-- [ ] 9.11.15 Test cluster reformation
-- [ ] 9.11.16 Test split-brain resolution
+- [ ] 10.4.11 Test node discovery and connection
+- [ ] 10.4.12 Test state synchronization across nodes
+- [ ] 10.4.13 Test node failure handling
+- [ ] 10.4.14 Test load distribution
+- [ ] 10.4.15 Test cluster reformation
+- [ ] 10.4.16 Test split-brain resolution
 
 **Deployment Tests** (`deployment_test.exs`):
-- [ ] 9.11.17 Test Docker image build
-- [ ] 9.11.18 Test Kubernetes manifest validity
-- [ ] 9.11.19 Test configuration management
-- [ ] 9.11.20 Test secret handling
-- [ ] 9.11.21 Test rollback procedures
-- [ ] 9.11.22 Test zero-downtime deployment
+- [ ] 10.4.17 Test Docker image build
+- [ ] 10.4.18 Test Kubernetes manifest validity
+- [ ] 10.4.19 Test configuration management
+- [ ] 10.4.20 Test secret handling
+- [ ] 10.4.21 Test rollback procedures
+- [ ] 10.4.22 Test zero-downtime deployment
 
 **Feature Flag Tests** (`feature_flags_test.exs`):
-- [ ] 9.11.23 Test feature toggle functionality
-- [ ] 9.11.24 Test gradual rollout percentages
-- [ ] 9.11.25 Test user-specific flags
-- [ ] 9.11.26 Test flag persistence
-- [ ] 9.11.27 Test A/B testing support
-- [ ] 9.11.28 Test flag inheritance
+- [ ] 10.4.23 Test feature toggle functionality
+- [ ] 10.4.24 Test gradual rollout percentages
+- [ ] 10.4.25 Test user-specific flags
+- [ ] 10.4.26 Test flag persistence
+- [ ] 10.4.27 Test A/B testing support
+- [ ] 10.4.28 Test flag inheritance
 
-### 9.12 Phase 9 Integration Tests
+### 10.5 Phase 10 Integration Tests
 
-Create comprehensive integration tests in `test/integration/phase_9_test.exs` to verify:
-- [ ] 9.12.1 Test end-to-end secure workflow with monitoring
-- [ ] 9.12.2 Test high load handling with rate limiting
-- [ ] 9.12.3 Test monitoring captures system health
-- [ ] 9.12.4 Test graceful degradation when services fail
-- [ ] 9.12.5 Test distributed deployment scenario
-- [ ] 9.12.6 Test backup and restore procedures
-- [ ] 9.12.7 Test feature flag integration
-- [ ] 9.12.8 Test tool server scaling
-- [ ] 9.12.9 Test security controls
-- [ ] 9.12.10 Test production readiness criteria
+Create comprehensive integration tests in `test/integration/phase_10_test.exs` to verify:
+- [ ] 10.5.1 Test end-to-end secure workflow with monitoring
+- [ ] 10.5.2 Test high load handling with rate limiting
+- [ ] 10.5.3 Test monitoring captures system health
+- [ ] 10.5.4 Test graceful degradation when services fail
+- [ ] 10.5.5 Test distributed deployment scenario
+- [ ] 10.5.6 Test backup and restore procedures
+- [ ] 10.5.7 Test feature flag integration
+- [ ] 10.5.8 Test tool server scaling
+- [ ] 10.5.9 Test security controls
+- [ ] 10.5.10 Test production readiness criteria
 
-### 9.13 Final System Integration Tests
+### 10.6 Final System Integration Tests
 
 Create final system tests in `test/integration/complete_system_test.exs` to verify:
-- [ ] 9.13.1 Test full coding assistant workflow from project creation to code generation
-- [ ] 9.13.2 Test system behavior under sustained load
-- [ ] 9.13.3 Test monitoring and alerting pipeline
-- [ ] 9.13.4 Test multi-user collaboration scenarios
-- [ ] 9.13.5 Test disaster recovery procedures
-- [ ] 9.13.6 Test performance meets SLOs
-- [ ] 9.13.7 Test security controls are effective
-- [ ] 9.13.8 Test tool integration enhances code quality
-- [ ] 9.13.9 Test planning system with tools
-- [ ] 9.13.10 Test complete system resilience
-- [ ] 9.13.11 Test dynamic LLM configuration system integration
-- [ ] 9.13.12 Test unified command system across all interfaces
-- [ ] 9.13.13 Test chat-focused TUI integration
-- [ ] 9.13.14 Test error handling and recovery mechanisms
-- [ ] 9.13.15 Test instruction templating system integration
-- [ ] 9.13.16 Test REPL interface functionality
+- [ ] 10.6.1 Test full coding assistant workflow from project creation to code generation
+- [ ] 10.6.2 Test system behavior under sustained load
+- [ ] 10.6.3 Test monitoring and alerting pipeline
+- [ ] 10.6.4 Test multi-user collaboration scenarios
+- [ ] 10.6.5 Test disaster recovery procedures
+- [ ] 10.6.6 Test performance meets SLOs
+- [ ] 10.6.7 Test security controls are effective
+- [ ] 10.6.8 Test tool integration enhances code quality
+- [ ] 10.6.9 Test planning system with tools
+- [ ] 10.6.10 Test complete system resilience
+- [ ] 10.6.11 Test dynamic LLM configuration system integration
+- [ ] 10.6.12 Test unified command system across all interfaces
+- [ ] 10.6.13 Test chat-focused TUI integration
+- [ ] 10.6.14 Test error handling and recovery mechanisms
+- [ ] 10.6.15 Test instruction templating system integration
+- [ ] 10.6.16 Test REPL interface functionality
 
 ---
 
@@ -831,7 +832,7 @@ Create final system tests in `test/integration/complete_system_test.exs` to veri
 - **Security-First Template Processing** (Phase 8.4)
 - **Client Integration & Real-time Updates** (Phase 8.5)
 - **LLM Tool Definition System** (Phase 9)
-- **Production Readiness** (Phase 9)
+- **Production Readiness** (Phase 10)
 
 ### 🔗 Recent Integration Highlights:
 - Successfully integrated dynamic LLM configuration across all AI engines
