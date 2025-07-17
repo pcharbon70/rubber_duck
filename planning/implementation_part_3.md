@@ -535,19 +535,155 @@ Create tests in `test/rubber_duck/tools/workflow_test.exs` to verify:
 - [ ] 9.5.16 Test workflow persistence
 - [ ] 9.5.17 Test distributed execution
 
-### 9.6 Phase 9 Integration Tests
+### 9.7 MCP Protocol Integration
+
+Implement Model Context Protocol (MCP) server functionality to expose RubberDuck's tool system to external LLMs and AI systems. This transport-agnostic design initially implements WebSocket via Phoenix Channels, enabling real-time tool execution and streaming responses.
+
+#### Tasks:
+- [ ] 9.7.1 Create MCP server core with transport abstraction:
+  - [ ] 9.7.1.1 Implement `RubberDuck.MCP.Server` GenServer
+  - [ ] 9.7.1.2 Define transport behavior callbacks
+  - [ ] 9.7.1.3 Build MCP protocol message handler
+  - [ ] 9.7.1.4 Create session management system
+  - [ ] 9.7.1.5 Implement capability negotiation
+  - [ ] 9.7.1.6 Add connection lifecycle management
+  - [ ] 9.7.1.7 Build request/response correlation
+  - [ ] 9.7.1.8 Support streaming responses
+  - [ ] 9.7.1.9 Implement protocol version negotiation
+  - [ ] 9.7.1.10 Add graceful shutdown handling
+- [ ] 9.7.2 Build Tool-MCP bridge:
+  - [ ] 9.7.2.1 Create `RubberDuck.MCP.ToolAdapter`
+  - [ ] 9.7.2.2 Convert tool registry to MCP tool list
+  - [ ] 9.7.2.3 Map MCP tool calls to internal execution
+  - [ ] 9.7.2.4 Transform parameters between formats
+  - [ ] 9.7.2.5 Handle result formatting for MCP
+  - [ ] 9.7.2.6 Support progress reporting
+  - [ ] 9.7.2.7 Implement error translation
+  - [ ] 9.7.2.8 Add resource discovery
+  - [ ] 9.7.2.9 Build prompt template support
+  - [ ] 9.7.2.10 Enable tool capability exposure
+- [ ] 9.7.3 Implement MCP-enhanced tool composition:
+  - [ ] 9.7.3.1 Extend Reactor workflows for MCP
+  - [ ] 9.7.3.2 Support multi-tool MCP operations
+  - [ ] 9.7.3.3 Add MCP sampling patterns
+  - [ ] 9.7.3.4 Enable workflow streaming
+  - [ ] 9.7.3.5 Build reactive MCP triggers
+  - [ ] 9.7.3.6 Support tool result chaining
+  - [ ] 9.7.3.7 Implement parallel tool execution
+  - [ ] 9.7.3.8 Add conditional MCP flows
+  - [ ] 9.7.3.9 Create MCP workflow templates
+  - [ ] 9.7.3.10 Enable cross-tool context sharing
+- [ ] 9.7.4 Create WebSocket transport via Phoenix:
+  - [ ] 9.7.4.1 Implement `RubberDuckWeb.MCPChannel`
+  - [ ] 9.7.4.2 Handle MCP protocol over WebSocket
+  - [ ] 9.7.4.3 Support bi-directional messaging
+  - [ ] 9.7.4.4 Implement channel authentication
+  - [ ] 9.7.4.5 Add connection state recovery
+  - [ ] 9.7.4.6 Build message queuing
+  - [ ] 9.7.4.7 Support channel presence
+  - [ ] 9.7.4.8 Enable real-time streaming
+  - [ ] 9.7.4.9 Add heartbeat mechanism
+  - [ ] 9.7.4.10 Document transport interface for future implementations
+- [ ] 9.7.5 Implement MCP security and rate limiting:
+  - [ ] 9.7.5.1 Add per-client authentication via Phoenix.Token
+  - [ ] 9.7.5.2 Build tool access authorization
+  - [ ] 9.7.5.3 Implement rate limiting per client
+  - [ ] 9.7.5.4 Add request size limits
+  - [ ] 9.7.5.5 Create audit logging for MCP
+  - [ ] 9.7.5.6 Support capability-based security
+  - [ ] 9.7.5.7 Implement session timeout
+  - [ ] 9.7.5.8 Add IP-based access control
+  - [ ] 9.7.5.9 Build security event monitoring
+  - [ ] 9.7.5.10 Enable tool-specific permissions
+- [ ] 9.7.6 Add MCP monitoring and telemetry:
+  - [ ] 9.7.6.1 Create MCP-specific metrics
+  - [ ] 9.7.6.2 Track WebSocket connections
+  - [ ] 9.7.6.3 Monitor protocol performance
+  - [ ] 9.7.6.4 Add client session analytics
+  - [ ] 9.7.6.5 Track tool usage via MCP
+  - [ ] 9.7.6.6 Monitor streaming performance
+  - [ ] 9.7.6.7 Build MCP dashboard
+  - [ ] 9.7.6.8 Add error rate tracking
+  - [ ] 9.7.6.9 Implement SLO monitoring
+  - [ ] 9.7.6.10 Create usage reports
+- [ ] 9.7.7 Build MCP development tools:
+  - [ ] 9.7.7.1 Create MCP protocol inspector
+  - [ ] 9.7.7.2 Add debug logging mode
+  - [ ] 9.7.7.3 Build MCP client simulator
+  - [ ] 9.7.7.4 Implement protocol validator
+  - [ ] 9.7.7.5 Create MCP playground
+- [ ] 9.7.8 Add MCP documentation and examples:
+  - [ ] 9.7.8.1 Document MCP API endpoints
+  - [ ] 9.7.8.2 Create integration guide
+  - [ ] 9.7.8.3 Build example MCP clients
+  - [ ] 9.7.8.4 Add tool usage examples
+  - [ ] 9.7.8.5 Document security best practices
+- [ ] 9.7.9 Implement MCP compliance testing:
+  - [ ] 9.7.9.1 Build protocol compliance suite
+  - [ ] 9.7.9.2 Test against MCP specification
+  - [ ] 9.7.9.3 Validate message formats
+  - [ ] 9.7.9.4 Ensure capability compliance
+  - [ ] 9.7.9.5 Test interoperability
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/mcp/` directory to verify:
+
+**Server Core Tests** (`server_test.exs`):
+- [ ] 9.7.10 Test transport abstraction behavior
+- [ ] 9.7.11 Test session lifecycle management
+- [ ] 9.7.12 Test capability negotiation protocol
+- [ ] 9.7.13 Test request/response correlation
+- [ ] 9.7.14 Test streaming response handling
+- [ ] 9.7.15 Test graceful shutdown procedures
+- [ ] 9.7.16 Test protocol version negotiation
+
+**Tool Bridge Tests** (`tool_adapter_test.exs`):
+- [ ] 9.7.17 Test tool discovery and listing
+- [ ] 9.7.18 Test parameter transformation
+- [ ] 9.7.19 Test result formatting
+- [ ] 9.7.20 Test error translation
+- [ ] 9.7.21 Test progress reporting
+- [ ] 9.7.22 Test resource exposure
+- [ ] 9.7.23 Test capability mapping
+
+**WebSocket Transport Tests** (`websocket_transport_test.exs`):
+- [ ] 9.7.24 Test Phoenix Channel integration
+- [ ] 9.7.25 Test bi-directional messaging
+- [ ] 9.7.26 Test connection recovery
+- [ ] 9.7.27 Test authentication flow
+- [ ] 9.7.28 Test streaming over WebSocket
+- [ ] 9.7.29 Test presence tracking
+- [ ] 9.7.30 Test heartbeat mechanism
+
+**Security Tests** (`mcp_security_test.exs`):
+- [ ] 9.7.31 Test client authentication
+- [ ] 9.7.32 Test authorization checks
+- [ ] 9.7.33 Test rate limiting
+- [ ] 9.7.34 Test audit logging
+- [ ] 9.7.35 Test session timeout
+- [ ] 9.7.36 Test security event tracking
+
+**Integration Tests** (`mcp_integration_test.exs`):
+- [ ] 9.7.37 Test end-to-end MCP tool execution
+- [ ] 9.7.38 Test complex workflow via MCP
+- [ ] 9.7.39 Test concurrent MCP clients
+- [ ] 9.7.40 Test MCP under load
+- [ ] 9.7.41 Test protocol compliance
+- [ ] 9.7.42 Test tool composition via MCP
+
+### 9.8 Phase 9 Integration Tests
 
 Create comprehensive integration tests in `test/integration/phase_9_test.exs` to verify:
-- [ ] 9.6.1 Test complete tool definition and registration pipeline
-- [ ] 9.6.2 Test tool execution through all layers
-- [ ] 9.6.3 Test tool server with real clients
-- [ ] 9.6.4 Test security isolation effectiveness
-- [ ] 9.6.5 Test complex workflow execution
-- [ ] 9.6.6 Test tool system performance under load
-- [ ] 9.6.7 Test error propagation and handling
-- [ ] 9.6.8 Test tool hot reloading in development
-- [ ] 9.6.9 Test distributed tool execution
-- [ ] 9.6.10 Test complete tool lifecycle from definition to execution
+- [ ] 9.8.1 Test complete tool definition and registration pipeline
+- [ ] 9.8.2 Test tool execution through all layers
+- [ ] 9.8.3 Test tool server with real clients
+- [ ] 9.8.4 Test security isolation effectiveness
+- [ ] 9.8.5 Test complex workflow execution
+- [ ] 9.8.6 Test tool system performance under load
+- [ ] 9.8.7 Test error propagation and handling
+- [ ] 9.8.8 Test tool hot reloading in development
+- [ ] 9.8.9 Test distributed tool execution
+- [ ] 9.8.10 Test complete tool lifecycle from definition to execution
 
 ---
 
