@@ -60,6 +60,12 @@ defmodule RubberDuck.Application do
       RubberDuck.Tool.Monitoring,
       RubberDuck.Tool.Monitoring.Dashboard,
       RubberDuck.Tool.Telemetry.Poller,
+      # Tool registry (required by integration bridge)
+      RubberDuck.Tool.Registry,
+      # Tool integration bridge components
+      RubberDuck.Tool.ExternalRegistry,
+      RubberDuck.Tool.ExternalRouter,
+      RubberDuck.Tool.StatePersistence,
       # Phoenix Presence for tracking users
       RubberDuckWeb.Presence,
       # Message queue for offline users
