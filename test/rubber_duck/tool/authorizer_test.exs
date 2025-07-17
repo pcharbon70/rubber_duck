@@ -74,7 +74,7 @@ defmodule RubberDuck.Tool.AuthorizerTest do
       end
       
       security do
-        sandbox :restricted
+        sandbox :strict
         capabilities [:admin_access, :system_modify]
       end
     end
@@ -102,7 +102,7 @@ defmodule RubberDuck.Tool.AuthorizerTest do
       end
       
       security do
-        sandbox :restricted
+        sandbox :strict
         capabilities [:file_read, :file_write]
       end
     end
