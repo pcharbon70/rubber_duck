@@ -56,6 +56,10 @@ defmodule RubberDuck.Application do
       {Task.Supervisor, name: RubberDuck.TaskSupervisor},
       # Result processing components
       RubberDuck.Cache.ETS,
+      # Monitoring and observability components
+      RubberDuck.Tool.Monitoring,
+      RubberDuck.Tool.Monitoring.Dashboard,
+      RubberDuck.Tool.Telemetry.Poller,
       # Phoenix Presence for tracking users
       RubberDuckWeb.Presence,
       # Message queue for offline users

@@ -13,7 +13,7 @@ defmodule RubberDuck.Tool.Executor do
   
   require Logger
   
-  alias RubberDuck.Tool.{Validator, Authorizer, Sandbox, ResultProcessor}
+  alias RubberDuck.Tool.{Validator, Authorizer, Sandbox, ResultProcessor, Telemetry, Monitoring}
   
   @type execution_result :: %{
     output: any(),
@@ -217,6 +217,20 @@ defmodule RubberDuck.Tool.Executor do
     retries = if execution_config, do: execution_config.retries, else: 0
     
     start_time = System.monotonic_time(:millisecond)
+    tool_metadata = RubberDuck.Tool.metadata(tool_module)
+    
+    # Emit telemetry start event
+    Telemetry.execute_start(tool_metadata.name, %{
+      user_id: context.user.id,
+      execution_id: context.execution_id
+    })
+    
+    # Record execution start in monitoring
+    Monitoring.record_execution(:started, tool_metadata.name, %{
+      user_id: context.user.id,
+      execution_id: context.execution_id,
+      params: params
+    }, %{})
     
     emit_execution_event(:started, tool_module, context.user, params)
     
@@ -239,20 +253,72 @@ defmodule RubberDuck.Tool.Executor do
         processing_opts = Map.get(context, :processing, [])
         case ResultProcessor.process_result(raw_result, tool_module, context, processing_opts) do
           {:ok, processed_result} ->
+            # Emit telemetry stop event for successful execution
+            Telemetry.execute_stop(tool_metadata.name, execution_time, %{
+              user_id: context.user.id,
+              execution_id: context.execution_id,
+              status: :success
+            })
+            
+            # Record in monitoring
+            Monitoring.record_execution(:completed, tool_metadata.name, %{
+              user_id: context.user.id,
+              execution_id: context.execution_id
+            }, %{
+              execution_time: execution_time,
+              retry_count: processed_result.retry_count
+            })
+            
             emit_execution_event(:completed, tool_module, context.user, processed_result)
             {:ok, processed_result}
           {:error, reason, details} ->
             Logger.error("Result processing failed: #{inspect(reason)} - #{inspect(details)}")
+            
+            # Still count as successful execution even if processing failed
+            Telemetry.execute_stop(tool_metadata.name, execution_time, %{
+              user_id: context.user.id,
+              execution_id: context.execution_id,
+              status: :success,
+              processing_failed: true
+            })
+            
             # Return raw result if processing fails
             emit_execution_event(:completed, tool_module, context.user, raw_result)
             {:ok, raw_result}
         end
       
       {:error, reason} ->
+        # Emit telemetry exception event
+        Telemetry.execute_exception(tool_metadata.name, execution_time, :error, reason, %{
+          user_id: context.user.id,
+          execution_id: context.execution_id
+        })
+        
+        # Record in monitoring
+        Monitoring.record_execution(:failed, tool_metadata.name, %{
+          user_id: context.user.id,
+          execution_id: context.execution_id,
+          reason: reason
+        }, %{execution_time: execution_time})
+        
         emit_execution_event(:failed, tool_module, context.user, reason)
         {:error, reason}
       
       {:error, reason, details} ->
+        # Emit telemetry exception event
+        Telemetry.execute_exception(tool_metadata.name, execution_time, :error, {reason, details}, %{
+          user_id: context.user.id,
+          execution_id: context.execution_id
+        })
+        
+        # Record in monitoring
+        Monitoring.record_execution(:failed, tool_metadata.name, %{
+          user_id: context.user.id,
+          execution_id: context.execution_id,
+          reason: reason,
+          details: details
+        }, %{execution_time: execution_time})
+        
         emit_execution_event(:failed, tool_module, context.user, {reason, details})
         {:error, reason, details}
     end
