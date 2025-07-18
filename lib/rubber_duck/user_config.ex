@@ -107,38 +107,21 @@ defmodule RubberDuck.UserConfig do
   @doc """
   Get all configurations for a user.
   
-  Returns all LLM configurations for the user, organized by provider.
+  Returns all LLM configurations for the user as a list.
   
   ## Examples
   
       iex> RubberDuck.UserConfig.get_all_configs("user123")
-      {:ok, %{
-        openai: %{model: "gpt-4", is_default: true, usage_count: 5},
-        anthropic: %{model: "claude-3-sonnet", is_default: false, usage_count: 2}
-      }}
+      {:ok, [%RubberDuck.Memory.UserLLMConfig{...}]}
   """
-  @spec get_all_configs(user_id()) :: {:ok, map()} | {:error, term()}
+  @spec get_all_configs(user_id()) :: {:ok, list()} | {:error, term()}
   def get_all_configs(user_id) when is_binary(user_id) do
     case Memory.get_user_configs(user_id) do
       {:ok, configs} when is_list(configs) ->
-        config_map = 
-          configs
-          |> Enum.map(fn config ->
-            {config.provider, %{
-              model: config.model,
-              is_default: config.is_default,
-              usage_count: config.usage_count,
-              metadata: config.metadata,
-              created_at: config.created_at,
-              updated_at: config.updated_at
-            }}
-          end)
-          |> Map.new()
-        
-        {:ok, config_map}
+        {:ok, configs}
         
       {:ok, []} ->
-        {:ok, %{}}
+        {:ok, []}
         
       {:error, reason} ->
         {:error, reason}
@@ -199,6 +182,37 @@ defmodule RubberDuck.UserConfig do
         
       {:ok, configs} when is_list(configs) and length(configs) == 0 ->
         {:error, :not_found}
+        
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
+  Remove all configurations for a user's provider.
+  
+  This removes all LLM configurations for the specified provider.
+  
+  ## Examples
+  
+      iex> RubberDuck.UserConfig.remove_provider("user123", :openai)
+      {:ok, 2}  # Removed 2 configs
+      
+      iex> RubberDuck.UserConfig.remove_provider("user123", :unknown)
+      {:ok, 0}  # No configs found
+  """
+  @spec remove_provider(user_id(), provider()) :: {:ok, integer()} | {:error, term()}
+  def remove_provider(user_id, provider) when is_binary(user_id) and is_atom(provider) do
+    case Memory.get_provider_configs(user_id, provider) do
+      {:ok, configs} when is_list(configs) ->
+        # Remove all configs for this provider
+        results = Enum.map(configs, &Ash.destroy/1)
+        
+        # Check if any deletions failed
+        case Enum.find(results, fn result -> match?({:error, _}, result) end) do
+          nil -> {:ok, length(configs)}
+          {:error, reason} -> {:error, reason}
+        end
         
       {:error, reason} ->
         {:error, reason}
