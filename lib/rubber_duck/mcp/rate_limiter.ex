@@ -244,7 +244,7 @@ defmodule RubberDuck.MCP.RateLimiter do
   
   @impl GenServer
   def handle_call({:update_config, config}, _from, state) do
-    new_state = %{state | config: DeepMerge.deep_merge(state.config, config)}
+    new_state = %{state | config: Map.merge(state.config, config)}
     {:reply, :ok, new_state}
   end
   
@@ -361,7 +361,7 @@ defmodule RubberDuck.MCP.RateLimiter do
     end
   end
   
-  defp get_operation_limits(config, operation, priority) do
+  defp get_operation_limits(config, _operation, priority) do
     # For now, use client limits for operations
     # Could be extended to have per-operation limits
     get_client_limits(config, :default, priority)

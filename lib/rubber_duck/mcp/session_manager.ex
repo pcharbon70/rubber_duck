@@ -187,7 +187,7 @@ defmodule RubberDuck.MCP.SessionManager do
         Logger.info("Created session #{session.id} for user #{user_id}")
         {:reply, {:ok, session}, new_state}
         
-      {:error, reason} = error ->
+      {:error, _reason} = error ->
         {:reply, error, state}
     end
   end

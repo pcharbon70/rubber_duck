@@ -19,6 +19,7 @@ defmodule RubberDuck.MCP.IPAccessControl do
   """
   
   use GenServer
+  import Bitwise
   
   require Logger
   
@@ -195,7 +196,7 @@ defmodule RubberDuck.MCP.IPAccessControl do
         Logger.info("Added #{type} rule for #{ip_pattern} by #{created_by}")
         {:reply, :ok, new_state}
         
-      {:error, reason} = error ->
+      {:error, _reason} = error ->
         {:reply, error, state}
     end
   end
@@ -363,7 +364,7 @@ defmodule RubberDuck.MCP.IPAccessControl do
           match_rule?(ip_address, :temporary_block) ->
             {:deny, "IP temporarily blocked"}
             
-          state.config.enable_geo_blocking and geo_blocked?(ip_address, state) ->
+          state.config.enable_geo_blocking == true and geo_blocked?(ip_address, state) ->
             {:deny, "Geographic location blocked"}
             
           true ->
@@ -377,14 +378,9 @@ defmodule RubberDuck.MCP.IPAccessControl do
   end
   
   defp match_rule?(ip_address, rule_type) do
-    :ets.select(:mcp_ip_rules, [
-      {
-        {:"$1", %{type: ^rule_type}},
-        [],
-        [:"$1"]
-      }
-    ])
-    |> Enum.any?(fn pattern -> ip_matches_pattern?(ip_address, pattern) end)
+    :ets.tab2list(:mcp_ip_rules)
+    |> Enum.filter(fn {_pattern, rule} -> rule.type == rule_type end)
+    |> Enum.any?(fn {pattern, _rule} -> ip_matches_pattern?(ip_address, pattern) end)
   end
   
   defp ip_matches_pattern?(ip_address, pattern) do

@@ -230,41 +230,6 @@ defmodule RubberDuckWeb.MCPAuth do
   
   defp extract_api_key_from_uri(_), do: :error
   
-  defp verify_token(token) do
-    case Phoenix.Token.verify(RubberDuckWeb.Endpoint, "mcp_auth", token, max_age: 86400) do
-      {:ok, auth_data} ->
-        {:ok, %{
-          user_id: auth_data.user_id,
-          permissions: auth_data.permissions || ["tools:*", "resources:*"],
-          role: auth_data.role || "user",
-          client_info: auth_data.client_info || %{}
-        }}
-        
-      {:error, reason} ->
-        {:error, "Token verification failed: #{reason}"}
-    end
-  end
-  
-  defp verify_api_key(api_key) do
-    # TODO: Implement proper API key verification against database
-    # For now, use simple validation
-    case validate_api_key_format(api_key) do
-      :ok ->
-        # Generate consistent user ID from API key
-        user_id = generate_user_id_from_api_key(api_key)
-        permissions = determine_api_key_permissions(api_key)
-        
-        {:ok, %{
-          user_id: user_id,
-          permissions: permissions,
-          role: "api_user",
-          client_info: %{auth_method: "api_key"}
-        }}
-        
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
   
   defp validate_client_name(%{"name" => name}) when is_binary(name) and name != "" do
     {:ok, name}
@@ -288,46 +253,6 @@ defmodule RubberDuckWeb.MCPAuth do
     end
   end
   
-  defp validate_api_key_format(api_key) do
-    cond do
-      # Development test key
-      api_key == "test_key" ->
-        :ok
-        
-      # Minimum length check
-      byte_size(api_key) < 32 ->
-        {:error, "API key too short"}
-        
-      # Format validation (alphanumeric + dashes/underscores)
-      not Regex.match?(~r/^[a-zA-Z0-9_-]+$/, api_key) ->
-        {:error, "Invalid API key format"}
-        
-      true ->
-        :ok
-    end
-  end
-  
-  defp generate_user_id_from_api_key(api_key) do
-    # Generate stable user ID from API key
-    if api_key == "test_key" do
-      "mcp_user_test"
-    else
-      hash = :crypto.hash(:sha256, "mcp_user_" <> api_key)
-      "mcp_user_" <> Base.encode16(hash, case: :lower) |> String.slice(0, 16)
-    end
-  end
-  
-  defp determine_api_key_permissions(api_key) do
-    # TODO: Look up permissions from database
-    # For now, provide default permissions based on key
-    case api_key do
-      "test_key" ->
-        ["tools:*", "resources:*", "prompts:*", "workflows:*"]
-        
-      _ ->
-        ["tools:list", "tools:call", "resources:list", "resources:read"]
-    end
-  end
   
   defp user_allowed_capabilities do
     [

@@ -233,7 +233,7 @@ defmodule RubberDuck.MCP.AuditLogger do
   
   @impl GenServer
   def handle_call({:update_config, config}, _from, state) do
-    new_config = DeepMerge.deep_merge(state.config, config)
+    new_config = Map.merge(state.config, config)
     
     # Handle config changes
     new_state = handle_config_changes(state, new_config)
@@ -427,12 +427,16 @@ defmodule RubberDuck.MCP.AuditLogger do
     guards = []
     
     # Add time range guards
-    if from = filter[:from] do
-      guards = [{:>, :"$1", from} | guards]
+    guards = if from = filter[:from] do
+      [{:>, :"$1", from} | guards]
+    else
+      guards
     end
     
-    if to = filter[:to] do
-      guards = [{:<, :"$1", to} | guards]
+    guards = if to = filter[:to] do
+      [{:<, :"$1", to} | guards]
+    else
+      guards
     end
     
     # Build basic match pattern
@@ -447,24 +451,32 @@ defmodule RubberDuck.MCP.AuditLogger do
     }
     
     # Add type filter
-    if types = filter[:type] do
+    guards = if types = filter[:type] do
       type_list = if is_list(types), do: types, else: [types]
-      guards = [{:member, :"$2", type_list} | guards]
+      [{:member, :"$2", type_list} | guards]
+    else
+      guards
     end
     
     # Add user filter
-    if user_id = filter[:user_id] do
-      guards = [{:==, :"$3", user_id} | guards]
+    guards = if user_id = filter[:user_id] do
+      [{:==, :"$3", user_id} | guards]
+    else
+      guards
     end
     
     # Add client filter
-    if client_id = filter[:client_id] do
-      guards = [{:==, :"$4", client_id} | guards]
+    guards = if client_id = filter[:client_id] do
+      [{:==, :"$4", client_id} | guards]
+    else
+      guards
     end
     
     # Add operation filter
-    if operation = filter[:operation] do
-      guards = [{:==, :"$5", operation} | guards]
+    guards = if operation = filter[:operation] do
+      [{:==, :"$5", operation} | guards]
+    else
+      guards
     end
     
     [{match_head, guards, [:"$_"]}]
@@ -538,10 +550,26 @@ defmodule RubberDuck.MCP.AuditLogger do
       ]
     end)
     
-    CSV.encode([headers | rows])
-    |> Enum.to_list()
-    |> IO.iodata_to_binary()
+    # Simple CSV implementation
+    csv_data = [headers | rows]
+    |> Enum.map(fn row ->
+      row
+      |> Enum.map(&escape_csv_field/1)
+      |> Enum.join(",")
+    end)
+    |> Enum.join("\n")
+    
+    csv_data
   end
+  
+  defp escape_csv_field(field) when is_binary(field) do
+    if String.contains?(field, [",", "\"", "\n"]) do
+      "\"" <> String.replace(field, "\"", "\"\"") <> "\""
+    else
+      field
+    end
+  end
+  defp escape_csv_field(field), do: to_string(field)
   
   defp rotate_log_file_if_needed(state) do
     if state.log_file do
