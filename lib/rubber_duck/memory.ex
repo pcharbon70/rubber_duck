@@ -31,7 +31,21 @@ defmodule RubberDuck.Memory do
       define :create_or_update_profile, action: :create
       define :update_profile, action: :update
       define :add_learned_pattern, action: :add_learned_pattern, args: [:pattern_key, :pattern_data]
+      define :set_llm_preference, action: :set_llm_preference, args: [:provider, :model, :is_default]
+      define :add_llm_model, action: :add_llm_model, args: [:provider, :model]
+      define :clear_llm_preferences, action: :clear_llm_preferences
       define :get_user_profile, action: :get_by_user, args: [:user_id]
+    end
+
+    resource RubberDuck.Memory.UserLLMConfig do
+      define :create_config, action: :create
+      define :update_config, action: :update
+      define :increment_usage, action: :increment_usage
+      define :set_user_default, action: :set_user_default, args: [:user_id, :provider, :model]
+      define :get_user_configs, action: :get_by_user, args: [:user_id]
+      define :get_user_default, action: :get_user_default, args: [:user_id]
+      define :get_provider_configs, action: :get_by_user_and_provider, args: [:user_id, :provider]
+      define :get_provider_default, action: :get_user_provider_default, args: [:user_id, :provider]
     end
 
     resource RubberDuck.Memory.CodePattern do

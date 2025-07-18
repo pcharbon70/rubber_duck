@@ -25,6 +25,7 @@ defmodule RubberDuckWeb.ConversationChannel do
   require Logger
   
   alias RubberDuck.Engine.Manager, as: EngineManager
+  alias RubberDuck.SessionContext
   
   @default_timeout 60_000
   @max_context_messages 20
@@ -33,17 +34,30 @@ defmodule RubberDuckWeb.ConversationChannel do
   def join("conversation:" <> conversation_id, params, socket) do
     Logger.info("User joining conversation: #{conversation_id}")
     
+    user_id = params["user_id"] || generate_user_id()
+    session_id = generate_session_id()
+    preferences = Map.get(params, "preferences", %{})
+    
     # Initialize conversation state
     socket =
       socket
       |> assign(:conversation_id, conversation_id)
       |> assign(:messages, [])
       |> assign(:context, %{})
-      |> assign(:user_id, params["user_id"] || generate_user_id())
-      |> assign(:session_id, generate_session_id())
-      |> assign(:preferences, Map.get(params, "preferences", %{}))
+      |> assign(:user_id, user_id)
+      |> assign(:session_id, session_id)
+      |> assign(:preferences, preferences)
     
-    {:ok, %{conversation_id: conversation_id, session_id: socket.assigns.session_id}, socket}
+    # Create session context with user LLM preferences
+    case SessionContext.ensure_context(session_id, user_id, %{preferences: preferences}) do
+      {:ok, _context} ->
+        Logger.debug("Session context created for user #{user_id}")
+        
+      {:error, reason} ->
+        Logger.warning("Failed to create session context: #{inspect(reason)}")
+    end
+    
+    {:ok, %{conversation_id: conversation_id, session_id: session_id}, socket}
   end
   
   @impl true
@@ -84,6 +98,15 @@ defmodule RubberDuckWeb.ConversationChannel do
         
         messages = add_message(messages, assistant_message)
         socket = assign(socket, :messages, messages)
+        
+        # Record LLM usage for this session
+        if Map.has_key?(input.llm_config, :provider) and Map.has_key?(input.llm_config, :model) do
+          SessionContext.record_llm_usage(
+            socket.assigns.session_id,
+            input.llm_config.provider,
+            input.llm_config.model
+          )
+        end
         
         # Send response
         push(socket, "response", format_response(result, content))
@@ -139,6 +162,16 @@ defmodule RubberDuckWeb.ConversationChannel do
     {:noreply, socket}
   end
   
+  @impl true
+  def terminate(_reason, socket) do
+    # Clean up session context when channel terminates
+    if Map.has_key?(socket.assigns, :session_id) do
+      SessionContext.remove_context(socket.assigns.session_id)
+    end
+    
+    :ok
+  end
+  
   # Private functions
   
   defp build_context(socket, params) do
@@ -162,9 +195,24 @@ defmodule RubberDuckWeb.ConversationChannel do
       model: nil  # Let engine decide
     }
     
-    defaults
+    # Start with defaults and preferences
+    config = defaults
     |> Map.merge(socket.assigns.preferences)
     |> Map.merge(Map.get(params, "llm_config", %{}))
+    
+    # Enhance with user's session context LLM config
+    case SessionContext.get_llm_config(socket.assigns.session_id) do
+      {:ok, %{provider: provider, model: model}} ->
+        config
+        |> Map.put(:provider, provider)
+        |> Map.put(:model, model)
+        |> Map.put(:user_id, socket.assigns.user_id)
+      
+      {:error, _} ->
+        # Fall back to original config
+        config
+        |> Map.put(:user_id, socket.assigns.user_id)
+    end
   end
   
   defp format_messages_for_context(messages) do

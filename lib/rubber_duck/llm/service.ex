@@ -81,6 +81,7 @@ defmodule RubberDuck.LLM.Service do
 
   - `:model` - Specific model to use (required)
   - `:messages` - List of messages (required)
+  - `:user_id` - User ID for personalized configuration (optional)
   - `:temperature` - Sampling temperature (0.0 to 2.0)
   - `:max_tokens` - Maximum tokens to generate
   - `:stream` - Whether to stream the response
@@ -388,11 +389,15 @@ defmodule RubberDuck.LLM.Service do
   end
 
   defp validate_request(opts, state) do
-    with {:ok, model} <- validate_model(opts[:model], state),
+    user_id = opts[:user_id]
+    
+    with {:ok, model} <- validate_model(opts[:model], state, user_id),
          {:ok, messages} <- validate_messages(opts[:messages]),
          {:ok, validated_opts} <- validate_options(opts) do
-      provider_name = Map.get(state.model_mapping, model)
-      Logger.debug("Selected provider #{inspect(provider_name)} for model #{model}")
+      
+      # Resolve provider based on user preferences if available
+      provider_name = resolve_provider_for_user(opts[:model], user_id, state)
+      Logger.debug("Selected provider #{inspect(provider_name)} for model #{model} (user: #{user_id})")
 
       request = %Request{
         id: nil,
@@ -409,11 +414,21 @@ defmodule RubberDuck.LLM.Service do
     end
   end
 
-  defp validate_model(nil, _state), do: {:error, :model_required}
+  defp validate_model(nil, _state, _user_id), do: {:error, :model_required}
 
-  defp validate_model(model, state) do
-    Logger.debug("Validating model #{model}, available models: #{inspect(Map.keys(state.model_mapping))}")
-    if Map.has_key?(state.model_mapping, model) do
+  defp validate_model(model, state, user_id) do
+    Logger.debug("Validating model #{model} for user #{user_id}, available models: #{inspect(Map.keys(state.model_mapping))}")
+    
+    # Check if model is available in application config
+    app_model_available = Map.has_key?(state.model_mapping, model)
+    
+    # Check if model is available in user's configuration
+    user_model_available = case user_id do
+      nil -> false
+      _ -> user_has_model?(user_id, model)
+    end
+    
+    if app_model_available || user_model_available do
       {:ok, model}
     else
       {:error, {:unknown_model, model}}
@@ -432,7 +447,8 @@ defmodule RubberDuck.LLM.Service do
       stream: Keyword.get(opts, :stream, false),
       timeout: Keyword.get(opts, :timeout, 30_000),
       priority: Keyword.get(opts, :priority, :normal),
-      from_cot: Keyword.get(opts, :from_cot, false)
+      from_cot: Keyword.get(opts, :from_cot, false),
+      user_id: Keyword.get(opts, :user_id, nil)
     }
 
     {:ok, validated}
@@ -832,6 +848,59 @@ defmodule RubberDuck.LLM.Service do
       pid ->
         send(pid, {:update_last_used, provider_name})
         :ok
+    end
+  end
+
+  defp resolve_provider_for_user(model, user_id, state) do
+    case user_id do
+      nil ->
+        # Fall back to application config
+        Map.get(state.model_mapping, model)
+      
+      _ ->
+        # Try to get user's provider preference for this model
+        case get_user_provider_for_model(user_id, model) do
+          {:ok, provider} ->
+            # Verify the provider is configured and available
+            if Map.has_key?(state.providers, provider) do
+              provider
+            else
+              # Fall back to application config
+              Map.get(state.model_mapping, model)
+            end
+          
+          :not_found ->
+            # Fall back to application config
+            Map.get(state.model_mapping, model)
+        end
+    end
+  end
+
+  defp user_has_model?(user_id, model) do
+    case RubberDuck.LLM.Config.get_user_models(user_id) do
+      {:ok, user_models} ->
+        user_models
+        |> Map.values()
+        |> List.flatten()
+        |> Enum.member?(model)
+      
+      :not_found ->
+        false
+    end
+  end
+
+  defp get_user_provider_for_model(user_id, model) do
+    case RubberDuck.LLM.Config.get_user_models(user_id) do
+      {:ok, user_models} ->
+        # Find which provider has this model
+        provider = Enum.find_value(user_models, fn {provider, models} ->
+          if model in models, do: provider, else: nil
+        end)
+        
+        if provider, do: {:ok, provider}, else: :not_found
+      
+      :not_found ->
+        :not_found
     end
   end
   
