@@ -7,7 +7,7 @@ defmodule RubberDuck.Tool.Composition.ConditionalReturn do
   from either the success or failure branch.
   """
   
-  use RubberDuck.Workflows.Step
+  @behaviour Reactor.Step
   
   @doc """
   Returns the appropriate result based on the condition outcome.
@@ -22,13 +22,22 @@ defmodule RubberDuck.Tool.Composition.ConditionalReturn do
   
   The result from the branch that was executed based on the condition.
   """
-  @impl true
-  def run(arguments, _context) do
-    condition_result = Map.get(arguments, :condition_result)
-    success_result = Map.get(arguments, :success_result)
-    failure_result = Map.get(arguments, :failure_result)
+  @impl Reactor.Step
+  def run(arguments, _context, _options) do
+    # Convert Reactor arguments to a map if needed
+    args = case arguments do
+      args when is_map(args) -> args
+      args when is_list(args) ->
+        Enum.reduce(args, %{}, fn arg, acc ->
+          Map.put(acc, arg.name, arg.value)
+        end)
+    end
     
-    case condition_result do
+    condition_result = Map.get(args, :condition_result)
+    success_result = Map.get(args, :success_result)
+    failure_result = Map.get(args, :failure_result)
+    
+    result = case condition_result do
       {:ok, _} ->
         # Condition succeeded, return success result
         case success_result do
@@ -62,13 +71,44 @@ defmodule RubberDuck.Tool.Composition.ConditionalReturn do
           end
         end
     end
+    
+    # Ensure we always return a valid Reactor.Step result
+    case result do
+      {:ok, _} = ok -> ok
+      {:error, _} = error -> error
+      other -> {:ok, other}
+    end
   end
   
   @doc """
   No compensation needed for conditional return.
   """
-  @impl true
-  def compensate(_arguments, _result, _context) do
+  @impl Reactor.Step
+  def compensate(_arguments, _result, _context, _options) do
+    :ok
+  end
+  
+  @doc """
+  Conditional return can be undone by doing nothing.
+  """
+  @impl Reactor.Step
+  def undo(_arguments, _result, _context, _options) do
+    :ok
+  end
+  
+  @doc """
+  Conditional return steps can run asynchronously.
+  """
+  @impl Reactor.Step
+  def async?(_) do
+    true
+  end
+  
+  @doc """
+  Conditional return can always run.
+  """
+  @impl Reactor.Step
+  def can?(_arguments, _context) do
     :ok
   end
 end
