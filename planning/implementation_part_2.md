@@ -679,14 +679,13 @@ Set up the core Ash domain and resources for the planning system, including plan
 - [ ] 7.1.7 Create database migrations for planning tables
 - [ ] 7.1.8 Implement Ash actions for CRUD operations
 - [ ] 7.1.9 Add authorization policies for plan access
-- [ ] 7.1.10 Create GraphQL API for planning resources
 
 #### Unit Tests:
-- [ ] 7.1.11 Test Plan resource creation and validation
-- [ ] 7.1.12 Test Task resource with dependency management
-- [ ] 7.1.13 Test constraint enforcement
-- [ ] 7.1.14 Test validation result tracking
-- [ ] 7.1.15 Test authorization policies
+- [ ] 7.1.10 Test Plan resource creation and validation
+- [ ] 7.1.11 Test Task resource with dependency management
+- [ ] 7.1.12 Test constraint enforcement
+- [ ] 7.1.13 Test validation result tracking
+- [ ] 7.1.14 Test authorization policies
 
 ### 7.2 Task Decomposition Engine
 
