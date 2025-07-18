@@ -11,7 +11,7 @@ defmodule RubberDuck.MCP.Bridge do
   """
   
   alias RubberDuck.Tool.Registry
-  alias RubberDuck.MCP.ToolAdapter
+  alias RubberDuck.MCP.{ToolAdapter, WorkflowAdapter}
   alias RubberDuck.Workspace
   
   require Logger
@@ -62,6 +62,236 @@ defmodule RubberDuck.MCP.Bridge do
           "isError" => true
         }
     end
+  end
+  
+  # Workflow-related functions
+  
+  @doc """
+  Creates a new MCP-enhanced workflow.
+  
+  Supports sophisticated tool composition with streaming, context sharing,
+  and advanced execution patterns.
+  """
+  def create_workflow(workflow_id, definition, _options \\ %{}) do
+    case WorkflowAdapter.create_workflow(workflow_id, definition) do
+      {:ok, _workflow} ->
+        %{
+          "workflow_id" => workflow_id,
+          "status" => "created",
+          "definition" => definition,
+          "capabilities" => %{
+            "streaming" => true,
+            "context_sharing" => true,
+            "parallel_execution" => true,
+            "conditional_flows" => true,
+            "reactive_triggers" => true
+          }
+        }
+        
+      {:error, reason} ->
+        %{
+          "workflow_id" => workflow_id,
+          "status" => "error",
+          "error" => inspect(reason),
+          "isError" => true
+        }
+    end
+  end
+  
+  @doc """
+  Executes a workflow with MCP-enhanced capabilities.
+  
+  Supports both standard and streaming execution modes.
+  """
+  def execute_workflow(workflow_id, workflow_definition, options \\ %{}) do
+    case WorkflowAdapter.create_workflow(workflow_id, workflow_definition) do
+      {:ok, workflow} ->
+        case WorkflowAdapter.execute_workflow(workflow, options) do
+          {:ok, result} ->
+            %{
+              "workflow_id" => workflow_id,
+              "status" => "completed",
+              "result" => result,
+              "execution_time" => DateTime.utc_now()
+            }
+            
+          {:error, reason} ->
+            %{
+              "workflow_id" => workflow_id,
+              "status" => "failed",
+              "error" => inspect(reason),
+              "isError" => true
+            }
+        end
+        
+      {:error, reason} ->
+        %{
+          "workflow_id" => workflow_id,
+          "status" => "creation_failed",
+          "error" => inspect(reason),
+          "isError" => true
+        }
+    end
+  end
+  
+  @doc """
+  Executes a multi-tool operation in a single MCP request.
+  
+  Chains multiple tool calls with automatic parameter transformation.
+  """
+  def execute_multi_tool_operation(tool_calls, options \\ %{}) do
+    case WorkflowAdapter.create_multi_tool_operation(tool_calls) do
+      {:ok, operation} ->
+        case WorkflowAdapter.execute_multi_tool_operation(operation, options) do
+          {:ok, result} ->
+            %{
+              "operation_type" => "multi_tool",
+              "status" => "completed",
+              "result" => result,
+              "tools_executed" => length(tool_calls)
+            }
+            
+          {:error, reason} ->
+            %{
+              "operation_type" => "multi_tool",
+              "status" => "failed",
+              "error" => inspect(reason),
+              "isError" => true
+            }
+        end
+        
+      {:error, reason} ->
+        %{
+          "operation_type" => "multi_tool",
+          "status" => "creation_failed",
+          "error" => inspect(reason),
+          "isError" => true
+        }
+    end
+  end
+  
+  @doc """
+  Lists available workflow templates.
+  
+  Returns reusable workflow patterns for common use cases.
+  """
+  def list_workflow_templates(_options \\ %{}) do
+    templates = WorkflowAdapter.list_workflow_templates()
+    
+    formatted_templates = Enum.map(templates, fn template ->
+      %{
+        "name" => template.name,
+        "version" => template.version,
+        "description" => template.description,
+        "category" => template.category,
+        "parameters" => template.parameters,
+        "examples" => template.examples,
+        "created_at" => template.created_at
+      }
+    end)
+    
+    %{
+      "templates" => formatted_templates,
+      "total_count" => length(formatted_templates)
+    }
+  end
+  
+  @doc """
+  Creates a workflow from a template with parameter substitution.
+  """
+  def create_workflow_from_template(template_name, params, _options \\ %{}) do
+    case WorkflowAdapter.create_workflow_from_template(%{name: template_name}, params) do
+      {:ok, workflow} ->
+        %{
+          "template_name" => template_name,
+          "status" => "created",
+          "parameters" => params,
+          "workflow_definition" => workflow
+        }
+        
+      {:error, reason} ->
+        %{
+          "template_name" => template_name,
+          "status" => "creation_failed",
+          "error" => inspect(reason),
+          "isError" => true
+        }
+    end
+  end
+  
+  @doc """
+  Executes MCP sampling within a workflow context.
+  
+  Enables dynamic tool selection based on sampling results.
+  """
+  def execute_workflow_sampling(sampling_config, options \\ %{}) do
+    case WorkflowAdapter.execute_sampling(sampling_config, options) do
+      {:ok, selected_tool} ->
+        %{
+          "sampling_type" => "tool_selection",
+          "selected_tool" => selected_tool,
+          "status" => "completed",
+          "timestamp" => DateTime.utc_now()
+        }
+        
+      {:error, reason} ->
+        %{
+          "sampling_type" => "tool_selection",
+          "status" => "failed",
+          "error" => inspect(reason),
+          "isError" => true
+        }
+    end
+  end
+  
+  @doc """
+  Creates a reactive trigger for event-driven workflows.
+  """
+  def create_reactive_trigger(trigger_config, _options \\ %{}) do
+    case WorkflowAdapter.create_reactive_trigger(trigger_config) do
+      {:ok, trigger} ->
+        # Register the trigger
+        case WorkflowAdapter.register_trigger(trigger) do
+          :ok ->
+            %{
+              "trigger_id" => trigger.id,
+              "status" => "registered",
+              "event" => trigger.event,
+              "workflow" => trigger.workflow,
+              "active" => trigger.active
+            }
+            
+          {:error, reason} ->
+            %{
+              "trigger_id" => trigger.id,
+              "status" => "registration_failed",
+              "error" => inspect(reason),
+              "isError" => true
+            }
+        end
+        
+      {:error, reason} ->
+        %{
+          "status" => "creation_failed",
+          "error" => inspect(reason),
+          "isError" => true
+        }
+    end
+  end
+  
+  @doc """
+  Creates a shared context for cross-tool communication.
+  """
+  def create_shared_context(initial_context, _options \\ %{}) do
+    context = WorkflowAdapter.create_shared_context(initial_context)
+    
+    %{
+      "context_id" => context.id,
+      "status" => "created",
+      "data" => context.data,
+      "created_at" => context.created_at,
+      "version" => context.version
+    }
   end
   
   # Resource-related functions
