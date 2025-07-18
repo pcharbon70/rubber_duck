@@ -48,7 +48,7 @@ defmodule RubberDuckWeb.MCPChannel do
   
   use Phoenix.Channel
   
-  alias RubberDuck.MCP.Bridge
+  alias RubberDuck.MCP.{Bridge, SecurityManager}
   alias RubberDuckWeb.{Presence, MCPAuth, MCPConnectionManager}
   
   require Logger
@@ -212,6 +212,15 @@ defmodule RubberDuckWeb.MCPChannel do
         Phoenix.PubSub.unsubscribe(RubberDuck.PubSub, "mcp_streaming:#{session_id}")
         Phoenix.PubSub.unsubscribe(RubberDuck.PubSub, "workflow_stream:#{session_id}")
         
+        # Report termination to security manager
+        if security_context = get_in(state, [:auth_context, :security_context]) do
+          SecurityManager.report_security_event(
+            security_context,
+            "session_terminated",
+            %{reason: inspect(reason), session_id: session_id}
+          )
+        end
+        
         # Handle connection state based on termination reason
         case reason do
           :normal ->
@@ -244,6 +253,16 @@ defmodule RubberDuckWeb.MCPChannel do
     # Check if heartbeat is overdue (30 seconds)
     if DateTime.diff(current_time, state.last_heartbeat) > 30 do
       Logger.warning("MCP session #{state.session_id} heartbeat timeout")
+      
+      # Report security event
+      if security_context = get_in(state, [:auth_context, :security_context]) do
+        SecurityManager.report_security_event(
+          security_context,
+          "session_timeout",
+          %{reason: "heartbeat_timeout", session_id: state.session_id}
+        )
+      end
+      
       {:stop, :heartbeat_timeout, socket}
     else
       schedule_heartbeat()
@@ -328,6 +347,47 @@ defmodule RubberDuckWeb.MCPChannel do
   defp handle_mcp_request(%{id: id, method: method, params: params}, socket) do
     Logger.debug("Handling MCP request: #{method}")
     
+    # Get security context from auth context
+    state = socket.assigns.mcp_state
+    security_context = get_in(state, [:auth_context, :security_context])
+    
+    # Check request size limits
+    case SecurityManager.validate_request_size(%{method: method, params: params}) do
+      :ok ->
+        # Check rate limits
+        case SecurityManager.check_rate_limit(security_context, method) do
+          :ok ->
+            # Check authorization
+            case SecurityManager.authorize_operation(security_context, method, params) do
+              :allow ->
+                # Process the request
+                result = process_authorized_request(method, params, id, socket)
+                
+                # Audit the operation
+                SecurityManager.audit_operation(security_context, method, params, result)
+                
+                result
+                
+              {:deny, reason} ->
+                SecurityManager.audit_operation(security_context, method, params, {:error, :unauthorized})
+                send_error_response(socket, id, "Unauthorized: #{reason}")
+            end
+            
+          {:error, :rate_limited, retry_after: retry_after} ->
+            SecurityManager.audit_operation(security_context, method, params, {:error, :rate_limited})
+            send_error_response(socket, id, %{
+              code: -32000,
+              message: "Rate limit exceeded",
+              data: %{retry_after: retry_after}
+            })
+        end
+        
+      {:error, :request_too_large} ->
+        send_error_response(socket, id, "Request too large")
+    end
+  end
+  
+  defp process_authorized_request(method, params, id, socket) do
     case method do
       "tools/list" ->
         result = Bridge.list_tools()
@@ -517,7 +577,7 @@ defmodule RubberDuckWeb.MCPChannel do
     push(socket, "mcp_message", response)
   end
   
-  defp send_error_response(socket, id, error) do
+  defp send_error_response(socket, id, error) when is_binary(error) do
     response = %{
       "jsonrpc" => @jsonrpc_version,
       "id" => id,
@@ -530,15 +590,26 @@ defmodule RubberDuckWeb.MCPChannel do
     push(socket, "mcp_message", response)
   end
   
+  defp send_error_response(socket, id, error) when is_map(error) do
+    response = %{
+      "jsonrpc" => @jsonrpc_version,
+      "id" => id,
+      "error" => error
+    }
+    
+    push(socket, "mcp_message", response)
+  end
+  
   defp build_context(socket) do
     state = socket.assigns.mcp_state
     
     %{
       session_id: state.session_id,
-      user_id: socket.assigns.user_id,
+      user_id: get_in(state, [:auth_context, :user_id]) || socket.assigns[:user_id],
       client_info: state.client_info,
       capabilities: state.capabilities,
-      timestamp: DateTime.utc_now()
+      timestamp: DateTime.utc_now(),
+      security_context: get_in(state, [:auth_context, :security_context])
     }
   end
   

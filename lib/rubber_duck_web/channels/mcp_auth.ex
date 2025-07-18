@@ -11,6 +11,8 @@ defmodule RubberDuckWeb.MCPAuth do
   
   require Logger
   
+  alias RubberDuck.MCP.SecurityManager
+  
   @type auth_result :: {:ok, map()} | {:error, String.t()}
   @type client_info :: %{
     name: String.t(),
@@ -31,15 +33,38 @@ defmodule RubberDuckWeb.MCPAuth do
   def authenticate_client(params, connect_info) do
     Logger.debug("Authenticating MCP client with params: #{inspect(sanitize_params(params))}")
     
-    case extract_auth_credentials(params, connect_info) do
-      {:ok, :token, token} ->
-        verify_token(token)
-        
-      {:ok, :api_key, api_key} ->
-        verify_api_key(api_key)
-        
+    # Extract credentials
+    credentials = case extract_auth_credentials(params, connect_info) do
+      {:ok, :token, token} -> %{"token" => token}
+      {:ok, :api_key, api_key} -> %{"apiKey" => api_key}
+      {:error, reason} -> {:error, reason}
+    end
+    
+    # Build connection info with IP address
+    connection_info = Map.merge(connect_info, %{
+      ip_address: extract_ip_address(connect_info),
+      user_agent: extract_user_agent(connect_info)
+    })
+    
+    case credentials do
       {:error, reason} ->
         {:error, reason}
+        
+      creds ->
+        # Delegate to SecurityManager for comprehensive authentication
+        case SecurityManager.authenticate(creds, connection_info) do
+          {:ok, security_context} ->
+            {:ok, %{
+              user_id: security_context.user_id,
+              permissions: MapSet.to_list(security_context.capabilities),
+              role: determine_role_from_capabilities(security_context.capabilities),
+              client_info: Map.get(params, "clientInfo", %{}),
+              security_context: security_context
+            }}
+            
+          {:error, reason} ->
+            {:error, reason}
+        end
     end
   end
   
@@ -76,7 +101,15 @@ defmodule RubberDuckWeb.MCPAuth do
   """
   @spec authorize_capability(map(), String.t()) :: boolean()
   def authorize_capability(auth_context, capability) do
+    # Use SecurityManager for authorization if security context available
     case auth_context do
+      %{security_context: security_context} ->
+        case SecurityManager.authorize_operation(security_context, capability, %{}) do
+          :allow -> true
+          {:deny, _reason} -> false
+        end
+        
+      # Fallback to legacy authorization
       %{permissions: permissions} when is_list(permissions) ->
         capability in permissions or "*" in permissions
         
@@ -101,6 +134,24 @@ defmodule RubberDuckWeb.MCPAuth do
   """
   @spec create_session_token(map()) :: String.t()
   def create_session_token(auth_context) do
+    # If we have a security context with a session, use that token
+    case auth_context do
+      %{security_context: %{session_id: session_id}} ->
+        # SecurityManager already created a session, return its token
+        # Extract token from security context metadata
+        case RubberDuck.MCP.SessionManager.validate_token(session_id) do
+          {:ok, session} -> session.token
+          _ ->
+            # Fallback to creating our own token
+            create_legacy_session_token(auth_context)
+        end
+        
+      _ ->
+        create_legacy_session_token(auth_context)
+    end
+  end
+  
+  defp create_legacy_session_token(auth_context) do
     session_data = %{
       user_id: auth_context.user_id,
       client_info: auth_context.client_info,
@@ -307,5 +358,44 @@ defmodule RubberDuckWeb.MCPAuth do
     params
     |> Map.drop(["token", "apiKey", "api_key", "password", "secret"])
     |> Map.put("sanitized", true)
+  end
+  
+  defp extract_ip_address(connect_info) do
+    case connect_info do
+      %{peer_data: %{address: {a, b, c, d}}} ->
+        "#{a}.#{b}.#{c}.#{d}"
+        
+      %{x_headers: headers} ->
+        # Check for forwarded IP
+        Enum.find_value(headers, fn
+          {"x-forwarded-for", ip} -> String.split(ip, ",") |> List.first() |> String.trim()
+          {"x-real-ip", ip} -> String.trim(ip)
+          _ -> nil
+        end)
+        
+      _ ->
+        nil
+    end
+  end
+  
+  defp extract_user_agent(connect_info) do
+    case connect_info do
+      %{x_headers: headers} ->
+        Enum.find_value(headers, fn
+          {"user-agent", ua} -> ua
+          _ -> nil
+        end)
+        
+      _ ->
+        nil
+    end
+  end
+  
+  defp determine_role_from_capabilities(capabilities) do
+    cond do
+      MapSet.member?(capabilities, "admin:*") -> "admin"
+      MapSet.member?(capabilities, "workflows:create") -> "user"
+      true -> "readonly"
+    end
   end
 end
