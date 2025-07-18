@@ -7,7 +7,8 @@ config :rubber_duck,
     RubberDuck.Memory,
     RubberDuck.Workspace,
     RubberDuck.Context,
-    RubberDuck.Conversations
+    RubberDuck.Conversations,
+    RubberDuck.Planning
   ]
 
 # Instructions system configuration
