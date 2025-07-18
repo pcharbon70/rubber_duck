@@ -364,15 +364,20 @@ defmodule RubberDuck.MCP.IPAccessControl do
           match_rule?(ip_address, :temporary_block) ->
             {:deny, "IP temporarily blocked"}
             
-          state.config.enable_geo_blocking == true and geo_blocked?(ip_address, state) ->
-            {:deny, "Geographic location blocked"}
-            
           true ->
-            if state.config.allow_by_default do
-              :allow
+            # Check geo-blocking if enabled
+            geo_decision = if state.config.enable_geo_blocking do
+              if geo_blocked?(ip_address, state) do
+                {:deny, "Geographic location blocked"}
+              else
+                nil
+              end
             else
-              {:deny, "No whitelist entry found"}
+              nil
             end
+            
+            # Return geo decision or default decision
+            geo_decision || default_decision(state)
         end
     end
   end
@@ -435,6 +440,14 @@ defmodule RubberDuck.MCP.IPAccessControl do
     # Placeholder for geo-blocking logic
     # Would integrate with a geo-IP service
     false
+  end
+  
+  defp default_decision(state) do
+    if state.config.allow_by_default do
+      :allow
+    else
+      {:deny, "No whitelist entry found"}
+    end
   end
   
   defp validate_ip_pattern(pattern) do
