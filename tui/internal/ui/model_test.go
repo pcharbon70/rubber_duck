@@ -5,58 +5,20 @@ import (
 )
 
 func TestNewModel(t *testing.T) {
-	// Test model creation
+	// This test will fail until we implement the Model
 	model := NewModel()
 	
-	// Verify initial state
-	if model.activePane != FileTreePane {
-		t.Errorf("Expected active pane to be FileTreePane, got %v", model.activePane)
+	if model == nil {
+		t.Fatal("Expected non-nil model")
 	}
 	
-	if model.connected {
-		t.Error("Expected model to be disconnected initially")
+	// Check that chat is focused by default
+	if model.activePane != ChatPane {
+		t.Errorf("Expected chat pane to be active by default, got %v", model.activePane)
 	}
 	
-	if model.editor.Value() != "" {
-		t.Error("Expected editor to be empty initially")
-	}
-	
-	if model.commandPalette.IsVisible() {
-		t.Error("Expected command palette to be hidden initially")
-	}
-}
-
-func TestModelView(t *testing.T) {
-	// Test that view doesn't panic
-	model := NewModel()
-	model.width = 80
-	model.height = 24
-	
-	view := model.View()
-	if view == "" {
-		t.Error("Expected non-empty view")
-	}
-}
-
-func TestNextPane(t *testing.T) {
-	model := NewModel()
-	
-	// Test pane cycling
-	model.activePane = FileTreePane
-	next := model.nextPane()
-	if next != EditorPane {
-		t.Errorf("Expected EditorPane after FileTreePane, got %v", next)
-	}
-	
-	model.activePane = EditorPane
-	next = model.nextPane()
-	if next != OutputPane {
-		t.Errorf("Expected OutputPane after EditorPane, got %v", next)
-	}
-	
-	model.activePane = OutputPane
-	next = model.nextPane()
-	if next != FileTreePane {
-		t.Errorf("Expected FileTreePane after OutputPane, got %v", next)
+	// Check that model dimensions are initialized
+	if model.width == 0 || model.height == 0 {
+		t.Error("Expected default dimensions to be set")
 	}
 }

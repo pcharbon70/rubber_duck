@@ -20,9 +20,6 @@ func main() {
 		tea.WithMouseCellMotion(), // Enable mouse support
 	)
 
-	// Store the program reference in a global variable that the Phoenix client can access
-	ui.SetProgram(p)
-
 	// Run the program
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
