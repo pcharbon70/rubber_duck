@@ -46,597 +46,135 @@ Create tests in `test/rubber_duck_web/channels/code_channel_test.exs` to verify:
 - [ ] 5.1.16 Test message queuing for offline users
 - [ ] 5.1.17 Test rate limiting enforcement
 
-### 5.2 Unified Command Abstraction Layer ✅ Completed
 
-Implement a centralized command processing system that provides consistent behavior across all client interfaces (CLI, LiveView, TUI, WebSocket), eliminating code duplication and enabling seamless command execution regardless of the client type.
 
-**Status**: Successfully implemented and integrated with WebSocket CLI channel. All channel tests passing.
-
-#### Tasks:
-
-**Command Structure and Context:**
-- [x] 5.2.1 Create `RubberDuck.Commands.Command` struct:
-  - [x] 5.2.1.1 Define command name and subcommand fields
-  - [x] 5.2.1.2 Add args and options maps
-  - [x] 5.2.1.3 Include client_type identifier
-  - [x] 5.2.1.4 Add output format specification
-- [x] 5.2.2 Create `RubberDuck.Commands.Context` struct:
-  - [x] 5.2.2.1 User identification and session tracking
-  - [x] 5.2.2.2 Project and conversation context
-  - [x] 5.2.2.3 Permission list management
-  - [x] 5.2.2.4 Metadata storage for extensions
-
-**Command Parser with Optimus:**
-- [x] 5.2.3 Create `RubberDuck.Commands.Parser` module:
-  - [x] 5.2.3.1 Define Optimus specification for all commands
-  - [x] 5.2.3.2 Implement CLI input parsing
-  - [x] 5.2.3.3 Add WebSocket message parsing
-  - [x] 5.2.3.4 Create LiveView params parsing
-  - [x] 5.2.3.5 Build TUI input parsing
-- [x] 5.2.4 Configure command specifications:
-  - [x] 5.2.4.1 `analyze` command with file/directory args
-  - [x] 5.2.4.2 `generate` command with description and language
-  - [x] 5.2.4.3 `complete` command with position info
-  - [x] 5.2.4.4 `refactor` command with instruction
-  - [x] 5.2.4.5 `test` command with framework options
-  - [x] 5.2.4.6 `llm` command with dynamic configuration subcommands
-  - [x] 5.2.4.7 `health` command for server monitoring
-- [x] 5.2.5 Add command validation:
-  - [x] 5.2.5.1 Required argument checking
-  - [x] 5.2.5.2 Option type validation
-  - [x] 5.2.5.3 Mutually exclusive option handling
-  - [x] 5.2.5.4 Default value application
-
-**Central Command Processor:**
-- [x] 5.2.6 Create `RubberDuck.Commands.Processor` GenServer:
-  - [x] 5.2.6.1 Initialize with handler registry
-  - [x] 5.2.6.2 Load validators and formatters
-  - [x] 5.2.6.3 Set up telemetry hooks
-  - [x] 5.2.6.4 Configure timeout handling
-- [x] 5.2.7 Implement command execution pipeline:
-  - [x] 5.2.7.1 Command validation stage
-  - [x] 5.2.7.2 Authorization checking
-  - [x] 5.2.7.3 Handler execution with timeout
-  - [x] 5.2.7.4 Response formatting
-  - [x] 5.2.7.5 Error handling and recovery
-- [x] 5.2.8 Add execution features:
-  - [x] 5.2.8.1 Async command support
-  - [x] 5.2.8.2 Command cancellation
-  - [x] 5.2.8.3 Progress reporting
-  - [ ] 5.2.8.4 Result caching
-
-**Command Handlers:**
-- [x] 5.2.9 Create handler behavior and implementations:
-  - [x] 5.2.9.1 Define `RubberDuck.Commands.Handler` behaviour
-  - [x] 5.2.9.2 `Handlers.Analyze` for code analysis
-  - [x] 5.2.9.3 `Handlers.Generate` for code generation
-  - [x] 5.2.9.4 `Handlers.Complete` for completions
-  - [x] 5.2.9.5 `Handlers.Refactor` for refactoring
-  - [x] 5.2.9.6 `Handlers.Test` for test generation
-  - [x] 5.2.9.7 `Handlers.LLM` for provider management with dynamic configuration
-  - [x] 5.2.9.8 `Handlers.Health` for health checks with provider status
-- [x] 5.2.10 Integrate handlers with existing engines:
-  - [x] 5.2.10.1 Connect to Phase 2 engine system
-  - [x] 5.2.10.2 Use Phase 3 LLM services with dynamic configuration
-  - [x] 5.2.10.3 Access Phase 3 memory system
-  - [ ] 5.2.10.4 Trigger Phase 4 workflows
-
-**Response Formatters:**
-- [x] 5.2.11 Create `RubberDuck.Commands.Formatters` module:
-  - [x] 5.2.11.1 JSON formatter for all result types
-  - [x] 5.2.11.2 Text formatter with templates
-  - [x] 5.2.11.3 Table formatter using TableRex
-  - [x] 5.2.11.4 Markdown formatter for rich clients
-- [x] 5.2.12 Implement client-specific formatting:
-  - [x] 5.2.12.1 CLI-optimized text output
-  - [x] 5.2.12.2 LiveView HTML formatting
-  - [x] 5.2.12.3 TUI ANSI formatting
-  - [x] 5.2.12.4 WebSocket structured messages
-
-**Client Adapters:**
-- [x] 5.2.13 Create adapter modules for each client:
-  - [x] 5.2.13.1 `Adapters.CLI` for command-line interface
-  - [x] 5.2.13.2 `Adapters.WebSocket` for Phoenix channels
-  - [x] 5.2.13.3 `Adapters.LiveView` for web interface
-  - [x] 5.2.13.4 `Adapters.TUI` for terminal UI
-- [x] 5.2.14 Implement adapter features:
-  - [x] 5.2.14.1 Context building from client state
-  - [x] 5.2.14.2 Error handling per client type
-  - [x] 5.2.14.3 Streaming support where applicable
-  - [x] 5.2.14.4 Client-specific authentication
-
-**Integration and Extensions:**
-- [ ] 5.2.15 Create Ash Framework bridge: (Not implemented - per user decision)
-  - [ ] 5.2.15.1 Map commands to Ash actions
-  - [ ] 5.2.15.2 Use Ash authorization policies
-  - [ ] 5.2.15.3 Track command execution in resources
-  - [ ] 5.2.15.4 Enable GraphQL command access
-- [ ] 5.2.16 Add advanced features: (Not implemented - per user decision)
-  - [ ] 5.2.16.1 Command composition support
-  - [ ] 5.2.16.2 Macro command definitions
-  - [ ] 5.2.16.3 Command history tracking
-  - [ ] 5.2.16.4 Command aliasing system
-
-#### Unit Tests:
-
-**Parser Tests** (`test/rubber_duck/commands/parser_test.exs`):
-- [x] 5.2.17 Test CLI argument parsing for all commands
-- [x] 5.2.18 Test WebSocket message parsing
-- [x] 5.2.19 Test validation error handling
-- [x] 5.2.20 Test default value application
-- [x] 5.2.21 Test unknown command handling
-
-**Processor Tests** (`test/rubber_duck/commands/processor_test.exs`):
-- [x] 5.2.22 Test command execution pipeline
-- [x] 5.2.23 Test authorization enforcement
-- [x] 5.2.24 Test timeout handling
-- [x] 5.2.25 Test concurrent command execution
-- [x] 5.2.26 Test error recovery
-
-**Handler Tests** (`test/rubber_duck/commands/handlers/`):
-- [x] 5.2.27 Test each command handler implementation
-- [x] 5.2.28 Test handler integration with engines
-- [x] 5.2.29 Test async command handling
-- [x] 5.2.30 Test command cancellation
-- [x] 5.2.31 Test LLM handler with dynamic configuration
-- [x] 5.2.32 Test health handler with provider monitoring
-
-**Formatter Tests** (`test/rubber_duck/commands/formatters_test.exs`):
-- [x] 5.2.33 Test JSON formatting for all result types
-- [x] 5.2.34 Test table formatting with edge cases
-- [x] 5.2.35 Test client-specific formatting
-- [x] 5.2.36 Test error formatting
-
-**Integration Tests** (`test/rubber_duck/commands/integration_test.exs`):
-- [x] 5.2.37 Test complete command flow for each client
-- [x] 5.2.38 Test command authorization scenarios
-- [x] 5.2.39 Test cross-client command consistency
-- [x] 5.2.40 Test performance under load
-
-**Channel Integration Tests** (`test/rubber_duck_web/channels/cli_channel_test.exs`):
-- [x] 5.2.41 Test WebSocket channel integration with unified command system
-- [x] 5.2.42 Test async command execution through channels
-- [x] 5.2.43 Test error handling and response formatting
-- [x] 5.2.44 Test all commands through channel interface
-
-#### Implementation Notes:
-
-**Architecture Decisions:**
-- Implemented Command and Context structs as core data structures for all command processing
-- Used Optimus for CLI parsing, with custom parsers for WebSocket, LiveView, and TUI formats
-- Built GenServer-based Processor with handler registry pattern for extensibility
-- Created Handler behavior to ensure consistent implementation across all commands
-- Implemented comprehensive formatters supporting JSON, text, table, and markdown output
-- Built client-specific adapters to provide convenient interfaces for each client type
-
-**Key Features Implemented:**
-- Unified command structure working across CLI, WebSocket, LiveView, and TUI interfaces
-- Async command execution with progress tracking and cancellation support
-- Multi-format output supporting different client needs
-- Authorization and validation pipeline ensuring security
-- Integration with existing engine systems and LLM services
-- Comprehensive error handling and recovery mechanisms
-- Dynamic LLM configuration support through new commands
-
-**Integration Highlights:**
-- Successfully migrated WebSocket CLI channel to use unified command system
-- All 17 channel tests passing after implementation
-- Removed old command-specific handlers in favor of unified approach
-- Maintained backward compatibility while eliminating code duplication
-
-**Not Implemented (Per User Decision):**
-- Ash Framework bridge (5.2.15) - Not needed for current requirements
-- Advanced features like command composition and macros (5.2.16) - Not needed initially
-
-**Files Created/Modified:**
-- Core modules: `lib/rubber_duck/commands/` (command.ex, context.ex, parser.ex, processor.ex, handler.ex, formatters.ex)
-- Handlers: `lib/rubber_duck/commands/handlers/` (analyze.ex, generate.ex, complete.ex, refactor.ex, test.ex, llm.ex, health.ex)
-- Adapters: `lib/rubber_duck/commands/adapters/` (cli.ex, websocket.ex, liveview.ex, tui.ex)
-- Tests: Comprehensive test coverage with 72 tests across all modules
-- Updated: `lib/rubber_duck_web/channels/cli_channel.ex` to use unified system
-
-See `notes/features/001-unified-command-abstraction-layer.md` for detailed implementation documentation.
-
-### 5.3 Dynamic LLM Configuration System ✅ Completed
-
-Implement dynamic LLM provider and model configuration that allows runtime switching of providers and models through CLI commands and configuration files.
-
-**Status**: Successfully implemented complete dynamic LLM configuration system with CLI commands and centralized configuration management.
-
-#### Tasks:
-
-**LLM Configuration Management:**
-- [x] 5.3.1 Create `RubberDuck.LLM.Config` module:
-  - [x] 5.3.1.1 Unified configuration API for provider/model selection
-  - [x] 5.3.1.2 Merge CLI config with application config
-  - [x] 5.3.1.3 Priority system (CLI > app config)
-  - [x] 5.3.1.4 Model validation and availability checking
-- [x] 5.3.2 Extend `RubberDuck.CLIClient.Auth` module:
-  - [x] 5.3.2.1 LLM configuration storage in CLI config file
-  - [x] 5.3.2.2 Provider and model persistence functions
-  - [x] 5.3.2.3 JSON configuration management
-  - [x] 5.3.2.4 Default provider tracking
-
-**CLI Command Extensions:**
-- [x] 5.3.3 Add new LLM subcommands to parser:
-  - [x] 5.3.3.1 `llm set-model <provider> <model>` - Set model for provider
-  - [x] 5.3.3.2 `llm set-default <provider>` - Set default provider
-  - [x] 5.3.3.3 `llm list-models [provider]` - List available models
-  - [x] 5.3.3.4 Enhanced `llm status` with model information
-- [x] 5.3.4 Update LLM command handler:
-  - [x] 5.3.4.1 Process new configuration commands
-  - [x] 5.3.4.2 Integrate with Config module
-  - [x] 5.3.4.3 Provide user feedback and validation
-  - [x] 5.3.4.4 Handle configuration errors gracefully
-
-**Engine Integration:**
-- [x] 5.3.5 Update all AI engines for dynamic configuration:
-  - [x] 5.3.5.1 Generation Engine - Remove hardcoded model selection
-  - [x] 5.3.5.2 Analysis Engine - Use dynamic provider/model selection
-  - [x] 5.3.5.3 Refactoring Engine - Dynamic configuration integration
-  - [x] 5.3.5.4 Test Generation Engine - Provider-aware generation
-  - [x] 5.3.5.5 Completion Engine - Dynamic model selection
-- [x] 5.3.6 Create configuration validation:
-  - [x] 5.3.6.1 Provider availability checking
-  - [x] 5.3.6.2 Model compatibility validation
-  - [x] 5.3.6.3 Fallback strategies for missing configs
-
-**CLI Configuration Format:**
-```json
-{
-  "api_key": "...",
-  "server_url": "...",
-  "llm": {
-    "default_provider": "ollama",
-    "providers": {
-      "ollama": {"model": "codellama"},
-      "openai": {"model": "gpt-4"},
-      "anthropic": {"model": "claude-3-sonnet"}
-    }
-  }
-}
-```
-
-#### Unit Tests:
-
-**Configuration Tests** (`test/rubber_duck/llm/config_test.exs`):
-- [x] 5.3.7 Test provider model retrieval from CLI config
-- [x] 5.3.8 Test fallback to application config
-- [x] 5.3.9 Test current provider and model selection
-- [x] 5.3.10 Test model validation logic
-- [x] 5.3.11 Test configuration merging priorities
-
-**CLI Auth Tests** (`test/rubber_duck/cli_client/auth_test.exs`):
-- [x] 5.3.12 Test LLM configuration storage and retrieval
-- [x] 5.3.13 Test provider model updates
-- [x] 5.3.14 Test default provider setting
-- [x] 5.3.15 Test configuration persistence
-
-**Engine Integration Tests**:
-- [x] 5.3.16 Test generation engine with dynamic configuration
-- [x] 5.3.17 Test analysis engine provider selection
-- [x] 5.3.18 Test all engines use dynamic configuration
-- [x] 5.3.19 Test engine fallback on configuration errors
-
-#### Implementation Notes:
-
-**Architecture Decisions:**
-- Created centralized `LLM.Config` module for unified configuration management
-- Extended existing CLI config system rather than creating separate storage
-- Implemented priority-based configuration merging (CLI > app config)
-- Updated all engines to use dynamic configuration instead of hardcoded models
-
-**Key Features Implemented:**
-- Complete dynamic LLM provider and model configuration
-- CLI commands for runtime configuration changes
-- Persistent configuration storage in CLI config file
-- Integration with all existing AI engines
-- Configuration validation and error handling
-- Backward compatibility with existing configurations
-
-**Configuration Priority System:**
-1. CLI configuration file (`~/.rubber_duck/config.json`)
-2. Application configuration (`config/*.exs`)
-3. Default fallbacks
-
-**Integration Highlights:**
-- All AI engines now use `Config.get_current_provider_and_model/0`
-- Removed hardcoded model selection throughout the codebase
-- Comprehensive test coverage for all configuration scenarios
-- Seamless integration with existing command system
-
-**Files Created/Modified:**
-- New module: `lib/rubber_duck/llm/config.ex`
-- Enhanced: `lib/rubber_duck/cli_client/auth.ex` with LLM config functions
-- Updated: All engine modules to use dynamic configuration
-- Enhanced: `lib/rubber_duck/commands/parser.ex` with new LLM subcommands
-- Enhanced: `lib/rubber_duck/commands/handlers/llm.ex` with configuration commands
-- Tests: Comprehensive test coverage for dynamic configuration
-
-See `notes/features/004-dynamic-llm-configuration.md` for detailed implementation documentation.
-
-### 5.4 LiveView Interface
+### 5.2 LiveView Interface
 
 Build a comprehensive Phoenix LiveView application for real-time collaborative coding with integrated AI assistance, following the architecture design that combines code editing and LLM chat capabilities.
 
 #### Tasks:
 
 **Core LiveView Infrastructure:**
-- [ ] 5.4.1 Create `RubberDuckWeb.CodingSessionLive` module as main coordinator
-- [ ] 5.4.2 Implement Phoenix PubSub subscriptions:
-  - [ ] 5.4.2.1 Project-level updates (`project:#{project_id}`)
-  - [ ] 5.4.2.2 Editor updates (`editor:#{project_id}`)
-  - [ ] 5.4.2.3 Chat updates (`chat:#{project_id}`)
-- [ ] 5.4.3 Set up WebSocket channel subscription for coding sessions
-- [ ] 5.4.4 Implement state management:
-  - [ ] 5.4.4.1 Project and file state
-  - [ ] 5.4.4.2 Conversation and message streams
-  - [ ] 5.4.4.3 Editor content with debouncing
-  - [ ] 5.4.4.4 Streaming status indicators
+- [ ] 5.2.1 Create `RubberDuckWeb.CodingSessionLive` module as main coordinator
+- [ ] 5.2.2 Implement Phoenix PubSub subscriptions:
+  - [ ] 5.2.2.1 Project-level updates (`project:#{project_id}`)
+  - [ ] 5.2.2.2 Editor updates (`editor:#{project_id}`)
+  - [ ] 5.2.2.3 Chat updates (`chat:#{project_id}`)
+- [ ] 5.2.3 Set up WebSocket channel subscription for coding sessions
+- [ ] 5.2.4 Implement state management:
+  - [ ] 5.2.4.1 Project and file state
+  - [ ] 5.2.4.2 Conversation and message streams
+  - [ ] 5.2.4.3 Editor content with debouncing
+  - [ ] 5.2.4.4 Streaming status indicators
 
 **Monaco Editor Component:**
-- [ ] 5.4.5 Create `RubberDuckWeb.Components.MonacoEditorComponent`
-- [ ] 5.4.6 Implement Monaco Editor integration:
-  - [ ] 5.4.6.1 JavaScript hooks for editor mounting
-  - [ ] 5.4.6.2 Syntax highlighting with language detection
-  - [ ] 5.4.6.3 Real-time collaborative editing
-  - [ ] 5.4.6.4 External update handling
-  - [ ] 5.4.6.5 Code suggestions overlay
-- [ ] 5.4.7 Add editor configuration:
-  - [ ] 5.4.7.1 Theme support (vs-dark default)
-  - [ ] 5.4.7.2 Font and display preferences
-  - [ ] 5.4.7.3 Language-specific settings
-- [ ] 5.4.8 Implement AI suggestion integration:
-  - [ ] 5.4.8.1 Suggestion display overlay
-  - [ ] 5.4.8.2 Apply/dismiss functionality
-  - [ ] 5.4.8.3 Incremental completion updates
+- [ ] 5.2.5 Create `RubberDuckWeb.Components.MonacoEditorComponent`
+- [ ] 5.2.6 Implement Monaco Editor integration:
+  - [ ] 5.2.6.1 JavaScript hooks for editor mounting
+  - [ ] 5.2.6.2 Syntax highlighting with language detection
+  - [ ] 5.2.6.3 Real-time collaborative editing
+  - [ ] 5.2.6.4 External update handling
+  - [ ] 5.2.6.5 Code suggestions overlay
+- [ ] 5.2.7 Add editor configuration:
+  - [ ] 5.2.7.1 Theme support (vs-dark default)
+  - [ ] 5.2.7.2 Font and display preferences
+  - [ ] 5.2.7.3 Language-specific settings
+- [ ] 5.2.8 Implement AI suggestion integration:
+  - [ ] 5.2.8.1 Suggestion display overlay
+  - [ ] 5.2.8.2 Apply/dismiss functionality
+  - [ ] 5.2.8.3 Incremental completion updates
 
 **Chat Panel Component:**
-- [ ] 5.4.9 Create `RubberDuckWeb.Components.ChatPanelComponent`
-- [ ] 5.4.10 Implement chat functionality:
-  - [ ] 5.4.10.1 Message streaming with typing indicators
-  - [ ] 5.4.10.2 LLM response streaming support
-  - [ ] 5.4.10.3 Context-aware prompting
-  - [ ] 5.4.10.4 Message history with timestamps
-- [ ] 5.4.11 Integrate with Phase 3 systems:
-  - [ ] 5.4.11.1 LLM Service for completions with dynamic configuration
-  - [ ] 5.4.11.2 Memory Manager for context
-  - [ ] 5.4.11.3 Context Builder for prompts
+- [ ] 5.2.9 Create `RubberDuckWeb.Components.ChatPanelComponent`
+- [ ] 5.2.10 Implement chat functionality:
+  - [ ] 5.2.10.1 Message streaming with typing indicators
+  - [ ] 5.2.10.2 LLM response streaming support
+  - [ ] 5.2.10.3 Context-aware prompting
+  - [ ] 5.2.10.4 Message history with timestamps
+- [ ] 5.2.11 Integrate with Phase 3 systems:
+  - [ ] 5.2.11.1 LLM Service for completions with dynamic configuration
+  - [ ] 5.2.11.2 Memory Manager for context
+  - [ ] 5.2.11.3 Context Builder for prompts
 
 **File Tree Component:**
-- [ ] 5.4.12 Create `RubberDuckWeb.Components.FileTreeComponent`
-- [ ] 5.4.13 Implement file navigation:
-  - [ ] 5.4.13.1 Project file listing
-  - [ ] 5.4.13.2 File selection handling
-  - [ ] 5.4.13.3 Current file highlighting
-  - [ ] 5.4.13.4 File type icons
+- [ ] 5.2.12 Create `RubberDuckWeb.Components.FileTreeComponent`
+- [ ] 5.2.13 Implement file navigation:
+  - [ ] 5.2.13.1 Project file listing
+  - [ ] 5.2.13.2 File selection handling
+  - [ ] 5.2.13.3 Current file highlighting
+  - [ ] 5.2.13.4 File type icons
 
 **Context Panel Component:**
-- [ ] 5.4.14 Create `RubberDuckWeb.Components.ContextPanelComponent`
-- [ ] 5.4.15 Display project context information:
-  - [ ] 5.4.15.1 Current analysis results
-  - [ ] 5.4.15.2 Code metrics
-  - [ ] 5.4.15.3 Relevant documentation
-  - [ ] 5.4.15.4 LLM provider status with dynamic configuration
+- [ ] 5.2.14 Create `RubberDuckWeb.Components.ContextPanelComponent`
+- [ ] 5.2.15 Display project context information:
+  - [ ] 5.2.15.1 Current analysis results
+  - [ ] 5.2.15.2 Code metrics
+  - [ ] 5.2.15.3 Relevant documentation
+  - [ ] 5.2.15.4 LLM provider status with dynamic configuration
 
 **JavaScript Integration:**
-- [ ] 5.4.16 Create Monaco Editor hooks (`assets/js/hooks/monaco_editor.js`):
-  - [ ] 5.4.16.1 Editor mounting and configuration
-  - [ ] 5.4.16.2 Content change debouncing
-  - [ ] 5.4.16.3 Cursor position tracking
-  - [ ] 5.4.16.4 Completion provider registration
-- [ ] 5.4.17 Implement live_monaco_editor integration
-- [ ] 5.4.18 Add collaborative cursor support
+- [ ] 5.2.16 Create Monaco Editor hooks (`assets/js/hooks/monaco_editor.js`):
+  - [ ] 5.2.16.1 Editor mounting and configuration
+  - [ ] 5.2.16.2 Content change debouncing
+  - [ ] 5.2.16.3 Cursor position tracking
+  - [ ] 5.2.16.4 Completion provider registration
+- [ ] 5.2.17 Implement live_monaco_editor integration
+- [ ] 5.2.18 Add collaborative cursor support
 
 **Real-time Features:**
-- [ ] 5.4.19 Implement file content synchronization:
-  - [ ] 5.4.19.1 Debounced auto-save
-  - [ ] 5.4.19.2 Conflict resolution
-  - [ ] 5.4.19.3 Multi-user awareness
-- [ ] 5.4.20 Add presence tracking for collaboration
-- [ ] 5.4.21 Create real-time analysis updates
+- [ ] 5.2.19 Implement file content synchronization:
+  - [ ] 5.2.19.1 Debounced auto-save
+  - [ ] 5.2.19.2 Conflict resolution
+  - [ ] 5.2.19.3 Multi-user awareness
+- [ ] 5.2.20 Add presence tracking for collaboration
+- [ ] 5.2.21 Create real-time analysis updates
 
 **Integration with Existing Systems:**
-- [ ] 5.4.22 Connect to Phase 2 engines:
-  - [ ] 5.4.22.1 Code Analysis Engine integration
-  - [ ] 5.4.22.2 Suggestion Engine for completions
-- [ ] 5.4.23 Integrate Phase 4 workflows:
-  - [ ] 5.4.23.1 Trigger analysis workflows
-  - [ ] 5.4.23.2 Display workflow results
-- [ ] 5.4.24 Add telemetry events for UI interactions
-- [ ] 5.4.25 Integrate with unified command system:
-  - [ ] 5.4.25.1 Command execution through LiveView
-  - [ ] 5.4.25.2 Dynamic LLM configuration in UI
-  - [ ] 5.4.25.3 Real-time command feedback
+- [ ] 5.2.22 Connect to Phase 2 engines:
+  - [ ] 5.2.22.1 Code Analysis Engine integration
+  - [ ] 5.2.22.2 Suggestion Engine for completions
+- [ ] 5.2.23 Integrate Phase 4 workflows:
+  - [ ] 5.2.23.1 Trigger analysis workflows
+  - [ ] 5.2.23.2 Display workflow results
+- [ ] 5.2.24 Add telemetry events for UI interactions
+- [ ] 5.2.25 Integrate with unified command system:
+  - [ ] 5.2.25.1 Command execution through LiveView
+  - [ ] 5.2.25.2 Dynamic LLM configuration in UI
+  - [ ] 5.2.25.3 Real-time command feedback
 
 #### Unit Tests:
 
 **CodingSessionLive Tests** (`test/rubber_duck_web/live/coding_session_live_test.exs`):
-- [ ] 5.4.26 Test mount with project authorization
-- [ ] 5.4.27 Test PubSub subscription setup
-- [ ] 5.4.28 Test file selection and content loading
-- [ ] 5.4.29 Test editor content change handling
-- [ ] 5.4.30 Test file save functionality
-- [ ] 5.4.31 Test real-time update broadcasting
+- [ ] 5.2.26 Test mount with project authorization
+- [ ] 5.2.27 Test PubSub subscription setup
+- [ ] 5.2.28 Test file selection and content loading
+- [ ] 5.2.29 Test editor content change handling
+- [ ] 5.2.30 Test file save functionality
+- [ ] 5.2.31 Test real-time update broadcasting
 
 **Component Tests** (`test/rubber_duck_web/components/`):
-- [ ] 5.4.32 Test Monaco Editor component rendering
-- [ ] 5.4.33 Test Chat Panel message streaming
-- [ ] 5.4.34 Test File Tree navigation
-- [ ] 5.4.35 Test suggestion application
-- [ ] 5.4.36 Test context panel updates
+- [ ] 5.2.32 Test Monaco Editor component rendering
+- [ ] 5.2.33 Test Chat Panel message streaming
+- [ ] 5.2.34 Test File Tree navigation
+- [ ] 5.2.35 Test suggestion application
+- [ ] 5.2.36 Test context panel updates
 
 **Integration Tests** (`test/rubber_duck_web/live/integration_test.exs`):
-- [ ] 5.4.37 Test complete coding session flow
-- [ ] 5.4.38 Test multi-user collaboration
-- [ ] 5.4.39 Test LLM response streaming
-- [ ] 5.4.40 Test code analysis integration
-- [ ] 5.4.41 Test memory persistence across sessions
+- [ ] 5.2.37 Test complete coding session flow
+- [ ] 5.2.38 Test multi-user collaboration
+- [ ] 5.2.39 Test LLM response streaming
+- [ ] 5.2.40 Test code analysis integration
+- [ ] 5.2.41 Test memory persistence across sessions
 
 **JavaScript Hook Tests** (`test/assets/js/hooks/`):
-- [ ] 5.4.42 Test Monaco Editor mounting
-- [ ] 5.4.43 Test content synchronization
-- [ ] 5.4.44 Test completion provider
-- [ ] 5.4.45 Test external update handling
-- [ ] 5.4.46 Test cursor position broadcasting
+- [ ] 5.2.42 Test Monaco Editor mounting
+- [ ] 5.2.43 Test content synchronization
+- [ ] 5.2.44 Test completion provider
+- [ ] 5.2.45 Test external update handling
+- [ ] 5.2.46 Test cursor position broadcasting
 
-### 5.5 WebSocket CLI Client Implementation ✅ Completed
 
-Transform the CLI from mix task-based to a standalone WebSocket client that communicates with the running Phoenix server, eliminating compilation overhead and maintaining server state.
-
-**Status**: Successfully implemented complete WebSocket CLI client with comprehensive dynamic LLM configuration support.
-
-#### Tasks:
-- [x] 5.5.1 Add WebSocket client dependencies:
-  - [x] 5.5.1.1 `phoenix_gen_socket_client` for WebSocket communication
-  - [x] 5.5.1.2 `websocket_client` for transport layer
-- [x] 5.5.2 Create Phoenix Channel infrastructure:
-  - [x] 5.5.2.1 `CLIChannel` for handling all CLI commands
-  - [x] 5.5.2.2 Update `UserSocket` with CLI channel and API key auth
-  - [x] 5.5.2.3 Implement channel message handlers for each command type
-- [x] 5.5.3 Build WebSocket client architecture:
-  - [x] 5.5.3.1 `CLIClient.Client` GenServer for connection management
-  - [x] 5.5.3.2 `CLIClient.Transport` for Phoenix.Channels.GenSocketClient
-  - [x] 5.5.3.3 Automatic reconnection on disconnect
-  - [x] 5.5.3.4 Request/response correlation for async operations
-- [x] 5.5.4 Implement authentication system:
-  - [x] 5.5.4.1 `CLIClient.Auth` for API key management
-  - [x] 5.5.4.2 Secure storage in `~/.rubber_duck/config.json`
-  - [x] 5.5.4.3 `Mix.Tasks.RubberDuck.Auth` for key generation
-  - [x] 5.5.4.4 Environment variable support
-  - [x] 5.5.4.5 LLM configuration storage and management
-- [x] 5.5.5 Create command handlers:
-  - [x] 5.5.5.1 `analyze` - Code analysis via WebSocket
-  - [x] 5.5.5.2 `generate` - Code generation with streaming
-  - [x] 5.5.5.3 `complete` - Code completions
-  - [x] 5.5.5.4 `refactor` - Code refactoring
-  - [x] 5.5.5.5 `test` - Test generation
-  - [x] 5.5.5.6 `llm` - LLM provider management with dynamic configuration
-  - [x] 5.5.5.7 `health` - Server health monitoring with provider status
-- [x] 5.5.6 Implement streaming support:
-  - [x] 5.5.6.1 Stream message protocol (start/data/end)
-  - [x] 5.5.6.2 Progress indicators for long operations
-  - [x] 5.5.6.3 Real-time output display
-- [x] 5.5.7 Build escript packaging:
-  - [x] 5.5.7.1 Configure escript in mix.exs
-  - [x] 5.5.7.2 `CLIClient.Main` entry point with Optimus
-  - [x] 5.5.7.3 Embedded Elixir runtime
-  - [x] 5.5.7.4 Binary distribution at `bin/rubber_duck`
-- [x] 5.5.8 Add output formatting:
-  - [x] 5.5.8.1 Plain text formatter (default)
-  - [x] 5.5.8.2 JSON formatter for automation
-  - [x] 5.5.8.3 Table formatter with column alignment
-  - [x] 5.5.8.4 Format-specific rendering for each command
-- [x] 5.5.9 Implement health check feature:
-  - [x] 5.5.9.1 Server uptime tracking
-  - [x] 5.5.9.2 Memory usage statistics
-  - [x] 5.5.9.3 Connection counting
-  - [x] 5.5.9.4 Provider health status with dynamic configuration
-- [x] 5.5.10 Add comprehensive LLM configuration commands:
-  - [x] 5.5.10.1 `llm status` - Show provider status and current models
-  - [x] 5.5.10.2 `llm set-model` - Set model for specific provider
-  - [x] 5.5.10.3 `llm set-default` - Set default provider
-  - [x] 5.5.10.4 `llm list-models` - List available models
-  - [x] 5.5.10.5 Provider connection management commands
-
-#### Unit Tests:
-Created comprehensive tests:
-- [x] 5.5.11 Test channel join and authentication
-- [x] 5.5.12 Test all command handlers (analyze, generate, complete, etc.)
-- [x] 5.5.13 Test streaming message protocol
-- [x] 5.5.14 Test LLM provider management commands with dynamic configuration
-- [x] 5.5.15 Test health check response format with provider status
-- [x] 5.5.16 Test connection failure and reconnection
-- [x] 5.5.17 Test API key authentication flow
-- [x] 5.5.18 Test LLM configuration persistence and retrieval
-- [x] 5.5.19 Test dynamic model selection commands
-
-#### Implementation Highlights:
-- Successfully transformed CLI from mix tasks to WebSocket client
-- Provides instant command execution without compilation
-- Persistent server connection with automatic reconnection
-- Real-time streaming for long operations
-- Distributable binary with embedded Elixir runtime
-- Complete dynamic LLM configuration through CLI commands
-- Comprehensive health monitoring including provider status
-- Integration with unified command system
-
-See `notes/features/002-websocket-cli-client-integration.md` for implementation details.
-
-### 5.6 Enhanced REPL Interface ✅ Completed
-
-Transform the CLI conversation experience with a comprehensive REPL (Read-Eval-Print Loop) interface that provides an interactive, stateful environment for AI-assisted development.
-
-**Status**: Successfully implemented complete REPL interface with multi-line input, slash commands, context management, and session persistence.
-
-#### Tasks:
-- [x] 5.6.1 Create REPL command specification:
-  - [x] 5.6.1.1 Add `repl` command to CLI client main module
-  - [x] 5.6.1.2 Define options (type, model, resume, no_welcome)
-  - [x] 5.6.1.3 Integrate with existing command routing system
-- [x] 5.6.2 Implement `RubberDuck.CLIClient.REPLHandler` module:
-  - [x] 5.6.2.1 Interactive input loop with IO.gets
-  - [x] 5.6.2.2 State management using Agent
-  - [x] 5.6.2.3 WebSocket connection reuse
-  - [x] 5.6.2.4 Session persistence
-- [x] 5.6.3 Build multi-line input support:
-  - [x] 5.6.3.1 Triple quote `"""` delimiter detection
-  - [x] 5.6.3.2 Backslash `\` line continuation
-  - [x] 5.6.3.3 Input buffering and assembly
-  - [x] 5.6.3.4 Proper line break preservation
-- [x] 5.6.4 Implement comprehensive slash commands:
-  - [x] 5.6.4.1 `/help` - Display available commands
-  - [x] 5.6.4.2 `/exit` or `/quit` - Exit REPL
-  - [x] 5.6.4.3 `/clear` - Clear screen
-  - [x] 5.6.4.4 `/info` - Show session information
-  - [x] 5.6.4.5 `/history` - Display conversation history
-  - [x] 5.6.4.6 `/save [filename]` - Save conversation
-  - [x] 5.6.4.7 `/recent` - List recent conversations
-  - [x] 5.6.4.8 `/switch <id>` - Switch conversation
-- [x] 5.6.5 Add context management commands:
-  - [x] 5.6.5.1 `/context` - Show current context files
-  - [x] 5.6.5.2 `/context add <file>` - Add file to context
-  - [x] 5.6.5.3 `/context remove <file>` - Remove from context
-  - [x] 5.6.5.4 `/context clear` - Clear all context
-  - [x] 5.6.5.5 Context persistence across sessions
-- [x] 5.6.6 Create integrated command support:
-  - [x] 5.6.6.1 `/analyze <file>` - Run analysis in context
-  - [x] 5.6.6.2 `/generate <prompt>` - Generate code
-  - [x] 5.6.6.3 `/refactor <instruction>` - Refactor with context
-  - [x] 5.6.6.4 `/test <file>` - Generate tests
-- [x] 5.6.7 Implement session management:
-  - [x] 5.6.7.1 Auto-save on exit
-  - [x] 5.6.7.2 Session state persistence
-  - [x] 5.6.7.3 Resume last or specific conversation
-  - [x] 5.6.7.4 Conversation ID extraction and reuse
-- [x] 5.6.8 Add user experience enhancements:
-  - [x] 5.6.8.1 Colored prompts and output
-  - [x] 5.6.8.2 Streaming response display
-  - [x] 5.6.8.3 Error handling with recovery
-  - [x] 5.6.8.4 Welcome message with tips
-  - [x] 5.6.8.5 Exit confirmation for unsaved changes
-
-#### Unit Tests:
-- [x] 5.6.9 Test REPL command parsing and routing
-- [x] 5.6.10 Test multi-line input assembly
-- [x] 5.6.11 Test slash command execution
-- [x] 5.6.12 Test context file management
-- [x] 5.6.13 Test session persistence and resumption
-- [x] 5.6.14 Test conversation switching
-- [x] 5.6.15 Test integrated command execution
-
-#### Implementation Highlights:
-- Direct message input without `send` command repetition
-- Stateful conversation management with persistence
-- Rich context awareness for better AI responses
-- Seamless integration with existing CLI commands
-- Enhanced user experience with multi-line support
-- Comprehensive slash command system
-- Session auto-save and recovery capabilities
-
-The REPL interface significantly improves the conversational experience by eliminating the need for repeated `send` commands and providing a natural, interactive environment for AI-assisted development.
-
-### 5.7 TUI (Terminal UI) Implementation with Go and Bubble Tea ✅ ~90% Complete
+### 5.3 TUI (Terminal UI) Implementation with Go and Bubble Tea ✅ ~90% Complete
 
 Build a modern terminal user interface using Go and the Bubble Tea framework, leveraging the Elm Architecture for predictable state management and seamless Phoenix WebSocket integration with chat-focused interface.
 
@@ -647,162 +185,162 @@ Build a modern terminal user interface using Go and the Bubble Tea framework, le
 #### Tasks:
 
 **Project Setup and Dependencies:**
-- [x] 5.6.1 Create Go module `github.com/rubber_duck/tui`
-- [x] 5.6.2 Add dependencies to `go.mod`:
-  - [x] 5.6.2.1 `github.com/charmbracelet/bubbletea` - Core TUI framework
-  - [x] 5.6.2.2 `github.com/charmbracelet/bubbles` - Component library
-  - [x] 5.6.2.3 `github.com/charmbracelet/lipgloss` - Styling system
-  - [x] 5.6.2.4 `github.com/nshafer/phx` - Phoenix channels client
-  - [ ] 5.6.2.5 `github.com/alecthomas/chroma` - Syntax highlighting
-- [x] 5.6.3 Set up project structure:
-  - [x] 5.6.3.1 `cmd/rubber_duck_tui/main.go` - Entry point
-  - [x] 5.6.3.2 `internal/ui/` - UI components
-  - [x] 5.6.3.3 `internal/phoenix/` - WebSocket integration
-  - [x] 5.6.3.4 `internal/commands/` - Command system
+- [x] 5.3.1 Create Go module `github.com/rubber_duck/tui`
+- [x] 5.3.2 Add dependencies to `go.mod`:
+  - [x] 5.3.2.1 `github.com/charmbracelet/bubbletea` - Core TUI framework
+  - [x] 5.3.2.2 `github.com/charmbracelet/bubbles` - Component library
+  - [x] 5.3.2.3 `github.com/charmbracelet/lipgloss` - Styling system
+  - [x] 5.3.2.4 `github.com/nshafer/phx` - Phoenix channels client
+  - [ ] 5.3.2.5 `github.com/alecthomas/chroma` - Syntax highlighting
+- [x] 5.3.3 Set up project structure:
+  - [x] 5.3.3.1 `cmd/rubber_duck_tui/main.go` - Entry point
+  - [x] 5.3.3.2 `internal/ui/` - UI components
+  - [x] 5.3.3.3 `internal/phoenix/` - WebSocket integration
+  - [x] 5.3.3.4 `internal/commands/` - Command system
 
 **Core Architecture Implementation:**
-- [x] 5.6.4 Implement base Model-Update-View architecture:
-  - [x] 5.6.4.1 Define `Model` struct with application state
-  - [x] 5.6.4.2 Create message types for all events
-  - [x] 5.6.4.3 Implement `Update` function for state transitions
-  - [x] 5.6.4.4 Build `View` function with Lipgloss layouts
-- [x] 5.6.5 Create state management system:
-  - [x] 5.6.5.1 File tree state and operations
-  - [x] 5.6.5.2 Editor state with content tracking
-  - [x] 5.6.5.3 Output pane state for results
-  - [x] 5.6.5.4 WebSocket connection state
-  - [x] 5.6.5.5 Chat state with message history
-  - [x] 5.6.5.6 Panel visibility state for dynamic layout
+- [x] 5.3.4 Implement base Model-Update-View architecture:
+  - [x] 5.3.4.1 Define `Model` struct with application state
+  - [x] 5.3.4.2 Create message types for all events
+  - [x] 5.3.4.3 Implement `Update` function for state transitions
+  - [x] 5.3.4.4 Build `View` function with Lipgloss layouts
+- [x] 5.3.5 Create state management system:
+  - [x] 5.3.5.1 File tree state and operations
+  - [x] 5.3.5.2 Editor state with content tracking
+  - [x] 5.3.5.3 Output pane state for results
+  - [x] 5.3.5.4 WebSocket connection state
+  - [x] 5.3.5.5 Chat state with message history
+  - [x] 5.3.5.6 Panel visibility state for dynamic layout
 
 **Chat-Focused Interface Implementation:**
-- [x] 5.6.6 Implement chat component (`internal/ui/chat.go`):
-  - [x] 5.6.6.1 Scrollable message history using viewport
-  - [x] 5.6.6.2 Multi-line input with textarea
-  - [x] 5.6.6.3 Message type support (user, assistant, system, error)
-  - [x] 5.6.6.4 Timestamp and author tracking
-  - [x] 5.6.6.5 Theme integration and styling
-- [x] 5.6.7 Create dynamic layout system:
-  - [x] 5.6.7.1 Chat takes remaining space after optional panels
-  - [x] 5.6.7.2 Automatic width calculation based on visible components
-  - [x] 5.6.7.3 Minimum width enforcement for usability
-  - [x] 5.6.7.4 Panel toggle functionality
-- [x] 5.6.8 Add keyboard controls for chat interface:
-  - [x] 5.6.8.1 `Ctrl+F`: Toggle file tree visibility
-  - [x] 5.6.8.2 `Ctrl+E`: Toggle editor visibility
-  - [x] 5.6.8.3 `Ctrl+/`: Focus chat input
-  - [x] 5.6.8.4 `Tab`: Cycle through visible panes
-  - [x] 5.6.8.5 `Enter`: Send message
-  - [x] 5.6.8.6 `Ctrl+Enter`: Newline in chat
+- [x] 5.3.6 Implement chat component (`internal/ui/chat.go`):
+  - [x] 5.3.6.1 Scrollable message history using viewport
+  - [x] 5.3.6.2 Multi-line input with textarea
+  - [x] 5.3.6.3 Message type support (user, assistant, system, error)
+  - [x] 5.3.6.4 Timestamp and author tracking
+  - [x] 5.3.6.5 Theme integration and styling
+- [x] 5.3.7 Create dynamic layout system:
+  - [x] 5.3.7.1 Chat takes remaining space after optional panels
+  - [x] 5.3.7.2 Automatic width calculation based on visible components
+  - [x] 5.3.7.3 Minimum width enforcement for usability
+  - [x] 5.3.7.4 Panel toggle functionality
+- [x] 5.3.8 Add keyboard controls for chat interface:
+  - [x] 5.3.8.1 `Ctrl+F`: Toggle file tree visibility
+  - [x] 5.3.8.2 `Ctrl+E`: Toggle editor visibility
+  - [x] 5.3.8.3 `Ctrl+/`: Focus chat input
+  - [x] 5.3.8.4 `Tab`: Cycle through visible panes
+  - [x] 5.3.8.5 `Enter`: Send message
+  - [x] 5.3.8.6 `Ctrl+Enter`: Newline in chat
 
 **Phoenix WebSocket Integration:**
-- [x] 5.6.9 Implement Phoenix channel client:
-  - [x] 5.6.9.1 Connection management with auto-reconnect
-  - [x] 5.6.9.2 Channel join/leave operations
-  - [x] 5.6.9.3 Message serialization/deserialization
-  - [x] 5.6.9.4 Event subscription system
-- [x] 5.6.10 Create WebSocket command adapters:
-  - [x] 5.6.10.1 File analysis commands
-  - [x] 5.6.10.2 Code generation commands
-  - [x] 5.6.10.3 Completion requests
-  - [x] 5.6.10.4 Refactoring operations
-  - [x] 5.6.10.5 Chat message integration
-- [x] 5.6.11 Implement streaming support:
-  - [x] 5.6.11.1 Stream start/data/end message handling
-  - [x] 5.6.11.2 Progressive output rendering
-  - [ ] 5.6.11.3 Stream cancellation
-  - [ ] 5.6.11.4 Error recovery
+- [x] 5.3.9 Implement Phoenix channel client:
+  - [x] 5.3.9.1 Connection management with auto-reconnect
+  - [x] 5.3.9.2 Channel join/leave operations
+  - [x] 5.3.9.3 Message serialization/deserialization
+  - [x] 5.3.9.4 Event subscription system
+- [x] 5.3.10 Create WebSocket command adapters:
+  - [x] 5.3.10.1 File analysis commands
+  - [x] 5.3.10.2 Code generation commands
+  - [x] 5.3.10.3 Completion requests
+  - [x] 5.3.10.4 Refactoring operations
+  - [x] 5.3.10.5 Chat message integration
+- [x] 5.3.11 Implement streaming support:
+  - [x] 5.3.11.1 Stream start/data/end message handling
+  - [x] 5.3.11.2 Progressive output rendering
+  - [ ] 5.3.11.3 Stream cancellation
+  - [ ] 5.3.11.4 Error recovery
 
 **UI Component Development:**
-- [x] 5.6.12 Build file tree component:
-  - [x] 5.6.12.1 Recursive tree rendering with Lipgloss
-  - [x] 5.6.12.2 Expand/collapse functionality
-  - [x] 5.6.12.3 File type icons and styling
-  - [x] 5.6.12.4 Keyboard navigation (j/k, enter)
-  - [x] 5.6.12.5 File selection events
-- [x] 5.6.13 Create code editor component:
-  - [x] 5.6.13.1 Integrate Bubbles textarea
-  - [ ] 5.6.13.2 Syntax highlighting with Chroma
-  - [x] 5.6.13.3 Line numbers and cursor position
-  - [x] 5.6.13.4 Content change tracking
-  - [ ] 5.6.13.5 Auto-save functionality
-- [x] 5.6.14 Implement output/results pane:
-  - [x] 5.6.14.1 Scrollable viewport with Bubbles
-  - [x] 5.6.14.2 Formatted analysis results
-  - [x] 5.6.14.3 Error display with styling
-  - [x] 5.6.14.4 Progress indicators
-  - [ ] 5.6.14.5 Clear and filter options
-- [x] 5.6.15 Build command palette:
-  - [x] 5.6.15.1 Fuzzy search with text input
-  - [x] 5.6.15.2 Command list with descriptions
-  - [x] 5.6.15.3 Keyboard shortcuts display
-  - [x] 5.6.15.4 Command execution system
-  - [ ] 5.6.15.5 Recent commands history
+- [x] 5.3.12 Build file tree component:
+  - [x] 5.3.12.1 Recursive tree rendering with Lipgloss
+  - [x] 5.3.12.2 Expand/collapse functionality
+  - [x] 5.3.12.3 File type icons and styling
+  - [x] 5.3.12.4 Keyboard navigation (j/k, enter)
+  - [x] 5.3.12.5 File selection events
+- [x] 5.3.13 Create code editor component:
+  - [x] 5.3.13.1 Integrate Bubbles textarea
+  - [ ] 5.3.13.2 Syntax highlighting with Chroma
+  - [x] 5.3.13.3 Line numbers and cursor position
+  - [x] 5.3.13.4 Content change tracking
+  - [ ] 5.3.13.5 Auto-save functionality
+- [x] 5.3.14 Implement output/results pane:
+  - [x] 5.3.14.1 Scrollable viewport with Bubbles
+  - [x] 5.3.14.2 Formatted analysis results
+  - [x] 5.3.14.3 Error display with styling
+  - [x] 5.3.14.4 Progress indicators
+  - [ ] 5.3.14.5 Clear and filter options
+- [x] 5.3.15 Build command palette:
+  - [x] 5.3.15.1 Fuzzy search with text input
+  - [x] 5.3.15.2 Command list with descriptions
+  - [x] 5.3.15.3 Keyboard shortcuts display
+  - [x] 5.3.15.4 Command execution system
+  - [ ] 5.3.15.5 Recent commands history
 
 **Layout and Navigation:**
-- [x] 5.6.16 Implement responsive layout system:
-  - [x] 5.6.16.1 Dynamic layout with chat as primary pane
-  - [x] 5.6.16.2 Dynamic width calculation
-  - [x] 5.6.16.3 Terminal resize handling
-  - [x] 5.6.16.4 Minimum size constraints
-- [x] 5.6.17 Create navigation system:
-  - [x] 5.6.17.1 Tab cycling between panes
-  - [x] 5.6.17.2 Vim-style navigation keys
-  - [x] 5.6.17.3 Focus indicators
-  - [x] 5.6.17.4 Panel-specific controls
-  - [ ] 5.6.17.5 Mouse support where available
-- [x] 5.6.18 Add status bar:
-  - [x] 5.6.18.1 Connection status indicator
-  - [x] 5.6.18.2 Current file path
-  - [x] 5.6.18.3 Operation progress
-  - [x] 5.6.18.4 Key hints and active panels
+- [x] 5.3.16 Implement responsive layout system:
+  - [x] 5.3.16.1 Dynamic layout with chat as primary pane
+  - [x] 5.3.16.2 Dynamic width calculation
+  - [x] 5.3.16.3 Terminal resize handling
+  - [x] 5.3.16.4 Minimum size constraints
+- [x] 5.3.17 Create navigation system:
+  - [x] 5.3.17.1 Tab cycling between panes
+  - [x] 5.3.17.2 Vim-style navigation keys
+  - [x] 5.3.17.3 Focus indicators
+  - [x] 5.3.17.4 Panel-specific controls
+  - [ ] 5.3.17.5 Mouse support where available
+- [x] 5.3.18 Add status bar:
+  - [x] 5.3.18.1 Connection status indicator
+  - [x] 5.3.18.2 Current file path
+  - [x] 5.3.18.3 Operation progress
+  - [x] 5.3.18.4 Key hints and active panels
 
 **Advanced Features:**
-- [x] 5.6.19 Implement modal dialogs:
-  - [x] 5.6.19.1 Confirmation dialogs
-  - [x] 5.6.19.2 Input prompts
-  - [x] 5.6.19.3 Settings dialog
-  - [x] 5.6.19.4 Help overlay
-- [x] 5.6.20 Add command integration:
-  - [x] 5.6.20.1 Messages starting with `/` parsed as commands
-  - [x] 5.6.20.2 Regular messages sent as chat commands
-  - [x] 5.6.20.3 Integration with existing command router
-  - [x] 5.6.20.4 Echo functionality for testing
-- [ ] 5.6.21 Add theming support:
-  - [ ] 5.6.21.1 Color scheme definitions
-  - [ ] 5.6.21.2 Dark/light mode toggle
-  - [ ] 5.6.21.3 Custom style configuration
-- [ ] 5.6.22 Create performance optimizations:
-  - [ ] 5.6.22.1 Render caching for static components
-  - [ ] 5.6.22.2 Debounced file operations
-  - [ ] 5.6.22.3 Lazy loading for large files
-  - [ ] 5.6.22.4 Virtual scrolling for file tree
+- [x] 5.3.19 Implement modal dialogs:
+  - [x] 5.3.19.1 Confirmation dialogs
+  - [x] 5.3.19.2 Input prompts
+  - [x] 5.3.19.3 Settings dialog
+  - [x] 5.3.19.4 Help overlay
+- [x] 5.3.20 Add command integration:
+  - [x] 5.3.20.1 Messages starting with `/` parsed as commands
+  - [x] 5.3.20.2 Regular messages sent as chat commands
+  - [x] 5.3.20.3 Integration with existing command router
+  - [x] 5.3.20.4 Echo functionality for testing
+- [ ] 5.3.21 Add theming support:
+  - [ ] 5.3.21.1 Color scheme definitions
+  - [ ] 5.3.21.2 Dark/light mode toggle
+  - [ ] 5.3.21.3 Custom style configuration
+- [ ] 5.3.22 Create performance optimizations:
+  - [ ] 5.3.22.1 Render caching for static components
+  - [ ] 5.3.22.2 Debounced file operations
+  - [ ] 5.3.22.3 Lazy loading for large files
+  - [ ] 5.3.22.4 Virtual scrolling for file tree
 
 #### Unit Tests:
 Create tests in `tui/internal/ui/*_test.go` files to verify:
-- [x] 5.6.23 Test Model initialization and state
-- [x] 5.6.24 Test Update function message handling
-- [x] 5.6.25 Test View rendering without errors
-- [x] 5.6.26 Test WebSocket connection lifecycle
-- [x] 5.6.27 Test chat component functionality
-- [x] 5.6.28 Test dynamic layout calculations
-- [x] 5.6.29 Test panel toggle operations
-- [x] 5.6.30 Test keyboard shortcut handling
-- [ ] 5.6.31 Test file tree navigation operations
-- [ ] 5.6.32 Test editor content synchronization
-- [ ] 5.6.33 Test command palette filtering
-- [ ] 5.6.34 Test error recovery mechanisms
+- [x] 5.3.23 Test Model initialization and state
+- [x] 5.3.24 Test Update function message handling
+- [x] 5.3.25 Test View rendering without errors
+- [x] 5.3.26 Test WebSocket connection lifecycle
+- [x] 5.3.27 Test chat component functionality
+- [x] 5.3.28 Test dynamic layout calculations
+- [x] 5.3.29 Test panel toggle operations
+- [x] 5.3.30 Test keyboard shortcut handling
+- [ ] 5.3.31 Test file tree navigation operations
+- [ ] 5.3.32 Test editor content synchronization
+- [ ] 5.3.33 Test command palette filtering
+- [ ] 5.3.34 Test error recovery mechanisms
 
 #### Integration Tests:
 Create tests in `tui/test/integration_test.go` to verify:
-- [x] 5.6.35 Test full TUI startup and initialization
-- [x] 5.6.36 Test Phoenix channel communication
-- [x] 5.6.37 Test file analysis workflow
-- [x] 5.6.38 Test code generation streaming
-- [x] 5.6.39 Test chat-focused interface workflow
-- [x] 5.6.40 Test panel visibility toggling
-- [ ] 5.6.41 Test concurrent operations
-- [ ] 5.6.42 Test reconnection after disconnect
-- [ ] 5.6.43 Test state persistence
+- [x] 5.3.35 Test full TUI startup and initialization
+- [x] 5.3.36 Test Phoenix channel communication
+- [x] 5.3.37 Test file analysis workflow
+- [x] 5.3.38 Test code generation streaming
+- [x] 5.3.39 Test chat-focused interface workflow
+- [x] 5.3.40 Test panel visibility toggling
+- [ ] 5.3.41 Test concurrent operations
+- [ ] 5.3.42 Test reconnection after disconnect
+- [ ] 5.3.43 Test state persistence
 
 #### Implementation Highlights:
 
@@ -822,26 +360,26 @@ Create tests in `tui/test/integration_test.go` to verify:
 
 See `tui/notes/features/001-chat-focused-interface.md` for detailed implementation documentation.
 
-### 5.7 System Error Handling Enhancement ✅ Completed
+### 5.4 System Error Handling Enhancement ✅ Completed
 
 Implement comprehensive error handling and reporting system improvements to ensure robust system operation.
 
 **Status**: Successfully implemented Tower error reporting configuration fixes and system stability improvements.
 
 #### Tasks:
-- [x] 5.7.1 Fix Tower error reporting configuration:
-  - [x] 5.7.1.1 Correct Tower reporter configuration format in dev.exs and prod.exs
-  - [x] 5.7.1.2 Change from keyword list to map format for reporters
-  - [x] 5.7.1.3 Use correct Tower.EphemeralReporter instead of non-existent Tower.LogReporter
-  - [x] 5.7.1.4 Move reporter-specific options to separate config blocks
-- [x] 5.7.2 Create comprehensive error testing:
-  - [x] 5.7.2.1 Add test to validate Tower configuration format
-  - [x] 5.7.2.2 Ensure reporters are configured as module atoms
-  - [x] 5.7.2.3 Verify reporter module availability
-- [x] 5.7.3 Improve system stability:
-  - [x] 5.7.3.1 Fix command processor startup in application supervision tree
-  - [x] 5.7.3.2 Resolve JSON encoding issues in CLI channels
-  - [x] 5.7.3.3 Add proper error handling for double JSON encoding
+- [x] 5.4.1 Fix Tower error reporting configuration:
+  - [x] 5.4.1.1 Correct Tower reporter configuration format in dev.exs and prod.exs
+  - [x] 5.4.1.2 Change from keyword list to map format for reporters
+  - [x] 5.4.1.3 Use correct Tower.EphemeralReporter instead of non-existent Tower.LogReporter
+  - [x] 5.4.1.4 Move reporter-specific options to separate config blocks
+- [x] 5.4.2 Create comprehensive error testing:
+  - [x] 5.4.2.1 Add test to validate Tower configuration format
+  - [x] 5.4.2.2 Ensure reporters are configured as module atoms
+  - [x] 5.4.2.3 Verify reporter module availability
+- [x] 5.4.3 Improve system stability:
+  - [x] 5.4.3.1 Fix command processor startup in application supervision tree
+  - [x] 5.4.3.2 Resolve JSON encoding issues in CLI channels
+  - [x] 5.4.3.3 Add proper error handling for double JSON encoding
 
 #### Implementation Details:
 
@@ -868,19 +406,19 @@ config :tower,
 
 See `notes/fixes/001-tower-reporter-configuration.md` for detailed fix documentation.
 
-### 5.8 Phase 5 Integration Tests
+### 5.5 Phase 5 Integration Tests
 
 Create comprehensive integration tests in `test/integration/phase_5_test.exs` to verify:
-- [ ] 5.8.1 Test LiveView and Channel coordination
-- [ ] 5.8.2 Test CLI triggers real-time updates
-- [ ] 5.8.3 Test settings sync across interfaces
-- [ ] 5.8.4 Test analysis results consistency
-- [ ] 5.8.5 Test multiple concurrent WebSocket connections
-- [ ] 5.8.6 Test LiveView rapid update handling
-- [ ] 5.8.7 Test TUI state management with chat interface
-- [ ] 5.8.8 Test dynamic LLM configuration across all interfaces
-- [ ] 5.8.9 Test unified command system consistency
-- [ ] 5.8.10 Test error handling and recovery mechanisms
+- [ ] 5.5.1 Test LiveView and Channel coordination
+- [ ] 5.5.2 Test CLI triggers real-time updates
+- [ ] 5.5.3 Test settings sync across interfaces
+- [ ] 5.5.4 Test analysis results consistency
+- [ ] 5.5.5 Test multiple concurrent WebSocket connections
+- [ ] 5.5.6 Test LiveView rapid update handling
+- [ ] 5.5.7 Test TUI state management with chat interface
+- [ ] 5.5.8 Test dynamic LLM configuration across all interfaces
+- [ ] 5.5.9 Test unified command system consistency
+- [ ] 5.5.10 Test error handling and recovery mechanisms
 
 ---
 
@@ -1077,10 +615,10 @@ Optimize performance with ETS configurations and implement comprehensive securit
   - [ ] 6.5.3.3 Session management
   - [ ] 6.5.3.4 Multi-factor support
 - [ ] 6.5.4 Create encryption layer:
-  - [ ] 6.5.4.1 AES-256-GCM implementation
-  - [ ] 6.5.4.2 Key rotation system
-  - [ ] 6.5.4.3 Encrypted storage
-  - [ ] 6.5.4.4 Secure transmission
+  - [ ] 6.5.2.1 AES-256-GCM implementation
+  - [ ] 6.5.2.2 Key rotation system
+  - [ ] 6.5.2.3 Encrypted storage
+  - [ ] 6.5.2.4 Secure transmission
 - [ ] 6.5.5 Build monitoring infrastructure:
   - [ ] 6.5.5.1 Telemetry events
   - [ ] 6.5.5.2 Metrics aggregation
