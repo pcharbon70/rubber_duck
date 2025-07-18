@@ -5,9 +5,13 @@ defmodule RubberDuck.MCP.Bridge do
   Translates MCP requests into RubberDuck tool executions and converts
   the results back to MCP format. Also exposes RubberDuck's resources
   and prompts through the MCP interface.
+  
+  Enhanced with ToolAdapter for comprehensive tool metadata, parameter
+  transformation, progress reporting, and error handling.
   """
   
-  alias RubberDuck.Tool.{Registry, Executor}
+  alias RubberDuck.Tool.Registry
+  alias RubberDuck.MCP.ToolAdapter
   alias RubberDuck.Workspace
   
   require Logger
@@ -15,12 +19,20 @@ defmodule RubberDuck.MCP.Bridge do
   # Tool-related functions
   
   @doc """
-  Lists available tools in MCP format.
+  Lists available tools in MCP format with enhanced metadata.
   """
   def list_tools do
     case Registry.list_all() do
       tools when is_list(tools) ->
-        mcp_tools = Enum.map(tools, &convert_tool_to_mcp/1)
+        # Use ToolAdapter for comprehensive conversion
+        mcp_tools = tools
+        |> Enum.map(fn tool -> 
+          # Get the actual module from the tool record
+          module = Map.get(tool, :module) || tool
+          ToolAdapter.convert_tool_to_mcp(module)
+        end)
+        |> Enum.reject(&is_nil/1)
+        
         %{"tools" => mcp_tools}
         
       _ ->
@@ -30,44 +42,21 @@ defmodule RubberDuck.MCP.Bridge do
   end
   
   @doc """
-  Executes a tool by name with the given arguments.
+  Executes a tool by name with enhanced parameter handling and progress reporting.
   """
   def execute_tool(tool_name, arguments, context) do
-    case Registry.get(tool_name) do
-      {:ok, tool_module} ->
-        # Convert MCP arguments to tool params
-        params = convert_mcp_arguments(arguments, tool_module)
+    # Use ToolAdapter for comprehensive execution handling
+    case ToolAdapter.map_mcp_call(tool_name, arguments, context) do
+      {:ok, result} ->
+        result
         
-        # Execute through RubberDuck's tool system
-        case Executor.execute(tool_module, params, context) do
-          {:ok, result} ->
-            %{
-              "content" => [
-                %{
-                  "type" => "text",
-                  "text" => format_tool_result(result)
-                }
-              ]
-            }
-            
-          {:error, error} ->
-            %{
-              "content" => [
-                %{
-                  "type" => "text", 
-                  "text" => "Tool execution failed: #{inspect(error)}"
-                }
-              ],
-              "isError" => true
-            }
-        end
-        
-      {:error, :not_found} ->
+      {:error, error} ->
+        # Error is already formatted by ToolAdapter
         %{
           "content" => [
             %{
-              "type" => "text",
-              "text" => "Tool not found: #{tool_name}"
+              "type" => "text", 
+              "text" => "Tool execution failed: #{inspect(error)}"
             }
           ],
           "isError" => true
@@ -92,6 +81,10 @@ defmodule RubberDuck.MCP.Bridge do
     memory_resources = list_memory_resources()
     resources = resources ++ memory_resources
     
+    # Add tool resources
+    tool_resources = list_tool_resources()
+    resources = resources ++ tool_resources
+    
     # Apply cursor-based pagination if requested
     resources = apply_pagination(resources, params)
     
@@ -108,6 +101,9 @@ defmodule RubberDuck.MCP.Bridge do
         
       {:ok, {:memory, type, id}} ->
         read_memory_resource(type, id, context)
+        
+      {:ok, {:tool, tool_name, resource_type}} ->
+        read_tool_resource(tool_name, resource_type, context)
         
       {:error, :invalid_uri} ->
         %{
@@ -128,8 +124,15 @@ defmodule RubberDuck.MCP.Bridge do
   Lists available prompts.
   """
   def list_prompts do
-    # Define some built-in prompts
-    prompts = [
+    # Get tool-specific prompts from all registered tools
+    tool_prompts = Registry.list_all()
+    |> Enum.flat_map(fn tool ->
+      module = Map.get(tool, :module) || tool
+      ToolAdapter.prompt_templates(module)
+    end)
+    
+    # Add built-in prompts
+    built_in_prompts = [
       %{
         "name" => "analyze_code",
         "description" => "Analyze code for issues and improvements",
@@ -180,7 +183,7 @@ defmodule RubberDuck.MCP.Bridge do
       }
     ]
     
-    %{"prompts" => prompts}
+    %{"prompts" => built_in_prompts ++ tool_prompts}
   end
   
   @doc """
@@ -208,67 +211,6 @@ defmodule RubberDuck.MCP.Bridge do
   end
   
   # Private functions
-  
-  defp convert_tool_to_mcp(tool) do
-    %{
-      "name" => tool.name,
-      "description" => tool.description || "No description available",
-      "inputSchema" => build_tool_schema(tool)
-    }
-  end
-  
-  defp build_tool_schema(tool) do
-    # Convert tool parameters to JSON Schema
-    properties = case tool[:parameters] do
-      nil -> %{}
-      params when is_list(params) ->
-        Enum.reduce(params, %{}, fn param, acc ->
-          Map.put(acc, to_string(param.name), %{
-            "type" => parameter_type_to_json_type(param.type),
-            "description" => param.description || ""
-          })
-        end)
-      _ -> %{}
-    end
-    
-    required = case tool[:parameters] do
-      nil -> []
-      params when is_list(params) ->
-        params
-        |> Enum.filter(& &1.required)
-        |> Enum.map(& to_string(&1.name))
-      _ -> []
-    end
-    
-    %{
-      "type" => "object",
-      "properties" => properties,
-      "required" => required
-    }
-  end
-  
-  defp parameter_type_to_json_type(:string), do: "string"
-  defp parameter_type_to_json_type(:integer), do: "integer"
-  defp parameter_type_to_json_type(:float), do: "number"
-  defp parameter_type_to_json_type(:boolean), do: "boolean"
-  defp parameter_type_to_json_type(:map), do: "object"
-  defp parameter_type_to_json_type(:list), do: "array"
-  defp parameter_type_to_json_type(_), do: "string"
-  
-  defp convert_mcp_arguments(arguments, _tool_module) do
-    # For now, pass arguments through directly
-    # In future, could use tool module metadata for conversion
-    arguments
-  end
-  
-  defp format_tool_result(result) when is_binary(result), do: result
-  defp format_tool_result(result) when is_map(result) do
-    case Jason.encode(result, pretty: true) do
-      {:ok, json} -> json
-      _ -> inspect(result)
-    end
-  end
-  defp format_tool_result(result), do: inspect(result)
   
   defp list_workspace_resources do
     case Workspace.list_projects(%{}) do
@@ -320,6 +262,9 @@ defmodule RubberDuck.MCP.Bridge do
         
       %URI{scheme: "memory", host: type, path: "/" <> id} ->
         {:ok, {:memory, type, id}}
+        
+      %URI{scheme: "tool", host: tool_name, path: "/" <> resource_type} ->
+        {:ok, {:tool, tool_name, resource_type}}
         
       _ ->
         {:error, :invalid_uri}
@@ -430,4 +375,79 @@ defmodule RubberDuck.MCP.Bridge do
   end
   
   defp build_prompt_messages(_), do: []
+  
+  defp list_tool_resources do
+    Registry.list_all()
+    |> Enum.flat_map(fn tool ->
+      module = Map.get(tool, :module) || tool
+      ToolAdapter.discover_tool_resources(module)
+    end)
+  end
+  
+  defp read_tool_resource(tool_name, resource_type, _context) do
+    case Registry.get(String.to_atom(tool_name)) do
+      {:ok, tool_module} ->
+        case resource_type do
+          "documentation" ->
+            metadata = tool_module.__tool__(:metadata)
+            %{
+              "contents" => [
+                %{
+                  "uri" => "tool://#{tool_name}/documentation",
+                  "mimeType" => "text/markdown",
+                  "text" => metadata.description || "No documentation available"
+                }
+              ]
+            }
+            
+          "schema" ->
+            metadata = tool_module.__tool__(:metadata)
+            schema = ToolAdapter.parameter_schema_to_mcp(metadata.parameters)
+            %{
+              "contents" => [
+                %{
+                  "uri" => "tool://#{tool_name}/schema",
+                  "mimeType" => "application/schema+json",
+                  "text" => Jason.encode!(schema, pretty: true)
+                }
+              ]
+            }
+            
+          "examples" ->
+            metadata = tool_module.__tool__(:metadata)
+            examples = metadata.examples || []
+            %{
+              "contents" => [
+                %{
+                  "uri" => "tool://#{tool_name}/examples",
+                  "mimeType" => "application/json",
+                  "text" => Jason.encode!(examples, pretty: true)
+                }
+              ]
+            }
+            
+          _ ->
+            %{
+              "contents" => [
+                %{
+                  "type" => "text",
+                  "text" => "Unknown resource type: #{resource_type}"
+                }
+              ],
+              "isError" => true
+            }
+        end
+        
+      _ ->
+        %{
+          "contents" => [
+            %{
+              "type" => "text",
+              "text" => "Tool not found: #{tool_name}"
+            }
+          ],
+          "isError" => true
+        }
+    end
+  end
 end
