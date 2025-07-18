@@ -742,7 +742,7 @@ defmodule RubberDuck.Tool.Monitoring do
     
     errors = :ets.select(:tool_execution_history, [
       {{{:"$1", :"$2", :"$3"}, :"$4"},
-       [{:andalso, {:>, :"$1", since}, {:"==", {:"$4", :event}, :failed}}],
+       [{:andalso, {:>, :"$1", since}, {:==, {:map_get, :event, :"$4"}, :failed}}],
        [:"$4"]}
     ])
     
