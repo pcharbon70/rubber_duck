@@ -68,10 +68,10 @@ defmodule RubberDuck.Instructions.SecurityMonitor do
   
   def init(opts) do
     # Initialize ETS tables
-    :ets.new(:security_events, [:bag, :public, :named_table])
-    :ets.new(:user_profiles, [:set, :public, :named_table])
-    :ets.new(:anomaly_baselines, [:set, :public, :named_table])
-    :ets.new(:active_alerts, [:set, :public, :named_table])
+    ensure_table(:security_events, [:bag, :public, :named_table])
+    ensure_table(:user_profiles, [:set, :public, :named_table])
+    ensure_table(:anomaly_baselines, [:set, :public, :named_table])
+    ensure_table(:active_alerts, [:set, :public, :named_table])
     
     # Schedule cleanup
     schedule_cleanup()
@@ -403,6 +403,13 @@ defmodule RubberDuck.Instructions.SecurityMonitor do
     Process.send_after(self(), :cleanup, cleanup_interval)
   end
   
+  defp ensure_table(name, opts) do
+    case :ets.whereis(name) do
+      :undefined -> :ets.new(name, opts)
+      _tid -> name
+    end
+  end
+
   defp emit_security_event(event_type, metadata) do
     :telemetry.execute(
       [:rubber_duck, :instructions, :security, :event],

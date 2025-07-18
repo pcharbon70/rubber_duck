@@ -1,172 +1,244 @@
 defmodule RubberDuck.MCP.ServerTest do
   use ExUnit.Case, async: true
   
-  alias RubberDuck.MCP.Server
-  alias RubberDuck.MCP.Server.State
-  alias Hermes.Server.Frame
+  alias RubberDuck.MCP.{Server, Protocol}
   
-  @moduletag :mcp_server
-  
-  describe "server lifecycle" do
-    test "initializes with default configuration" do
-      opts = []
-      frame = Hermes.Server.Frame.new()
-      
-      assert {:ok, frame} = Server.init(opts, frame)
-      
-      state = frame.assigns[:server_state]
-      assert %State{} = state
-      assert state.transport == :stdio
-      assert state.request_count == 0
-      assert MapSet.size(state.active_sessions) == 0
+  defmodule MockTransport do
+    use GenServer
+    
+    @behaviour RubberDuck.MCP.Transport
+    
+    def start_link(opts) do
+      GenServer.start_link(__MODULE__, opts)
     end
     
-    test "initializes with custom configuration" do
-      opts = [
-        transport: :streamable_http,
-        tool_filter: fn name -> String.starts_with?(name, "allowed_") end,
-        resource_filter: fn uri -> not String.contains?(uri, "secret") end
-      ]
-      frame = Hermes.Server.Frame.new()
-      
-      assert {:ok, frame} = Server.init(opts, frame)
-      
-      state = frame.assigns[:server_state]
-      assert state.transport == :streamable_http
-      assert is_function(state.tool_filter, 1)
-      assert is_function(state.resource_filter, 1)
-    end
-  end
-  
-  describe "notification handling" do
-    setup do
-      frame = Hermes.Server.Frame.new()
-      {:ok, frame} = Server.init([], frame)
-      {:ok, frame: frame}
+    def init(opts) do
+      parent = Keyword.fetch!(opts, :parent)
+      {:ok, %{parent: parent, messages: [], connections: %{}}}
     end
     
-    test "handles cancellation notifications", %{frame: frame} do
-      notification = %{
-        "method" => "notifications/cancelled",
-        "params" => %{"requestId" => "req_123"}
+    @impl RubberDuck.MCP.Transport
+    def subscribe(_transport), do: :ok
+    
+    @impl RubberDuck.MCP.Transport
+    def send_message(transport, connection_id, message) do
+      GenServer.call(transport, {:send_message, connection_id, message})
+    end
+    
+    @impl RubberDuck.MCP.Transport
+    def close_connection(transport, connection_id) do
+      GenServer.call(transport, {:close_connection, connection_id})
+    end
+    
+    @impl RubberDuck.MCP.Transport
+    def stop(transport) do
+      GenServer.stop(transport)
+    end
+    
+    @impl RubberDuck.MCP.Transport
+    def list_connections(transport) do
+      GenServer.call(transport, :list_connections)
+    end
+    
+    # Test helpers
+    def simulate_connection(transport, connection_id \\ nil) do
+      GenServer.call(transport, {:simulate_connection, connection_id})
+    end
+    
+    def simulate_message(transport, connection_id, message) do
+      GenServer.call(transport, {:simulate_message, connection_id, message})
+    end
+    
+    def get_sent_messages(transport) do
+      GenServer.call(transport, :get_sent_messages)
+    end
+    
+    # GenServer callbacks
+    def handle_call({:send_message, connection_id, message}, _from, state) do
+      messages = [{connection_id, message} | state.messages]
+      {:reply, :ok, %{state | messages: messages}}
+    end
+    
+    def handle_call({:close_connection, connection_id}, _from, state) do
+      connections = Map.delete(state.connections, connection_id)
+      {:reply, :ok, %{state | connections: connections}}
+    end
+    
+    def handle_call(:list_connections, _from, state) do
+      connections = Map.values(state.connections)
+      {:reply, {:ok, connections}, state}
+    end
+    
+    def handle_call({:simulate_connection, connection_id}, _from, state) do
+      id = connection_id || RubberDuck.MCP.Transport.generate_connection_id()
+      connection_info = %{
+        id: id,
+        remote_info: %{type: "test"},
+        connected_at: DateTime.utc_now()
       }
       
-      assert {:noreply, _frame} = Server.handle_notification(notification, frame)
+      send(state.parent, {:transport_connected, connection_info})
+      connections = Map.put(state.connections, id, connection_info)
+      
+      {:reply, {:ok, id}, %{state | connections: connections}}
     end
     
-    test "handles log level notifications", %{frame: frame} do
-      notification = %{
-        "method" => "logging/setLevel",
-        "params" => %{"level" => "debug"}
-      }
-      
-      assert {:noreply, updated_frame} = Server.handle_notification(notification, frame)
-      # Verify log level was updated in frame
+    def handle_call({:simulate_message, connection_id, message}, _from, state) do
+      send(state.parent, {:transport_message, connection_id, message})
+      {:reply, :ok, state}
     end
     
-    test "handles unknown notifications gracefully", %{frame: frame} do
-      notification = %{
-        "method" => "unknown/method",
-        "params" => %{}
-      }
-      
-      assert {:noreply, _frame} = Server.handle_notification(notification, frame)
+    def handle_call(:get_sent_messages, _from, state) do
+      {:reply, Enum.reverse(state.messages), state}
     end
   end
   
-  describe "server_info/0" do
-    test "returns correct server information" do
-      info = Server.server_info()
+  setup do
+    {:ok, server} = Server.start_link(
+      transport: MockTransport,
+      transport_opts: [],
+      name: nil
+    )
+    
+    transport = :sys.get_state(server).transport
+    
+    {:ok, server: server, transport: transport}
+  end
+  
+  describe "connection lifecycle" do
+    test "accepts new connections", %{server: server, transport: transport} do
+      # Simulate a new connection
+      {:ok, conn_id} = MockTransport.simulate_connection(transport)
       
-      assert info["name"] == "RubberDuck AI Assistant"
-      assert info["version"] == "0.1.0"
+      # Connection should be accepted
+      assert {:ok, status} = Server.status(server)
+      assert status.active_sessions == 0  # Not yet initialized
+    end
+    
+    test "requires initialization before other messages", %{transport: transport} do
+      # Simulate connection
+      {:ok, conn_id} = MockTransport.simulate_connection(transport)
+      
+      # Send non-initialization message
+      request = Protocol.build_request(1, "tools/list")
+      MockTransport.simulate_message(transport, conn_id, request)
+      
+      # Should receive error response
+      Process.sleep(50)  # Give time to process
+      messages = MockTransport.get_sent_messages(transport)
+      
+      assert [{^conn_id, response}] = messages
+      assert response["error"]["code"] == -32600  # Invalid request
+      assert response["error"]["message"] =~ "Must initialize"
+    end
+    
+    test "handles initialization correctly", %{server: server, transport: transport} do
+      # Simulate connection
+      {:ok, conn_id} = MockTransport.simulate_connection(transport)
+      
+      # Send initialization
+      init_request = Protocol.build_request(1, "initialize", %{
+        "protocolVersion" => "2024-11-05",
+        "clientInfo" => %{
+          "name" => "Test Client",
+          "version" => "1.0.0"
+        }
+      })
+      
+      MockTransport.simulate_message(transport, conn_id, init_request)
+      
+      # Should receive initialization response
+      Process.sleep(50)
+      messages = MockTransport.get_sent_messages(transport)
+      
+      assert [{^conn_id, response}] = messages
+      assert response["id"] == 1
+      assert response["result"]["protocolVersion"] == "2024-11-05"
+      assert response["result"]["capabilities"]
+      assert response["result"]["serverInfo"]["name"] == "RubberDuck MCP Server"
+      
+      # Now we should have an active session
+      assert {:ok, status} = Server.status(server)
+      assert status.active_sessions == 1
+    end
+    
+    test "rejects incompatible protocol versions", %{transport: transport} do
+      # Simulate connection
+      {:ok, conn_id} = MockTransport.simulate_connection(transport)
+      
+      # Send initialization with wrong version
+      init_request = Protocol.build_request(1, "initialize", %{
+        "protocolVersion" => "1.0.0",
+        "clientInfo" => %{"name" => "Test Client"}
+      })
+      
+      MockTransport.simulate_message(transport, conn_id, init_request)
+      
+      # Should receive error
+      Process.sleep(50)
+      messages = MockTransport.get_sent_messages(transport)
+      
+      assert [{^conn_id, response}] = messages
+      assert response["error"]["code"] == -32602  # Invalid params
+      assert response["error"]["message"] =~ "Incompatible protocol version"
     end
   end
   
-  describe "server_capabilities/0" do
-    test "returns all enabled capabilities" do
-      capabilities = Server.server_capabilities()
+  describe "session management" do
+    test "lists active sessions", %{server: server, transport: transport} do
+      # Create multiple sessions
+      {:ok, conn1} = MockTransport.simulate_connection(transport)
+      {:ok, conn2} = MockTransport.simulate_connection(transport)
       
-      assert Map.has_key?(capabilities, "tools")
-      assert Map.has_key?(capabilities, "resources")
-      assert Map.has_key?(capabilities, "prompts")
-      assert Map.has_key?(capabilities, "logging")
+      # Initialize both
+      init_request = Protocol.build_request(1, "initialize", %{
+        "protocolVersion" => "2024-11-05"
+      })
+      
+      MockTransport.simulate_message(transport, conn1, init_request)
+      MockTransport.simulate_message(transport, conn2, init_request)
+      
+      Process.sleep(50)
+      
+      # List sessions
+      assert {:ok, sessions} = Server.list_sessions(server)
+      assert length(sessions) == 2
+      assert Enum.all?(sessions, fn s -> s.id in [conn1, conn2] end)
+    end
+    
+    test "handles session disconnection", %{server: server, transport: transport} do
+      # Create and initialize session
+      {:ok, conn_id} = MockTransport.simulate_connection(transport)
+      
+      init_request = Protocol.build_request(1, "initialize", %{
+        "protocolVersion" => "2024-11-05"
+      })
+      
+      MockTransport.simulate_message(transport, conn_id, init_request)
+      Process.sleep(50)
+      
+      # Verify session exists
+      assert {:ok, status} = Server.status(server)
+      assert status.active_sessions == 1
+      
+      # Simulate disconnect
+      send(server, {:transport_disconnected, conn_id, :closed})
+      Process.sleep(50)
+      
+      # Session should be removed
+      assert {:ok, status} = Server.status(server)
+      assert status.active_sessions == 0
     end
   end
   
-  describe "state management" do
-    setup do
-      frame = Hermes.Server.Frame.new()
-      {:ok, frame} = Server.init([], frame)
-      state = frame.assigns[:server_state]
-      {:ok, state: state, frame: frame}
-    end
-    
-    test "records requests", %{state: state} do
-      updated_state = State.record_request(state)
+  describe "graceful shutdown" do
+    test "handles shutdown request", %{server: server} do
+      # Request shutdown
+      assert :ok = Server.shutdown(server)
       
-      assert updated_state.request_count == 1
-      assert updated_state.last_activity != nil
-    end
-    
-    test "manages sessions", %{state: state} do
-      state = State.add_session(state, "session_123")
-      assert MapSet.member?(state.active_sessions, "session_123")
-      
-      state = State.remove_session(state, "session_123")
-      refute MapSet.member?(state.active_sessions, "session_123")
-    end
-    
-    test "calculates uptime", %{state: state} do
-      # Create a state with a start time in the past
-      state_with_start = %{state | start_time: System.monotonic_time(:second) - 1}
-      
-      uptime = State.uptime(state_with_start)
-      assert uptime >= 1
-    end
-    
-    test "applies tool filters", %{state: state} do
-      # Without filter
-      assert State.tool_allowed?(state, "any_tool")
-      
-      # With filter
-      filter = fn name -> String.starts_with?(name, "allowed_") end
-      state = %{state | tool_filter: filter}
-      
-      assert State.tool_allowed?(state, "allowed_tool")
-      refute State.tool_allowed?(state, "forbidden_tool")
-    end
-    
-    test "applies resource filters", %{state: state} do
-      # Without filter
-      assert State.resource_allowed?(state, "any://resource")
-      
-      # With filter
-      filter = fn uri -> not String.contains?(uri, "secret") end
-      state = %{state | resource_filter: filter}
-      
-      assert State.resource_allowed?(state, "public://data")
-      refute State.resource_allowed?(state, "secret://data")
-    end
-  end
-  
-  describe "transport configuration" do
-    setup do
-      # Ensure Hermes.Server.Registry is started
-      start_supervised!(Hermes.Server.Registry)
-      :ok
-    end
-    
-    test "starts with STDIO transport" do
-      assert {:ok, _pid} = Server.start_link(transport: :stdio)
-    end
-    
-    @tag :skip
-    test "starts with StreamableHTTP transport" do
-      assert {:ok, _pid} = Server.start_link(
-        transport: :streamable_http,
-        port: 8081
-      )
+      # Server should be marked as shutting down
+      assert {:ok, status} = Server.status(server)
+      assert status.shutdown_requested == true
     end
   end
 end
