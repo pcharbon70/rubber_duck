@@ -57,8 +57,7 @@ defmodule RubberDuck.Tool.Security.Sandbox do
     monitor_pid = spawn_monitor_process(limits)
     
     # Spawn the sandboxed process
-    spawn_opts = [
-      :monitor,
+    _spawn_opts = [
       max_heap_size: limits.max_heap_size,
       message_queue_data: :off_heap  # Reduce memory pressure
     ]
@@ -70,7 +69,7 @@ defmodule RubberDuck.Tool.Security.Sandbox do
       
       # Execute with reduction checking
       execute_with_limits(fun, limits)
-    end, spawn_opts)
+    end)
     
     # Monitor the sandboxed process
     monitor_sandbox(sandbox_pid, monitor_ref, monitor_pid, limits)

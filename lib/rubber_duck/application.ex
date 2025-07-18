@@ -60,6 +60,8 @@ defmodule RubberDuck.Application do
       RubberDuck.Tool.Monitoring,
       RubberDuck.Tool.Monitoring.Dashboard,
       RubberDuck.Tool.Telemetry.Poller,
+      # Composition workflow monitoring
+      RubberDuck.Tool.Composition.Metrics,
       # Tool registry (required by integration bridge)
       RubberDuck.Tool.Registry,
       # Tool integration bridge components
