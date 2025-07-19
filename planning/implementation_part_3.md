@@ -1,6 +1,6 @@
-# RubberDuck Implementation Plan - Part 3 (Phases 8-10)
+# RubberDuck Implementation Plan - Part 3 (Phases 8-11)
 
-This document contains the detailed implementation plans for Phases 8-10 of the RubberDuck project. For the overall project status and earlier phases, see:
+This document contains the detailed implementation plans for Phases 8-11 of the RubberDuck project. For the overall project status and earlier phases, see:
 - [Main implementation plan](implementation_plan.md) - Overview and status
 - [Part 1](implementation_part_1.md) - Phases 1-4 (Foundation through Workflow Orchestration)
 - [Part 2](implementation_part_2.md) - Phases 5-7 (Real-time Communication through Planning System)
@@ -8,7 +8,8 @@ This document contains the detailed implementation plans for Phases 8-10 of the 
 ## Table of Contents
 8. [Phase 8: Instruction Templating System](#phase-8-instruction-templating-system)
 9. [Phase 9: LLM Tool Definition System](#phase-9-llm-tool-definition-system)
-10. [Phase 10: Advanced Features & Production Readiness](#phase-10-advanced-features--production-readiness)
+10. [Phase 10: Real-Time Status Messaging System](#phase-10-real-time-status-messaging-system)
+11. [Phase 11: Advanced Features & Production Readiness](#phase-11-advanced-features--production-readiness)
 
 ---
 
@@ -705,259 +706,503 @@ Create comprehensive integration tests in `test/integration/phase_9_test.exs` to
 
 ---
 
-## Phase 10: Advanced Features & Production Readiness
+## Phase 10: Real-Time Status Messaging System
+
+This phase implements a high-performance, non-blocking status messaging system that provides real-time visibility into conversation processing without impacting system performance. The system leverages Phoenix Channels, PubSub, and GenServer-based queuing for ephemeral status updates.
+
+### 10.1 Core Status Broadcasting Infrastructure
+
+Build the foundation for asynchronous, non-blocking status message broadcasting with intelligent batching and queue management.
+
+#### Tasks:
+- [ ] 11.1.1 Create `RubberDuck.StatusBroadcaster` GenServer:
+  - [ ] 11.1.1.1 Implement message queue with configurable size limits
+  - [ ] 11.1.1.2 Build batch processing with configurable batch size
+  - [ ] 11.1.1.3 Add periodic flush timer mechanism
+  - [ ] 11.1.1.4 Create overflow handling with message dropping
+- [ ] 11.1.2 Implement queue management:
+  - [ ] 11.1.2.1 Use Erlang `:queue` for efficient FIFO operations
+  - [ ] 11.1.2.2 Track queue size for overflow prevention
+  - [ ] 11.1.2.3 Implement backpressure monitoring
+  - [ ] 11.1.2.4 Add queue metrics collection
+- [ ] 11.1.3 Build message batching system:
+  - [ ] 11.1.3.1 Group messages by conversation and category
+  - [ ] 11.1.3.2 Implement efficient batch processing
+  - [ ] 11.1.3.3 Add batch size optimization
+  - [ ] 11.1.3.4 Create batch timing controls
+- [ ] 11.1.4 Create async task execution:
+  - [ ] 11.1.4.1 Use Task.Supervisor for broadcast tasks
+  - [ ] 11.1.4.2 Implement task monitoring and cleanup
+  - [ ] 11.1.4.3 Add failure isolation
+  - [ ] 11.1.4.4 Build task metrics tracking
+- [ ] 11.1.5 Implement PubSub broadcasting:
+  - [ ] 11.1.5.1 Create topic structure for efficient routing
+  - [ ] 11.1.5.2 Add message formatting for consistency
+  - [ ] 11.1.5.3 Implement broadcast error handling
+  - [ ] 11.1.5.4 Build broadcast performance monitoring
+- [ ] 11.1.6 Add configuration management:
+  - [ ] 11.1.6.1 Queue size limits configuration
+  - [ ] 11.1.6.2 Batch size configuration
+  - [ ] 11.1.6.3 Flush interval configuration
+  - [ ] 11.1.6.4 Dynamic configuration updates
+- [ ] 11.1.7 Create telemetry integration
+- [ ] 11.1.8 Build graceful shutdown handling
+- [ ] 11.1.9 Implement queue persistence options
+- [ ] 11.1.10 Add distributed broadcasting support
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/status/broadcaster_test.exs` to verify:
+
+**Queue Management Tests**:
+- [ ] 11.1.11 Test message queuing under normal load
+- [ ] 11.1.12 Test queue overflow handling
+- [ ] 11.1.13 Test batch processing efficiency
+- [ ] 11.1.14 Test timer-based flushing
+- [ ] 11.1.15 Test concurrent message queueing
+- [ ] 11.1.16 Test graceful shutdown with pending messages
+
+**Broadcasting Tests**:
+- [ ] 11.1.17 Test message grouping by category
+- [ ] 11.1.18 Test PubSub topic generation
+- [ ] 11.1.19 Test broadcast error recovery
+- [ ] 11.1.20 Test distributed broadcasting
+- [ ] 11.1.21 Test message ordering preservation
+- [ ] 11.1.22 Test performance under high load
+
+### 11.2 Phoenix Channel Implementation
+
+Implement WebSocket channels for real-time status message delivery with category-based subscriptions and authorization.
+
+#### Tasks:
+- [ ] 11.2.1 Create `RubberDuckWeb.StatusChannel`:
+  - [ ] 11.2.1.1 Implement channel join with category selection
+  - [ ] 11.2.1.2 Add conversation-based authorization
+  - [ ] 11.2.1.3 Build subscription management
+  - [ ] 11.2.1.4 Create message forwarding from PubSub
+- [ ] 11.2.2 Implement category subscriptions:
+  - [ ] 11.2.2.1 Define allowed categories (engine, tool, workflow, progress, error, info)
+  - [ ] 11.2.2.2 Build dynamic subscription management
+  - [ ] 11.2.2.3 Add category validation
+  - [ ] 11.2.2.4 Create per-conversation category filtering
+- [ ] 11.2.3 Build authorization system:
+  - [ ] 11.2.3.1 Verify user access to conversation
+  - [ ] 11.2.3.2 Implement token-based authentication
+  - [ ] 11.2.3.3 Add rate limiting per connection
+  - [ ] 11.2.3.4 Create audit logging
+- [ ] 11.2.4 Create message handling:
+  - [ ] 11.2.4.1 Handle subscribe_category messages
+  - [ ] 11.2.4.2 Handle unsubscribe_category messages
+  - [ ] 11.2.4.3 Forward PubSub messages to WebSocket
+  - [ ] 11.2.4.4 Add message transformation
+- [ ] 11.2.5 Implement connection lifecycle:
+  - [ ] 11.2.5.1 Clean subscription tracking on join
+  - [ ] 11.2.5.2 Automatic cleanup on disconnect
+  - [ ] 11.2.5.3 Reconnection state management
+  - [ ] 11.2.5.4 Connection health monitoring
+- [ ] 11.2.6 Add channel presence tracking
+- [ ] 11.2.7 Build channel metrics collection
+- [ ] 11.2.8 Create channel error handling
+- [ ] 11.2.9 Implement message buffering for reconnection
+- [ ] 11.2.10 Add channel integration with UserSocket
+
+#### Unit Tests:
+Create tests in `test/rubber_duck_web/channels/status_channel_test.exs` to verify:
+
+**Channel Functionality Tests**:
+- [ ] 11.2.11 Test authorized channel join
+- [ ] 11.2.12 Test unauthorized access rejection
+- [ ] 11.2.13 Test category subscription management
+- [ ] 11.2.14 Test message forwarding from PubSub
+- [ ] 11.2.15 Test dynamic category updates
+- [ ] 11.2.16 Test connection lifecycle handling
+
+**Message Delivery Tests**:
+- [ ] 11.2.17 Test targeted message delivery
+- [ ] 11.2.18 Test category filtering accuracy
+- [ ] 11.2.19 Test message ordering
+- [ ] 11.2.20 Test high-frequency message handling
+- [ ] 11.2.21 Test reconnection state recovery
+- [ ] 11.2.22 Test concurrent subscriber handling
+
+### 11.3 System-Wide Integration
+
+Integrate the status messaging system throughout the RubberDuck application, adding status updates to all major processing components.
+
+#### Tasks:
+- [ ] 11.3.1 Create `RubberDuck.Status` API module:
+  - [ ] 11.3.1.1 Implement fire-and-forget update function
+  - [ ] 11.3.1.2 Add convenience functions by category
+  - [ ] 11.3.1.3 Build metadata standardization
+  - [ ] 11.3.1.4 Create consistent timestamp handling
+- [ ] 11.3.2 Integrate with LLM engines:
+  - [ ] 11.3.2.1 Add status updates to OpenAI engine
+  - [ ] 11.3.2.2 Add status updates to Ollama engine
+  - [ ] 11.3.2.3 Add status updates to mock engine
+  - [ ] 11.3.2.4 Standardize engine status metadata
+- [ ] 11.3.3 Integrate with tool system:
+  - [ ] 11.3.3.1 Add pre-execution status updates
+  - [ ] 11.3.3.2 Add execution progress updates
+  - [ ] 11.3.3.3 Add completion status updates
+  - [ ] 11.3.3.4 Include tool metadata in updates
+- [ ] 11.3.4 Integrate with workflow system:
+  - [ ] 11.3.4.1 Add workflow start/end updates
+  - [ ] 11.3.4.2 Add step transition updates
+  - [ ] 11.3.4.3 Add progress percentage tracking
+  - [ ] 11.3.4.4 Include workflow context in updates
+- [ ] 11.3.5 Integrate with conversation processing:
+  - [ ] 11.3.5.1 Add message processing updates
+  - [ ] 11.3.5.2 Add context building updates
+  - [ ] 11.3.5.3 Add response generation updates
+  - [ ] 11.3.5.4 Track conversation state changes
+- [ ] 11.3.6 Add error reporting integration
+- [ ] 11.3.7 Build progress tracking utilities
+- [ ] 11.3.8 Create status aggregation helpers
+- [ ] 11.3.9 Implement conditional status updates
+- [ ] 11.3.10 Add bulk status update support
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/status/integration_test.exs` to verify:
+
+**API Usage Tests**:
+- [ ] 11.3.11 Test fire-and-forget behavior
+- [ ] 11.3.12 Test category-specific functions
+- [ ] 11.3.13 Test metadata handling
+- [ ] 11.3.14 Test null conversation handling
+- [ ] 11.3.15 Test high-frequency update handling
+- [ ] 11.3.16 Test API error resilience
+
+**Integration Tests**:
+- [ ] 11.3.17 Test engine status updates
+- [ ] 11.3.18 Test tool execution updates
+- [ ] 11.3.19 Test workflow progress tracking
+- [ ] 11.3.20 Test conversation flow updates
+- [ ] 11.3.21 Test error propagation
+- [ ] 11.3.22 Test system-wide status flow
+
+### 11.4 Monitoring and Performance Optimization
+
+Implement comprehensive monitoring, metrics collection, and performance optimization for the status messaging system.
+
+#### Tasks:
+- [ ] 11.4.1 Add telemetry events:
+  - [ ] 11.4.1.1 Message queuing metrics
+  - [ ] 11.4.1.2 Batch processing metrics
+  - [ ] 11.4.1.3 Broadcast latency tracking
+  - [ ] 11.4.1.4 Channel subscription metrics
+- [ ] 11.4.2 Create performance dashboards:
+  - [ ] 11.4.2.1 Queue depth visualization
+  - [ ] 11.4.2.2 Message throughput graphs
+  - [ ] 11.4.2.3 Latency distribution charts
+  - [ ] 11.4.2.4 Category usage statistics
+- [ ] 11.4.3 Implement optimization strategies:
+  - [ ] 11.4.3.1 Dynamic batch sizing
+  - [ ] 11.4.3.2 Adaptive flush intervals
+  - [ ] 11.4.3.3 Message compression options
+  - [ ] 11.4.3.4 Topic sharding for scale
+- [ ] 11.4.4 Build monitoring alerts:
+  - [ ] 11.4.4.1 Queue overflow alerts
+  - [ ] 11.4.4.2 High latency warnings
+  - [ ] 11.4.4.3 Channel error tracking
+  - [ ] 11.4.4.4 System health indicators
+- [ ] 11.4.5 Add debugging tools:
+  - [ ] 11.4.5.1 Message tracing capability
+  - [ ] 11.4.5.2 Channel state inspection
+  - [ ] 11.4.5.3 Queue state dumping
+  - [ ] 11.4.5.4 Performance profiling hooks
+- [ ] 11.4.6 Create load testing framework
+- [ ] 11.4.7 Build capacity planning tools
+- [ ] 11.4.8 Add A/B testing support
+- [ ] 11.4.9 Implement SLA monitoring
+- [ ] 11.4.10 Create optimization documentation
+
+#### Unit Tests:
+Create tests in `test/rubber_duck/status/monitoring_test.exs` to verify:
+
+**Metrics Collection Tests**:
+- [ ] 11.4.11 Test telemetry event emission
+- [ ] 11.4.12 Test metric accuracy
+- [ ] 11.4.13 Test metric aggregation
+- [ ] 11.4.14 Test performance overhead
+- [ ] 11.4.15 Test metric persistence
+- [ ] 11.4.16 Test dashboard data generation
+
+**Optimization Tests**:
+- [ ] 11.4.17 Test dynamic batch sizing
+- [ ] 11.4.18 Test adaptive intervals
+- [ ] 11.4.19 Test compression benefits
+- [ ] 11.4.20 Test sharding effectiveness
+- [ ] 11.4.21 Test load balancing
+- [ ] 11.4.22 Test optimization stability
+
+### 11.5 Phase 11 Integration Tests
+
+Create comprehensive integration tests in `test/integration/phase_11_test.exs` to verify:
+- [ ] 11.5.1 Test end-to-end status flow from engine to WebSocket
+- [ ] 11.5.2 Test system behavior under sustained high load
+- [ ] 11.5.3 Test multiple concurrent conversations
+- [ ] 11.5.4 Test category-based filtering accuracy
+- [ ] 11.5.5 Test graceful degradation under overload
+- [ ] 11.5.6 Test reconnection and state recovery
+- [ ] 11.5.7 Test distributed system operation
+- [ ] 11.5.8 Test monitoring and alerting pipeline
+- [ ] 11.5.9 Test zero performance impact on main flow
+- [ ] 11.5.10 Test complete system resilience
+
+---
+
+## Phase 11: Advanced Features & Production Readiness
 
 This final phase implements production-critical features including background job processing, security measures, deployment configurations, and performance optimizations. This phase ensures the system is ready for real-world usage at scale.
 
-### 10.1 Background Job Processing with Oban
+### 11.1 Background Job Processing with Oban
 
 Implement asynchronous job processing for resource-intensive operations like project indexing and batch analysis.
 
 #### Tasks:
-- [ ] 10.1.1 Add Oban dependency and configuration
-- [ ] 10.1.2 Create Oban database migrations
-- [ ] 10.1.3 Set up job queues:
-  - [ ] 10.1.3.1 `:indexing` - File and project indexing
-  - [ ] 10.1.3.2 `:analysis` - Code analysis jobs
-  - [ ] 10.1.3.3 `:generation` - Batch code generation
-  - [ ] 10.1.3.4 `:notification` - User notifications
-- [ ] 10.1.4 Implement job workers:
-  - [ ] 10.1.4.1 `ProjectIndexer` - Index entire projects
-  - [ ] 10.1.4.2 `FileAnalyzer` - Analyze individual files
-  - [ ] 10.1.4.3 `BatchGenerator` - Generate multiple files
-  - [ ] 10.1.4.4 `ReportGenerator` - Create analysis reports
-- [ ] 10.1.5 Add job scheduling for periodic tasks
-- [ ] 10.1.6 Implement job progress tracking
-- [ ] 10.1.7 Create job retry strategies
-- [ ] 10.1.8 Build job monitoring dashboard
-- [ ] 10.1.9 Add job priority system
-- [ ] 10.1.10 Set up job telemetry
+- [ ] 11.1.1 Add Oban dependency and configuration
+- [ ] 11.1.2 Create Oban database migrations
+- [ ] 11.1.3 Set up job queues:
+  - [ ] 11.1.3.1 `:indexing` - File and project indexing
+  - [ ] 11.1.3.2 `:analysis` - Code analysis jobs
+  - [ ] 11.1.3.3 `:generation` - Batch code generation
+  - [ ] 11.1.3.4 `:notification` - User notifications
+- [ ] 11.1.4 Implement job workers:
+  - [ ] 11.1.4.1 `ProjectIndexer` - Index entire projects
+  - [ ] 11.1.4.2 `FileAnalyzer` - Analyze individual files
+  - [ ] 11.1.4.3 `BatchGenerator` - Generate multiple files
+  - [ ] 11.1.4.4 `ReportGenerator` - Create analysis reports
+- [ ] 11.1.5 Add job scheduling for periodic tasks
+- [ ] 11.1.6 Implement job progress tracking
+- [ ] 11.1.7 Create job retry strategies
+- [ ] 11.1.8 Build job monitoring dashboard
+- [ ] 11.1.9 Add job priority system
+- [ ] 11.1.10 Set up job telemetry
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/workers/` directory to verify:
 
 **ProjectIndexer Tests** (`project_indexer_test.exs`):
-- [ ] 10.1.11 Test indexing all project files
-- [ ] 10.1.12 Test handling large projects with batching
-- [ ] 10.1.13 Test recovery from partial failures
-- [ ] 10.1.14 Test progress tracking updates
-- [ ] 10.1.15 Test file change detection
-- [ ] 10.1.16 Test concurrent indexing safety
+- [ ] 11.1.11 Test indexing all project files
+- [ ] 11.1.12 Test handling large projects with batching
+- [ ] 11.1.13 Test recovery from partial failures
+- [ ] 11.1.14 Test progress tracking updates
+- [ ] 11.1.15 Test file change detection
+- [ ] 11.1.16 Test concurrent indexing safety
 
-### 10.2 Security Implementation
+### 11.2 Security Implementation
 
 Implement comprehensive security measures including authentication, authorization, input validation, and rate limiting.
 
 #### Tasks:
-- [ ] 10.2.1 Implement authentication system:
-  - [ ] 10.2.1.1 JWT token generation
-  - [ ] 10.2.1.2 API key management
-  - [ ] 10.2.1.3 OAuth2 integration
-  - [ ] 10.2.1.4 Session management
-- [ ] 10.2.2 Add authorization layer:
-  - [ ] 10.2.2.1 Role-based access control (RBAC)
-  - [ ] 10.2.2.2 Project-level permissions
-  - [ ] 10.2.2.3 Resource-level authorization
-- [ ] 10.2.3 Create input validation:
-  - [ ] 10.2.3.1 Code injection prevention
-  - [ ] 10.2.3.2 Path traversal protection
-  - [ ] 10.2.3.3 Size limits enforcement
-- [ ] 10.2.4 Implement rate limiting:
-  - [ ] 10.2.4.1 Token bucket per user
-  - [ ] 10.2.4.2 Endpoint-specific limits
-  - [ ] 10.2.4.3 DDoS protection
-- [ ] 10.2.5 Add security scanning:
-  - [ ] 10.2.5.1 Dependency vulnerability checks
-  - [ ] 10.2.5.2 Code security analysis
-- [ ] 10.2.6 Set up audit logging
-- [ ] 10.2.7 Implement data encryption at rest
+- [ ] 11.2.1 Implement authentication system:
+  - [ ] 11.2.1.1 JWT token generation
+  - [ ] 11.2.1.2 API key management
+  - [ ] 11.2.1.3 OAuth2 integration
+  - [ ] 11.2.1.4 Session management
+- [ ] 11.2.2 Add authorization layer:
+  - [ ] 11.2.2.1 Role-based access control (RBAC)
+  - [ ] 11.2.2.2 Project-level permissions
+  - [ ] 11.2.2.3 Resource-level authorization
+- [ ] 11.2.3 Create input validation:
+  - [ ] 11.2.3.1 Code injection prevention
+  - [ ] 11.2.3.2 Path traversal protection
+  - [ ] 11.2.3.3 Size limits enforcement
+- [ ] 11.2.4 Implement rate limiting:
+  - [ ] 11.2.4.1 Token bucket per user
+  - [ ] 11.2.4.2 Endpoint-specific limits
+  - [ ] 11.2.4.3 DDoS protection
+- [ ] 11.2.5 Add security scanning:
+  - [ ] 11.2.5.1 Dependency vulnerability checks
+  - [ ] 11.2.5.2 Code security analysis
+- [ ] 11.2.6 Set up audit logging
+- [ ] 11.2.7 Implement data encryption at rest
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/security/` directory:
 
 **Authentication Tests** (`authentication_test.exs`):
-- [ ] 10.2.8 Test JWT token generation and verification
-- [ ] 10.2.9 Test token expiration handling
-- [ ] 10.2.10 Test API key validation
-- [ ] 10.2.11 Test OAuth2 flow
-- [ ] 10.2.12 Test session management
-- [ ] 10.2.13 Test multi-factor authentication
+- [ ] 11.2.8 Test JWT token generation and verification
+- [ ] 11.2.9 Test token expiration handling
+- [ ] 11.2.10 Test API key validation
+- [ ] 11.2.11 Test OAuth2 flow
+- [ ] 11.2.12 Test session management
+- [ ] 11.2.13 Test multi-factor authentication
 
 **Authorization Tests** (`authorization_test.exs`):
-- [ ] 10.2.14 Test project permission enforcement
-- [ ] 10.2.15 Test role-based access
-- [ ] 10.2.16 Test resource-level permissions
-- [ ] 10.2.17 Test permission inheritance
-- [ ] 10.2.18 Test cross-project isolation
-- [ ] 10.2.19 Test admin overrides
+- [ ] 11.2.14 Test project permission enforcement
+- [ ] 11.2.15 Test role-based access
+- [ ] 11.2.16 Test resource-level permissions
+- [ ] 11.2.17 Test permission inheritance
+- [ ] 11.2.18 Test cross-project isolation
+- [ ] 11.2.19 Test admin overrides
 
 **Input Validation Tests** (`validation_test.exs`):
-- [ ] 10.2.20 Test path traversal prevention
-- [ ] 10.2.21 Test code input sanitization
-- [ ] 10.2.22 Test size limit enforcement
-- [ ] 10.2.23 Test injection attack prevention
-- [ ] 10.2.24 Test file type validation
-- [ ] 10.2.25 Test rate limiting
+- [ ] 11.2.20 Test path traversal prevention
+- [ ] 11.2.21 Test code input sanitization
+- [ ] 11.2.22 Test size limit enforcement
+- [ ] 11.2.23 Test injection attack prevention
+- [ ] 11.2.24 Test file type validation
+- [ ] 11.2.25 Test rate limiting
 
-### 10.3 Monitoring and Observability
+### 11.3 Monitoring and Observability
 
 Implement comprehensive monitoring, logging, and observability features for production operations.
 
 #### Tasks:
-- [ ] 10.3.1 Set up Telemetry integration:
-  - [ ] 10.3.1.1 Define telemetry events
-  - [ ] 10.3.1.2 Create metric reporters
-  - [ ] 10.3.1.3 Add custom measurements
-- [ ] 10.3.2 Implement structured logging:
-  - [ ] 10.3.2.1 JSON log formatting
-  - [ ] 10.3.2.2 Log aggregation setup
-  - [ ] 10.3.2.3 Correlation ID tracking
-- [ ] 10.3.3 Create health check endpoints:
-  - [ ] 10.3.3.1 Database connectivity
-  - [ ] 10.3.3.2 LLM provider status with dynamic configuration
-  - [ ] 10.3.3.3 Memory usage
-  - [ ] 10.3.3.4 Job queue health
-- [ ] 10.3.4 Add performance monitoring:
-  - [ ] 10.3.4.1 Request duration tracking
-  - [ ] 10.3.4.2 Database query analysis
-  - [ ] 10.3.4.3 Memory profiling
-- [ ] 10.3.5 Set up error tracking:
-  - [ ] 10.3.5.1 Tower integration with proper configuration
-  - [ ] 10.3.5.2 Error aggregation
-  - [ ] 10.3.5.3 Alert configuration
-- [ ] 10.3.6 Build metrics dashboard
-- [ ] 10.3.7 Implement distributed tracing
-- [ ] 10.3.8 Create SLO monitoring
-- [ ] 10.3.9 Add LLM enhancement metrics:
-  - [ ] 10.3.9.1 CoT reasoning quality tracking
-  - [ ] 10.3.9.2 RAG retrieval precision monitoring
-  - [ ] 10.3.9.3 Self-correction effectiveness metrics
-  - [ ] 10.3.9.4 Enhancement technique A/B testing
-  - [ ] 10.3.9.5 Dynamic configuration usage analytics
+- [ ] 11.3.1 Set up Telemetry integration:
+  - [ ] 11.3.1.1 Define telemetry events
+  - [ ] 11.3.1.2 Create metric reporters
+  - [ ] 11.3.1.3 Add custom measurements
+- [ ] 11.3.2 Implement structured logging:
+  - [ ] 11.3.2.1 JSON log formatting
+  - [ ] 11.3.2.2 Log aggregation setup
+  - [ ] 11.3.2.3 Correlation ID tracking
+- [ ] 11.3.3 Create health check endpoints:
+  - [ ] 11.3.3.1 Database connectivity
+  - [ ] 11.3.3.2 LLM provider status with dynamic configuration
+  - [ ] 11.3.3.3 Memory usage
+  - [ ] 11.3.3.4 Job queue health
+- [ ] 11.3.4 Add performance monitoring:
+  - [ ] 11.3.4.1 Request duration tracking
+  - [ ] 11.3.4.2 Database query analysis
+  - [ ] 11.3.4.3 Memory profiling
+- [ ] 11.3.5 Set up error tracking:
+  - [ ] 11.3.5.1 Tower integration with proper configuration
+  - [ ] 11.3.5.2 Error aggregation
+  - [ ] 11.3.5.3 Alert configuration
+- [ ] 11.3.6 Build metrics dashboard
+- [ ] 11.3.7 Implement distributed tracing
+- [ ] 11.3.8 Create SLO monitoring
+- [ ] 11.3.9 Add LLM enhancement metrics:
+  - [ ] 11.3.9.1 CoT reasoning quality tracking
+  - [ ] 11.3.9.2 RAG retrieval precision monitoring
+  - [ ] 11.3.9.3 Self-correction effectiveness metrics
+  - [ ] 11.3.9.4 Enhancement technique A/B testing
+  - [ ] 11.3.9.5 Dynamic configuration usage analytics
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/monitoring/` directory:
 
 **Telemetry Tests** (`telemetry_test.exs`):
-- [ ] 10.3.10 Test completion event emission
-- [ ] 10.3.11 Test LLM request latency tracking
-- [ ] 10.3.12 Test custom metric recording
-- [ ] 10.3.13 Test event metadata inclusion
-- [ ] 10.3.14 Test metric aggregation
-- [ ] 10.3.15 Test performance measurements
-- [ ] 10.3.16 Test LLM enhancement metrics
+- [ ] 11.3.10 Test completion event emission
+- [ ] 11.3.11 Test LLM request latency tracking
+- [ ] 11.3.12 Test custom metric recording
+- [ ] 11.3.13 Test event metadata inclusion
+- [ ] 11.3.14 Test metric aggregation
+- [ ] 11.3.15 Test performance measurements
+- [ ] 11.3.16 Test LLM enhancement metrics
 
 **Health Check Tests** (`health_test.exs`):
-- [ ] 10.3.17 Test comprehensive health endpoint
-- [ ] 10.3.18 Test detailed health with issues
-- [ ] 10.3.19 Test individual component checks
-- [ ] 10.3.20 Test health status aggregation
-- [ ] 10.3.21 Test timeout handling
-- [ ] 10.3.22 Test graceful degradation
+- [ ] 11.3.17 Test comprehensive health endpoint
+- [ ] 11.3.18 Test detailed health with issues
+- [ ] 11.3.19 Test individual component checks
+- [ ] 11.3.20 Test health status aggregation
+- [ ] 11.3.21 Test timeout handling
+- [ ] 11.3.22 Test graceful degradation
 
 **Metrics Tests** (`metrics_test.exs`):
-- [ ] 10.3.23 Test request metric tracking
-- [ ] 10.3.24 Test memory usage monitoring
-- [ ] 10.3.25 Test business metric collection
-- [ ] 10.3.26 Test metric persistence
-- [ ] 10.3.27 Test dashboard data aggregation
-- [ ] 10.3.28 Test alert triggering
+- [ ] 11.3.23 Test request metric tracking
+- [ ] 11.3.24 Test memory usage monitoring
+- [ ] 11.3.25 Test business metric collection
+- [ ] 11.3.26 Test metric persistence
+- [ ] 11.3.27 Test dashboard data aggregation
+- [ ] 11.3.28 Test alert triggering
 
-### 10.4 Deployment and Scaling
+### 11.4 Deployment and Scaling
 
 Implement deployment configurations and scaling strategies for production environments.
 
 #### Tasks:
-- [ ] 10.4.1 Create Docker configuration:
-  - [ ] 10.4.1.1 Multi-stage Dockerfile
-  - [ ] 10.4.1.2 Docker Compose setup
-  - [ ] 10.4.1.3 Health check configuration
-  - [ ] 10.4.1.4 Volume management
-  - [ ] 10.4.1.5 Tool server containerization
-- [ ] 10.4.2 Set up Kubernetes deployment:
-  - [ ] 10.4.2.1 Deployment manifests
-  - [ ] 10.4.2.2 Service configuration
-  - [ ] 10.4.2.3 Ingress rules
-  - [ ] 10.4.2.4 ConfigMaps and Secrets
-  - [ ] 10.4.2.5 Service mesh integration
-- [ ] 10.4.3 Implement clustering:
-  - [ ] 10.4.3.1 libcluster configuration
-  - [ ] 10.4.3.2 Node discovery
-  - [ ] 10.4.3.3 Distributed Erlang setup
-  - [ ] 10.4.3.4 State synchronization
-  - [ ] 10.4.3.5 Tool registry distribution
-- [ ] 10.4.4 Add horizontal scaling:
-  - [ ] 10.4.4.1 Load balancer configuration
-  - [ ] 10.4.4.2 Session affinity
-  - [ ] 10.4.4.3 Autoscaling rules
-  - [ ] 10.4.4.4 Connection pooling
-- [ ] 10.4.5 Create database migrations strategy
-- [ ] 10.4.6 Set up blue-green deployment
-- [ ] 10.4.7 Implement feature flags
-- [ ] 10.4.8 Add CDN configuration
-- [ ] 10.4.9 Create backup and restore procedures
-- [ ] 10.4.10 Build disaster recovery plan
+- [ ] 11.4.1 Create Docker configuration:
+  - [ ] 11.4.1.1 Multi-stage Dockerfile
+  - [ ] 11.4.1.2 Docker Compose setup
+  - [ ] 11.4.1.3 Health check configuration
+  - [ ] 11.4.1.4 Volume management
+  - [ ] 11.4.1.5 Tool server containerization
+- [ ] 11.4.2 Set up Kubernetes deployment:
+  - [ ] 11.4.2.1 Deployment manifests
+  - [ ] 11.4.2.2 Service configuration
+  - [ ] 11.4.2.3 Ingress rules
+  - [ ] 11.4.2.4 ConfigMaps and Secrets
+  - [ ] 11.4.2.5 Service mesh integration
+- [ ] 11.4.3 Implement clustering:
+  - [ ] 11.4.3.1 libcluster configuration
+  - [ ] 11.4.3.2 Node discovery
+  - [ ] 11.4.3.3 Distributed Erlang setup
+  - [ ] 11.4.3.4 State synchronization
+  - [ ] 11.4.3.5 Tool registry distribution
+- [ ] 11.4.4 Add horizontal scaling:
+  - [ ] 11.4.4.1 Load balancer configuration
+  - [ ] 11.4.4.2 Session affinity
+  - [ ] 11.4.4.3 Autoscaling rules
+  - [ ] 11.4.4.4 Connection pooling
+- [ ] 11.4.5 Create database migrations strategy
+- [ ] 11.4.6 Set up blue-green deployment
+- [ ] 11.4.7 Implement feature flags
+- [ ] 11.4.8 Add CDN configuration
+- [ ] 11.4.9 Create backup and restore procedures
+- [ ] 11.4.10 Build disaster recovery plan
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/deployment/` directory:
 
 **Clustering Tests** (`clustering_test.exs`):
-- [ ] 10.4.11 Test node discovery and connection
-- [ ] 10.4.12 Test state synchronization across nodes
-- [ ] 10.4.13 Test node failure handling
-- [ ] 10.4.14 Test load distribution
-- [ ] 10.4.15 Test cluster reformation
-- [ ] 10.4.16 Test split-brain resolution
+- [ ] 11.4.11 Test node discovery and connection
+- [ ] 11.4.12 Test state synchronization across nodes
+- [ ] 11.4.13 Test node failure handling
+- [ ] 11.4.14 Test load distribution
+- [ ] 11.4.15 Test cluster reformation
+- [ ] 11.4.16 Test split-brain resolution
 
 **Deployment Tests** (`deployment_test.exs`):
-- [ ] 10.4.17 Test Docker image build
-- [ ] 10.4.18 Test Kubernetes manifest validity
-- [ ] 10.4.19 Test configuration management
-- [ ] 10.4.20 Test secret handling
-- [ ] 10.4.21 Test rollback procedures
-- [ ] 10.4.22 Test zero-downtime deployment
+- [ ] 11.4.17 Test Docker image build
+- [ ] 11.4.18 Test Kubernetes manifest validity
+- [ ] 11.4.19 Test configuration management
+- [ ] 11.4.20 Test secret handling
+- [ ] 11.4.21 Test rollback procedures
+- [ ] 11.4.22 Test zero-downtime deployment
 
 **Feature Flag Tests** (`feature_flags_test.exs`):
-- [ ] 10.4.23 Test feature toggle functionality
-- [ ] 10.4.24 Test gradual rollout percentages
-- [ ] 10.4.25 Test user-specific flags
-- [ ] 10.4.26 Test flag persistence
-- [ ] 10.4.27 Test A/B testing support
-- [ ] 10.4.28 Test flag inheritance
+- [ ] 11.4.23 Test feature toggle functionality
+- [ ] 11.4.24 Test gradual rollout percentages
+- [ ] 11.4.25 Test user-specific flags
+- [ ] 11.4.26 Test flag persistence
+- [ ] 11.4.27 Test A/B testing support
+- [ ] 11.4.28 Test flag inheritance
 
-### 10.5 Phase 10 Integration Tests
+### 11.5 Phase 11 Integration Tests
 
-Create comprehensive integration tests in `test/integration/phase_10_test.exs` to verify:
-- [ ] 10.5.1 Test end-to-end secure workflow with monitoring
-- [ ] 10.5.2 Test high load handling with rate limiting
-- [ ] 10.5.3 Test monitoring captures system health
-- [ ] 10.5.4 Test graceful degradation when services fail
-- [ ] 10.5.5 Test distributed deployment scenario
-- [ ] 10.5.6 Test backup and restore procedures
-- [ ] 10.5.7 Test feature flag integration
-- [ ] 10.5.8 Test tool server scaling
-- [ ] 10.5.9 Test security controls
-- [ ] 10.5.10 Test production readiness criteria
+Create comprehensive integration tests in `test/integration/phase_11_test.exs` to verify:
+- [ ] 11.5.1 Test end-to-end secure workflow with monitoring
+- [ ] 11.5.2 Test high load handling with rate limiting
+- [ ] 11.5.3 Test monitoring captures system health
+- [ ] 11.5.4 Test graceful degradation when services fail
+- [ ] 11.5.5 Test distributed deployment scenario
+- [ ] 11.5.6 Test backup and restore procedures
+- [ ] 11.5.7 Test feature flag integration
+- [ ] 11.5.8 Test tool server scaling
+- [ ] 11.5.9 Test security controls
+- [ ] 11.5.10 Test production readiness criteria
 
-### 10.6 Final System Integration Tests
+### 11.6 Final System Integration Tests
 
 Create final system tests in `test/integration/complete_system_test.exs` to verify:
-- [ ] 10.6.1 Test full coding assistant workflow from project creation to code generation
-- [ ] 10.6.2 Test system behavior under sustained load
-- [ ] 10.6.3 Test monitoring and alerting pipeline
-- [ ] 10.6.4 Test multi-user collaboration scenarios
-- [ ] 10.6.5 Test disaster recovery procedures
-- [ ] 10.6.6 Test performance meets SLOs
-- [ ] 10.6.7 Test security controls are effective
-- [ ] 10.6.8 Test tool integration enhances code quality
-- [ ] 10.6.9 Test planning system with tools
-- [ ] 10.6.10 Test complete system resilience
-- [ ] 10.6.11 Test dynamic LLM configuration system integration
-- [ ] 10.6.12 Test unified command system across all interfaces
-- [ ] 10.6.13 Test chat-focused TUI integration
-- [ ] 10.6.14 Test error handling and recovery mechanisms
-- [ ] 10.6.15 Test instruction templating system integration
-- [ ] 10.6.16 Test REPL interface functionality
+- [ ] 11.6.1 Test full coding assistant workflow from project creation to code generation
+- [ ] 11.6.2 Test system behavior under sustained load
+- [ ] 11.6.3 Test monitoring and alerting pipeline
+- [ ] 11.6.4 Test multi-user collaboration scenarios
+- [ ] 11.6.5 Test disaster recovery procedures
+- [ ] 11.6.6 Test performance meets SLOs
+- [ ] 11.6.7 Test security controls are effective
+- [ ] 11.6.8 Test tool integration enhances code quality
+- [ ] 11.6.9 Test planning system with tools
+- [ ] 11.6.10 Test complete system resilience
+- [ ] 11.6.11 Test dynamic LLM configuration system integration
+- [ ] 11.6.12 Test unified command system across all interfaces
+- [ ] 11.6.13 Test chat-focused TUI integration
+- [ ] 11.6.14 Test error handling and recovery mechanisms
+- [ ] 11.6.15 Test instruction templating system integration
+- [ ] 11.6.16 Test REPL interface functionality
 
 ---
 
@@ -986,7 +1231,8 @@ Create final system tests in `test/integration/complete_system_test.exs` to veri
 - **Security-First Template Processing** (Phase 8.4)
 - **Client Integration & Real-time Updates** (Phase 8.5)
 - **LLM Tool Definition System** (Phase 9)
-- **Production Readiness** (Phase 10)
+- **Real-Time Status Messaging System** (Phase 10)
+- **Production Readiness** (Phase 11)
 
 ### 🔗 Recent Integration Highlights:
 - Successfully integrated dynamic LLM configuration across all AI engines
