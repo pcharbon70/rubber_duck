@@ -97,6 +97,15 @@ defmodule RubberDuck.Status do
   def info(conversation_id, text, metadata \\ %{}) do
     update(conversation_id, :info, text, metadata)
   end
+  
+  @doc """
+  Send a custom status update with any category.
+  Alias for update/4.
+  """
+  @spec broadcast(String.t() | nil, atom(), String.t(), map()) :: :ok
+  def broadcast(conversation_id, category, text, metadata \\ %{}) do
+    update(conversation_id, category, text, metadata)
+  end
 
   # Metadata Builders
 

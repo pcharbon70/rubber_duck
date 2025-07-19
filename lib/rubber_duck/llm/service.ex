@@ -845,13 +845,14 @@ defmodule RubberDuck.LLM.Service do
     )
     
     start_time = System.monotonic_time(:millisecond)
-    token_count = 0
+    token_ref = :counters.new(1, [:atomics])
     
     # Wrap callback to track tokens
     tracking_callback = fn chunk ->
       # Count tokens (approximate)
       if chunk.content do
-        token_count = token_count + String.split(chunk.content) |> length()
+        token_count = String.split(chunk.content) |> length()
+        :counters.add(token_ref, 1, token_count)
       end
       
       # Call original callback
@@ -859,6 +860,7 @@ defmodule RubberDuck.LLM.Service do
       
       # Send completion status on final chunk
       if chunk.finish_reason do
+        total_tokens = :counters.get(token_ref, 1)
         Status.with_timing(
           conversation_id,
           :engine,
@@ -867,7 +869,7 @@ defmodule RubberDuck.LLM.Service do
           Status.build_llm_metadata(request.model, to_string(provider_name), %{
             request_id: request.id,
             streaming: true,
-            approximate_tokens: token_count,
+            approximate_tokens: total_tokens,
             finish_reason: chunk.finish_reason
           })
         )
