@@ -13,6 +13,7 @@ defmodule RubberDuck.Tool.Composition.ErrorHandler do
   use RubberDuck.Workflows.Step
 
   require Logger
+  alias RubberDuck.Status
 
   @doc """
   Creates a retry step that wraps another step with retry logic.
@@ -323,6 +324,22 @@ defmodule RubberDuck.Tool.Composition.ErrorHandler do
             Logger.warning(
               "Tool #{tool_module} failed on attempt #{attempt}, retrying in #{delay}ms: #{inspect(error)}"
             )
+            
+            # Report retry attempt
+            if conversation_id = context[:conversation_id] do
+              Status.progress(
+                conversation_id,
+                "Retrying after error",
+                %{
+                  tool: tool_module,
+                  attempt: attempt,
+                  max_attempts: max_attempts,
+                  delay_ms: delay,
+                  error: inspect(error),
+                  retryable: true
+                }
+              )
+            end
 
             # Sleep before retry
             Process.sleep(delay)

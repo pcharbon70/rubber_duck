@@ -23,7 +23,7 @@ defmodule RubberDuck.ErrorBoundary do
 
   use GenServer
   require Logger
-  alias RubberDuck.Errors
+  alias RubberDuck.{Errors, Status}
 
   @default_timeout 5_000
 
@@ -174,6 +174,23 @@ defmodule RubberDuck.ErrorBoundary do
         error_type: error.__struct__
       })
 
+    # Report to status system if conversation_id is present
+    if conversation_id = metadata[:conversation_id] do
+      Status.error(
+        conversation_id,
+        "Error boundary caught exception",
+        Status.build_error_metadata(
+          :boundary_exception,
+          Exception.message(error),
+          %{
+            error_type: error.__struct__,
+            error_boundary: true,
+            metadata: metadata
+          }
+        )
+      )
+    end
+
     Errors.report_exception(error, stacktrace, enhanced_metadata)
   end
 
@@ -185,6 +202,25 @@ defmodule RubberDuck.ErrorBoundary do
       })
 
     message = "Caught #{kind}: #{inspect(reason)}"
+    
+    # Report to status system if conversation_id is present
+    if conversation_id = metadata[:conversation_id] do
+      Status.error(
+        conversation_id,
+        "Error boundary caught #{kind}",
+        Status.build_error_metadata(
+          :boundary_catch,
+          message,
+          %{
+            catch_kind: kind,
+            reason: inspect(reason),
+            error_boundary: true,
+            metadata: metadata
+          }
+        )
+      )
+    end
+    
     # Convert to keyword list for Tower
     Tower.report_message(:error, message, Map.to_list(enhanced_metadata))
   end

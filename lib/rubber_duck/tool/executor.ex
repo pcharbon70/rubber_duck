@@ -14,6 +14,7 @@ defmodule RubberDuck.Tool.Executor do
   require Logger
 
   alias RubberDuck.Tool.{Validator, Authorizer, Sandbox, ResultProcessor, Telemetry, Monitoring}
+  alias RubberDuck.Status
 
   @type execution_result :: %{
           output: any(),
@@ -55,6 +56,20 @@ defmodule RubberDuck.Tool.Executor do
   def execute(tool_module, params, user, context \\ %{}) do
     execution_id = generate_execution_id()
     full_context = build_execution_context(user, execution_id, context)
+    
+    # Get tool metadata for status updates
+    tool_metadata = RubberDuck.Tool.metadata(tool_module)
+    conversation_id = context[:conversation_id]
+    
+    # Send initial status
+    Status.tool(
+      conversation_id,
+      "Preparing #{tool_metadata.name}",
+      Status.build_tool_metadata(tool_metadata.name, params, %{
+        execution_id: execution_id,
+        stage: "initialization"
+      })
+    )
 
     with {:ok, validated_params} <- validate_parameters(tool_module, params),
          {:ok, :authorized} <- authorize_execution(tool_module, user, full_context),
@@ -65,16 +80,49 @@ defmodule RubberDuck.Tool.Executor do
       {:ok, result}
     else
       {:error, :validation_failed, errors} ->
+        Status.error(
+          conversation_id,
+          "#{tool_metadata.name} validation failed",
+          Status.build_error_metadata(:validation_error, format_validation_errors(errors), %{
+            tool: tool_metadata.name,
+            execution_id: execution_id
+          })
+        )
         {:error, :validation_failed, errors}
 
       {:error, :authorization_failed, reason} ->
+        Status.error(
+          conversation_id,
+          "#{tool_metadata.name} authorization failed",
+          Status.build_error_metadata(:authorization_error, inspect(reason), %{
+            tool: tool_metadata.name,
+            execution_id: execution_id
+          })
+        )
         {:error, :authorization_failed, reason}
 
       {:error, reason} ->
+        Status.error(
+          conversation_id,
+          "#{tool_metadata.name} failed",
+          Status.build_error_metadata(:execution_error, inspect(reason), %{
+            tool: tool_metadata.name,
+            execution_id: execution_id
+          })
+        )
         emit_execution_event(:failed, tool_module, user, reason)
         {:error, reason}
 
       {:error, reason, details} ->
+        Status.error(
+          conversation_id,
+          "#{tool_metadata.name} failed",
+          Status.build_error_metadata(:execution_error, inspect(reason), %{
+            tool: tool_metadata.name,
+            execution_id: execution_id,
+            details: details
+          })
+        )
         emit_execution_event(:failed, tool_module, user, reason)
         {:error, reason, details}
     end
@@ -219,6 +267,19 @@ defmodule RubberDuck.Tool.Executor do
 
     start_time = System.monotonic_time(:millisecond)
     tool_metadata = RubberDuck.Tool.metadata(tool_module)
+    conversation_id = context[:conversation_id]
+
+    # Send execution start status
+    Status.tool(
+      conversation_id,
+      "Executing #{tool_metadata.name}",
+      Status.build_tool_metadata(tool_metadata.name, params, %{
+        execution_id: context.execution_id,
+        stage: "execution",
+        timeout: timeout,
+        retries_allowed: retries
+      })
+    )
 
     # Emit telemetry start event
     Telemetry.execute_start(tool_metadata.name, %{
@@ -279,6 +340,20 @@ defmodule RubberDuck.Tool.Executor do
                 execution_time: execution_time,
                 retry_count: processed_result.retry_count
               }
+            )
+
+            # Send completion status
+            Status.with_timing(
+              conversation_id,
+              :tool,
+              "Completed #{tool_metadata.name}",
+              start_time,
+              Status.build_tool_metadata(tool_metadata.name, params, %{
+                execution_id: context.execution_id,
+                stage: "completed",
+                retry_count: processed_result.retry_count,
+                output_size: byte_size(inspect(processed_result.output))
+              })
             )
 
             emit_execution_event(:completed, tool_module, context.user, processed_result)
@@ -461,6 +536,13 @@ defmodule RubberDuck.Tool.Executor do
   defp generate_execution_id do
     :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
   end
+
+  defp format_validation_errors(errors) when is_list(errors) do
+    errors
+    |> Enum.map(&to_string/1)
+    |> Enum.join(", ")
+  end
+  defp format_validation_errors(error), do: inspect(error)
 
   defp emit_execution_event(event, tool_module, user, data) do
     metadata = RubberDuck.Tool.metadata(tool_module)
