@@ -106,7 +106,6 @@ defmodule RubberDuckWeb.ConversationChannel do
   alias RubberDuck.SessionContext
   alias RubberDuck.UserConfig
   alias RubberDuck.Conversations
-  alias RubberDuck.Accounts
 
   @default_timeout 60_000
   @max_context_messages 20
