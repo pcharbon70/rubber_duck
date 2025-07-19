@@ -1,7 +1,7 @@
 defmodule RubberDuck.Instructions.Security do
   @moduledoc """
   Security validation and sandboxing for template processing.
-  
+
   Provides comprehensive security measures including:
   - Input validation and sanitization
   - Template size and complexity limits
@@ -19,7 +19,7 @@ defmodule RubberDuck.Instructions.Security do
 
   @doc """
   Validates a template for security concerns before processing.
-  
+
   Checks for:
   - Template size limits
   - Dangerous patterns
@@ -52,7 +52,7 @@ defmodule RubberDuck.Instructions.Security do
 
   @doc """
   Validates variables before template processing.
-  
+
   Ensures variables don't contain:
   - System access attempts
   - Code injection patterns
@@ -65,6 +65,7 @@ defmodule RubberDuck.Instructions.Security do
       :ok
     end
   end
+
   def validate_variables(_), do: {:error, :invalid_variables}
 
   @doc """
@@ -90,13 +91,13 @@ defmodule RubberDuck.Instructions.Security do
     cond do
       String.contains?(path, "..") ->
         {:error, SecurityError.exception(reason: :path_traversal)}
-        
+
       String.contains?(path, "~") ->
         {:error, SecurityError.exception(reason: :path_traversal)}
-        
+
       String.starts_with?(path, "/") ->
         {:error, SecurityError.exception(reason: :unauthorized_access)}
-        
+
       true ->
         :ok
     end
@@ -117,7 +118,7 @@ defmodule RubberDuck.Instructions.Security do
 
   @doc """
   Creates a sandbox context for template execution.
-  
+
   Limits available functions and modules to safe subset.
   """
   @spec sandbox_context(map()) :: map()
@@ -176,8 +177,10 @@ defmodule RubberDuck.Instructions.Security do
       ~r/\|>\s*to_atom/,
       # Command injection patterns
       ~r/\b(sh|bash|cmd|powershell)\b/i,
-      ~r/`.*`/,  # Backticks
-      ~r/\$\(.*\)/,  # Command substitution
+      # Backticks
+      ~r/`.*`/,
+      # Command substitution
+      ~r/\$\(.*\)/,
       # Network access
       ~r/\b(HTTPoison|Tesla|Req|:httpc)\b/,
       ~r/\bSocket\./,
@@ -208,24 +211,24 @@ defmodule RubberDuck.Instructions.Security do
   defp contains_obfuscation?(template) do
     # Check for excessive string concatenation
     concat_count = length(Regex.scan(~r/<>|\+/, template))
-    
+
     # Check for base64 encoded content
     has_base64 = Regex.match?(~r/Base\.decode64|:base64\.decode/, template)
-    
+
     # Check for hex encoding
     has_hex = Regex.match?(~r/\b0x[0-9a-fA-F]+\b/, template)
-    
+
     # Check for unicode escape sequences
     has_unicode = Regex.match?(~r/\\u[0-9a-fA-F]{4}/, template)
-    
+
     concat_count > 5 or has_base64 or (has_hex and has_unicode)
   end
 
   defp check_complexity(template, opts) do
     max_nesting = Keyword.get(opts, :max_nesting, @max_nesting_depth)
-    
+
     nesting_level = calculate_nesting_depth(template)
-    
+
     if nesting_level > max_nesting do
       {:error, SecurityError.exception(reason: :excessive_nesting)}
     else
@@ -241,47 +244,71 @@ defmodule RubberDuck.Instructions.Security do
       ~r/\{%\s*unless\s+/,
       ~r/\{%\s*case\s+/
     ]
-    
+
     # Find all opening and closing tags
     open_tags = Enum.flat_map(control_patterns, &Regex.scan(&1, template))
     close_tags = Regex.scan(~r/\{%\s*end\w*\s*%\}/, template)
-    
+
     max(length(open_tags), length(close_tags))
   end
 
   defp check_variable_names(template) do
     # Extract variable names from template - handle nested access
     variable_patterns = [
-      ~r/\{\{[\s]*(\w+(?:\.\w+)*)/,  # {{ user.name }}
-      ~r/\{%\s*assign\s+(\w+)/,       # {% assign var = value %}
-      ~r/\{%\s*for\s+\w+\s+in\s+(\w+)/ # {% for item in items %}
+      # {{ user.name }}
+      ~r/\{\{[\s]*(\w+(?:\.\w+)*)/,
+      # {% assign var = value %}
+      ~r/\{%\s*assign\s+(\w+)/,
+      # {% for item in items %}
+      ~r/\{%\s*for\s+\w+\s+in\s+(\w+)/
     ]
-    
-    all_variables = variable_patterns
-    |> Enum.flat_map(fn pattern -> 
-      Regex.scan(pattern, template) |> Enum.map(fn [_, name] -> name end)
-    end)
-    |> Enum.uniq()
-    
+
+    all_variables =
+      variable_patterns
+      |> Enum.flat_map(fn pattern ->
+        Regex.scan(pattern, template) |> Enum.map(fn [_, name] -> name end)
+      end)
+      |> Enum.uniq()
+
     suspicious_names = [
-      "system", "file", "io", "code", "kernel", "process",
-      "eval", "exec", "spawn", "apply", "module", "env",
-      "__proto__", "constructor", "prototype", "__dirname",
-      "require", "import", "global", "window", "document"
+      "system",
+      "file",
+      "io",
+      "code",
+      "kernel",
+      "process",
+      "eval",
+      "exec",
+      "spawn",
+      "apply",
+      "module",
+      "env",
+      "__proto__",
+      "constructor",
+      "prototype",
+      "__dirname",
+      "require",
+      "import",
+      "global",
+      "window",
+      "document"
     ]
-    
+
     # Check for suspicious patterns in variable paths
     suspicious_patterns = [
       ~r/\b(system|file|process|code)\./i,
-      ~r/__[A-Z]+__/,  # __MODULE__, __ENV__, etc
-      ~r/\.\.\//       # Path traversal in object access
+      # __MODULE__, __ENV__, etc
+      ~r/__[A-Z]+__/,
+      # Path traversal in object access
+      ~r/\.\.\//
     ]
-    
-    has_suspicious_name = Enum.any?(all_variables, fn var ->
-      String.downcase(var) in suspicious_names or
-      Enum.any?(suspicious_patterns, &Regex.match?(&1, var))
-    end)
-    
+
+    has_suspicious_name =
+      Enum.any?(all_variables, fn var ->
+        String.downcase(var) in suspicious_names or
+          Enum.any?(suspicious_patterns, &Regex.match?(&1, var))
+      end)
+
     if has_suspicious_name do
       {:error, SecurityError.exception(reason: :injection_attempt)}
     else
@@ -313,11 +340,11 @@ defmodule RubberDuck.Instructions.Security do
       check_dangerous_patterns(value)
     end
   end
-  
+
   defp validate_value(value) when is_number(value), do: :ok
   defp validate_value(value) when is_boolean(value), do: :ok
   defp validate_value(nil), do: :ok
-  
+
   defp validate_value(value) when is_list(value) do
     if length(value) > 1000 do
       {:error, SecurityError.exception(reason: :list_too_large)}
@@ -330,7 +357,7 @@ defmodule RubberDuck.Instructions.Security do
       end)
     end
   end
-  
+
   defp validate_value(value) when is_map(value) do
     if map_size(value) > 100 do
       {:error, SecurityError.exception(reason: :map_too_large)}
@@ -338,14 +365,14 @@ defmodule RubberDuck.Instructions.Security do
       check_variable_content(value)
     end
   end
-  
+
   defp validate_value(_), do: {:error, SecurityError.exception(reason: :invalid_value_type)}
 
   # Advanced pattern checking
   defp check_advanced_patterns(template) do
     # Check for suspicious filter chains
     filter_chain_pattern = ~r/\|\s*\w+\s*:\s*['"][^'"]*['"]\s*\|\s*\w+/
-    
+
     if Regex.match?(filter_chain_pattern, template) do
       # Analyze filter chains for dangerous combinations
       check_filter_chain_safety(template)
@@ -357,21 +384,23 @@ defmodule RubberDuck.Instructions.Security do
   defp check_filter_chain_safety(template) do
     # Extract filter chains
     chains = Regex.scan(~r/\{\{[^}]+\}\}/, template)
-    
+
     dangerous_filter_combinations = [
       ["to_atom"],
       ["eval", "execute"],
       ["decode", "apply"],
       ["parse", "call"]
     ]
-    
-    has_dangerous_chain = Enum.any?(chains, fn [chain] ->
-      filters = extract_filters(chain)
-      Enum.any?(dangerous_filter_combinations, fn combo ->
-        Enum.all?(combo, fn filter -> filter in filters end)
+
+    has_dangerous_chain =
+      Enum.any?(chains, fn [chain] ->
+        filters = extract_filters(chain)
+
+        Enum.any?(dangerous_filter_combinations, fn combo ->
+          Enum.all?(combo, fn filter -> filter in filters end)
+        end)
       end)
-    end)
-    
+
     if has_dangerous_chain do
       {:error, SecurityError.exception(reason: :injection_attempt)}
     else
@@ -392,7 +421,8 @@ defmodule RubberDuck.Instructions.Security do
     # Parse template structure
     case parse_template_structure(template) do
       {:ok, ast} -> validate_ast_safety(ast)
-      {:error, _} -> :ok  # If we can't parse, let normal validation handle it
+      # If we can't parse, let normal validation handle it
+      {:error, _} -> :ok
     end
   end
 
@@ -410,10 +440,10 @@ defmodule RubberDuck.Instructions.Security do
     # Extract all Liquid tags and objects
     tag_pattern = ~r/\{%\s*(\w+)([^%]*?)%\}/
     obj_pattern = ~r/\{\{([^}]+)\}\}/
-    
+
     tags = Regex.scan(tag_pattern, template, capture: :all_but_first)
     objects = Regex.scan(obj_pattern, template, capture: :all_but_first)
-    
+
     %{
       tags: Enum.map(tags, fn [tag, content] -> {tag, String.trim(content)} end),
       objects: Enum.map(objects, &List.first/1)
@@ -423,17 +453,21 @@ defmodule RubberDuck.Instructions.Security do
   defp validate_ast_safety(ast) do
     # Check for dangerous tag usage patterns
     dangerous_tag_patterns = [
-      {"include", ~r/\.\./},  # Path traversal in includes
-      {"raw", ~r/\{%|%\}/},   # Nested tags in raw blocks
-      {"capture", ~r/system|file|process/i}  # Capturing dangerous content
+      # Path traversal in includes
+      {"include", ~r/\.\./},
+      # Nested tags in raw blocks
+      {"raw", ~r/\{%|%\}/},
+      # Capturing dangerous content
+      {"capture", ~r/system|file|process/i}
     ]
-    
-    has_dangerous_pattern = Enum.any?(ast.tags, fn {tag, content} ->
-      Enum.any?(dangerous_tag_patterns, fn {danger_tag, pattern} ->
-        tag == danger_tag and Regex.match?(pattern, content)
+
+    has_dangerous_pattern =
+      Enum.any?(ast.tags, fn {tag, content} ->
+        Enum.any?(dangerous_tag_patterns, fn {danger_tag, pattern} ->
+          tag == danger_tag and Regex.match?(pattern, content)
+        end)
       end)
-    end)
-    
+
     if has_dangerous_pattern do
       {:error, SecurityError.exception(reason: :injection_attempt)}
     else
@@ -448,7 +482,7 @@ defmodule RubberDuck.Instructions.Security do
       :ok
     else
       entropy = calculate_shannon_entropy(template)
-      
+
       # High entropy might indicate encoded/obfuscated content
       if entropy > 4.5 do
         {:error, SecurityError.exception(reason: :suspicious_content)}
@@ -462,17 +496,17 @@ defmodule RubberDuck.Instructions.Security do
     # Calculate Shannon entropy
     chars = String.graphemes(string)
     total = length(chars)
-    
+
     if total == 0 do
       0.0
     else
       char_counts = Enum.frequencies(chars)
-      
+
       char_counts
       |> Map.values()
       |> Enum.reduce(0.0, fn count, entropy ->
         probability = count / total
-        entropy - (probability * :math.log2(probability))
+        entropy - probability * :math.log2(probability)
       end)
     end
   end

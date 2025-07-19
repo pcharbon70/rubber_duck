@@ -1,13 +1,13 @@
 defmodule RubberDuck.Tool.Telemetry do
   @moduledoc """
   Telemetry integration for tool execution monitoring.
-  
+
   Provides standardized telemetry events and measurements for the tool
   execution system, enabling integration with various monitoring solutions.
   """
-  
+
   require Logger
-  
+
   @doc """
   Emits a tool execution start event.
   """
@@ -18,7 +18,7 @@ defmodule RubberDuck.Tool.Telemetry do
       Map.merge(metadata, %{tool: tool_name})
     )
   end
-  
+
   @doc """
   Emits a tool execution stop event.
   """
@@ -29,7 +29,7 @@ defmodule RubberDuck.Tool.Telemetry do
       Map.merge(metadata, %{tool: tool_name})
     )
   end
-  
+
   @doc """
   Emits a tool execution exception event.
   """
@@ -44,7 +44,7 @@ defmodule RubberDuck.Tool.Telemetry do
       })
     )
   end
-  
+
   @doc """
   Emits a validation event.
   """
@@ -58,7 +58,7 @@ defmodule RubberDuck.Tool.Telemetry do
       })
     )
   end
-  
+
   @doc """
   Emits an authorization event.
   """
@@ -72,7 +72,7 @@ defmodule RubberDuck.Tool.Telemetry do
       })
     )
   end
-  
+
   @doc """
   Emits a sandbox execution event.
   """
@@ -86,7 +86,7 @@ defmodule RubberDuck.Tool.Telemetry do
       })
     )
   end
-  
+
   @doc """
   Emits a sandbox violation event.
   """
@@ -100,7 +100,7 @@ defmodule RubberDuck.Tool.Telemetry do
       })
     )
   end
-  
+
   @doc """
   Emits a result processing event.
   """
@@ -114,7 +114,7 @@ defmodule RubberDuck.Tool.Telemetry do
       Map.merge(metadata, %{tool: tool_name})
     )
   end
-  
+
   @doc """
   Emits a cache operation event.
   """
@@ -129,7 +129,7 @@ defmodule RubberDuck.Tool.Telemetry do
       })
     )
   end
-  
+
   @doc """
   Sets up default telemetry reporters.
   """
@@ -138,28 +138,28 @@ defmodule RubberDuck.Tool.Telemetry do
     if Application.get_env(:rubber_duck, :env) == :dev do
       attach_console_reporter()
     end
-    
+
     # Metrics reporter
     attach_metrics_reporter()
-    
+
     # Log reporter for errors
     attach_error_reporter()
   end
-  
+
   @doc """
   Attaches a custom telemetry handler.
   """
   def attach_handler(handler_id, events, handler_fun, config \\ nil) do
     :telemetry.attach_many(handler_id, events, handler_fun, config)
   end
-  
+
   @doc """
   Detaches a telemetry handler.
   """
   def detach_handler(handler_id) do
     :telemetry.detach(handler_id)
   end
-  
+
   @doc """
   Lists all tool telemetry events.
   """
@@ -169,42 +169,42 @@ defmodule RubberDuck.Tool.Telemetry do
       [:rubber_duck, :tool, :execution, :start],
       [:rubber_duck, :tool, :execution, :stop],
       [:rubber_duck, :tool, :execution, :exception],
-      
+
       # Validation events
       [:rubber_duck, :tool, :validation, :start],
       [:rubber_duck, :tool, :validation, :stop],
-      
+
       # Authorization events
       [:rubber_duck, :tool, :authorization, :start],
       [:rubber_duck, :tool, :authorization, :stop],
-      
+
       # Sandbox events
       [:rubber_duck, :tool, :sandbox, :execution],
       [:rubber_duck, :tool, :sandbox, :violation],
-      
+
       # Result processing events
       [:rubber_duck, :tool, :result, :processed],
       [:rubber_duck, :tool, :result, :cached],
-      
+
       # Resource events
       [:rubber_duck, :tool, :resource, :limit_exceeded],
       [:rubber_duck, :tool, :resource, :usage],
-      
+
       # Error events
       [:rubber_duck, :tool, :error, :validation_failed],
       [:rubber_duck, :tool, :error, :authorization_failed],
       [:rubber_duck, :tool, :error, :execution_failed]
     ]
   end
-  
+
   # Private functions
-  
+
   defp attach_console_reporter do
     events = [
       [:rubber_duck, :tool, :execution, :stop],
       [:rubber_duck, :tool, :execution, :exception]
     ]
-    
+
     :telemetry.attach_many(
       "rubber-duck-console-reporter",
       events,
@@ -212,10 +212,10 @@ defmodule RubberDuck.Tool.Telemetry do
       nil
     )
   end
-  
+
   defp attach_metrics_reporter do
     events = list_events()
-    
+
     :telemetry.attach_many(
       "rubber-duck-metrics-reporter",
       events,
@@ -223,7 +223,7 @@ defmodule RubberDuck.Tool.Telemetry do
       nil
     )
   end
-  
+
   defp attach_error_reporter do
     events = [
       [:rubber_duck, :tool, :execution, :exception],
@@ -231,7 +231,7 @@ defmodule RubberDuck.Tool.Telemetry do
       [:rubber_duck, :tool, :error, :authorization_failed],
       [:rubber_duck, :tool, :error, :execution_failed]
     ]
-    
+
     :telemetry.attach_many(
       "rubber-duck-error-reporter",
       events,
@@ -239,20 +239,20 @@ defmodule RubberDuck.Tool.Telemetry do
       nil
     )
   end
-  
+
   defp handle_console_event(event_name, measurements, metadata, _config) do
     case event_name do
       [:rubber_duck, :tool, :execution, :stop] ->
         IO.puts("[TELEMETRY] Tool #{metadata.tool} executed in #{measurements.duration}ms")
-      
+
       [:rubber_duck, :tool, :execution, :exception] ->
         IO.puts("[TELEMETRY] Tool #{metadata.tool} failed: #{metadata.kind} - #{metadata.reason}")
-      
+
       _ ->
         :ok
     end
   end
-  
+
   defp handle_metrics_event(event_name, measurements, metadata, _config) do
     # Forward to monitoring system
     case event_name do
@@ -263,7 +263,7 @@ defmodule RubberDuck.Tool.Telemetry do
           1,
           metadata
         )
-        
+
         # Record measurements as gauges
         Enum.each(measurements, fn {key, value} ->
           RubberDuck.Tool.Monitoring.record_metric(
@@ -273,7 +273,7 @@ defmodule RubberDuck.Tool.Telemetry do
             metadata
           )
         end)
-      
+
       _ ->
         :ok
     end
@@ -281,14 +281,14 @@ defmodule RubberDuck.Tool.Telemetry do
     error ->
       Logger.error("Failed to record metric: #{inspect(error)}")
   end
-  
+
   defp handle_error_event(event_name, measurements, metadata, _config) do
-    Logger.error("Tool error event: #{inspect(event_name)}", 
+    Logger.error("Tool error event: #{inspect(event_name)}",
       measurements: measurements,
       metadata: metadata
     )
   end
-  
+
   defp format_metric_name(event_name) do
     event_name
     |> Enum.join(".")
@@ -300,32 +300,34 @@ defmodule RubberDuck.Tool.Telemetry.Poller do
   @moduledoc """
   Periodic telemetry measurements for tool execution system.
   """
-  
+
   use GenServer
   require Logger
-  
-  @polling_interval 10_000 # 10 seconds
-  
+
+  # 10 seconds
+  @polling_interval 10_000
+
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
-  
+
   @impl true
   def init(_opts) do
     schedule_poll()
     {:ok, %{}}
   end
-  
+
   @impl true
   def handle_info(:poll, state) do
     emit_measurements()
     schedule_poll()
     {:noreply, state}
   end
-  
+
   defp emit_measurements do
     # Memory measurements
     memory = :erlang.memory()
+
     :telemetry.execute(
       [:rubber_duck, :tool, :system, :memory],
       %{
@@ -336,7 +338,7 @@ defmodule RubberDuck.Tool.Telemetry.Poller do
       },
       %{}
     )
-    
+
     # Process measurements
     :telemetry.execute(
       [:rubber_duck, :tool, :system, :processes],
@@ -346,9 +348,10 @@ defmodule RubberDuck.Tool.Telemetry.Poller do
       },
       %{}
     )
-    
+
     # IO measurements
     {{:input, input}, {:output, output}} = :erlang.statistics(:io)
+
     :telemetry.execute(
       [:rubber_duck, :tool, :system, :io],
       %{
@@ -357,9 +360,10 @@ defmodule RubberDuck.Tool.Telemetry.Poller do
       },
       %{}
     )
-    
+
     # Cache measurements
     cache_stats = RubberDuck.Cache.ETS.stats()
+
     if not Map.has_key?(cache_stats, :error) do
       :telemetry.execute(
         [:rubber_duck, :tool, :cache, :stats],
@@ -370,9 +374,10 @@ defmodule RubberDuck.Tool.Telemetry.Poller do
         %{}
       )
     end
-    
+
     # Storage measurements
     storage_stats = RubberDuck.Storage.FileSystem.stats()
+
     if not Map.has_key?(storage_stats, :error) do
       :telemetry.execute(
         [:rubber_duck, :tool, :storage, :stats],
@@ -387,7 +392,7 @@ defmodule RubberDuck.Tool.Telemetry.Poller do
     error ->
       Logger.error("Failed to emit telemetry measurements: #{inspect(error)}")
   end
-  
+
   defp schedule_poll do
     Process.send_after(self(), :poll, @polling_interval)
   end

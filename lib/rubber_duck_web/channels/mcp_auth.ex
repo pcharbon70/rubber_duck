@@ -1,29 +1,29 @@
 defmodule RubberDuckWeb.MCPAuth do
   @moduledoc """
   Authentication and authorization for MCP (Model Context Protocol) channels.
-  
+
   Provides secure authentication mechanisms for MCP clients including:
   - Token-based authentication
   - API key authentication
   - Client capability verification
   - Session management
   """
-  
+
   require Logger
-  
+
   alias RubberDuck.MCP.SecurityManager
-  
+
   @type auth_result :: {:ok, map()} | {:error, String.t()}
   @type client_info :: %{
-    name: String.t(),
-    version: String.t(),
-    capabilities: map(),
-    metadata: map()
-  }
-  
+          name: String.t(),
+          version: String.t(),
+          capabilities: map(),
+          metadata: map()
+        }
+
   @doc """
   Authenticates an MCP client connection.
-  
+
   Supports multiple authentication methods:
   - Phoenix.Token for trusted clients
   - API key for external integrations
@@ -32,45 +32,48 @@ defmodule RubberDuckWeb.MCPAuth do
   @spec authenticate_client(map(), map()) :: auth_result()
   def authenticate_client(params, connect_info) do
     Logger.debug("Authenticating MCP client with params: #{inspect(sanitize_params(params))}")
-    
+
     # Extract credentials
-    credentials = case extract_auth_credentials(params, connect_info) do
-      {:ok, :token, token} -> %{"token" => token}
-      {:ok, :api_key, api_key} -> %{"apiKey" => api_key}
-      {:error, reason} -> {:error, reason}
-    end
-    
+    credentials =
+      case extract_auth_credentials(params, connect_info) do
+        {:ok, :token, token} -> %{"token" => token}
+        {:ok, :api_key, api_key} -> %{"apiKey" => api_key}
+        {:error, reason} -> {:error, reason}
+      end
+
     # Build connection info with IP address
-    connection_info = Map.merge(connect_info, %{
-      ip_address: extract_ip_address(connect_info),
-      user_agent: extract_user_agent(connect_info)
-    })
-    
+    connection_info =
+      Map.merge(connect_info, %{
+        ip_address: extract_ip_address(connect_info),
+        user_agent: extract_user_agent(connect_info)
+      })
+
     case credentials do
       {:error, reason} ->
         {:error, reason}
-        
+
       creds ->
         # Delegate to SecurityManager for comprehensive authentication
         case SecurityManager.authenticate(creds, connection_info) do
           {:ok, security_context} ->
-            {:ok, %{
-              user_id: security_context.user_id,
-              permissions: MapSet.to_list(security_context.capabilities),
-              role: determine_role_from_capabilities(security_context.capabilities),
-              client_info: Map.get(params, "clientInfo", %{}),
-              security_context: security_context
-            }}
-            
+            {:ok,
+             %{
+               user_id: security_context.user_id,
+               permissions: MapSet.to_list(security_context.capabilities),
+               role: determine_role_from_capabilities(security_context.capabilities),
+               client_info: Map.get(params, "clientInfo", %{}),
+               security_context: security_context
+             }}
+
           {:error, reason} ->
             {:error, reason}
         end
     end
   end
-  
+
   @doc """
   Validates client information and capabilities.
-  
+
   Ensures client provides required information and has compatible capabilities.
   """
   @spec validate_client_info(map()) :: {:ok, client_info()} | {:error, String.t()}
@@ -78,25 +81,24 @@ defmodule RubberDuckWeb.MCPAuth do
     with {:ok, name} <- validate_client_name(client_info),
          {:ok, version} <- validate_client_version(client_info),
          {:ok, capabilities} <- validate_client_capabilities(client_info) do
-      
       validated_info = %{
         name: name,
         version: version,
         capabilities: capabilities,
         metadata: Map.get(client_info, "metadata", %{})
       }
-      
+
       {:ok, validated_info}
     else
       {:error, reason} -> {:error, reason}
     end
   end
-  
+
   def validate_client_info(_), do: {:error, "Invalid client info format"}
-  
+
   @doc """
   Checks if a client is authorized to use specific MCP capabilities.
-  
+
   Implements capability-based authorization for fine-grained access control.
   """
   @spec authorize_capability(map(), String.t()) :: boolean()
@@ -108,28 +110,28 @@ defmodule RubberDuckWeb.MCPAuth do
           :allow -> true
           {:deny, _reason} -> false
         end
-        
+
       # Fallback to legacy authorization
       %{permissions: permissions} when is_list(permissions) ->
         capability in permissions or "*" in permissions
-        
+
       %{role: "admin"} ->
         true
-        
+
       %{role: "user"} ->
         capability in user_allowed_capabilities()
-        
+
       %{role: "readonly"} ->
         capability in readonly_capabilities()
-        
+
       _ ->
         false
     end
   end
-  
+
   @doc """
   Creates a secure session token for an authenticated client.
-  
+
   Returns a signed token that can be used for subsequent requests.
   """
   @spec create_session_token(map()) :: String.t()
@@ -140,17 +142,19 @@ defmodule RubberDuckWeb.MCPAuth do
         # SecurityManager already created a session, return its token
         # Extract token from security context metadata
         case RubberDuck.MCP.SessionManager.validate_token(session_id) do
-          {:ok, session} -> session.token
+          {:ok, session} ->
+            session.token
+
           _ ->
             # Fallback to creating our own token
             create_legacy_session_token(auth_context)
         end
-        
+
       _ ->
         create_legacy_session_token(auth_context)
     end
   end
-  
+
   defp create_legacy_session_token(auth_context) do
     session_data = %{
       user_id: auth_context.user_id,
@@ -158,10 +162,10 @@ defmodule RubberDuckWeb.MCPAuth do
       permissions: auth_context.permissions,
       expires_at: DateTime.add(DateTime.utc_now(), 3600, :second)
     }
-    
+
     Phoenix.Token.sign(RubberDuckWeb.Endpoint, "mcp_session", session_data)
   end
-  
+
   @doc """
   Verifies a session token and returns the associated context.
   """
@@ -174,12 +178,12 @@ defmodule RubberDuckWeb.MCPAuth do
         else
           {:error, "Session expired"}
         end
-        
+
       {:error, reason} ->
         {:error, "Invalid session token: #{reason}"}
     end
   end
-  
+
   @doc """
   Refreshes a session token if it's still valid.
   """
@@ -190,24 +194,24 @@ defmodule RubberDuckWeb.MCPAuth do
         # Create new token with extended expiration
         new_token = create_session_token(session_data)
         {:ok, new_token}
-        
+
       {:error, reason} ->
         {:error, reason}
     end
   end
-  
+
   # Private functions
-  
+
   defp extract_auth_credentials(params, connect_info) do
     cond do
       # Check for token in params
       Map.has_key?(params, "token") and is_binary(params["token"]) ->
         {:ok, :token, params["token"]}
-      
+
       # Check for API key in params
       Map.has_key?(params, "apiKey") and is_binary(params["apiKey"]) ->
         {:ok, :api_key, params["apiKey"]}
-      
+
       # Check for API key in query string
       true ->
         case extract_api_key_from_uri(connect_info) do
@@ -216,44 +220,44 @@ defmodule RubberDuckWeb.MCPAuth do
         end
     end
   end
-  
+
   defp extract_api_key_from_uri(%{uri: %{query: query}}) when is_binary(query) do
     case URI.decode_query(query) do
       %{"api_key" => api_key} when is_binary(api_key) and api_key != "" ->
         {:ok, api_key}
+
       %{"apiKey" => api_key} when is_binary(api_key) and api_key != "" ->
         {:ok, api_key}
+
       _ ->
         :error
     end
   end
-  
+
   defp extract_api_key_from_uri(_), do: :error
-  
-  
+
   defp validate_client_name(%{"name" => name}) when is_binary(name) and name != "" do
     {:ok, name}
   end
-  
+
   defp validate_client_name(_), do: {:error, "Missing or invalid client name"}
-  
+
   defp validate_client_version(%{"version" => version}) when is_binary(version) and version != "" do
     {:ok, version}
   end
-  
+
   defp validate_client_version(_), do: {:error, "Missing or invalid client version"}
-  
+
   defp validate_client_capabilities(client_info) do
     capabilities = Map.get(client_info, "capabilities", %{})
-    
+
     if is_map(capabilities) do
       {:ok, capabilities}
     else
       {:error, "Invalid client capabilities format"}
     end
   end
-  
-  
+
   defp user_allowed_capabilities do
     [
       "tools:list",
@@ -267,7 +271,7 @@ defmodule RubberDuckWeb.MCPAuth do
       "workflows:templates"
     ]
   end
-  
+
   defp readonly_capabilities do
     [
       "tools:list",
@@ -278,18 +282,18 @@ defmodule RubberDuckWeb.MCPAuth do
       "workflows:templates"
     ]
   end
-  
+
   defp sanitize_params(params) do
     params
     |> Map.drop(["token", "apiKey", "api_key", "password", "secret"])
     |> Map.put("sanitized", true)
   end
-  
+
   defp extract_ip_address(connect_info) do
     case connect_info do
       %{peer_data: %{address: {a, b, c, d}}} ->
         "#{a}.#{b}.#{c}.#{d}"
-        
+
       %{x_headers: headers} ->
         # Check for forwarded IP
         Enum.find_value(headers, fn
@@ -297,12 +301,12 @@ defmodule RubberDuckWeb.MCPAuth do
           {"x-real-ip", ip} -> String.trim(ip)
           _ -> nil
         end)
-        
+
       _ ->
         nil
     end
   end
-  
+
   defp extract_user_agent(connect_info) do
     case connect_info do
       %{x_headers: headers} ->
@@ -310,12 +314,12 @@ defmodule RubberDuckWeb.MCPAuth do
           {"user-agent", ua} -> ua
           _ -> nil
         end)
-        
+
       _ ->
         nil
     end
   end
-  
+
   defp determine_role_from_capabilities(capabilities) do
     cond do
       MapSet.member?(capabilities, "admin:*") -> "admin"

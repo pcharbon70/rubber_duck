@@ -38,7 +38,7 @@ defmodule RubberDuck.Engines.Generation do
   @behaviour RubberDuck.Engine
 
   require Logger
-  
+
   alias RubberDuck.LLM.Config
   alias RubberDuck.CoT.Manager, as: ConversationManager
   alias RubberDuck.CoT.Chains.GenerationChain
@@ -106,7 +106,7 @@ defmodule RubberDuck.Engines.Generation do
   @impl true
   def execute(input, state) do
     Logger.debug("Generation engine execute called with input: #{inspect(input)}")
-    
+
     with {:ok, validated_input} <- validate_input(input) do
       # Build CoT context
       cot_context = %{
@@ -123,14 +123,14 @@ defmodule RubberDuck.Engines.Generation do
         similar_patterns: get_similar_patterns_from_state(validated_input, state),
         available_libraries: get_language_libraries(validated_input.language)
       }
-      
+
       Logger.debug("Executing CoT generation chain")
-      
+
       # Execute CoT generation chain
       case ConversationManager.execute_chain(GenerationChain, validated_input.prompt, cot_context) do
         {:ok, cot_session} ->
           generation_result = extract_generation_result_from_cot(cot_session)
-          
+
           # Build final result
           enhanced = %{
             code: generation_result.code,
@@ -146,23 +146,23 @@ defmodule RubberDuck.Engines.Generation do
               validation: generation_result.validation
             }
           }
-          
+
           # Update history
           _updated_state = update_history(state, validated_input.prompt, enhanced.code)
-          
+
           # Emit telemetry
           :telemetry.execute(
             [:rubber_duck, :generation, :completed],
             %{confidence: enhanced.confidence},
             %{language: validated_input.language}
           )
-          
+
           {:ok, enhanced}
-          
+
         {:error, reason} ->
           Logger.error("CoT generation chain error: #{inspect(reason)}")
           Logger.warning("Falling back to legacy generation")
-          
+
           # Fallback to existing implementation
           legacy_generate(input, state)
       end
@@ -172,7 +172,7 @@ defmodule RubberDuck.Engines.Generation do
         error
     end
   end
-  
+
   # Legacy generation function for fallback
   defp legacy_generate(input, state) do
     with {:ok, validated_input} <- validate_input(input),
@@ -181,15 +181,14 @@ defmodule RubberDuck.Engines.Generation do
          {:ok, generated} <- generate_code(prompt, validated_input, state),
          {:ok, validated} <- validate_generated_code(generated, validated_input, state),
          {:ok, enhanced} <- enhance_with_imports(validated, validated_input, state) do
-      
       _updated_state = update_history(state, validated_input.prompt, enhanced.code)
-      
+
       :telemetry.execute(
         [:rubber_duck, :generation, :completed],
         %{confidence: enhanced.confidence, fallback: true},
         %{language: validated_input.language}
       )
-      
+
       {:ok, enhanced}
     end
   end
@@ -582,10 +581,10 @@ defmodule RubberDuck.Engines.Generation do
   defp generate_code(prompt, input, state) do
     # Call LLM service to generate code
     Logger.debug("Calling LLM service for code generation")
-    
+
     # Get current provider and model from config
     {provider, model} = get_provider_and_model_for_language(input.language)
-    
+
     opts = [
       provider: provider,
       model: model,
@@ -595,9 +594,10 @@ defmodule RubberDuck.Engines.Generation do
       ],
       temperature: state.config[:temperature] || 0.7,
       max_tokens: state.config[:max_tokens] || 4096,
-      timeout: 280_000  # 4.5 minutes, slightly less than the 5 minute engine timeout
+      # 4.5 minutes, slightly less than the 5 minute engine timeout
+      timeout: 280_000
     ]
-    
+
     Logger.debug("LLM request options: #{inspect(opts)}")
 
     case RubberDuck.LLM.Service.completion(opts) do
@@ -662,12 +662,12 @@ defmodule RubberDuck.Engines.Generation do
     case Config.get_current_provider_and_model() do
       {provider, model} when not is_nil(provider) and not is_nil(model) ->
         {provider, model}
+
       _ ->
         # Fallback to defaults if not configured
         {:ollama, "codellama"}
     end
   end
-  
 
   defp get_system_prompt(language) do
     """
@@ -745,6 +745,7 @@ defmodule RubberDuck.Engines.Generation do
             Logger.debug("Extracted code: #{inspect(code)}")
             # Apply simple refactoring based on instruction
             refactor_elixir_code(code, input.prompt)
+
           error ->
             Logger.debug("Failed to extract code: #{inspect(error)}")
             # Fallback
@@ -757,6 +758,7 @@ defmodule RubberDuck.Engines.Generation do
         case extract_code_from_prompt(input.prompt) do
           {:ok, code} ->
             generate_tests_for_elixir(code, input.prompt)
+
           _ ->
             # Fallback test template
             """
@@ -902,30 +904,32 @@ defmodule RubberDuck.Engines.Generation do
         case extract_code_from_prompt(input.prompt) do
           {:ok, code} ->
             generate_tests_for_python(code, input.prompt)
+
           _ ->
             # Fallback test template
             """
             import unittest
-            
+
             class TestModule(unittest.TestCase):
                 def test_basic(self):
                     self.assertTrue(True)
-            
+
             if __name__ == '__main__':
                 unittest.main()
             """
         end
-        
+
       # Handle refactoring requests
       String.contains?(input.prompt, "Refactor") ->
         # Extract the code from the prompt
         case extract_code_from_prompt(input.prompt) do
           {:ok, code} ->
             refactor_python_code(code, input.prompt)
+
           _ ->
             "# Unable to extract code from prompt"
         end
-        
+
       true ->
         """
         # Generated code for: #{input.prompt}
@@ -1270,11 +1274,11 @@ defmodule RubberDuck.Engines.Generation do
   end
 
   # CoT integration helpers
-  
+
   defp get_similar_patterns_from_state(input, state) do
     # Get similar patterns from history and cache
     keywords = extract_keywords(input.prompt)
-    
+
     state.history
     |> Enum.filter(fn record ->
       record_keywords = extract_keywords(record.prompt)
@@ -1289,7 +1293,7 @@ defmodule RubberDuck.Engines.Generation do
     end)
     |> Enum.take(5)
   end
-  
+
   defp get_language_libraries(language) do
     case language do
       :elixir -> ["GenServer", "Enum", "Task", "Process", "Ecto", "Phoenix", "Plug"]
@@ -1298,7 +1302,7 @@ defmodule RubberDuck.Engines.Generation do
       _ -> []
     end
   end
-  
+
   defp extract_generation_result_from_cot(cot_session) do
     # Extract results from the CoT session steps
     requirements = get_cot_step_result(cot_session, :understand_requirements)
@@ -1310,7 +1314,7 @@ defmodule RubberDuck.Engines.Generation do
     tests = get_cot_step_result(cot_session, :generate_tests)
     validation = get_cot_step_result(cot_session, :validate_output)
     alternatives = get_cot_step_result(cot_session, :provide_alternatives)
-    
+
     %{
       code: extract_code_from_cot(documentation || implementation),
       dependencies: parse_cot_dependencies(dependencies),
@@ -1322,45 +1326,53 @@ defmodule RubberDuck.Engines.Generation do
       requirements: requirements
     }
   end
-  
+
   defp get_cot_step_result(cot_session, step_name) do
     case Map.get(cot_session[:steps], step_name) do
       %{result: result} -> result
       _ -> nil
     end
   end
-  
+
   defp extract_code_from_cot(text) when is_binary(text) do
     # Extract code blocks from the text
     case Regex.scan(~r/```(?:elixir|ex|javascript|js|python|py)?\n(.*?)```/s, text) do
-      [[_, code] | _] -> String.trim(code)
-      _ -> 
+      [[_, code] | _] ->
+        String.trim(code)
+
+      _ ->
         # If no code block found, try to extract from the text
         text
         |> String.split("\n")
-        |> Enum.drop_while(&(!String.starts_with?(&1, "defmodule") && 
-                             !String.starts_with?(&1, "def ") &&
-                             !String.starts_with?(&1, "function") &&
-                             !String.starts_with?(&1, "class ")))
+        |> Enum.drop_while(
+          &(!String.starts_with?(&1, "defmodule") &&
+              !String.starts_with?(&1, "def ") &&
+              !String.starts_with?(&1, "function") &&
+              !String.starts_with?(&1, "class "))
+        )
         |> Enum.join("\n")
         |> String.trim()
     end
   end
+
   defp extract_code_from_cot(_), do: ""
-  
+
   defp parse_cot_dependencies(deps_text) when is_binary(deps_text) do
     # Extract imports and dependencies from CoT output
-    imports = Regex.scan(~r/(?:import|alias|use|require|from)\s+([A-Z][\w.]+)/, deps_text)
-    |> Enum.map(fn [_, module] -> module end)
-    |> Enum.uniq()
-    
-    deps = Regex.scan(~r/{:(\w+),\s*"~> ([\d.]+)"}/, deps_text)
-    |> Enum.map(fn [_, name, version] -> {name, version} end)
-    
+    imports =
+      Regex.scan(~r/(?:import|alias|use|require|from)\s+([A-Z][\w.]+)/, deps_text)
+      |> Enum.map(fn [_, module] -> module end)
+      |> Enum.uniq()
+
+    deps =
+      Regex.scan(~r/{:(\w+),\s*"~> ([\d.]+)"}/, deps_text)
+      |> Enum.map(fn [_, name, version] -> {name, version} end)
+
     %{imports: imports, dependencies: deps}
   end
+
   defp parse_cot_dependencies(_), do: %{imports: [], dependencies: []}
-  
+
   defp extract_cot_documentation(doc_text) when is_binary(doc_text) do
     # Extract documentation sections
     doc_text
@@ -1368,8 +1380,9 @@ defmodule RubberDuck.Engines.Generation do
     |> Enum.filter(&String.contains?(&1, ["@doc", "@moduledoc", "@spec", "\"\"\"", "/**"]))
     |> Enum.join("\n")
   end
+
   defp extract_cot_documentation(_), do: ""
-  
+
   defp extract_cot_tests(tests_text) when is_binary(tests_text) do
     # Extract test code
     case Regex.scan(~r/```(?:elixir|ex|javascript|js|python|py)?\n(.*?)```/s, tests_text) do
@@ -1377,11 +1390,14 @@ defmodule RubberDuck.Engines.Generation do
         codes
         |> Enum.map(fn [_, code] -> String.trim(code) end)
         |> Enum.join("\n\n")
-      _ -> tests_text || ""
+
+      _ ->
+        tests_text || ""
     end
   end
+
   defp extract_cot_tests(_), do: ""
-  
+
   defp parse_cot_alternatives(alt_text) when is_binary(alt_text) do
     # Extract alternative approaches
     alt_text
@@ -1390,8 +1406,9 @@ defmodule RubberDuck.Engines.Generation do
     |> Enum.map(&String.trim/1)
     |> Enum.filter(&(String.length(&1) > 10))
   end
+
   defp parse_cot_alternatives(_), do: []
-  
+
   defp parse_cot_validation(val_text) when is_binary(val_text) do
     # Extract validation results
     %{
@@ -1400,49 +1417,55 @@ defmodule RubberDuck.Engines.Generation do
       warnings: extract_validation_warnings(val_text)
     }
   end
+
   defp parse_cot_validation(_), do: %{passed: true, checks: [], warnings: []}
-  
+
   defp extract_validation_checks(text) when is_binary(text) do
     text
     |> String.split("\n")
     |> Enum.filter(&String.match?(&1, ~r/^\d+\./))
     |> Enum.map(&String.replace(&1, ~r/^\d+\.\s*/, ""))
   end
+
   defp extract_validation_checks(_), do: []
-  
+
   defp extract_validation_warnings(text) when is_binary(text) do
     text
     |> String.split("\n")
     |> Enum.filter(&String.contains?(String.downcase(&1), ["warning", "note", "caution"]))
     |> Enum.map(&String.trim/1)
   end
+
   defp extract_validation_warnings(_), do: []
-  
+
   defp calculate_confidence_from_validation(validation) do
     base = if validation.passed, do: 0.9, else: 0.6
     warning_penalty = length(validation.warnings) * 0.05
-    
+
     max(base - warning_penalty, 0.5)
   end
 
   defp extract_code_from_prompt(prompt) do
     # Extract code from markdown code blocks in the prompt
     case Regex.run(~r/```(?:\w+)?\s*\n(.*?)```/s, prompt) do
-      [_, code] -> 
+      [_, code] ->
         # Unescape the code if needed
-        unescaped = code
-        |> String.trim()
-        |> String.replace("\\\"", "\"")
-        |> String.replace("\\#", "#")
+        unescaped =
+          code
+          |> String.trim()
+          |> String.replace("\\\"", "\"")
+          |> String.replace("\\#", "#")
+
         {:ok, unescaped}
-      _ -> 
+
+      _ ->
         {:error, :no_code_found}
     end
   end
 
   defp refactor_elixir_code(code, prompt) do
     prompt_lower = String.downcase(prompt)
-    
+
     cond do
       String.contains?(prompt_lower, "documentation") ->
         # Add documentation to functions
@@ -1458,20 +1481,20 @@ defmodule RubberDuck.Engines.Generation do
             line
           end
         end)
-        
+
       String.contains?(prompt_lower, "rename") ->
         # Handle specific rename patterns
         cond do
           String.contains?(prompt_lower, "hello") and String.contains?(prompt_lower, "greet") ->
             code
             |> String.replace("def hello", "def greet")
-            
+
           true ->
             # Default: just prepend functions with new_ 
             code
             |> String.replace(~r/def (\w+)/, "def new_\\1")
         end
-        
+
       true ->
         # Default: just return the code with a comment
         "# Refactored code\n" <> code
@@ -1480,29 +1503,31 @@ defmodule RubberDuck.Engines.Generation do
 
   defp generate_tests_for_elixir(code, _prompt) do
     # Extract module name from code
-    module_name = 
+    module_name =
       case Regex.run(~r/defmodule\s+([A-Za-z0-9_.]+)/, code) do
         [_, name] -> name
         _ -> "Module"
       end
-    
+
     # Extract function definitions
-    functions = Regex.scan(~r/def\s+(\w+)/, code)
-    |> Enum.map(fn [_, func_name] -> func_name end)
-    |> Enum.reject(&(&1 in ["init", "handle_call", "handle_cast", "handle_info"]))
-    
+    functions =
+      Regex.scan(~r/def\s+(\w+)/, code)
+      |> Enum.map(fn [_, func_name] -> func_name end)
+      |> Enum.reject(&(&1 in ["init", "handle_call", "handle_cast", "handle_info"]))
+
     # Generate test module
-    test_functions = functions
-    |> Enum.map(fn func_name ->
-      "  describe \"#{func_name}/1\" do\n" <>
-      "    test \"#{func_name} works correctly\" do\n" <>
-      "      # TODO: Add actual test implementation\n" <>
-      "      assert is_function(&#{module_name}.#{func_name}/1)\n" <>
-      "    end\n" <>
-      "  end"
-    end)
-    |> Enum.join("\n\n")
-    
+    test_functions =
+      functions
+      |> Enum.map(fn func_name ->
+        "  describe \"#{func_name}/1\" do\n" <>
+          "    test \"#{func_name} works correctly\" do\n" <>
+          "      # TODO: Add actual test implementation\n" <>
+          "      assert is_function(&#{module_name}.#{func_name}/1)\n" <>
+          "    end\n" <>
+          "  end"
+      end)
+      |> Enum.join("\n\n")
+
     """
     defmodule #{module_name}Test do
       use ExUnit.Case
@@ -1529,25 +1554,27 @@ defmodule RubberDuck.Engines.Generation do
 
   defp generate_tests_for_python(code, _prompt) do
     # Extract class and function names from code
-    functions = Regex.scan(~r/def\s+(\w+)/, code)
-    |> Enum.map(fn [_, func_name] -> func_name end)
-    |> Enum.reject(&(&1 in ["__init__", "__str__", "__repr__"]))
-    
+    functions =
+      Regex.scan(~r/def\s+(\w+)/, code)
+      |> Enum.map(fn [_, func_name] -> func_name end)
+      |> Enum.reject(&(&1 in ["__init__", "__str__", "__repr__"]))
+
     # Generate test class
-    test_methods = functions
-    |> Enum.map(fn func_name ->
-      "    def test_#{func_name}(self):\n" <>
-      "        # TODO: Add actual test implementation\n" <>
-      "        self.assertTrue(True)"
-    end)
-    |> Enum.join("\n\n")
-    
+    test_methods =
+      functions
+      |> Enum.map(fn func_name ->
+        "    def test_#{func_name}(self):\n" <>
+          "        # TODO: Add actual test implementation\n" <>
+          "        self.assertTrue(True)"
+      end)
+      |> Enum.join("\n\n")
+
     """
     import unittest
-    
+
     class TestModule(unittest.TestCase):
     #{if test_methods == "", do: "    def test_basic(self):\n        self.assertTrue(True)", else: test_methods}
-    
+
     if __name__ == '__main__':
         unittest.main()
     """
@@ -1555,7 +1582,7 @@ defmodule RubberDuck.Engines.Generation do
 
   defp refactor_python_code(code, prompt) do
     prompt_lower = String.downcase(prompt)
-    
+
     cond do
       String.contains?(prompt_lower, "documentation") ->
         # Add docstrings to functions
@@ -1570,7 +1597,7 @@ defmodule RubberDuck.Engines.Generation do
             line
           end
         end)
-        
+
       true ->
         # Default: just return the code
         code

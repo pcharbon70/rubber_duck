@@ -1,18 +1,18 @@
 defmodule RubberDuck.Planning.DecompositionChains do
   @moduledoc """
   Chain-of-Thought reasoning chains for task decomposition.
-  
+
   Provides structured reasoning chains for different decomposition strategies
   and validation workflows.
   """
-  
+
   defmodule LinearDecomposition do
     @moduledoc """
     Chain for linear task decomposition - simple sequential tasks.
     """
-    
+
     @behaviour RubberDuck.CoT.ChainBehaviour
-    
+
     def config do
       %{
         name: :linear_decomposition,
@@ -23,16 +23,16 @@ defmodule RubberDuck.Planning.DecompositionChains do
         cache_ttl: 1800
       }
     end
-    
+
     def steps do
       [
         %{
           name: :understand_request,
           prompt: """
           Analyze this request and identify the main goal:
-          
+
           {{query}}
-          
+
           What is the user trying to achieve? Be specific.
           """,
           validates: [:has_goal_understanding],
@@ -42,13 +42,13 @@ defmodule RubberDuck.Planning.DecompositionChains do
           name: :identify_steps,
           prompt: """
           Based on the goal: {{understand_request}}
-          
+
           List the sequential steps needed to achieve this goal.
           Each step should be:
           - Atomic (can't be broken down further)
           - Actionable (clear what needs to be done)
           - Measurable (clear when it's complete)
-          
+
           Number each step.
           """,
           depends_on: [:understand_request],
@@ -60,7 +60,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           For each step identified:
           {{identify_steps}}
-          
+
           Add:
           1. Estimated complexity (trivial/simple/medium/complex/very_complex)
           2. Success criteria (how to know it's done)
@@ -75,12 +75,12 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           Review the task sequence:
           {{add_details}}
-          
+
           Check for:
           - Missing steps
           - Incorrect ordering
           - Unrealistic complexity estimates
-          
+
           Provide a final, validated task list.
           """,
           depends_on: [:add_details],
@@ -89,7 +89,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
         }
       ]
     end
-    
+
     def validators do
       %{
         has_goal_understanding: fn result ->
@@ -107,14 +107,14 @@ defmodule RubberDuck.Planning.DecompositionChains do
       }
     end
   end
-  
+
   defmodule HierarchicalDecomposition do
     @moduledoc """
     Chain for hierarchical task decomposition - complex features with sub-tasks.
     """
-    
+
     @behaviour RubberDuck.CoT.ChainBehaviour
-    
+
     def config do
       %{
         name: :hierarchical_decomposition,
@@ -125,16 +125,16 @@ defmodule RubberDuck.Planning.DecompositionChains do
         cache_ttl: 1800
       }
     end
-    
+
     def steps do
       [
         %{
           name: :analyze_scope,
           prompt: """
           Analyze the scope and complexity of this request:
-          
+
           {{query}}
-          
+
           Identify:
           1. Main components or modules
           2. Key phases or milestones
@@ -148,12 +148,12 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           Based on the analysis:
           {{analyze_scope}}
-          
+
           Create a hierarchical task structure:
           - Level 1: Major phases or components
           - Level 2: Tasks within each phase
           - Level 3: Sub-tasks if needed
-          
+
           Use indentation to show hierarchy.
           """,
           depends_on: [:analyze_scope],
@@ -165,7 +165,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           For the hierarchy:
           {{create_hierarchy}}
-          
+
           Define relationships:
           1. Dependencies between tasks (which must complete before others)
           2. Parallel tasks (which can be done simultaneously)
@@ -180,12 +180,12 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           For each task in the hierarchy:
           {{create_hierarchy}}
-          
+
           Estimate:
           1. Complexity level
           2. Approximate effort (in relative units)
           3. Risk factors
-          
+
           Roll up estimates to parent tasks.
           """,
           depends_on: [:create_hierarchy],
@@ -197,12 +197,12 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           For each task and phase:
           {{create_hierarchy}}
-          
+
           Define clear success criteria:
           - Measurable outcomes
           - Quality standards
           - Acceptance criteria
-          
+
           Ensure child task criteria support parent task success.
           """,
           depends_on: [:create_hierarchy],
@@ -211,7 +211,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
         }
       ]
     end
-    
+
     def validators do
       %{
         has_scope_analysis: fn result ->
@@ -232,14 +232,14 @@ defmodule RubberDuck.Planning.DecompositionChains do
       }
     end
   end
-  
+
   defmodule TreeOfThoughtDecomposition do
     @moduledoc """
     Chain for tree-of-thought decomposition - exploring multiple approaches.
     """
-    
+
     @behaviour RubberDuck.CoT.ChainBehaviour
-    
+
     def config do
       %{
         name: :tree_of_thought_decomposition,
@@ -250,7 +250,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
         cache_ttl: 1800
       }
     end
-    
+
     def steps do
       [
         %{
@@ -258,12 +258,12 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           For this request:
           {{query}}
-          
+
           Brainstorm 3-4 different approaches to tackle it:
           1. Name each approach
           2. Briefly describe the strategy
           3. List pros and cons
-          
+
           Be creative and consider different perspectives.
           """,
           validates: [:has_multiple_approaches],
@@ -274,7 +274,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           For the first approach from:
           {{brainstorm_approaches}}
-          
+
           Create a detailed task breakdown:
           - List all tasks needed
           - Identify dependencies
@@ -290,7 +290,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           For the second approach from:
           {{brainstorm_approaches}}
-          
+
           Create a detailed task breakdown:
           - List all tasks needed
           - Identify dependencies
@@ -306,7 +306,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           For the third approach from:
           {{brainstorm_approaches}}
-          
+
           Create a detailed task breakdown:
           - List all tasks needed
           - Identify dependencies
@@ -321,18 +321,18 @@ defmodule RubberDuck.Planning.DecompositionChains do
           name: :evaluate_approaches,
           prompt: """
           Compare the detailed approaches:
-          
+
           Approach 1: {{detail_approach_1}}
           Approach 2: {{detail_approach_2}}
           Approach 3: {{detail_approach_3}}
-          
+
           Evaluate based on:
           1. Total complexity
           2. Risk level
           3. Resource requirements
           4. Time to completion
           5. Likelihood of success
-          
+
           Recommend the best approach and explain why.
           """,
           depends_on: [:detail_approach_1, :detail_approach_2, :detail_approach_3],
@@ -344,7 +344,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           Based on the evaluation:
           {{evaluate_approaches}}
-          
+
           Create the final task decomposition:
           1. Take the recommended approach
           2. Incorporate any good ideas from other approaches
@@ -357,7 +357,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
         }
       ]
     end
-    
+
     def validators do
       %{
         has_multiple_approaches: fn result ->
@@ -375,14 +375,14 @@ defmodule RubberDuck.Planning.DecompositionChains do
       }
     end
   end
-  
+
   defmodule TaskValidation do
     @moduledoc """
     Chain for validating decomposed tasks.
     """
-    
+
     @behaviour RubberDuck.CoT.ChainBehaviour
-    
+
     def config do
       %{
         name: :task_validation,
@@ -393,7 +393,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
         cache_ttl: 900
       }
     end
-    
+
     def steps do
       [
         %{
@@ -401,7 +401,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           Review this task decomposition:
           {{tasks}}
-          
+
           Check for completeness:
           1. Does it fully address the original request?
           2. Are there any missing steps?
@@ -417,7 +417,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
           Analyze task dependencies:
           {{tasks}}
           {{dependencies}}
-          
+
           Verify:
           1. All dependencies make logical sense
           2. No circular dependencies exist
@@ -433,7 +433,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           Review complexity estimates:
           {{tasks}}
-          
+
           Assess:
           1. Are complexity ratings realistic?
           2. Is the overall complexity manageable?
@@ -449,7 +449,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           Examine success criteria:
           {{tasks}}
-          
+
           Validate that each task has:
           1. Clear, measurable success criteria
           2. Realistic acceptance standards
@@ -468,7 +468,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
           - Dependencies: {{verify_dependencies}}
           - Complexity: {{assess_complexity}}
           - Criteria: {{validate_criteria}}
-          
+
           Provide:
           1. Overall assessment (valid/needs work)
           2. Specific improvements needed
@@ -481,7 +481,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
         }
       ]
     end
-    
+
     def validators do
       %{
         has_completeness_check: fn result ->
@@ -502,14 +502,14 @@ defmodule RubberDuck.Planning.DecompositionChains do
       }
     end
   end
-  
+
   defmodule RefinementChain do
     @moduledoc """
     Chain for iterative refinement of task decompositions.
     """
-    
+
     @behaviour RubberDuck.CoT.ChainBehaviour
-    
+
     def config do
       %{
         name: :task_refinement,
@@ -520,7 +520,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
         cache_ttl: 900
       }
     end
-    
+
     def steps do
       [
         %{
@@ -529,7 +529,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
           Review this task decomposition and feedback:
           {{tasks}}
           {{feedback}}
-          
+
           Identify specific issues:
           1. Which tasks need clarification?
           2. What dependencies are problematic?
@@ -544,7 +544,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           For each issue identified:
           {{identify_issues}}
-          
+
           Propose specific solutions:
           1. How to clarify unclear tasks
           2. How to fix dependency problems
@@ -560,10 +560,10 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           Apply the proposed solutions:
           {{propose_solutions}}
-          
+
           To the original tasks:
           {{tasks}}
-          
+
           Provide the refined task list with all improvements incorporated.
           """,
           depends_on: [:propose_solutions],
@@ -575,10 +575,10 @@ defmodule RubberDuck.Planning.DecompositionChains do
           prompt: """
           Compare refined version:
           {{apply_refinements}}
-          
+
           With original:
           {{tasks}}
-          
+
           Verify:
           1. All issues have been addressed
           2. No new problems introduced
@@ -591,7 +591,7 @@ defmodule RubberDuck.Planning.DecompositionChains do
         }
       ]
     end
-    
+
     def validators do
       %{
         has_issue_identification: fn result ->

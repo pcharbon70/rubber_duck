@@ -1,9 +1,9 @@
 defmodule RubberDuck.MCP.ClientTest do
   use ExUnit.Case, async: false
-  
+
   alias RubberDuck.MCP.Client
   alias RubberDuck.MCP.ClientSupervisor
-  
+
   @moduletag :mcp
 
   setup do
@@ -18,11 +18,11 @@ defmodule RubberDuck.MCP.ClientTest do
         transport: {:stdio, command: "echo", args: ["test"]},
         capabilities: [:tools]
       ]
-      
+
       assert {:ok, pid} = Client.start_link(opts)
       assert is_pid(pid)
       assert Process.alive?(pid)
-      
+
       assert :ok = Client.stop(:test_client)
       refute Process.alive?(pid)
     end
@@ -33,10 +33,10 @@ defmodule RubberDuck.MCP.ClientTest do
         transport: {:stdio, command: "echo", args: ["test"]},
         capabilities: [:tools]
       ]
-      
+
       assert {:ok, _pid} = Client.start_link(opts)
       assert RubberDuck.MCP.Client.Registry.registered?(:registry_test_client)
-      
+
       Client.stop(:registry_test_client)
       refute RubberDuck.MCP.Client.Registry.registered?(:registry_test_client)
     end
@@ -48,12 +48,12 @@ defmodule RubberDuck.MCP.ClientTest do
         capabilities: [:tools],
         auto_reconnect: false
       ]
-      
+
       assert {:ok, pid} = Client.start_link(opts)
-      
+
       # Give it time to fail
       Process.sleep(100)
-      
+
       # Should have stopped due to connection failure
       refute Process.alive?(pid)
     end
@@ -66,7 +66,7 @@ defmodule RubberDuck.MCP.ClientTest do
         transport: {:stdio, command: "echo", args: ["hello"]},
         capabilities: [:tools]
       ]
-      
+
       assert {:ok, pid} = Client.start_link(opts)
       assert is_pid(pid)
       Client.stop(:stdio_client)
@@ -78,7 +78,7 @@ defmodule RubberDuck.MCP.ClientTest do
         transport: {:http_sse, url: "http://localhost:8080/mcp", headers: %{"Authorization" => "Bearer token"}},
         capabilities: [:tools, :resources]
       ]
-      
+
       assert {:ok, pid} = Client.start_link(opts)
       assert is_pid(pid)
       Client.stop(:http_sse_client)
@@ -90,7 +90,7 @@ defmodule RubberDuck.MCP.ClientTest do
         transport: {:websocket, url: "ws://localhost:8080/mcp", headers: %{"Authorization" => "Bearer token"}},
         capabilities: [:tools, :resources, :prompts]
       ]
-      
+
       assert {:ok, pid} = Client.start_link(opts)
       assert is_pid(pid)
       Client.stop(:websocket_client)
@@ -106,13 +106,13 @@ defmodule RubberDuck.MCP.ClientTest do
         transport: {:stdio, command: "echo", args: ["test"]},
         capabilities: [:tools, :resources, :prompts]
       ]
-      
+
       {:ok, _pid} = Client.start_link(opts)
-      
+
       on_exit(fn ->
         Client.stop(:capability_client)
       end)
-      
+
       :ok
     end
 
@@ -131,13 +131,13 @@ defmodule RubberDuck.MCP.ClientTest do
         transport: {:stdio, command: "echo", args: ["test"]},
         capabilities: [:tools]
       ]
-      
+
       {:ok, _pid} = Client.start_link(opts)
-      
+
       on_exit(fn ->
         Client.stop(:tool_client)
       end)
-      
+
       :ok
     end
 
@@ -158,7 +158,7 @@ defmodule RubberDuck.MCP.ClientTest do
     test "returns error when not connected" do
       # Stop the client to simulate disconnection
       Client.stop(:tool_client)
-      
+
       # Start a new one that won't connect
       opts = [
         name: :disconnected_client,
@@ -166,13 +166,14 @@ defmodule RubberDuck.MCP.ClientTest do
         capabilities: [:tools],
         auto_reconnect: false
       ]
-      
+
       {:ok, _pid} = Client.start_link(opts)
-      Process.sleep(100)  # Let it fail to connect
-      
+      # Let it fail to connect
+      Process.sleep(100)
+
       assert {:error, :not_connected} = Client.list_tools(:disconnected_client)
       assert {:error, :not_connected} = Client.call_tool(:disconnected_client, "test", %{})
-      
+
       Client.stop(:disconnected_client)
     end
   end
@@ -182,14 +183,12 @@ defmodule RubberDuck.MCP.ClientTest do
       opts = [
         name: :oauth_client,
         transport: {:http_sse, url: "http://localhost:8080/mcp", headers: %{}},
-        auth: {:oauth2, 
-          client_id: "test_client",
-          client_secret: "test_secret",
-          token_url: "http://localhost:8080/oauth/token"
-        },
+        auth:
+          {:oauth2,
+           client_id: "test_client", client_secret: "test_secret", token_url: "http://localhost:8080/oauth/token"},
         capabilities: [:tools]
       ]
-      
+
       assert {:ok, _pid} = Client.start_link(opts)
       Client.stop(:oauth_client)
     end
@@ -201,7 +200,7 @@ defmodule RubberDuck.MCP.ClientTest do
         auth: {:api_key, key: "test_api_key"},
         capabilities: [:tools]
       ]
-      
+
       assert {:ok, _pid} = Client.start_link(opts)
       Client.stop(:api_key_client)
     end
@@ -213,7 +212,7 @@ defmodule RubberDuck.MCP.ClientTest do
         auth: {:certificate, cert: "cert.pem", key: "key.pem"},
         capabilities: [:tools]
       ]
-      
+
       assert {:ok, _pid} = Client.start_link(opts)
       Client.stop(:cert_client)
     end
@@ -226,19 +225,19 @@ defmodule RubberDuck.MCP.ClientTest do
         transport: {:stdio, command: "echo", args: ["test"]},
         capabilities: [:tools]
       ]
-      
+
       {:ok, _pid} = Client.start_link(opts)
-      
+
       on_exit(fn ->
         Client.stop(:health_client)
       end)
-      
+
       :ok
     end
 
     test "reports health status" do
       {:ok, health} = Client.health_check(:health_client)
-      
+
       assert is_map(health)
       assert health.status in [:initializing, :connecting, :connected, :disconnected, :error]
       assert is_boolean(health.connected)
@@ -266,25 +265,26 @@ defmodule RubberDuck.MCP.ClientTest do
         capabilities: [:tools],
         timeout: 5000
       ]
-      
+
       {:ok, _pid} = Client.start_link(opts)
-      
+
       on_exit(fn ->
         Client.stop(:concurrent_client)
       end)
-      
+
       :ok
     end
 
     @tag :skip
     test "handles concurrent tool calls" do
       # Would need mock server that can handle concurrent requests
-      tasks = for i <- 1..10 do
-        Task.async(fn ->
-          Client.call_tool(:concurrent_client, "test_tool", %{id: i})
-        end)
-      end
-      
+      tasks =
+        for i <- 1..10 do
+          Task.async(fn ->
+            Client.call_tool(:concurrent_client, "test_tool", %{id: i})
+          end)
+        end
+
       results = Task.await_many(tasks)
       assert length(results) == 10
     end
@@ -298,12 +298,12 @@ defmodule RubberDuck.MCP.ClientTest do
         capabilities: [:tools],
         timeout: 100
       ]
-      
+
       assert {:ok, _pid} = Client.start_link(opts)
-      
+
       # This should timeout
       assert {:error, :timeout} = Client.list_tools(:timeout_client, timeout: 100)
-      
+
       Client.stop(:timeout_client)
     end
 
@@ -314,9 +314,9 @@ defmodule RubberDuck.MCP.ClientTest do
         capabilities: [:tools],
         auto_reconnect: false
       ]
-      
+
       assert {:ok, pid} = Client.start_link(opts)
-      
+
       # Should fail to connect and stop
       Process.sleep(100)
       refute Process.alive?(pid)
@@ -334,34 +334,35 @@ defmodule RubberDuck.MCP.ClientTest do
         &__MODULE__.handle_telemetry_event/4,
         nil
       )
-      
+
       on_exit(fn ->
         :telemetry.detach("test-mcp-client")
       end)
-      
+
       :ok
     end
 
     test "emits telemetry events" do
       # Store events in process dictionary for testing
       Process.put(:telemetry_events, [])
-      
+
       opts = [
         name: :telemetry_client,
         transport: {:stdio, command: "echo", args: ["test"]},
         capabilities: [:tools]
       ]
-      
+
       {:ok, _pid} = Client.start_link(opts)
-      
+
       # Give it time to connect
       Process.sleep(100)
-      
+
       events = Process.get(:telemetry_events)
-      assert Enum.any?(events, fn {event, _, _} -> 
-        event == [:rubber_duck, :mcp, :client, :connected]
-      end)
-      
+
+      assert Enum.any?(events, fn {event, _, _} ->
+               event == [:rubber_duck, :mcp, :client, :connected]
+             end)
+
       Client.stop(:telemetry_client)
     end
   end

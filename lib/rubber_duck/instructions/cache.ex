@@ -1,12 +1,12 @@
 defmodule RubberDuck.Instructions.Cache do
   @moduledoc """
   High-performance instruction caching system extending RubberDuck.Context.Cache patterns.
-  
+
   Provides multi-layer caching for instruction content with intelligent invalidation,
   cache warming, and seamless integration with the hierarchical instruction management system.
-  
+
   ## Features
-  
+
   - **Multi-Layer Caching**: Separate caches for parsed content vs compiled templates
   - **Adaptive TTL**: Smart expiration based on file types and usage patterns
   - **Hierarchical Keys**: Context-aware cache keys supporting project/workspace/global scopes
@@ -14,16 +14,16 @@ defmodule RubberDuck.Instructions.Cache do
   - **Cache Warming**: Background pre-compilation of frequently used instructions
   - **Performance Monitoring**: Comprehensive telemetry integration
   - **Distributed Support**: Multi-node synchronization and replication
-  
+
   ## Cache Layers
-  
+
   1. **Parsed Content Cache**: Raw parsed instruction content with metadata
   2. **Compiled Template Cache**: Rendered templates ready for LLM consumption
   3. **Registry Cache**: Instruction registry entries with version tracking
   4. **Analytics Cache**: Usage patterns and performance metrics
-  
+
   ## Usage Examples
-  
+
       # Initialize cache system
       {:ok, _pid} = RubberDuck.Instructions.Cache.start_link()
       
@@ -66,12 +66,12 @@ defmodule RubberDuck.Instructions.Cache do
   @type cache_key :: {cache_layer(), scope(), String.t(), String.t()}
   @type scope :: :project | :workspace | :global | :directory
   @type cache_entry :: %{
-    value: term(),
-    inserted_at: integer(),
-    expires_at: integer(),
-    access_count: integer(),
-    last_accessed: integer()
-  }
+          value: term(),
+          inserted_at: integer(),
+          expires_at: integer(),
+          access_count: integer(),
+          last_accessed: integer()
+        }
 
   ## Public API
 
@@ -85,9 +85,9 @@ defmodule RubberDuck.Instructions.Cache do
 
   @doc """
   Builds a hierarchical cache key for instruction content.
-  
+
   ## Examples
-  
+
       iex> Cache.build_key(:parsed, :project, "/path/to/AGENTS.md", "abc123")
       {:parsed, :project, "/path/to/AGENTS.md", "abc123"}
       
@@ -101,7 +101,7 @@ defmodule RubberDuck.Instructions.Cache do
 
   @doc """
   Retrieves content from the cache.
-  
+
   Returns `{:ok, value}` on cache hit, `:miss` on cache miss or expiration.
   """
   @spec get(cache_key()) :: {:ok, term()} | :miss
@@ -111,7 +111,7 @@ defmodule RubberDuck.Instructions.Cache do
 
   @doc """
   Stores content in the cache with optional TTL.
-  
+
   TTL is automatically determined based on file type and scope if not specified.
   """
   @spec put(cache_key(), term(), keyword()) :: :ok
@@ -122,9 +122,9 @@ defmodule RubberDuck.Instructions.Cache do
 
   @doc """
   Invalidates cache entries based on pattern matching.
-  
+
   ## Examples
-  
+
       # Invalidate all entries for a specific file
       Cache.invalidate_file("/path/to/AGENTS.md")
       
@@ -203,50 +203,49 @@ defmodule RubberDuck.Instructions.Cache do
 
   def handle_call({:get, cache_key}, _from, state) do
     table = get_table_for_layer(elem(cache_key, 0), state.tables)
-    
-    result = if table do
-      now = :os.system_time(:millisecond)
-      
-      case :ets.lookup(table, cache_key) do
-        [{^cache_key, entry}] ->
-          if entry.expires_at > now do
-            # Update access statistics
-            updated_entry = %{entry | 
-              access_count: entry.access_count + 1,
-              last_accessed: now
-            }
-            :ets.insert(table, {cache_key, updated_entry})
-            
-            emit_telemetry(:cache_hit, %{cache_key: cache_key})
-            {:ok, entry.value}
-          else
-            # Expired entry
-            :ets.delete(table, cache_key)
-            emit_telemetry(:cache_miss, %{cache_key: cache_key, reason: :expired})
+
+    result =
+      if table do
+        now = :os.system_time(:millisecond)
+
+        case :ets.lookup(table, cache_key) do
+          [{^cache_key, entry}] ->
+            if entry.expires_at > now do
+              # Update access statistics
+              updated_entry = %{entry | access_count: entry.access_count + 1, last_accessed: now}
+              :ets.insert(table, {cache_key, updated_entry})
+
+              emit_telemetry(:cache_hit, %{cache_key: cache_key})
+              {:ok, entry.value}
+            else
+              # Expired entry
+              :ets.delete(table, cache_key)
+              emit_telemetry(:cache_miss, %{cache_key: cache_key, reason: :expired})
+              :miss
+            end
+
+          [] ->
+            emit_telemetry(:cache_miss, %{cache_key: cache_key, reason: :not_found})
             :miss
-          end
-        [] ->
-          emit_telemetry(:cache_miss, %{cache_key: cache_key, reason: :not_found})
-          :miss
+        end
+      else
+        # Invalid cache layer
+        emit_telemetry(:cache_error, %{cache_key: cache_key, reason: :invalid_layer})
+        :miss
       end
-    else
-      # Invalid cache layer
-      emit_telemetry(:cache_error, %{cache_key: cache_key, reason: :invalid_layer})
-      :miss
-    end
 
     # Update stats
     updated_stats = update_stats(state.stats, result)
-    
+
     {:reply, result, %{state | stats: updated_stats}}
   end
 
   def handle_call({:put, cache_key, value, ttl}, _from, state) do
     table = get_table_for_layer(elem(cache_key, 0), state.tables)
-    
+
     if table do
       now = :os.system_time(:millisecond)
-      
+
       entry = %{
         value: value,
         inserted_at: now,
@@ -256,9 +255,9 @@ defmodule RubberDuck.Instructions.Cache do
       }
 
       :ets.insert(table, {cache_key, entry})
-      
+
       emit_telemetry(:cache_put, %{cache_key: cache_key, ttl: ttl})
-      
+
       # Check cache size and cleanup if needed
       if should_cleanup?(table) do
         cleanup_table(table)
@@ -302,14 +301,15 @@ defmodule RubberDuck.Instructions.Cache do
   def handle_info(:cleanup, state) do
     cleanup_all_tables(state.tables)
     schedule_cleanup()
-    
+
     updated_stats = reset_periodic_stats(state.stats)
     cleanup_counter = state.cleanup_counter + 1
-    
-    if rem(cleanup_counter, 12) == 0 do  # Every hour
+
+    # Every hour
+    if rem(cleanup_counter, 12) == 0 do
       emit_telemetry(:cache_maintenance, %{cleanup_counter: cleanup_counter})
     end
-    
+
     {:noreply, %{state | stats: updated_stats, cleanup_counter: cleanup_counter}}
   end
 
@@ -334,7 +334,8 @@ defmodule RubberDuck.Instructions.Cache do
   defp get_table_for_layer(:compiled, tables), do: tables.compiled
   defp get_table_for_layer(:registry, tables), do: tables.registry
   defp get_table_for_layer(:analytics, tables), do: tables.analytics
-  defp get_table_for_layer(_, _), do: nil  # Handle invalid layers gracefully
+  # Handle invalid layers gracefully
+  defp get_table_for_layer(_, _), do: nil
 
   defp determine_ttl({_layer, scope, file_path, _hash}) do
     cond do
@@ -355,7 +356,7 @@ defmodule RubberDuck.Instructions.Cache do
       ~r/\.local\//,
       ~r/\/tmp\//
     ]
-    
+
     Enum.any?(dev_patterns, &Regex.match?(&1, file_path))
   end
 
@@ -373,14 +374,16 @@ defmodule RubberDuck.Instructions.Cache do
   defp update_stats(stats, {:ok, _value}) do
     %{stats | hits: stats.hits + 1}
   end
+
   defp update_stats(stats, :miss) do
     %{stats | misses: stats.misses + 1}
   end
 
   defp calculate_comprehensive_stats(tables, stats) do
-    total_entries = Enum.reduce(tables, 0, fn {_layer, table}, acc ->
-      acc + :ets.info(table, :size)
-    end)
+    total_entries =
+      Enum.reduce(tables, 0, fn {_layer, table}, acc ->
+        acc + :ets.info(table, :size)
+      end)
 
     total_requests = stats.hits + stats.misses
     hit_rate = if total_requests > 0, do: stats.hits / total_requests, else: 0.0
@@ -400,10 +403,11 @@ defmodule RubberDuck.Instructions.Cache do
 
   defp calculate_layer_stats(tables) do
     Enum.map(tables, fn {layer, table} ->
-      {layer, %{
-        size: :ets.info(table, :size),
-        memory: :ets.info(table, :memory)
-      }}
+      {layer,
+       %{
+         size: :ets.info(table, :size),
+         memory: :ets.info(table, :memory)
+       }}
     end)
     |> Enum.into(%{})
   end
@@ -428,13 +432,14 @@ defmodule RubberDuck.Instructions.Cache do
     Enum.each(tables, fn {_layer, table} ->
       # Get all entries and filter by scope and root path
       all_entries = :ets.tab2list(table)
-      
+
       Enum.each(all_entries, fn {key, _entry} ->
         case key do
           {_layer, ^scope, file_path, _hash} ->
             if String.starts_with?(file_path, root_path) do
               :ets.delete(table, key)
             end
+
           _ ->
             :skip
         end
@@ -453,19 +458,19 @@ defmodule RubberDuck.Instructions.Cache do
 
   defp cleanup_table(table) do
     now = :os.system_time(:millisecond)
-    
+
     # Remove expired entries
     expired_pattern = {{:_, %{expires_at: :"$1"}}, [{:<, :"$1", now}], [true]}
     :ets.select_delete(table, [expired_pattern])
-    
+
     # If still over limit, remove least recently accessed
     if :ets.info(table, :size) > @max_cache_size do
       entries = :ets.select(table, [{{:"$1", :"$2"}, [], [{{:"$1", :"$2"}}]}])
-      
+
       # Sort by last_accessed and remove oldest 10%
       sorted_entries = Enum.sort_by(entries, fn {_key, entry} -> entry.last_accessed end)
       to_remove = trunc(length(sorted_entries) * 0.1)
-      
+
       Enum.take(sorted_entries, to_remove)
       |> Enum.each(fn {key, _entry} -> :ets.delete(table, key) end)
     end
@@ -482,7 +487,7 @@ defmodule RubberDuck.Instructions.Cache do
   defp perform_cache_warming(root_path, opts) do
     try do
       Logger.debug("Starting cache warming for: #{root_path}")
-      
+
       # Discover high-priority instruction files
       case Registry.list_instructions(scope: :project, active: true, limit: 50) do
         instructions when is_list(instructions) ->
@@ -490,14 +495,13 @@ defmodule RubberDuck.Instructions.Cache do
           Enum.each(instructions, fn instruction ->
             warm_instruction(instruction, opts)
           end)
-          
+
         _error ->
           Logger.warning("Failed to list instructions for cache warming")
       end
-      
+
       send(self(), {:cache_warming_complete, root_path})
       emit_telemetry(:cache_warming_complete, %{root_path: root_path})
-      
     rescue
       error ->
         Logger.error("Cache warming failed for #{root_path}: #{inspect(error)}")
@@ -509,21 +513,22 @@ defmodule RubberDuck.Instructions.Cache do
     # Build cache key for parsed content
     content_hash = :crypto.hash(:sha256, instruction.content) |> Base.encode16(case: :lower)
     parsed_key = build_key(:parsed, instruction.scope, instruction.path, content_hash)
-    
+
     # Cache parsed content if not already cached
     case get(parsed_key) do
       :miss ->
         case FormatParser.parse_file(instruction.path) do
           {:ok, parsed} ->
             put(parsed_key, parsed)
-            
+
             # Also warm compiled template cache
             compiled_key = build_key(:compiled, instruction.scope, instruction.path, content_hash)
             warm_compiled_template(compiled_key, parsed)
-            
+
           {:error, _reason} ->
             :skip
         end
+
       {:ok, _} ->
         :already_cached
     end
@@ -536,25 +541,21 @@ defmodule RubberDuck.Instructions.Cache do
       "language" => "elixir",
       "framework" => "phoenix"
     }
-    
+
     case RubberDuck.Instructions.TemplateProcessor.process_template(
-      parsed_content.content, 
-      common_variables
-    ) do
+           parsed_content.content,
+           common_variables
+         ) do
       {:ok, compiled} ->
         put(cache_key, compiled, ttl: @template_cache_ttl)
+
       {:error, _reason} ->
         :skip
     end
   end
 
   defp reset_periodic_stats(stats) do
-    %{stats | 
-      hits: 0, 
-      misses: 0, 
-      puts: 0, 
-      invalidations: 0
-    }
+    %{stats | hits: 0, misses: 0, puts: 0, invalidations: 0}
   end
 
   defp setup_telemetry() do
@@ -581,8 +582,12 @@ defmodule RubberDuck.Instructions.Cache do
   end
 
   # Analytics helper functions
-  defp calculate_cache_efficiency(_tables), do: %{efficiency: 0.85} # Placeholder
-  defp find_hot_files(_tables), do: [] # Placeholder
-  defp calculate_memory_usage(_tables), do: %{total_bytes: 0} # Placeholder
-  defp analyze_expiration_patterns(_tables), do: %{patterns: []} # Placeholder
+  # Placeholder
+  defp calculate_cache_efficiency(_tables), do: %{efficiency: 0.85}
+  # Placeholder
+  defp find_hot_files(_tables), do: []
+  # Placeholder
+  defp calculate_memory_usage(_tables), do: %{total_bytes: 0}
+  # Placeholder
+  defp analyze_expiration_patterns(_tables), do: %{patterns: []}
 end

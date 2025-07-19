@@ -157,15 +157,15 @@ defmodule RubberDuckWeb.MessageQueue do
     # Get all messages and filter them manually since ETS select_delete has limitations 
     # with complex data types like DateTime structs in match specifications
     all_messages = :ets.tab2list(@table_name)
-    
-    expired_keys = 
+
+    expired_keys =
       for {key, message} <- all_messages,
           message.expires_at && DateTime.to_unix(message.expires_at, :microsecond) < now_unix do
         key
       end
-    
+
     expired_count = length(expired_keys)
-    
+
     # Delete expired messages
     for key <- expired_keys do
       :ets.delete(@table_name, key)

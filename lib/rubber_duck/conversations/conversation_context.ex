@@ -2,11 +2,11 @@ defmodule RubberDuck.Conversations.ConversationContext do
   @moduledoc """
   Manages the context state for a conversation including memory, preferences,
   and conversation-specific settings.
-  
+
   This resource stores the conversational state that helps maintain context
   across multiple message exchanges and provides memory for the AI assistant.
   """
-  
+
   use Ash.Resource,
     otp_app: :rubber_duck,
     domain: RubberDuck.Conversations,
@@ -15,9 +15,9 @@ defmodule RubberDuck.Conversations.ConversationContext do
   postgres do
     table "conversation_contexts"
     repo RubberDuck.Repo
-    
+
     migration_types total_tokens_used: :bigint
-    
+
     references do
       reference :conversation, on_delete: :delete
     end
@@ -25,7 +25,7 @@ defmodule RubberDuck.Conversations.ConversationContext do
 
   actions do
     defaults [:read, :destroy, create: :*, update: :*]
-    
+
     read :get_by_conversation do
       argument :conversation_id, :uuid, allow_nil?: false
       filter expr(conversation_id == ^arg(:conversation_id))
@@ -120,7 +120,7 @@ defmodule RubberDuck.Conversations.ConversationContext do
       default 0
       public? true
       description "Total tokens used in this conversation across all messages"
-      constraints [min: 0]
+      constraints min: 0
     end
 
     create_timestamp :inserted_at
@@ -133,6 +133,4 @@ defmodule RubberDuck.Conversations.ConversationContext do
       allow_nil? false
     end
   end
-
-
 end

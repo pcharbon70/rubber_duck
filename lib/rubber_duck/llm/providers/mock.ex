@@ -240,7 +240,7 @@ defmodule RubberDuck.LLM.Providers.Mock do
         "This is a mock response to: #{String.slice(user_input, 0, 50)}..."
     end
   end
-  
+
   defp generate_refactoring_response(input) do
     cond do
       String.contains?(input, "rename") and String.contains?(input, "hello") ->
@@ -255,7 +255,7 @@ defmodule RubberDuck.LLM.Providers.Mock do
           end
         end
         """
-        
+
       String.contains?(input, "documentation") ->
         """
         defmodule Test do
@@ -280,13 +280,13 @@ defmodule RubberDuck.LLM.Providers.Mock do
           end
         end
         """
-        
+
       true ->
         # Default refactoring - return just the code without markdown markers
         "defmodule RefactoredModule do\n  def refactored_function do\n    :ok\n  end\nend"
     end
   end
-  
+
   defp generate_test_response(input) do
     cond do
       String.contains?(input, "Test do") ->
@@ -312,7 +312,7 @@ defmodule RubberDuck.LLM.Providers.Mock do
           end
         end
         """
-        
+
       true ->
         # Default test - return just the code without markdown markers
         """
@@ -326,7 +326,7 @@ defmodule RubberDuck.LLM.Providers.Mock do
         """
     end
   end
-  
+
   defp generate_completion_response(_input) do
     # Return just the code without markdown markers
     """
@@ -335,12 +335,12 @@ defmodule RubberDuck.LLM.Providers.Mock do
       |> process_args()
       |> handle_result()
     end
-    
+
     defp process_args(args) do
       # Process the arguments
       {:ok, args}
     end
-    
+
     defp handle_result({:ok, result}) do
       {:ok, result}
     end
@@ -349,7 +349,7 @@ defmodule RubberDuck.LLM.Providers.Mock do
     end
     """
   end
-  
+
   defp generate_code_response(input) do
     cond do
       String.contains?(input, "GenServer") or String.contains?(input, "counter") ->
@@ -391,11 +391,11 @@ defmodule RubberDuck.LLM.Providers.Mock do
           end
         end
         """
-        
+
       String.contains?(input, "add") and String.contains?(input, "numbers") ->
         # Return just the code without markdown markers
         "def add(a, b) when is_number(a) and is_number(b) do\n  a + b\nend"
-        
+
       true ->
         # Default code generation - return just the code without markdown markers
         "def generated_function do\n  # Generated based on: #{String.slice(input, 0, 50)}\n  :ok\nend"

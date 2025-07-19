@@ -21,7 +21,7 @@ defmodule RubberDuck.Context.Strategies.LongContext do
   def build(query, opts) do
     # Enhance options with instruction-driven preferences
     enhanced_opts = InstructionEnhancer.create_enhanced_options(opts)
-    
+
     user_id = Keyword.get(enhanced_opts, :user_id)
     session_id = Keyword.get(enhanced_opts, :session_id)
     project_id = Keyword.get(enhanced_opts, :project_id)
@@ -55,22 +55,24 @@ defmodule RubberDuck.Context.Strategies.LongContext do
   @impl true
   def estimate_quality(query, opts) do
     # Long context is best for complex, multi-file operations
-    base_quality = cond do
-      # Model supports long context
-      Keyword.get(opts, :max_tokens, 4000) >= 16000 -> 0.9
-      # Multi-file operation
-      length(Keyword.get(opts, :files, [])) > 3 -> 0.8
-      String.contains?(query, ["architecture", "refactor", "analyze", "document"]) -> 0.7
-      true -> 0.4
-    end
-    
+    base_quality =
+      cond do
+        # Model supports long context
+        Keyword.get(opts, :max_tokens, 4000) >= 16000 -> 0.9
+        # Multi-file operation
+        length(Keyword.get(opts, :files, [])) > 3 -> 0.8
+        String.contains?(query, ["architecture", "refactor", "analyze", "document"]) -> 0.7
+        true -> 0.4
+      end
+
     # Boost quality if instructions prefer this strategy
-    instruction_boost = if Keyword.get(opts, :preferred_strategy) == :long_context do
-      0.2
-    else
-      0.0
-    end
-    
+    instruction_boost =
+      if Keyword.get(opts, :preferred_strategy) == :long_context do
+        0.2
+      else
+        0.0
+      end
+
     min(base_quality + instruction_boost, 1.0)
   end
 

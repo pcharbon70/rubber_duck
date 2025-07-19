@@ -410,16 +410,18 @@ defmodule RubberDuck.Enhancement.Coordinator do
   defp apply_cot_reasoning(content, config) do
     # Use the actual CoT system based on chain type
     chain_type = config[:chain_type] || :default
-    
+
     # Select appropriate chain module
-    chain_module = case chain_type do
-      :explanation -> ConversationChain
-      :generation -> GenerationChain
-      :analysis -> AnalysisChain
-      :problem_solving -> ProblemSolverChain
-      _ -> ConversationChain  # Default fallback
-    end
-    
+    chain_module =
+      case chain_type do
+        :explanation -> ConversationChain
+        :generation -> GenerationChain
+        :analysis -> AnalysisChain
+        :problem_solving -> ProblemSolverChain
+        # Default fallback
+        _ -> ConversationChain
+      end
+
     # Build context for CoT
     cot_context = %{
       enhancement_mode: true,
@@ -427,15 +429,15 @@ defmodule RubberDuck.Enhancement.Coordinator do
       config: config,
       original_content: content
     }
-    
+
     Logger.debug("[Enhancement Coordinator] Applying CoT with chain: #{inspect(chain_module)}")
-    
+
     # Execute the CoT chain
     case CoTManager.execute_chain(chain_module, content, cot_context) do
       {:ok, cot_session} ->
         # Extract enhanced content from the session
         enhanced_content = extract_enhanced_content(cot_session)
-        
+
         {:ok,
          %{
            output: enhanced_content,
@@ -446,7 +448,7 @@ defmodule RubberDuck.Enhancement.Coordinator do
              session_id: cot_session[:id]
            }
          }}
-        
+
       {:error, reason} ->
         Logger.error("[Enhancement Coordinator] CoT execution failed: #{inspect(reason)}")
         # Fallback to simple enhancement
@@ -461,7 +463,7 @@ defmodule RubberDuck.Enhancement.Coordinator do
          }}
     end
   end
-  
+
   defp extract_enhanced_content(cot_session) do
     # Get the final result from the CoT session
     cot_session[:steps]
@@ -473,7 +475,7 @@ defmodule RubberDuck.Enhancement.Coordinator do
       _ -> "Unable to enhance content through CoT"
     end
   end
-  
+
   defp extract_executed_steps(cot_session) do
     # Extract the names of executed steps
     cot_session[:steps]

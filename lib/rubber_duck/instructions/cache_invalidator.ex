@@ -1,30 +1,30 @@
 defmodule RubberDuck.Instructions.CacheInvalidator do
   @moduledoc """
   Intelligent cache invalidation system with file system integration.
-  
+
   Provides automatic invalidation of instruction caches when files change,
   cascade invalidation for template inheritance, and smart invalidation
   patterns based on instruction relationships.
-  
+
   ## Features
-  
+
   - **File System Integration**: Automatic invalidation on file changes
   - **Cascade Invalidation**: Invalidates dependent templates on parent changes
   - **Scope-based Invalidation**: Invalidates by project/workspace/global scope
   - **Registry Coordination**: Coordinates with instruction registry for version tracking
   - **Batch Invalidation**: Optimized bulk invalidation for large changes
   - **Smart Patterns**: Intelligent pattern matching for efficient invalidation
-  
+
   ## Invalidation Triggers
-  
+
   1. **File Changes**: Direct file modification, creation, or deletion
   2. **Template Dependencies**: Changes to inherited or included templates
   3. **Registry Updates**: Instruction registry version changes
   4. **Scope Changes**: Project-wide or workspace-wide updates
   5. **Manual Triggers**: Explicit invalidation requests
-  
+
   ## Usage Examples
-  
+
       # Start the invalidation system
       {:ok, _pid} = CacheInvalidator.start_link()
       
@@ -43,15 +43,16 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
 
   # File system watcher configuration
   @watcher_name :instruction_file_watcher
-  @debounce_interval 500  # milliseconds
+  # milliseconds
+  @debounce_interval 500
 
   @type invalidation_reason :: :file_change | :template_dependency | :registry_update | :manual
   @type invalidation_event :: %{
-    type: invalidation_reason(),
-    target: String.t(),
-    timestamp: integer(),
-    metadata: map()
-  }
+          type: invalidation_reason(),
+          target: String.t(),
+          timestamp: integer(),
+          metadata: map()
+        }
 
   ## Public API
 
@@ -65,7 +66,7 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
 
   @doc """
   Registers a directory for file system watching.
-  
+
   Any changes to instruction files in this directory will trigger cache invalidation.
   """
   @spec watch_directory(String.t()) :: :ok | {:error, term()}
@@ -118,18 +119,21 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
 
   def init(_opts) do
     # Start file system watcher (handle gracefully if not available)
-    watcher_pid = case FileSystem.start_link(
-      name: @watcher_name,
-      dirs: []  # Directories added dynamically
-    ) do
-      {:ok, pid} -> 
-        # Subscribe to file system events
-        FileSystem.subscribe(@watcher_name)
-        pid
-      _ -> 
-        Logger.warning("File system watcher not available, manual invalidation only")
-        nil
-    end
+    watcher_pid =
+      case FileSystem.start_link(
+             name: @watcher_name,
+             # Directories added dynamically
+             dirs: []
+           ) do
+        {:ok, pid} ->
+          # Subscribe to file system events
+          FileSystem.subscribe(@watcher_name)
+          pid
+
+        _ ->
+          Logger.warning("File system watcher not available, manual invalidation only")
+          nil
+      end
 
     state = %{
       watcher_pid: watcher_pid,
@@ -192,7 +196,7 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
   def handle_info({:file_event, _watcher_pid, {file_path, events}}, state) do
     if is_instruction_file?(file_path) do
       Logger.debug("File event for instruction file: #{file_path} - #{inspect(events)}")
-      
+
       # Debounce rapid file changes
       updated_state = debounce_file_invalidation(file_path, events, state)
       {:noreply, updated_state}
@@ -210,15 +214,15 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
     case Map.get(state.pending_invalidations, file_path) do
       nil ->
         {:noreply, state}
-        
+
       {_events, _timer_ref} ->
         # Process accumulated events
         event = create_invalidation_event(:file_change, file_path, :file_system)
         updated_state = process_invalidation_event(event, state)
-        
+
         # Remove from pending
         updated_pending = Map.delete(updated_state.pending_invalidations, file_path)
-        
+
         {:noreply, %{updated_state | pending_invalidations: updated_pending}}
     end
   end
@@ -257,97 +261,91 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
 
   defp process_invalidation_event(event, state) do
     file_path = event.target
-    
+
     # Invalidate all cache layers for this file
     Cache.invalidate_file(file_path)
-    
+
     # Check for template dependencies
     dependencies = find_template_dependencies(file_path, state.dependency_graph)
     Enum.each(dependencies, &Cache.invalidate_file/1)
-    
+
     # Update registry if needed
     update_instruction_registry(file_path)
-    
+
     # Record event and update stats
     updated_history = [event | state.invalidation_history]
     updated_stats = update_invalidation_stats(state.stats, event)
-    
+
     emit_invalidation_telemetry(event)
-    
-    %{state | 
-      invalidation_history: updated_history,
-      stats: updated_stats
-    }
+
+    %{state | invalidation_history: updated_history, stats: updated_stats}
   end
 
   defp process_cascade_invalidation(event, state) do
     template_path = event.target
-    
+
     # Find all files that depend on this template
     dependent_files = find_dependent_files(template_path, state.dependency_graph)
-    
+
     # Invalidate the template and all dependents
     Cache.invalidate_file(template_path)
     Enum.each(dependent_files, &Cache.invalidate_file/1)
-    
+
     # Record cascade event
     updated_history = [event | state.invalidation_history]
     updated_stats = update_invalidation_stats(state.stats, event)
-    
+
     emit_invalidation_telemetry(event, %{cascade_count: length(dependent_files)})
-    
-    %{state | 
-      invalidation_history: updated_history,
-      stats: updated_stats
-    }
+
+    %{state | invalidation_history: updated_history, stats: updated_stats}
   end
 
   defp process_scope_invalidation(scope, root_path, event, state) do
     # Invalidate all cache entries for the scope
     Cache.invalidate_scope(scope, root_path)
-    
+
     # Record scope event
     updated_history = [event | state.invalidation_history]
     updated_stats = update_invalidation_stats(state.stats, event)
-    
+
     emit_invalidation_telemetry(event, %{scope: scope, root_path: root_path})
-    
-    %{state | 
-      invalidation_history: updated_history,
-      stats: updated_stats
-    }
+
+    %{state | invalidation_history: updated_history, stats: updated_stats}
   end
 
   defp debounce_file_invalidation(file_path, events, state) do
     # Cancel existing timer if any
-    updated_pending = case Map.get(state.pending_invalidations, file_path) do
-      {_old_events, timer_ref} ->
-        Process.cancel_timer(timer_ref)
-        state.pending_invalidations
-      nil ->
-        state.pending_invalidations
-    end
-    
+    updated_pending =
+      case Map.get(state.pending_invalidations, file_path) do
+        {_old_events, timer_ref} ->
+          Process.cancel_timer(timer_ref)
+          state.pending_invalidations
+
+        nil ->
+          state.pending_invalidations
+      end
+
     # Start new debounce timer
-    timer_ref = Process.send_after(
-      self(), 
-      {:process_pending_invalidations, file_path}, 
-      @debounce_interval
-    )
-    
+    timer_ref =
+      Process.send_after(
+        self(),
+        {:process_pending_invalidations, file_path},
+        @debounce_interval
+      )
+
     # Store pending invalidation
     updated_pending = Map.put(updated_pending, file_path, {events, timer_ref})
-    
+
     %{state | pending_invalidations: updated_pending}
   end
 
   defp is_instruction_file?(file_path) do
     instruction_extensions = [".md", ".mdc", ".cursorrules"]
     instruction_names = ["AGENTS.md", "agents.md", ".agents.md"]
-    
+
     extension = Path.extname(file_path)
     filename = Path.basename(file_path)
-    
+
     extension in instruction_extensions or filename in instruction_names
   end
 
@@ -376,6 +374,7 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
       stats when is_map(stats) ->
         # Registry is available, could trigger re-indexing
         :ok
+
       _ ->
         # Registry not available
         :skip
@@ -384,7 +383,7 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
 
   defp update_invalidation_stats(stats, event) do
     updated_stats = %{stats | total_invalidations: stats.total_invalidations + 1}
-    
+
     case event.type do
       :file_change -> %{updated_stats | file_invalidations: stats.file_invalidations + 1}
       :template_dependency -> %{updated_stats | cascade_invalidations: stats.cascade_invalidations + 1}
@@ -411,12 +410,16 @@ defmodule RubberDuck.Instructions.CacheInvalidator do
   end
 
   defp emit_invalidation_telemetry(event, extra_metadata \\ %{}) do
-    metadata = Map.merge(%{
-      type: event.type,
-      target: event.target,
-      reason: event.reason
-    }, extra_metadata)
-    
+    metadata =
+      Map.merge(
+        %{
+          type: event.type,
+          target: event.target,
+          reason: event.reason
+        },
+        extra_metadata
+      )
+
     :telemetry.execute(
       [:rubber_duck, :instructions, :cache, :invalidation],
       %{count: 1, timestamp: event.timestamp},

@@ -1,7 +1,7 @@
 defmodule RubberDuck.Analysis.SourcerorParserTest do
   use ExUnit.Case
   alias RubberDuck.Analysis.SourcerorParser
-  
+
   describe "module structure extraction" do
     test "detects module definitions and metadata" do
       source = """
@@ -17,24 +17,24 @@ defmodule RubberDuck.Analysis.SourcerorParserTest do
         def hello, do: :world
       end
       """
-      
+
       {:ok, result} = SourcerorParser.parse(source)
-      
+
       assert length(result.modules) == 1
       assert hd(result.modules).name == MyApp.Example
-      
+
       assert length(result.imports) == 1
       assert hd(result.imports).module == Enum
       assert hd(result.imports).only == [map: 2, filter: 2]
-      
+
       assert length(result.aliases) == 2
       assert Enum.any?(result.aliases, &(&1.module == MyApp.User))
       assert Enum.any?(result.aliases, &(&1.module == MyApp.Post))
-      
+
       assert length(result.requires) == 1
       assert hd(result.requires).module == Logger
     end
-    
+
     test "handles nested modules" do
       source = """
       defmodule Outer do
@@ -45,16 +45,16 @@ defmodule RubberDuck.Analysis.SourcerorParserTest do
         def outer_fun, do: Inner.inner_fun()
       end
       """
-      
+
       {:ok, result} = SourcerorParser.parse(source)
-      
+
       assert length(result.modules) == 2
       module_names = Enum.map(result.modules, & &1.name)
       assert Outer in module_names
       assert Outer.Inner in module_names
     end
   end
-  
+
   describe "function detection and analysis" do
     test "identifies all function types" do
       source = """
@@ -71,27 +71,28 @@ defmodule RubberDuck.Analysis.SourcerorParserTest do
         def with_guard(x) when is_binary(x), do: String.to_integer(x)
       end
       """
-      
+
       {:ok, result} = SourcerorParser.parse(source)
-      
+
       functions = result.functions
-      assert length(functions) == 8  # Including multi-clause
-      
+      # Including multi-clause
+      assert length(functions) == 8
+
       public_fun = Enum.find(functions, &(&1.name == :public_fun))
       assert public_fun.type == :def
       assert public_fun.arity == 1
       assert public_fun.module == FunctionExample
-      
+
       private_fun = Enum.find(functions, &(&1.name == :private_fun))
       assert private_fun.type == :defp
-      
+
       macro = Enum.find(functions, &(&1.name == :my_macro))
       assert macro.type == :defmacro
-      
+
       private_macro = Enum.find(functions, &(&1.name == :private_macro))
       assert private_macro.type == :defmacrop
     end
-    
+
     test "tracks function metadata" do
       source = """
       defmodule MetadataExample do
@@ -100,15 +101,15 @@ defmodule RubberDuck.Analysis.SourcerorParserTest do
         def add(a, b), do: a + b
       end
       """
-      
+
       {:ok, result} = SourcerorParser.parse(source)
-      
+
       add_fun = Enum.find(result.functions, &(&1.name == :add))
       assert add_fun.line > 0
       # Note: @doc and @spec extraction would need additional implementation
     end
   end
-  
+
   describe "variable tracking" do
     test "tracks variable assignments and usage" do
       source = """
@@ -121,20 +122,20 @@ defmodule RubberDuck.Analysis.SourcerorParserTest do
         end
       end
       """
-      
+
       {:ok, result} = SourcerorParser.parse(source)
-      
+
       variables = result.variables
-      
+
       # Parameter variable
       assert Enum.any?(variables, &(&1.name == :input && &1.type == :pattern))
-      
+
       # Assignment variables
       assert Enum.any?(variables, &(&1.name == :x && &1.type == :assignment))
       assert Enum.any?(variables, &(&1.name == :y && &1.type == :assignment))
       assert Enum.any?(variables, &(&1.name == :z && &1.type == :assignment))
     end
-    
+
     test "extracts variables from pattern matching" do
       source = """
       defmodule PatternExample do
@@ -158,16 +159,16 @@ defmodule RubberDuck.Analysis.SourcerorParserTest do
         end
       end
       """
-      
+
       {:ok, result} = SourcerorParser.parse(source)
-      
+
       variables = result.variables
       var_names = Enum.map(variables, & &1.name) |> Enum.uniq()
-      
+
       expected = [:a, :b, :head, :tail, :value, :name, :age, :first, :rest]
       assert Enum.all?(expected, &(&1 in var_names))
     end
-    
+
     test "handles pattern matching in control structures" do
       source = """
       defmodule ControlPatternExample do
@@ -188,19 +189,19 @@ defmodule RubberDuck.Analysis.SourcerorParserTest do
         end
       end
       """
-      
+
       {:ok, result} = SourcerorParser.parse(source)
-      
+
       variables = result.variables
       var_names = Enum.map(variables, & &1.name) |> Enum.uniq()
-      
+
       assert :value in var_names
       assert :reason in var_names
       assert :user in var_names
       assert :posts in var_names
     end
   end
-  
+
   describe "function call tracking" do
     test "tracks local and remote calls" do
       source = """
@@ -222,28 +223,28 @@ defmodule RubberDuck.Analysis.SourcerorParserTest do
         defp helper(a, b), do: a + b
       end
       """
-      
+
       {:ok, result} = SourcerorParser.parse(source)
-      
+
       calls = result.calls
-      
+
       # Local call
       local_call = Enum.find(calls, &(&1.type == :local && elem(&1.to, 1) == :helper))
       assert local_call
       assert local_call.to == {CallExample, :helper, 2}
-      
+
       # Remote calls
       io_call = Enum.find(calls, &(&1.to == {IO, :puts, 1}))
       assert io_call
       assert io_call.type == :remote
-      
+
       string_call = Enum.find(calls, &(&1.to == {String, :upcase, 1}))
       assert string_call
-      
+
       enum_call = Enum.find(calls, &(&1.to == {Enum, :map, 2}))
       assert enum_call
     end
-    
+
     test "tracks function captures" do
       source = """
       defmodule CaptureExample do
@@ -263,17 +264,17 @@ defmodule RubberDuck.Analysis.SourcerorParserTest do
         def local_fun(x), do: x
       end
       """
-      
+
       {:ok, result} = SourcerorParser.parse(source)
-      
+
       captures = Enum.filter(result.calls, &(&1.type == :capture))
       assert length(captures) >= 1
-      
+
       anonymous = Enum.filter(result.calls, &(&1.type == :anonymous))
       assert length(anonymous) >= 1
     end
   end
-  
+
   describe "call graph construction" do
     test "builds complete call graph" do
       source = """
@@ -298,23 +299,23 @@ defmodule RubberDuck.Analysis.SourcerorParserTest do
         end
       end
       """
-      
+
       {:ok, result} = SourcerorParser.parse(source)
-      
+
       graph = SourcerorParser.build_call_graph(result)
-      
+
       # Check entry_point calls
       entry_calls = graph[{GraphExample, :entry_point, 0}]
       assert {GraphExample, :step1, 0} in entry_calls
       assert {GraphExample, :step2, 0} in entry_calls
-      
+
       # Check step1 calls
       step1_calls = graph[{GraphExample, :step1, 0}]
       assert {IO, :puts, 1} in step1_calls
       assert {GraphExample, :common_helper, 0} in step1_calls
     end
   end
-  
+
   describe "error handling" do
     test "handles syntax errors gracefully" do
       source = """
@@ -323,11 +324,11 @@ defmodule RubberDuck.Analysis.SourcerorParserTest do
           # Missing do/end
       end
       """
-      
+
       result = SourcerorParser.parse(source)
       assert {:error, _} = result
     end
-    
+
     test "continues parsing despite partial errors" do
       source = """
       defmodule PartiallyBroken do
@@ -339,13 +340,13 @@ defmodule RubberDuck.Analysis.SourcerorParserTest do
         def another_valid, do: :ok
       end
       """
-      
+
       # The parser should be resilient
       {:ok, result} = SourcerorParser.parse(source)
       assert length(result.functions) >= 2
     end
   end
-  
+
   describe "complex real-world example" do
     test "parses complex GenServer module" do
       source = """
@@ -420,31 +421,33 @@ defmodule RubberDuck.Analysis.SourcerorParserTest do
         defp get_processor(_), do: MyApp.DefaultProcessor
       end
       """
-      
+
       {:ok, result} = SourcerorParser.parse(source)
-      
+
       # Verify comprehensive parsing
       assert length(result.modules) == 1
       assert hd(result.modules).name == MyApp.Worker
-      
+
       # Check imports and aliases
       assert length(result.imports) >= 1
       assert length(result.aliases) >= 2
       assert length(result.requires) >= 1
-      
+
       # Check functions
       public_functions = Enum.filter(result.functions, &(&1.type == :def))
       private_functions = Enum.filter(result.functions, &(&1.type == :defp))
-      
-      assert length(public_functions) >= 4  # start_link, init, handle_call, handle_cast
-      assert length(private_functions) >= 3  # validate_data, process_internal, get_processor
-      
+
+      # start_link, init, handle_call, handle_cast
+      assert length(public_functions) >= 4
+      # validate_data, process_internal, get_processor
+      assert length(private_functions) >= 3
+
       # Check variables
       assert length(result.variables) > 0
-      
+
       # Check calls
       assert length(result.calls) > 0
-      
+
       # Verify call graph can be built
       graph = SourcerorParser.build_call_graph(result)
       assert map_size(graph) > 0

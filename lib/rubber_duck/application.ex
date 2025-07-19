@@ -79,26 +79,27 @@ defmodule RubberDuck.Application do
       # Instruction template security system
       RubberDuck.Instructions.SecurityPipeline,
       # Web endpoint - start last
-      RubberDuckWeb.Endpoint
+      RubberDuckWeb.Endpoint,
+      {AshAuthentication.Supervisor, [otp_app: :rubber_duck]}
       # Error boundary GenServer - started manually in tests
       # RubberDuck.ErrorBoundary
     ]
 
     opts = [strategy: :one_for_one, name: RubberDuck.Supervisor]
     result = Supervisor.start_link(children, opts)
-    
+
     # Log WebSocket endpoint information after startup
     log_websocket_info()
-    
+
     result
   end
-  
+
   defp log_websocket_info do
     port = Application.get_env(:rubber_duck, RubberDuckWeb.Endpoint)[:http][:port]
     host = Application.get_env(:rubber_duck, RubberDuckWeb.Endpoint)[:url][:host] || "localhost"
-    
+
     Logger.info("""
-    
+
     ============================================
     RubberDuck Server Started Successfully!
     ============================================

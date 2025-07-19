@@ -37,12 +37,12 @@ defmodule RubberDuck.LLM.Providers.Ollama do
 
     # Use request timeout if available, otherwise use config timeout
     timeout = get_in(request.options, [:timeout]) || config.timeout || @default_timeout
-    
+
     require Logger
     Logger.debug("Ollama request - URL: #{url}")
     Logger.debug("Ollama request - Body: #{inspect(body)}")
     Logger.debug("Ollama request - Timeout: #{timeout}ms")
-    
+
     req_opts = [
       json: body,
       headers: headers,
@@ -50,30 +50,32 @@ defmodule RubberDuck.LLM.Providers.Ollama do
       # Also set connect_timeout and pool_timeout
       connect_options: [timeout: timeout],
       pool_timeout: timeout,
-      retry: false  # Let our retry logic handle it
+      # Let our retry logic handle it
+      retry: false
     ]
-    
+
     Logger.debug("Ollama making HTTP request...")
     start_time = System.monotonic_time(:millisecond)
-    
-    result = case Req.post(url, req_opts) do
-      {:ok, %{status: 200, body: response_body}} ->
-        end_time = System.monotonic_time(:millisecond)
-        Logger.debug("Ollama request successful in #{end_time - start_time}ms")
-        Logger.debug("Ollama response body: #{inspect(response_body)}")
-        {:ok, parse_response(response_body, request)}
 
-      {:ok, response} ->
-        end_time = System.monotonic_time(:millisecond)
-        Logger.debug("Ollama request failed with status #{response.status} in #{end_time - start_time}ms")
-        Provider.handle_http_error({:ok, response})
+    result =
+      case Req.post(url, req_opts) do
+        {:ok, %{status: 200, body: response_body}} ->
+          end_time = System.monotonic_time(:millisecond)
+          Logger.debug("Ollama request successful in #{end_time - start_time}ms")
+          Logger.debug("Ollama response body: #{inspect(response_body)}")
+          {:ok, parse_response(response_body, request)}
 
-      {:error, reason} ->
-        end_time = System.monotonic_time(:millisecond)
-        Logger.error("Ollama request error in #{end_time - start_time}ms: #{inspect(reason)}")
-        {:error, {:connection_error, reason}}
-    end
-    
+        {:ok, response} ->
+          end_time = System.monotonic_time(:millisecond)
+          Logger.debug("Ollama request failed with status #{response.status} in #{end_time - start_time}ms")
+          Provider.handle_http_error({:ok, response})
+
+        {:error, reason} ->
+          end_time = System.monotonic_time(:millisecond)
+          Logger.error("Ollama request error in #{end_time - start_time}ms: #{inspect(reason)}")
+          {:error, {:connection_error, reason}}
+      end
+
     result
   end
 
@@ -215,22 +217,25 @@ defmodule RubberDuck.LLM.Providers.Ollama do
   @impl true
   def health_check(%ProviderConfig{} = config, connection_data) do
     # Handle both stateless and stateful connections
-    base_url = case connection_data do
-      :stateless -> config.base_url || @default_base_url
-      data when is_map(data) -> data[:base_url] || config.base_url || @default_base_url
-      _ -> config.base_url || @default_base_url
-    end
+    base_url =
+      case connection_data do
+        :stateless -> config.base_url || @default_base_url
+        data when is_map(data) -> data[:base_url] || config.base_url || @default_base_url
+        _ -> config.base_url || @default_base_url
+      end
+
     url = "#{base_url}/api/tags"
 
     case Req.get(url, receive_timeout: 5_000) do
       {:ok, %{status: 200, body: %{"models" => models}}} ->
         model_names = Enum.map(models, & &1["name"])
 
-        version = case connection_data do
-          :stateless -> "unknown"
-          data when is_map(data) -> data[:version] || "unknown"
-          _ -> "unknown"
-        end
+        version =
+          case connection_data do
+            :stateless -> "unknown"
+            data when is_map(data) -> data[:version] || "unknown"
+            _ -> "unknown"
+          end
 
         {:ok,
          %{

@@ -390,11 +390,10 @@ defmodule RubberDuck.LLM.Service do
 
   defp validate_request(opts, state) do
     user_id = opts[:user_id]
-    
+
     with {:ok, model} <- validate_model(opts[:model], state, user_id),
          {:ok, messages} <- validate_messages(opts[:messages]),
          {:ok, validated_opts} <- validate_options(opts) do
-      
       # Resolve provider based on user preferences if available
       provider_name = resolve_provider_for_user(opts[:model], user_id, state)
       Logger.debug("Selected provider #{inspect(provider_name)} for model #{model} (user: #{user_id})")
@@ -417,17 +416,20 @@ defmodule RubberDuck.LLM.Service do
   defp validate_model(nil, _state, _user_id), do: {:error, :model_required}
 
   defp validate_model(model, state, user_id) do
-    Logger.debug("Validating model #{model} for user #{user_id}, available models: #{inspect(Map.keys(state.model_mapping))}")
-    
+    Logger.debug(
+      "Validating model #{model} for user #{user_id}, available models: #{inspect(Map.keys(state.model_mapping))}"
+    )
+
     # Check if model is available in application config
     app_model_available = Map.has_key?(state.model_mapping, model)
-    
+
     # Check if model is available in user's configuration
-    user_model_available = case user_id do
-      nil -> false
-      _ -> user_has_model?(user_id, model)
-    end
-    
+    user_model_available =
+      case user_id do
+        nil -> false
+        _ -> user_has_model?(user_id, model)
+      end
+
     if app_model_available || user_model_available do
       {:ok, model}
     else
@@ -499,6 +501,7 @@ defmodule RubberDuck.LLM.Service do
         request_with_id = %{request | id: request_id, from: from}
 
         parent = self()
+
         Task.start(fn ->
           Logger.debug("[LLM Service Task] Starting request execution for #{request_id}")
           result = execute_request(request_with_id, provider_state, state)
@@ -552,7 +555,7 @@ defmodule RubberDuck.LLM.Service do
   defp execute_request(request, provider_state, _state) do
     # Direct LLM call
     adapter = provider_state.config.adapter
-    
+
     Logger.debug("[LLM Service] Executing direct request with adapter: #{inspect(adapter)}")
     Logger.debug("[LLM Service] Request: #{inspect(request.model)} - #{inspect(request.provider)}")
 
@@ -727,11 +730,11 @@ defmodule RubberDuck.LLM.Service do
   defp timeout(opts) when is_list(opts) do
     Keyword.get(opts, :timeout, 30_000)
   end
-  
+
   defp timeout(opts) when is_map(opts) do
     Map.get(opts, :timeout, 30_000)
   end
-  
+
   defp timeout(_), do: 30_000
 
   defp schedule_health_check do
@@ -856,7 +859,7 @@ defmodule RubberDuck.LLM.Service do
       nil ->
         # Fall back to application config
         Map.get(state.model_mapping, model)
-      
+
       _ ->
         # Try to get user's provider preference for this model
         case get_user_provider_for_model(user_id, model) do
@@ -868,7 +871,7 @@ defmodule RubberDuck.LLM.Service do
               # Fall back to application config
               Map.get(state.model_mapping, model)
             end
-          
+
           :not_found ->
             # Fall back to application config
             Map.get(state.model_mapping, model)
@@ -883,7 +886,7 @@ defmodule RubberDuck.LLM.Service do
         |> Map.values()
         |> List.flatten()
         |> Enum.member?(model)
-      
+
       :not_found ->
         false
     end
@@ -893,15 +896,15 @@ defmodule RubberDuck.LLM.Service do
     case RubberDuck.LLM.Config.get_user_models(user_id) do
       {:ok, user_models} ->
         # Find which provider has this model
-        provider = Enum.find_value(user_models, fn {provider, models} ->
-          if model in models, do: provider, else: nil
-        end)
-        
+        provider =
+          Enum.find_value(user_models, fn {provider, models} ->
+            if model in models, do: provider, else: nil
+          end)
+
         if provider, do: {:ok, provider}, else: :not_found
-      
+
       :not_found ->
         :not_found
     end
   end
-  
 end

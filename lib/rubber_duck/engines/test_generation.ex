@@ -259,7 +259,7 @@ defmodule RubberDuck.Engines.TestGeneration do
 
     # Get current provider and model from configuration
     {provider, model} = Config.get_current_provider_and_model()
-    
+
     opts = [
       provider: provider,
       model: model,
@@ -307,27 +307,28 @@ defmodule RubberDuck.Engines.TestGeneration do
   defp format_test_plan(plan) do
     sections = []
 
-    sections = if length(plan.test_cases) > 0 do
-      cases =
-        Enum.map(plan.test_cases, fn tc ->
-          "  - #{tc.description}"
-        end)
-        |> Enum.join("\n")
+    sections =
+      if length(plan.test_cases) > 0 do
+        cases =
+          Enum.map(plan.test_cases, fn tc ->
+            "  - #{tc.description}"
+          end)
+          |> Enum.join("\n")
 
-      sections ++ ["Test cases:\n#{cases}"]
-    else
-      sections
-    end
+        sections ++ ["Test cases:\n#{cases}"]
+      else
+        sections
+      end
 
-    sections = if length(plan.fixtures_needed) > 0 do
-      sections ++ ["Fixtures needed: #{Enum.join(plan.fixtures_needed, ", ")}"]
-    else
-      sections
-    end
+    sections =
+      if length(plan.fixtures_needed) > 0 do
+        sections ++ ["Fixtures needed: #{Enum.join(plan.fixtures_needed, ", ")}"]
+      else
+        sections
+      end
 
     Enum.join(sections, "\n\n")
   end
-
 
   defp get_test_system_prompt(:elixir, :exunit) do
     """

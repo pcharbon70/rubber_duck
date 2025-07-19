@@ -2,11 +2,11 @@ defmodule RubberDuck.Conversations do
   @moduledoc """
   Domain for managing conversational AI interactions including conversations,
   messages, and conversation context state.
-  
+
   This domain provides the foundation for multi-turn conversations with
   context awareness, history management, and integration with the LLM system.
   """
-  
+
   use Ash.Domain,
     otp_app: :rubber_duck
 

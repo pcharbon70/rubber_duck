@@ -569,7 +569,7 @@ defmodule RubberDuck.Analysis.Security do
       []
     else
       call_graph = build_security_call_graph(ast_info)
-      
+
       # Find paths to dangerous functions
       dangerous_targets = [
         {System, :cmd, 2},
@@ -580,39 +580,42 @@ defmodule RubberDuck.Analysis.Security do
         {:erlang, :binary_to_term, 1},
         {:erlang, :binary_to_term, 2}
       ]
-      
-      issues = Enum.flat_map(call_graph, fn {from, calls} ->
-        dangerous_calls = Enum.filter(calls, fn call ->
-          call in dangerous_targets
-        end)
-        
-        Enum.map(dangerous_calls, fn dangerous ->
-          func = Enum.find(ast_info.functions, fn f ->
-            f.name == elem(from, 1) && f.arity == elem(from, 2)
+
+      issues =
+        Enum.flat_map(call_graph, fn {from, calls} ->
+          dangerous_calls =
+            Enum.filter(calls, fn call ->
+              call in dangerous_targets
+            end)
+
+          Enum.map(dangerous_calls, fn dangerous ->
+            func =
+              Enum.find(ast_info.functions, fn f ->
+                f.name == elem(from, 1) && f.arity == elem(from, 2)
+              end)
+
+            Engine.create_issue(
+              :dangerous_call_chain,
+              :high,
+              "Function #{elem(from, 1)}/#{elem(from, 2)} calls potentially dangerous #{format_call(dangerous)}",
+              %{file: "", line: (func && func.line) || 0, column: nil, end_line: nil, end_column: nil},
+              "security/dangerous_call",
+              :security,
+              %{
+                caller: from,
+                dangerous_function: dangerous
+              }
+            )
           end)
-          
-          Engine.create_issue(
-            :dangerous_call_chain,
-            :high,
-            "Function #{elem(from, 1)}/#{elem(from, 2)} calls potentially dangerous #{format_call(dangerous)}",
-            %{file: "", line: func && func.line || 0, column: nil, end_line: nil, end_column: nil},
-            "security/dangerous_call",
-            :security,
-            %{
-              caller: from,
-              dangerous_function: dangerous
-            }
-          )
         end)
-      end)
-      
+
       issues
     end
   end
 
   defp build_security_call_graph(ast_info) do
     all_calls = get_all_calls(ast_info)
-    
+
     all_calls
     |> Enum.group_by(& &1.from)
     |> Map.new(fn {from, calls} ->
@@ -631,49 +634,52 @@ defmodule RubberDuck.Analysis.Security do
     else
       # Find variables that might contain user input
       input_patterns = ~r/(params|input|data|request|body|args)/
-      
-      suspicious_vars = 
+
+      suspicious_vars =
         ast_info.variables
         |> Enum.filter(fn var ->
           var.type == :assignment &&
-          Regex.match?(input_patterns, Atom.to_string(var.name))
+            Regex.match?(input_patterns, Atom.to_string(var.name))
         end)
-      
+
       # Check if these variables are used in dangerous contexts
-      issues = Enum.flat_map(suspicious_vars, fn var ->
-        check_variable_usage(var, ast_info)
-      end)
-      
+      issues =
+        Enum.flat_map(suspicious_vars, fn var ->
+          check_variable_usage(var, ast_info)
+        end)
+
       # Also check for direct parameter usage in dangerous functions
       param_usage_issues = check_direct_param_usage(ast_info)
-      
+
       issues ++ param_usage_issues
     end
   end
 
   defp check_variable_usage(var, ast_info) do
     # Find where this variable is used
-    usages = 
+    usages =
       ast_info.variables
       |> Enum.filter(fn v ->
         v.name == var.name && v.type == :usage && v.line > var.line
       end)
-    
+
     # Check if any usage is in a dangerous context
     # This is simplified - real implementation would need data flow analysis
     if Enum.any?(usages) do
-      [Engine.create_issue(
-        :unvalidated_input,
-        :medium,
-        "Variable '#{var.name}' may contain user input - ensure proper validation",
-        %{file: "", line: var.line, column: var.column, end_line: nil, end_column: nil},
-        "security/input_validation",
-        :security,
-        %{
-          variable: var.name,
-          recommendation: "Validate and sanitize user input before use"
-        }
-      )]
+      [
+        Engine.create_issue(
+          :unvalidated_input,
+          :medium,
+          "Variable '#{var.name}' may contain user input - ensure proper validation",
+          %{file: "", line: var.line, column: var.column, end_line: nil, end_column: nil},
+          "security/input_validation",
+          :security,
+          %{
+            variable: var.name,
+            recommendation: "Validate and sanitize user input before use"
+          }
+        )
+      ]
     else
       []
     end
@@ -689,19 +695,19 @@ defmodule RubberDuck.Analysis.Security do
         ~r/File\.(read|write)/,
         ~r/Code\.eval/
       ]
-      
+
       # Simple heuristic: functions with "params" or "input" in parameters
-      if Enum.any?(func.variables || [], fn v -> 
-        v.type == :pattern && Regex.match?(~r/(params|input)/, Atom.to_string(v.name))
-      end) do
+      if Enum.any?(func.variables || [], fn v ->
+           v.type == :pattern && Regex.match?(~r/(params|input)/, Atom.to_string(v.name))
+         end) do
         # Check if function has calls to dangerous functions
-        dangerous_calls = 
+        dangerous_calls =
           (func.body_calls || [])
           |> Enum.filter(fn call ->
             call_string = format_call(call.to)
             Enum.any?(dangerous_patterns, &Regex.match?(&1, call_string))
           end)
-        
+
         Enum.map(dangerous_calls, fn call ->
           Engine.create_issue(
             :potential_injection,
