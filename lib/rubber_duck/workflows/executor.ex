@@ -372,11 +372,13 @@ defmodule RubberDuck.Workflows.Executor do
   defp execute_workflow_internal(workflow_id, workflow, input, opts) do
     start_time = System.monotonic_time(:millisecond)
     conversation_id = opts[:conversation_id] || get_in(opts, [:context, :conversation_id])
+    
+    # Get workflow name early so it's available in rescue block
+    workflow_name = workflow_name(workflow)
 
     try do
       # Resolve workflow module
       workflow_module = resolve_workflow(workflow)
-      workflow_name = workflow_name(workflow)
 
       # Send workflow start status
       Status.workflow(

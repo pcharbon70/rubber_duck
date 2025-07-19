@@ -16,7 +16,7 @@ defmodule RubberDuck.Status.Debug do
   
   require Logger
   
-  alias RubberDuck.Status.{Broadcaster, Channel, Monitor, Optimizer}
+  alias RubberDuck.Status.{Broadcaster, Monitor, Optimizer}
   
   @doc """
   Enables message tracing for a specific conversation.

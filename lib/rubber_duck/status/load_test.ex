@@ -238,7 +238,7 @@ defmodule RubberDuck.Status.LoadTest do
   defp run_ramp_up_load(conversations, categories, current_rate, max_rate, ramp_duration) do
     if current_rate < max_rate do
       # Send messages at current rate
-      interval = div(1000, current_rate)
+      _interval = div(1000, current_rate)
       
       for _ <- 1..current_rate do
         Task.start(fn ->
@@ -392,7 +392,7 @@ defmodule RubberDuck.Status.LoadTest do
     }
   end
   
-  defp calculate_performance_metrics(metrics, initial_state, final_state) do
+  defp calculate_performance_metrics(metrics, _initial_state, _final_state) do
     queue_depths = Enum.map(metrics, & &1.queue_depth)
     
     %{
@@ -408,7 +408,7 @@ defmodule RubberDuck.Status.LoadTest do
     }
   end
   
-  defp generate_recommendations(scenario, metrics, final_state) do
+  defp generate_recommendations(scenario, metrics, _final_state) do
     recommendations = []
     
     # Check queue depth

@@ -17,7 +17,6 @@ defmodule RubberDuck.Status.Monitor do
   use GenServer
   require Logger
   
-  alias RubberDuck.Status.Telemetry
   
   @type metric_type :: :queue_depth | :throughput | :latency | :error_rate
   @type alert_level :: :info | :warning | :critical

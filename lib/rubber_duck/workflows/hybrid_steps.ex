@@ -259,7 +259,7 @@ defmodule RubberDuck.Workflows.HybridSteps do
     |> List.first()
   end
 
-  defp route_to_best_implementation(capability, strategy, opts) do
+  defp route_to_best_implementation(capability, strategy, _opts) do
     implementations = CapabilityRegistry.find_hybrid_compatible(capability)
 
     case strategy do
@@ -366,7 +366,7 @@ defmodule RubberDuck.Workflows.HybridSteps do
     Enum.filter(implementations, &(&1.type == type))
   end
 
-  defp create_execution_context(implementation, reactor_context, opts) do
+  defp create_execution_context(implementation, reactor_context, _opts) do
     ExecutionContext.create_hybrid_context(
       shared_state: %{
         implementation: implementation,

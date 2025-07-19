@@ -40,10 +40,10 @@ defmodule RubberDuckWeb.StatusDashboardLive do
   def render(assigns) do
     ~H"""
     <div class="status-dashboard">
-      <.header>
-        Status Broadcasting System Dashboard
-        <:subtitle>Real-time monitoring and performance metrics</:subtitle>
-      </.header>
+      <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Status Broadcasting System Dashboard</h1>
+        <p class="mt-2 text-sm text-gray-600">Real-time monitoring and performance metrics</p>
+      </div>
       
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <.metric_card title="Health Status" value={@health_status} type="status" />

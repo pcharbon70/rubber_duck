@@ -51,7 +51,7 @@ defmodule RubberDuck.Status.Telemetry do
     ]
     
     Enum.each(handlers, fn {event_suffix, handler} ->
-      event = @message_queued |> List.take(3) |> Kernel.++(event_suffix)
+      event = @message_queued |> Enum.take(3) |> Kernel.++(event_suffix)
       handler_id = "status-telemetry-#{Enum.join(event_suffix, "-")}"
       
       :telemetry.attach(
@@ -201,14 +201,14 @@ defmodule RubberDuck.Status.Telemetry do
   
   # Handler functions
   
-  defp handle_message_queued(_event, measurements, metadata, _config) do
+  defp handle_message_queued(_event, _measurements, metadata, _config) do
     Logger.debug("Status message queued", 
       conversation_id: metadata.conversation_id,
       category: metadata.category
     )
   end
   
-  defp handle_batch_processed(_event, measurements, metadata, _config) do
+  defp handle_batch_processed(_event, measurements, _metadata, _config) do
     Logger.debug("Status batch processed",
       batch_size: measurements.batch_size,
       processing_time_ms: measurements.processing_time_ms,
@@ -216,21 +216,21 @@ defmodule RubberDuck.Status.Telemetry do
     )
   end
   
-  defp handle_broadcast_sent(_event, measurements, metadata, _config) do
+  defp handle_broadcast_sent(_event, measurements, _metadata, _config) do
     Logger.debug("Status broadcast sent",
       message_count: measurements.message_count,
       latency_ms: measurements.latency_ms
     )
   end
   
-  defp handle_channel_subscribed(_event, measurements, metadata, _config) do
+  defp handle_channel_subscribed(_event, _measurements, metadata, _config) do
     Logger.debug("Channel subscription created",
       conversation_id: metadata.conversation_id,
       categories: metadata.categories
     )
   end
   
-  defp handle_channel_unsubscribed(_event, measurements, metadata, _config) do
+  defp handle_channel_unsubscribed(_event, _measurements, metadata, _config) do
     Logger.debug("Channel subscription removed",
       conversation_id: metadata.conversation_id
     )
