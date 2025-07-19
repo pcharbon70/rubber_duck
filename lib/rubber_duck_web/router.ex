@@ -40,6 +40,9 @@ defmodule RubberDuckWeb.Router do
       #
       # If an authenticated user must *not* be present:
       # on_mount {RubberDuckWeb.LiveUserAuth, :live_no_user}
+      
+      # Status System Dashboard (requires authentication)
+      live "/status", StatusDashboardLive, :index
     end
   end
 

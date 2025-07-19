@@ -21,8 +21,9 @@ defmodule RubberDuckWeb.AuthChannel do
   alias RubberDuck.Accounts.ApiKey
   
   # Rate limiting for security
-  @max_login_attempts_per_minute 5
-  @max_api_key_generation_per_hour 10
+  # TODO: Implement rate limiting
+  # @max_login_attempts_per_minute 5
+  # @max_api_key_generation_per_hour 10
   
   @impl true
   def join("auth:lobby", _params, socket) do

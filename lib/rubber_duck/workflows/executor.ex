@@ -14,6 +14,7 @@ defmodule RubberDuck.Workflows.Executor do
   require Logger
 
   alias RubberDuck.Workflows.{Registry, Cache, Metrics, ComplexityAnalyzer, DynamicBuilder}
+  alias RubberDuck.Status
 
   # 1 minute
   @default_timeout 60_000
@@ -370,13 +371,28 @@ defmodule RubberDuck.Workflows.Executor do
 
   defp execute_workflow_internal(workflow_id, workflow, input, opts) do
     start_time = System.monotonic_time(:millisecond)
+    conversation_id = opts[:conversation_id] || get_in(opts, [:context, :conversation_id])
+    
+    # Get workflow name early so it's available in rescue block
+    workflow_name = workflow_name(workflow)
 
     try do
       # Resolve workflow module
       workflow_module = resolve_workflow(workflow)
 
+      # Send workflow start status
+      Status.workflow(
+        conversation_id,
+        "Starting workflow: #{workflow_name}",
+        Status.build_workflow_metadata(workflow_name, 0, 0, %{
+          workflow_id: workflow_id,
+          stage: "initialization"
+        })
+      )
+
       # Get workflow steps
       steps = workflow_module.steps()
+      total_steps = length(steps)
 
       # Build Reactor using Builder API
       reactor = build_reactor(steps, input)
@@ -404,6 +420,19 @@ defmodule RubberDuck.Workflows.Executor do
 
       duration = System.monotonic_time(:millisecond) - start_time
 
+      # Send completion status
+      Status.with_timing(
+        conversation_id,
+        :workflow,
+        "Completed workflow: #{workflow_name}",
+        start_time,
+        Status.build_workflow_metadata(workflow_name, total_steps, total_steps, %{
+          workflow_id: workflow_id,
+          stage: "completed",
+          cache_hit: opts[:use_cache] && result != :miss
+        })
+      )
+
       # Record metrics
       Metrics.record_workflow_execution(workflow_id, workflow_module, duration, :success)
 
@@ -413,6 +442,17 @@ defmodule RubberDuck.Workflows.Executor do
         duration = System.monotonic_time(:millisecond) - start_time
 
         Logger.error("Workflow #{workflow_id} failed: #{inspect(e)}")
+
+        # Send error status
+        Status.error(
+          conversation_id,
+          "Workflow failed: #{workflow_name}",
+          Status.build_error_metadata(:workflow_error, Exception.message(e), %{
+            workflow_id: workflow_id,
+            workflow_name: workflow_name,
+            duration_ms: duration
+          })
+        )
 
         # Record metrics
         Metrics.record_workflow_execution(workflow_id, workflow, duration, :failure)

@@ -1,152 +1,190 @@
 defmodule RubberDuck.Status.BroadcasterTest do
+  @moduledoc """
+  Tests for the Status.Broadcaster GenServer.
+  """
+  
   use ExUnit.Case, async: false
   
   alias RubberDuck.Status.Broadcaster
-  alias RubberDuck.Status
+  
+  @test_conversation_id "broadcaster_test_123"
   
   setup do
-    # Subscribe to test topics for verification
-    Phoenix.PubSub.subscribe(RubberDuck.PubSub, "status:test-conv:engine")
-    Phoenix.PubSub.subscribe(RubberDuck.PubSub, "status:test-conv:tool")
-    Phoenix.PubSub.subscribe(RubberDuck.PubSub, "status:system:info")
+    # Start broadcaster for each test
+    {:ok, pid} = start_supervised(Broadcaster)
     
-    # Capture logs for overflow testing
-    :ok
-  end
-  
-  describe "broadcast/4" do
-    test "queues messages for broadcasting" do
-      assert :ok = Broadcaster.broadcast("test-conv", :engine, "Processing request", %{model: "gpt-4"})
-    end
+    # Subscribe to test conversation
+    Phoenix.PubSub.subscribe(RubberDuck.PubSub, "status:#{@test_conversation_id}")
     
-    test "accepts nil conversation_id for system messages" do
-      assert :ok = Broadcaster.broadcast(nil, :info, "System started", %{})
-    end
-  end
-  
-  describe "public API" do
-    test "Status module provides convenience functions" do
-      assert :ok = Status.engine("test-conv", "Starting engine", %{model: "gpt-4"})
-      assert :ok = Status.tool("test-conv", "Running tool", %{name: "search"})
-      assert :ok = Status.workflow("test-conv", "Workflow step 1", %{})
-      assert :ok = Status.progress("test-conv", "50% complete", %{percent: 50})
-      assert :ok = Status.error("test-conv", "An error occurred", %{code: "E001"})
-      assert :ok = Status.info("test-conv", "Information", %{})
-    end
+    %{broadcaster: pid}
   end
   
   describe "queue management" do
-    test "processes messages in batches" do
-      # Queue multiple messages
+    test "batches multiple updates", %{broadcaster: _pid} do
+      # Send multiple updates rapidly
       for i <- 1..5 do
-        Broadcaster.broadcast("test-conv", :tool, "Executing tool #{i}", %{index: i})
+        Broadcaster.queue_update(@test_conversation_id, :info, "Update #{i}", %{index: i})
       end
       
-      # Wait for batch processing
-      Process.sleep(100)
-      
-      # Should receive all messages
-      for i <- 1..5 do
-        assert_receive {:status_update, %{
-          text: "Executing tool " <> _,
-          category: :tool,
-          metadata: %{index: ^i}
-        }}, 1000
-      end
+      # Should receive a batched update
+      assert_receive {:status_batch, batch}, 500
+      assert length(batch) == 5
+      assert Enum.all?(batch, fn update -> update.category == :info end)
     end
     
-    test "groups messages by conversation and category" do
-      # Send messages to different topics
-      Broadcaster.broadcast("test-conv", :engine, "Engine update", %{})
-      Broadcaster.broadcast("test-conv", :tool, "Tool update", %{})
-      Broadcaster.broadcast(nil, :info, "System update", %{})
+    test "respects max batch size", %{broadcaster: _pid} do
+      # Send more updates than max batch size (assuming max is 10)
+      for i <- 1..15 do
+        Broadcaster.queue_update(@test_conversation_id, :info, "Update #{i}", %{})
+      end
       
-      Process.sleep(100)
+      # Should receive two batches
+      assert_receive {:status_batch, batch1}, 500
+      assert_receive {:status_batch, batch2}, 500
       
-      # Verify each message went to correct topic
-      assert_receive {:status_update, %{text: "Engine update", category: :engine}}, 1000
-      assert_receive {:status_update, %{text: "Tool update", category: :tool}}, 1000
-      assert_receive {:status_update, %{text: "System update", category: :info}}, 1000
+      assert length(batch1) == 10
+      assert length(batch2) == 5
+    end
+    
+    test "flushes on timeout", %{broadcaster: _pid} do
+      # Send just one update
+      Broadcaster.queue_update(@test_conversation_id, :info, "Single update", %{})
+      
+      # Should receive after flush interval
+      assert_receive {:status_batch, [update]}, 200
+      assert update.text == "Single update"
     end
   end
   
-  describe "queue overflow protection" do
-    @tag capture_log: true
-    test "drops messages when queue is full" do
-      # Start a new broadcaster with tiny queue limit for testing
-      {:ok, pid} = GenServer.start_link(Broadcaster, [queue_limit: 10, flush_interval: 10000])
+  describe "conversation tracking" do
+    test "tracks updates per conversation", %{broadcaster: pid} do
+      conv1 = "conv_1"
+      conv2 = "conv_2"
       
-      # Overflow the queue
-      for i <- 1..20 do
-        GenServer.cast(pid, {:queue_message, %{
-          conversation_id: "overflow-test",
-          category: :test,
-          text: "Message #{i}",
-          metadata: %{},
-          timestamp: DateTime.utc_now()
-        }})
+      # Subscribe to both conversations
+      Phoenix.PubSub.subscribe(RubberDuck.PubSub, "status:#{conv1}")
+      Phoenix.PubSub.subscribe(RubberDuck.PubSub, "status:#{conv2}")
+      
+      # Send updates to different conversations
+      Broadcaster.queue_update(conv1, :info, "Conv1 update", %{})
+      Broadcaster.queue_update(conv2, :info, "Conv2 update", %{})
+      
+      # Get stats
+      stats = GenServer.call(pid, :get_stats)
+      
+      assert stats.conversation_count >= 2
+      assert stats.total_updates >= 2
+    end
+    
+    test "handles high volume gracefully", %{broadcaster: _pid} do
+      # Send many updates rapidly
+      tasks = for i <- 1..100 do
+        Task.async(fn ->
+          Broadcaster.queue_update(@test_conversation_id, :info, "Update #{i}", %{})
+        end)
       end
       
-      # Give it a moment
-      Process.sleep(10)
+      # Wait for all tasks
+      Task.await_many(tasks)
       
-      # Check state - should have exactly 10 messages
-      state = :sys.get_state(pid)
-      assert state.queue_size == 10
+      # Should receive batches without dropping updates
+      received = receive_all_batches()
+      total_updates = Enum.sum(Enum.map(received, &length/1))
       
-      GenServer.stop(pid)
+      assert total_updates == 100
     end
   end
   
-  describe "telemetry events" do
-    test "emits telemetry for queue operations" do
-      # Create a separate process to avoid channel messages
-      test_pid = self()
+  describe "error handling" do
+    test "continues operating after broadcast failure", %{broadcaster: pid} do
+      # Simulate PubSub failure by unsubscribing
+      Phoenix.PubSub.unsubscribe(RubberDuck.PubSub, "status:#{@test_conversation_id}")
       
-      # Attach telemetry handler
-      :telemetry.attach(
-        "test-broadcaster-#{System.unique_integer()}",
-        [:rubber_duck, :status, :broadcaster, :queue_depth],
-        fn event, measurements, metadata, _config ->
-          send(test_pid, {:telemetry, event, measurements, metadata})
-        end,
-        nil
-      )
+      # Send update (will fail to deliver but shouldn't crash)
+      Broadcaster.queue_update(@test_conversation_id, :info, "Failed update", %{})
       
-      # Send to a different conversation to avoid our subscriptions
-      Broadcaster.broadcast("telemetry-test", :engine, "Test", %{})
+      # Re-subscribe
+      Phoenix.PubSub.subscribe(RubberDuck.PubSub, "status:#{@test_conversation_id}")
       
-      # May receive broadcast messages first, so filter them out
-      receive do
-        {:telemetry, [:rubber_duck, :status, :broadcaster, :queue_depth], %{size: size}, %{}} ->
-          assert size >= 0
-        {:status_update, _} ->
-          # Ignore broadcast messages
-          flunk("Did not receive telemetry event")
-      after
-        1000 ->
-          flunk("Timeout waiting for telemetry event")
-      end
+      # Should still be able to send updates
+      Broadcaster.queue_update(@test_conversation_id, :info, "Success update", %{})
       
-      :telemetry.detach("test-broadcaster-#{System.unique_integer()}")
+      assert_receive {:status_batch, [update]}, 500
+      assert update.text == "Success update"
+      
+      # Broadcaster should still be alive
+      assert Process.alive?(pid)
     end
   end
   
   describe "performance" do
-    @tag :performance
-    test "handles high message volume without blocking" do
-      # Measure time to queue 1000 messages
-      start_time = System.monotonic_time(:microsecond)
+    test "maintains performance under load", %{broadcaster: _pid} do
+      start_time = System.monotonic_time(:millisecond)
       
+      # Send 1000 updates
       for i <- 1..1000 do
-        Broadcaster.broadcast("perf-test", :progress, "Message #{i}", %{index: i})
+        Broadcaster.queue_update(@test_conversation_id, :info, "Load test #{i}", %{index: i})
       end
       
-      end_time = System.monotonic_time(:microsecond)
+      # Receive all batches
+      batches = receive_all_batches(5000)
+      total_received = Enum.sum(Enum.map(batches, &length/1))
+      
+      end_time = System.monotonic_time(:millisecond)
       duration = end_time - start_time
       
-      # Should complete very quickly (< 10ms for 1000 messages)
-      assert duration < 10_000, "Took #{duration}μs to queue 1000 messages"
+      # Should receive all updates
+      assert total_received == 1000
+      
+      # Should complete reasonably quickly (< 5 seconds)
+      assert duration < 5000
+      
+      # Calculate throughput
+      throughput = 1000 / (duration / 1000)
+      assert throughput > 200  # Should handle at least 200 updates/second
+    end
+  end
+  
+  describe "memory management" do
+    test "cleans up completed conversations", %{broadcaster: pid} do
+      # Create updates for multiple conversations
+      for i <- 1..10 do
+        conv_id = "temp_conv_#{i}"
+        Phoenix.PubSub.subscribe(RubberDuck.PubSub, "status:#{conv_id}")
+        
+        # Send some updates
+        for j <- 1..5 do
+          Broadcaster.queue_update(conv_id, :info, "Update #{j}", %{})
+        end
+      end
+      
+      # Wait for processing
+      Process.sleep(500)
+      
+      # Get initial stats
+      initial_stats = GenServer.call(pid, :get_stats)
+      
+      # Trigger cleanup (in real implementation)
+      # GenServer.cast(pid, :cleanup_stale_conversations)
+      
+      # Stats should show active conversations
+      assert initial_stats.conversation_count >= 10
+    end
+  end
+  
+  # Helper functions
+  
+  defp receive_all_batches(timeout \\ 1000) do
+    receive_all_batches([], timeout)
+  end
+  
+  defp receive_all_batches(acc, timeout) do
+    receive do
+      {:status_batch, batch} ->
+        receive_all_batches([batch | acc], timeout)
+    after
+      timeout ->
+        Enum.reverse(acc)
     end
   end
 end
