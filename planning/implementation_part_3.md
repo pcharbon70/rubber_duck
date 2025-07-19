@@ -715,238 +715,238 @@ This phase implements a high-performance, non-blocking status messaging system t
 Build the foundation for asynchronous, non-blocking status message broadcasting with intelligent batching and queue management.
 
 #### Tasks:
-- [ ] 11.1.1 Create `RubberDuck.StatusBroadcaster` GenServer:
-  - [ ] 11.1.1.1 Implement message queue with configurable size limits
-  - [ ] 11.1.1.2 Build batch processing with configurable batch size
-  - [ ] 11.1.1.3 Add periodic flush timer mechanism
-  - [ ] 11.1.1.4 Create overflow handling with message dropping
-- [ ] 11.1.2 Implement queue management:
-  - [ ] 11.1.2.1 Use Erlang `:queue` for efficient FIFO operations
-  - [ ] 11.1.2.2 Track queue size for overflow prevention
-  - [ ] 11.1.2.3 Implement backpressure monitoring
-  - [ ] 11.1.2.4 Add queue metrics collection
-- [ ] 11.1.3 Build message batching system:
-  - [ ] 11.1.3.1 Group messages by conversation and category
-  - [ ] 11.1.3.2 Implement efficient batch processing
-  - [ ] 11.1.3.3 Add batch size optimization
-  - [ ] 11.1.3.4 Create batch timing controls
-- [ ] 11.1.4 Create async task execution:
-  - [ ] 11.1.4.1 Use Task.Supervisor for broadcast tasks
-  - [ ] 11.1.4.2 Implement task monitoring and cleanup
-  - [ ] 11.1.4.3 Add failure isolation
-  - [ ] 11.1.4.4 Build task metrics tracking
-- [ ] 11.1.5 Implement PubSub broadcasting:
-  - [ ] 11.1.5.1 Create topic structure for efficient routing
-  - [ ] 11.1.5.2 Add message formatting for consistency
-  - [ ] 11.1.5.3 Implement broadcast error handling
-  - [ ] 11.1.5.4 Build broadcast performance monitoring
-- [ ] 11.1.6 Add configuration management:
-  - [ ] 11.1.6.1 Queue size limits configuration
-  - [ ] 11.1.6.2 Batch size configuration
-  - [ ] 11.1.6.3 Flush interval configuration
-  - [ ] 11.1.6.4 Dynamic configuration updates
-- [ ] 11.1.7 Create telemetry integration
-- [ ] 11.1.8 Build graceful shutdown handling
-- [ ] 11.1.9 Implement queue persistence options
-- [ ] 11.1.10 Add distributed broadcasting support
+- [ ] 10.1.1 Create `RubberDuck.StatusBroadcaster` GenServer:
+  - [ ] 10.1.1.1 Implement message queue with configurable size limits
+  - [ ] 10.1.1.2 Build batch processing with configurable batch size
+  - [ ] 10.1.1.3 Add periodic flush timer mechanism
+  - [ ] 10.1.1.4 Create overflow handling with message dropping
+- [ ] 10.1.2 Implement queue management:
+  - [ ] 10.1.2.1 Use Erlang `:queue` for efficient FIFO operations
+  - [ ] 10.1.2.2 Track queue size for overflow prevention
+  - [ ] 10.1.2.3 Implement backpressure monitoring
+  - [ ] 10.1.2.4 Add queue metrics collection
+- [ ] 10.1.3 Build message batching system:
+  - [ ] 10.1.3.1 Group messages by conversation and category
+  - [ ] 10.1.3.2 Implement efficient batch processing
+  - [ ] 10.1.3.3 Add batch size optimization
+  - [ ] 10.1.3.4 Create batch timing controls
+- [ ] 10.1.4 Create async task execution:
+  - [ ] 10.1.4.1 Use Task.Supervisor for broadcast tasks
+  - [ ] 10.1.4.2 Implement task monitoring and cleanup
+  - [ ] 10.1.4.3 Add failure isolation
+  - [ ] 10.1.4.4 Build task metrics tracking
+- [ ] 10.1.5 Implement PubSub broadcasting:
+  - [ ] 10.1.5.1 Create topic structure for efficient routing
+  - [ ] 10.1.5.2 Add message formatting for consistency
+  - [ ] 10.1.5.3 Implement broadcast error handling
+  - [ ] 10.1.5.4 Build broadcast performance monitoring
+- [ ] 10.1.6 Add configuration management:
+  - [ ] 10.1.6.1 Queue size limits configuration
+  - [ ] 10.1.6.2 Batch size configuration
+  - [ ] 10.1.6.3 Flush interval configuration
+  - [ ] 10.1.6.4 Dynamic configuration updates
+- [ ] 10.1.7 Create telemetry integration
+- [ ] 10.1.8 Build graceful shutdown handling
+- [ ] 10.1.9 Implement queue persistence options
+- [ ] 10.1.10 Add distributed broadcasting support
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/status/broadcaster_test.exs` to verify:
 
 **Queue Management Tests**:
-- [ ] 11.1.11 Test message queuing under normal load
-- [ ] 11.1.12 Test queue overflow handling
-- [ ] 11.1.13 Test batch processing efficiency
-- [ ] 11.1.14 Test timer-based flushing
-- [ ] 11.1.15 Test concurrent message queueing
-- [ ] 11.1.16 Test graceful shutdown with pending messages
+- [ ] 10.1.11 Test message queuing under normal load
+- [ ] 10.1.12 Test queue overflow handling
+- [ ] 10.1.13 Test batch processing efficiency
+- [ ] 10.1.14 Test timer-based flushing
+- [ ] 10.1.15 Test concurrent message queueing
+- [ ] 10.1.16 Test graceful shutdown with pending messages
 
 **Broadcasting Tests**:
-- [ ] 11.1.17 Test message grouping by category
-- [ ] 11.1.18 Test PubSub topic generation
-- [ ] 11.1.19 Test broadcast error recovery
-- [ ] 11.1.20 Test distributed broadcasting
-- [ ] 11.1.21 Test message ordering preservation
-- [ ] 11.1.22 Test performance under high load
+- [ ] 10.1.17 Test message grouping by category
+- [ ] 10.1.18 Test PubSub topic generation
+- [ ] 10.1.19 Test broadcast error recovery
+- [ ] 10.1.20 Test distributed broadcasting
+- [ ] 10.1.21 Test message ordering preservation
+- [ ] 10.1.22 Test performance under high load
 
-### 11.2 Phoenix Channel Implementation
+### 10.2 Phoenix Channel Implementation
 
 Implement WebSocket channels for real-time status message delivery with category-based subscriptions and authorization.
 
 #### Tasks:
-- [ ] 11.2.1 Create `RubberDuckWeb.StatusChannel`:
-  - [ ] 11.2.1.1 Implement channel join with category selection
-  - [ ] 11.2.1.2 Add conversation-based authorization
-  - [ ] 11.2.1.3 Build subscription management
-  - [ ] 11.2.1.4 Create message forwarding from PubSub
-- [ ] 11.2.2 Implement category subscriptions:
-  - [ ] 11.2.2.1 Define allowed categories (engine, tool, workflow, progress, error, info)
-  - [ ] 11.2.2.2 Build dynamic subscription management
-  - [ ] 11.2.2.3 Add category validation
-  - [ ] 11.2.2.4 Create per-conversation category filtering
-- [ ] 11.2.3 Build authorization system:
-  - [ ] 11.2.3.1 Verify user access to conversation
-  - [ ] 11.2.3.2 Implement token-based authentication
-  - [ ] 11.2.3.3 Add rate limiting per connection
-  - [ ] 11.2.3.4 Create audit logging
-- [ ] 11.2.4 Create message handling:
-  - [ ] 11.2.4.1 Handle subscribe_category messages
-  - [ ] 11.2.4.2 Handle unsubscribe_category messages
-  - [ ] 11.2.4.3 Forward PubSub messages to WebSocket
-  - [ ] 11.2.4.4 Add message transformation
-- [ ] 11.2.5 Implement connection lifecycle:
-  - [ ] 11.2.5.1 Clean subscription tracking on join
-  - [ ] 11.2.5.2 Automatic cleanup on disconnect
-  - [ ] 11.2.5.3 Reconnection state management
-  - [ ] 11.2.5.4 Connection health monitoring
-- [ ] 11.2.6 Add channel presence tracking
-- [ ] 11.2.7 Build channel metrics collection
-- [ ] 11.2.8 Create channel error handling
-- [ ] 11.2.9 Implement message buffering for reconnection
-- [ ] 11.2.10 Add channel integration with UserSocket
+- [ ] 10.2.1 Create `RubberDuckWeb.StatusChannel`:
+  - [ ] 10.2.1.1 Implement channel join with category selection
+  - [ ] 10.2.1.2 Add conversation-based authorization
+  - [ ] 10.2.1.3 Build subscription management
+  - [ ] 10.2.1.4 Create message forwarding from PubSub
+- [ ] 10.2.2 Implement category subscriptions:
+  - [ ] 10.2.2.1 Define allowed categories (engine, tool, workflow, progress, error, info)
+  - [ ] 10.2.2.2 Build dynamic subscription management
+  - [ ] 10.2.2.3 Add category validation
+  - [ ] 10.2.2.4 Create per-conversation category filtering
+- [ ] 10.2.3 Build authorization system:
+  - [ ] 10.2.3.1 Verify user access to conversation
+  - [ ] 10.2.3.2 Implement token-based authentication
+  - [ ] 10.2.3.3 Add rate limiting per connection
+  - [ ] 10.2.3.4 Create audit logging
+- [ ] 10.2.4 Create message handling:
+  - [ ] 10.2.4.1 Handle subscribe_category messages
+  - [ ] 10.2.4.2 Handle unsubscribe_category messages
+  - [ ] 10.2.4.3 Forward PubSub messages to WebSocket
+  - [ ] 10.2.4.4 Add message transformation
+- [ ] 10.2.5 Implement connection lifecycle:
+  - [ ] 10.2.5.1 Clean subscription tracking on join
+  - [ ] 10.2.5.2 Automatic cleanup on disconnect
+  - [ ] 10.2.5.3 Reconnection state management
+  - [ ] 10.2.5.4 Connection health monitoring
+- [ ] 10.2.6 Add channel presence tracking
+- [ ] 10.2.7 Build channel metrics collection
+- [ ] 10.2.8 Create channel error handling
+- [ ] 10.2.9 Implement message buffering for reconnection
+- [ ] 10.2.10 Add channel integration with UserSocket
 
 #### Unit Tests:
 Create tests in `test/rubber_duck_web/channels/status_channel_test.exs` to verify:
 
 **Channel Functionality Tests**:
-- [ ] 11.2.11 Test authorized channel join
-- [ ] 11.2.12 Test unauthorized access rejection
-- [ ] 11.2.13 Test category subscription management
-- [ ] 11.2.14 Test message forwarding from PubSub
-- [ ] 11.2.15 Test dynamic category updates
-- [ ] 11.2.16 Test connection lifecycle handling
+- [ ] 10.2.11 Test authorized channel join
+- [ ] 10.2.12 Test unauthorized access rejection
+- [ ] 10.2.13 Test category subscription management
+- [ ] 10.2.14 Test message forwarding from PubSub
+- [ ] 10.2.15 Test dynamic category updates
+- [ ] 10.2.16 Test connection lifecycle handling
 
 **Message Delivery Tests**:
-- [ ] 11.2.17 Test targeted message delivery
-- [ ] 11.2.18 Test category filtering accuracy
-- [ ] 11.2.19 Test message ordering
-- [ ] 11.2.20 Test high-frequency message handling
-- [ ] 11.2.21 Test reconnection state recovery
-- [ ] 11.2.22 Test concurrent subscriber handling
+- [ ] 10.2.17 Test targeted message delivery
+- [ ] 10.2.18 Test category filtering accuracy
+- [ ] 10.2.19 Test message ordering
+- [ ] 10.2.20 Test high-frequency message handling
+- [ ] 10.2.21 Test reconnection state recovery
+- [ ] 10.2.22 Test concurrent subscriber handling
 
-### 11.3 System-Wide Integration
+### 10.3 System-Wide Integration
 
 Integrate the status messaging system throughout the RubberDuck application, adding status updates to all major processing components.
 
 #### Tasks:
-- [ ] 11.3.1 Create `RubberDuck.Status` API module:
-  - [ ] 11.3.1.1 Implement fire-and-forget update function
-  - [ ] 11.3.1.2 Add convenience functions by category
-  - [ ] 11.3.1.3 Build metadata standardization
-  - [ ] 11.3.1.4 Create consistent timestamp handling
-- [ ] 11.3.2 Integrate with LLM engines:
-  - [ ] 11.3.2.1 Add status updates to OpenAI engine
-  - [ ] 11.3.2.2 Add status updates to Ollama engine
-  - [ ] 11.3.2.3 Add status updates to mock engine
-  - [ ] 11.3.2.4 Standardize engine status metadata
-- [ ] 11.3.3 Integrate with tool system:
-  - [ ] 11.3.3.1 Add pre-execution status updates
-  - [ ] 11.3.3.2 Add execution progress updates
-  - [ ] 11.3.3.3 Add completion status updates
-  - [ ] 11.3.3.4 Include tool metadata in updates
-- [ ] 11.3.4 Integrate with workflow system:
-  - [ ] 11.3.4.1 Add workflow start/end updates
-  - [ ] 11.3.4.2 Add step transition updates
-  - [ ] 11.3.4.3 Add progress percentage tracking
-  - [ ] 11.3.4.4 Include workflow context in updates
-- [ ] 11.3.5 Integrate with conversation processing:
-  - [ ] 11.3.5.1 Add message processing updates
-  - [ ] 11.3.5.2 Add context building updates
-  - [ ] 11.3.5.3 Add response generation updates
-  - [ ] 11.3.5.4 Track conversation state changes
-- [ ] 11.3.6 Add error reporting integration
-- [ ] 11.3.7 Build progress tracking utilities
-- [ ] 11.3.8 Create status aggregation helpers
-- [ ] 11.3.9 Implement conditional status updates
-- [ ] 11.3.10 Add bulk status update support
+- [ ] 10.3.1 Create `RubberDuck.Status` API module:
+  - [ ] 10.3.1.1 Implement fire-and-forget update function
+  - [ ] 10.3.1.2 Add convenience functions by category
+  - [ ] 10.3.1.3 Build metadata standardization
+  - [ ] 10.3.1.4 Create consistent timestamp handling
+- [ ] 10.3.2 Integrate with LLM engines:
+  - [ ] 10.3.2.1 Add status updates to OpenAI engine
+  - [ ] 10.3.2.2 Add status updates to Ollama engine
+  - [ ] 10.3.2.3 Add status updates to mock engine
+  - [ ] 10.3.2.4 Standardize engine status metadata
+- [ ] 10.3.3 Integrate with tool system:
+  - [ ] 10.3.3.1 Add pre-execution status updates
+  - [ ] 10.3.3.2 Add execution progress updates
+  - [ ] 10.3.3.3 Add completion status updates
+  - [ ] 10.3.3.4 Include tool metadata in updates
+- [ ] 10.3.4 Integrate with workflow system:
+  - [ ] 10.3.4.1 Add workflow start/end updates
+  - [ ] 10.3.4.2 Add step transition updates
+  - [ ] 10.3.4.3 Add progress percentage tracking
+  - [ ] 10.3.4.4 Include workflow context in updates
+- [ ] 10.3.5 Integrate with conversation processing:
+  - [ ] 10.3.5.1 Add message processing updates
+  - [ ] 10.3.5.2 Add context building updates
+  - [ ] 10.3.5.3 Add response generation updates
+  - [ ] 10.3.5.4 Track conversation state changes
+- [ ] 10.3.6 Add error reporting integration
+- [ ] 10.3.7 Build progress tracking utilities
+- [ ] 10.3.8 Create status aggregation helpers
+- [ ] 10.3.9 Implement conditional status updates
+- [ ] 10.3.10 Add bulk status update support
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/status/integration_test.exs` to verify:
 
 **API Usage Tests**:
-- [ ] 11.3.11 Test fire-and-forget behavior
-- [ ] 11.3.12 Test category-specific functions
-- [ ] 11.3.13 Test metadata handling
-- [ ] 11.3.14 Test null conversation handling
-- [ ] 11.3.15 Test high-frequency update handling
-- [ ] 11.3.16 Test API error resilience
+- [ ] 10.3.11 Test fire-and-forget behavior
+- [ ] 10.3.12 Test category-specific functions
+- [ ] 10.3.13 Test metadata handling
+- [ ] 10.3.14 Test null conversation handling
+- [ ] 10.3.15 Test high-frequency update handling
+- [ ] 10.3.16 Test API error resilience
 
 **Integration Tests**:
-- [ ] 11.3.17 Test engine status updates
-- [ ] 11.3.18 Test tool execution updates
-- [ ] 11.3.19 Test workflow progress tracking
-- [ ] 11.3.20 Test conversation flow updates
-- [ ] 11.3.21 Test error propagation
-- [ ] 11.3.22 Test system-wide status flow
+- [ ] 10.3.17 Test engine status updates
+- [ ] 10.3.18 Test tool execution updates
+- [ ] 10.3.19 Test workflow progress tracking
+- [ ] 10.3.20 Test conversation flow updates
+- [ ] 10.3.21 Test error propagation
+- [ ] 10.3.22 Test system-wide status flow
 
-### 11.4 Monitoring and Performance Optimization
+### 10.4 Monitoring and Performance Optimization
 
 Implement comprehensive monitoring, metrics collection, and performance optimization for the status messaging system.
 
 #### Tasks:
-- [ ] 11.4.1 Add telemetry events:
-  - [ ] 11.4.1.1 Message queuing metrics
-  - [ ] 11.4.1.2 Batch processing metrics
-  - [ ] 11.4.1.3 Broadcast latency tracking
-  - [ ] 11.4.1.4 Channel subscription metrics
-- [ ] 11.4.2 Create performance dashboards:
-  - [ ] 11.4.2.1 Queue depth visualization
-  - [ ] 11.4.2.2 Message throughput graphs
-  - [ ] 11.4.2.3 Latency distribution charts
-  - [ ] 11.4.2.4 Category usage statistics
-- [ ] 11.4.3 Implement optimization strategies:
-  - [ ] 11.4.3.1 Dynamic batch sizing
-  - [ ] 11.4.3.2 Adaptive flush intervals
-  - [ ] 11.4.3.3 Message compression options
-  - [ ] 11.4.3.4 Topic sharding for scale
-- [ ] 11.4.4 Build monitoring alerts:
-  - [ ] 11.4.4.1 Queue overflow alerts
-  - [ ] 11.4.4.2 High latency warnings
-  - [ ] 11.4.4.3 Channel error tracking
-  - [ ] 11.4.4.4 System health indicators
-- [ ] 11.4.5 Add debugging tools:
-  - [ ] 11.4.5.1 Message tracing capability
-  - [ ] 11.4.5.2 Channel state inspection
-  - [ ] 11.4.5.3 Queue state dumping
-  - [ ] 11.4.5.4 Performance profiling hooks
-- [ ] 11.4.6 Create load testing framework
-- [ ] 11.4.7 Build capacity planning tools
-- [ ] 11.4.8 Add A/B testing support
-- [ ] 11.4.9 Implement SLA monitoring
-- [ ] 11.4.10 Create optimization documentation
+- [ ] 10.4.1 Add telemetry events:
+  - [ ] 10.4.1.1 Message queuing metrics
+  - [ ] 10.4.1.2 Batch processing metrics
+  - [ ] 10.4.1.3 Broadcast latency tracking
+  - [ ] 10.4.1.4 Channel subscription metrics
+- [ ] 10.4.2 Create performance dashboards:
+  - [ ] 10.4.2.1 Queue depth visualization
+  - [ ] 10.4.2.2 Message throughput graphs
+  - [ ] 10.4.2.3 Latency distribution charts
+  - [ ] 10.4.2.4 Category usage statistics
+- [ ] 10.4.3 Implement optimization strategies:
+  - [ ] 10.4.3.1 Dynamic batch sizing
+  - [ ] 10.4.3.2 Adaptive flush intervals
+  - [ ] 10.4.3.3 Message compression options
+  - [ ] 10.4.3.4 Topic sharding for scale
+- [ ] 10.4.4 Build monitoring alerts:
+  - [ ] 10.4.4.1 Queue overflow alerts
+  - [ ] 10.4.4.2 High latency warnings
+  - [ ] 10.4.4.3 Channel error tracking
+  - [ ] 10.4.4.4 System health indicators
+- [ ] 10.4.5 Add debugging tools:
+  - [ ] 10.4.5.1 Message tracing capability
+  - [ ] 10.4.5.2 Channel state inspection
+  - [ ] 10.4.5.3 Queue state dumping
+  - [ ] 10.4.5.4 Performance profiling hooks
+- [ ] 10.4.6 Create load testing framework
+- [ ] 10.4.7 Build capacity planning tools
+- [ ] 10.4.8 Add A/B testing support
+- [ ] 10.4.9 Implement SLA monitoring
+- [ ] 10.4.10 Create optimization documentation
 
 #### Unit Tests:
 Create tests in `test/rubber_duck/status/monitoring_test.exs` to verify:
 
 **Metrics Collection Tests**:
-- [ ] 11.4.11 Test telemetry event emission
-- [ ] 11.4.12 Test metric accuracy
-- [ ] 11.4.13 Test metric aggregation
-- [ ] 11.4.14 Test performance overhead
-- [ ] 11.4.15 Test metric persistence
-- [ ] 11.4.16 Test dashboard data generation
+- [ ] 10.4.11 Test telemetry event emission
+- [ ] 10.4.12 Test metric accuracy
+- [ ] 10.4.13 Test metric aggregation
+- [ ] 10.4.14 Test performance overhead
+- [ ] 10.4.15 Test metric persistence
+- [ ] 10.4.16 Test dashboard data generation
 
 **Optimization Tests**:
-- [ ] 11.4.17 Test dynamic batch sizing
-- [ ] 11.4.18 Test adaptive intervals
-- [ ] 11.4.19 Test compression benefits
-- [ ] 11.4.20 Test sharding effectiveness
-- [ ] 11.4.21 Test load balancing
-- [ ] 11.4.22 Test optimization stability
+- [ ] 10.4.17 Test dynamic batch sizing
+- [ ] 10.4.18 Test adaptive intervals
+- [ ] 10.4.19 Test compression benefits
+- [ ] 10.4.20 Test sharding effectiveness
+- [ ] 10.4.21 Test load balancing
+- [ ] 10.4.22 Test optimization stability
 
-### 11.5 Phase 11 Integration Tests
+### 10.5 Phase 10 Integration Tests
 
-Create comprehensive integration tests in `test/integration/phase_11_test.exs` to verify:
-- [ ] 11.5.1 Test end-to-end status flow from engine to WebSocket
-- [ ] 11.5.2 Test system behavior under sustained high load
-- [ ] 11.5.3 Test multiple concurrent conversations
-- [ ] 11.5.4 Test category-based filtering accuracy
-- [ ] 11.5.5 Test graceful degradation under overload
-- [ ] 11.5.6 Test reconnection and state recovery
-- [ ] 11.5.7 Test distributed system operation
-- [ ] 11.5.8 Test monitoring and alerting pipeline
-- [ ] 11.5.9 Test zero performance impact on main flow
-- [ ] 11.5.10 Test complete system resilience
+Create comprehensive integration tests in `test/integration/phase_10_test.exs` to verify:
+- [ ] 10.5.1 Test end-to-end status flow from engine to WebSocket
+- [ ] 10.5.2 Test system behavior under sustained high load
+- [ ] 10.5.3 Test multiple concurrent conversations
+- [ ] 10.5.4 Test category-based filtering accuracy
+- [ ] 10.5.5 Test graceful degradation under overload
+- [ ] 10.5.6 Test reconnection and state recovery
+- [ ] 10.5.7 Test distributed system operation
+- [ ] 10.5.8 Test monitoring and alerting pipeline
+- [ ] 10.5.9 Test zero performance impact on main flow
+- [ ] 10.5.10 Test complete system resilience
 
 ---
 
