@@ -54,6 +54,8 @@ defmodule RubberDuck.Application do
       {Phoenix.PubSub, name: RubberDuck.PubSub},
       # Task supervisor for async tool executions
       {Task.Supervisor, name: RubberDuck.TaskSupervisor},
+      # Status broadcasting system
+      RubberDuck.Status.Broadcaster,
       # Result processing components
       RubberDuck.Cache.ETS,
       # Monitoring and observability components
