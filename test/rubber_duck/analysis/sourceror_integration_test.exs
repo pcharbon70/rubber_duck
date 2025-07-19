@@ -26,17 +26,15 @@ defmodule RubberDuck.Analysis.SourcerorIntegrationTest do
       assert length(ast_info.functions) == 2
 
       # Test full analysis pipeline
-      assert {:ok, results} = Analyzer.analyze_source(code, :elixir, 
-        engines: [:semantic, :security]
-      )
+      assert {:ok, results} = Analyzer.analyze_source(code, :elixir, engines: [:semantic, :security])
 
       # Check that issues were detected
       assert length(results.all_issues) > 0
-      
+
       # Find specific issues
       unused_var_issue = Enum.find(results.all_issues, &(&1.type == :unused_variable))
       unsafe_atom_issue = Enum.find(results.all_issues, &(&1.type == :dynamic_atom_creation))
-      
+
       assert unused_var_issue != nil
       assert unsafe_atom_issue != nil
     end

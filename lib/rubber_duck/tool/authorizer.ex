@@ -1,7 +1,7 @@
 defmodule RubberDuck.Tool.Authorizer do
   @moduledoc """
   Handles authorization for tool execution using capability-based and role-based access control.
-  
+
   This module provides comprehensive authorization checking for tools, including:
   - Capability-based authorization
   - Role-based access control
@@ -9,26 +9,26 @@ defmodule RubberDuck.Tool.Authorizer do
   - Audit logging
   - Authorization caching
   """
-  
+
   require Logger
-  
+
   @doc """
   Authorizes a user to execute a tool with the given context.
-  
+
   ## Parameters
-  
+
   - `tool_module` - The tool module to authorize
   - `user` - The user context containing roles and permissions
   - `context` - The execution context with additional information
   - `policy_module` - Optional custom authorization policy module
-  
+
   ## Returns
-  
+
   - `{:ok, :authorized}` - Authorization granted
   - `{:error, reason}` - Authorization denied with reason
-  
+
   ## Examples
-  
+
       iex> Authorizer.authorize(MyTool, user, %{action: :execute})
       {:ok, :authorized}
       
@@ -40,7 +40,6 @@ defmodule RubberDuck.Tool.Authorizer do
     with {:ok, :valid_tool} <- validate_tool(tool_module),
          {:ok, :valid_user} <- validate_user(user),
          {:ok, :authorized} <- check_authorization(tool_module, user, context, policy_module) do
-      
       log_authorization_success(tool_module, user, context)
       {:ok, :authorized}
     else
@@ -49,19 +48,19 @@ defmodule RubberDuck.Tool.Authorizer do
         {:error, reason}
     end
   end
-  
+
   @doc """
   Checks if a user has the required capabilities for a tool.
-  
+
   ## Examples
-  
+
       iex> Authorizer.has_capability?(user, :file_read)
       true
   """
   @spec has_capability?(map(), atom()) :: boolean()
   def has_capability?(user, capability) do
     user_permissions = user[:permissions] || []
-    
+
     # Admin users have all capabilities
     if :admin in (user[:roles] || []) do
       true
@@ -69,12 +68,12 @@ defmodule RubberDuck.Tool.Authorizer do
       capability in user_permissions
     end
   end
-  
+
   @doc """
   Checks if a user has the required role.
-  
+
   ## Examples
-  
+
       iex> Authorizer.has_role?(user, :admin)
       false
   """
@@ -83,10 +82,10 @@ defmodule RubberDuck.Tool.Authorizer do
     user_roles = user[:roles] || []
     role in user_roles
   end
-  
+
   @doc """
   Clears the authorization cache for a user.
-  
+
   This is useful when user permissions change.
   """
   @spec clear_cache(map()) :: :ok
@@ -95,9 +94,9 @@ defmodule RubberDuck.Tool.Authorizer do
     :ets.match_delete(:authorizer_cache, {cache_key, :_})
     :ok
   end
-  
+
   # Private functions
-  
+
   defp validate_tool(tool_module) do
     if RubberDuck.Tool.is_tool?(tool_module) do
       {:ok, :valid_tool}
@@ -105,7 +104,7 @@ defmodule RubberDuck.Tool.Authorizer do
       {:error, :invalid_tool}
     end
   end
-  
+
   defp validate_user(user) do
     if is_map(user) and Map.has_key?(user, :id) do
       {:ok, :valid_user}
@@ -113,24 +112,25 @@ defmodule RubberDuck.Tool.Authorizer do
       {:error, :invalid_user}
     end
   end
-  
+
   defp check_authorization(tool_module, user, context, policy_module) do
     cache_key = build_cache_key(user, tool_module, context)
-    
+
     case get_cached_authorization(cache_key) do
       {:ok, result} ->
         result
+
       :not_found ->
         result = perform_authorization(tool_module, user, context, policy_module)
         cache_authorization(cache_key, result)
         result
     end
   end
-  
+
   defp perform_authorization(tool_module, user, context, policy_module) do
     # Add small delay to simulate authorization work
     Process.sleep(5)
-    
+
     with {:ok, :rate_limit_ok} <- check_rate_limit(user, context),
          {:ok, :role_ok} <- check_roles(tool_module, user, context),
          {:ok, :capability_ok} <- check_capabilities(tool_module, user, context),
@@ -140,32 +140,35 @@ defmodule RubberDuck.Tool.Authorizer do
       {:error, reason} -> {:error, reason}
     end
   end
-  
+
   defp check_rate_limit(_user, _context) do
     # TODO: Integrate with rate limiting system
     # For now, always allow
     {:ok, :rate_limit_ok}
   end
-  
+
   defp check_capabilities(tool_module, user, context) do
     security_config = RubberDuck.Tool.security(tool_module)
-    required_capabilities = if security_config do
-      security_config.capabilities || []
-    else
-      []
-    end
-    
+
+    required_capabilities =
+      if security_config do
+        security_config.capabilities || []
+      else
+        []
+      end
+
     # If no capabilities are required, allow access
     if Enum.empty?(required_capabilities) do
       {:ok, :capability_ok}
     else
       # Filter capabilities based on context action
       filtered_capabilities = filter_capabilities_by_context(required_capabilities, context)
-      
+
       # Check if user has all required capabilities
-      missing_capabilities = filtered_capabilities
-                             |> Enum.reject(&has_capability?(user, &1))
-      
+      missing_capabilities =
+        filtered_capabilities
+        |> Enum.reject(&has_capability?(user, &1))
+
       if Enum.empty?(missing_capabilities) do
         {:ok, :capability_ok}
       else
@@ -173,35 +176,38 @@ defmodule RubberDuck.Tool.Authorizer do
       end
     end
   end
-  
+
   defp filter_capabilities_by_context(capabilities, context) do
     action = context[:action]
-    
-    result = case action do
-      :read -> 
-        # For read actions, only require read-related capabilities
-        Enum.filter(capabilities, fn cap -> 
-          cap_string = to_string(cap)
-          String.contains?(cap_string, "read")
-        end)
-      :write ->
-        # For write actions, require write-related capabilities
-        Enum.filter(capabilities, fn cap -> 
-          cap_string = to_string(cap)
-          String.contains?(cap_string, "write")
-        end)
-      _ ->
-        # For other actions, require all capabilities
-        capabilities
-    end
-    
+
+    result =
+      case action do
+        :read ->
+          # For read actions, only require read-related capabilities
+          Enum.filter(capabilities, fn cap ->
+            cap_string = to_string(cap)
+            String.contains?(cap_string, "read")
+          end)
+
+        :write ->
+          # For write actions, require write-related capabilities
+          Enum.filter(capabilities, fn cap ->
+            cap_string = to_string(cap)
+            String.contains?(cap_string, "write")
+          end)
+
+        _ ->
+          # For other actions, require all capabilities
+          capabilities
+      end
+
     result
   end
-  
+
   defp check_roles(tool_module, user, _context) do
     # Check if tool requires admin role
     security_config = RubberDuck.Tool.security(tool_module)
-    
+
     if security_config && :admin_access in (security_config.capabilities || []) do
       if has_role?(user, :admin) do
         {:ok, :role_ok}
@@ -212,11 +218,11 @@ defmodule RubberDuck.Tool.Authorizer do
       {:ok, :role_ok}
     end
   end
-  
+
   defp check_custom_policy(_tool_module, _user, _context, nil) do
     {:ok, :policy_ok}
   end
-  
+
   defp check_custom_policy(tool_module, user, context, policy_module) do
     try do
       case policy_module.authorize(tool_module, user, context) do
@@ -230,23 +236,25 @@ defmodule RubberDuck.Tool.Authorizer do
         {:error, :policy_error}
     end
   end
-  
+
   defp build_cache_key(user, tool_module) do
     "auth:#{user.id}:#{tool_module}"
   end
-  
+
   defp build_cache_key(user, tool_module, context) do
     context_hash = :crypto.hash(:md5, :erlang.term_to_binary(context)) |> Base.encode16(case: :lower)
     "auth:#{user.id}:#{tool_module}:#{context_hash}"
   end
-  
+
   defp get_cached_authorization(cache_key) do
     case :ets.lookup(:authorizer_cache, cache_key) do
-      [{^cache_key, result}] -> 
+      [{^cache_key, result}] ->
         # Add small delay to simulate cache hit being faster
         Process.sleep(1)
         {:ok, result}
-      [] -> :not_found
+
+      [] ->
+        :not_found
     end
   rescue
     ArgumentError ->
@@ -254,11 +262,13 @@ defmodule RubberDuck.Tool.Authorizer do
       try do
         :ets.new(:authorizer_cache, [:set, :public, :named_table])
       rescue
-        ArgumentError -> :ok  # Table already exists
+        # Table already exists
+        ArgumentError -> :ok
       end
+
       :not_found
   end
-  
+
   defp cache_authorization(cache_key, result) do
     :ets.insert(:authorizer_cache, {cache_key, result})
   rescue
@@ -267,30 +277,34 @@ defmodule RubberDuck.Tool.Authorizer do
       try do
         :ets.new(:authorizer_cache, [:set, :public, :named_table])
       rescue
-        ArgumentError -> :ok  # Table already exists
+        # Table already exists
+        ArgumentError -> :ok
       end
+
       :ets.insert(:authorizer_cache, {cache_key, result})
   end
-  
+
   defp log_authorization_success(tool_module, user, _context) do
     metadata = RubberDuck.Tool.metadata(tool_module)
-    
+
     Logger.info("Tool authorization granted for #{metadata.name} by user #{user.id}")
   end
-  
+
   defp log_authorization_failure(tool_module, user, _context, reason) do
-    metadata = if RubberDuck.Tool.is_tool?(tool_module) do
-      RubberDuck.Tool.metadata(tool_module)
-    else
-      %{name: "unknown"}
-    end
-    
-    user_id = if is_map(user) && Map.has_key?(user, :id) do
-      user.id
-    else
-      "unknown"
-    end
-    
+    metadata =
+      if RubberDuck.Tool.is_tool?(tool_module) do
+        RubberDuck.Tool.metadata(tool_module)
+      else
+        %{name: "unknown"}
+      end
+
+    user_id =
+      if is_map(user) && Map.has_key?(user, :id) do
+        user.id
+      else
+        "unknown"
+      end
+
     Logger.warning("Tool authorization denied for #{metadata.name} by user #{user_id}, reason: #{reason}")
   end
 end

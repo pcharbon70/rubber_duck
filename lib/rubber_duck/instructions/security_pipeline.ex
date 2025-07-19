@@ -1,29 +1,29 @@
 defmodule RubberDuck.Instructions.SecurityPipeline do
   @moduledoc """
   Security pipeline for template processing.
-  
+
   Coordinates all security measures including validation, rate limiting,
   sandboxed execution, audit logging, and real-time monitoring.
-  
+
   ## Architecture
-  
+
   The pipeline processes templates through multiple security layers:
-  
+
   1. **Rate Limiting** - Prevents abuse through request throttling
   2. **Input Validation** - Validates template syntax and content
   3. **Variable Sanitization** - Ensures variables are safe
   4. **Sandboxed Execution** - Runs templates in isolated environment
   5. **Audit Logging** - Records all security events
   6. **Monitoring** - Real-time threat detection
-  
+
   ## Usage
-  
+
       {:ok, result} = SecurityPipeline.process(template, variables, user_id: "user123")
   """
 
   use GenServer
   require Logger
-  
+
   alias RubberDuck.Instructions.{
     Security,
     SecurityError,
@@ -51,9 +51,9 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
 
   @doc """
   Processes a template through the security pipeline.
-  
+
   ## Options
-  
+
   - `:user_id` - User identifier for rate limiting and auditing
   - `:session_id` - Session identifier for tracking
   - `:ip_address` - IP address for audit logging
@@ -65,10 +65,10 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
   @spec process(String.t(), map(), keyword()) :: {:ok, String.t()} | {:error, term()}
   def process(template, variables \\ %{}, opts \\ []) do
     opts = Keyword.merge(@default_opts, opts)
-    
+
     # Build processing context
     context = build_context(template, variables, opts)
-    
+
     # Process through pipeline
     with :ok <- check_rate_limits(context),
          :ok <- validate_template(template, context),
@@ -124,17 +124,18 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
     # Initialize components
     {:ok, _} = RateLimiter.start_link()
     {:ok, _} = SecurityMonitor.start_link()
-    
+
     # Get security configuration from application environment
     security_config = Application.get_env(:rubber_duck, :security, [])
-    
+
     # Convert keyword list to map if needed
-    config = if is_list(security_config) do
-      Enum.into(security_config, %{})
-    else
-      security_config
-    end
-    
+    config =
+      if is_list(security_config) do
+        Enum.into(security_config, %{})
+      else
+        security_config
+      end
+
     state = %{
       metrics: %{
         total_processed: 0,
@@ -144,7 +145,7 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
       config: config,
       started_at: DateTime.utc_now()
     }
-    
+
     {:ok, state}
   end
 
@@ -154,9 +155,11 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
   end
 
   def handle_call(:get_metrics, _from, state) do
-    metrics = Map.merge(state.metrics, %{
-      uptime_seconds: DateTime.diff(DateTime.utc_now(), state.started_at)
-    })
+    metrics =
+      Map.merge(state.metrics, %{
+        uptime_seconds: DateTime.diff(DateTime.utc_now(), state.started_at)
+      })
+
     {:reply, {:ok, metrics}, state}
   end
 
@@ -182,23 +185,27 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
       {:template, context.template_hash},
       {:global, "global"}
     ]
-    
+
     Enum.reduce_while(checks, :ok, fn {level, key}, _acc ->
       case RateLimiter.check_rate(key, level) do
-        :ok -> {:cont, :ok}
-        {:error, :rate_limit_exceeded} -> 
+        :ok ->
+          {:cont, :ok}
+
+        {:error, :rate_limit_exceeded} ->
           {:halt, {:error, SecurityError.exception(reason: :rate_limit_exceeded)}}
       end
     end)
   end
 
   defp validate_template(template, context) do
-    security_opts = case context.security_level do
-      :strict -> [max_nesting: 5, max_variables: 50]
-      :relaxed -> [max_nesting: 20, max_variables: 200]
-      _ -> []  # :balanced uses defaults
-    end
-    
+    security_opts =
+      case context.security_level do
+        :strict -> [max_nesting: 5, max_variables: 50]
+        :relaxed -> [max_nesting: 20, max_variables: 200]
+        # :balanced uses defaults
+        _ -> []
+      end
+
     Security.validate_template(template, security_opts)
   end
 
@@ -209,17 +216,21 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
   defp execute_sandboxed(template, variables, context) do
     sandbox_opts = [
       timeout: 5_000,
-      max_heap_size: 50_000_000,  # 50MB
+      # 50MB
+      max_heap_size: 50_000_000,
       security_level: context.security_level
     ]
-    
+
     case SandboxExecutor.execute(template, variables, sandbox_opts) do
-      {:ok, result} -> 
+      {:ok, result} ->
         {:ok, result}
+
       {:error, :timeout} ->
         {:error, SecurityError.exception(reason: :timeout)}
+
       {:error, :memory_limit_exceeded} ->
         {:error, SecurityError.exception(reason: :memory_limit_exceeded)}
+
       {:error, reason} ->
         {:error, SecurityError.exception(reason: reason)}
     end
@@ -228,7 +239,7 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
   defp record_success(context, result) do
     # Update metrics
     GenServer.cast(__MODULE__, {:update_metrics, :success})
-    
+
     # Record audit log
     if context.opts[:audit] do
       SecurityAudit.log_event(%{
@@ -245,7 +256,7 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
         }
       })
     end
-    
+
     # Send monitoring event
     if context.opts[:monitor] do
       SecurityMonitor.record_event(:template_processed, %{
@@ -253,21 +264,22 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
         duration: DateTime.diff(DateTime.utc_now(), context.timestamp, :millisecond)
       })
     end
-    
+
     :ok
   end
 
   defp record_failure(context, reason) do
     # Update metrics
     GenServer.cast(__MODULE__, {:update_metrics, :failure})
-    
+
     # Determine severity
-    severity = case reason do
-      %SecurityError{reason: :injection_attempt} -> :high
-      %SecurityError{reason: :rate_limit_exceeded} -> :medium
-      _ -> :low
-    end
-    
+    severity =
+      case reason do
+        %SecurityError{reason: :injection_attempt} -> :high
+        %SecurityError{reason: :rate_limit_exceeded} -> :medium
+        _ -> :low
+      end
+
     # Record audit log
     if context.opts[:audit] do
       SecurityAudit.log_event(%{
@@ -284,7 +296,7 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
         }
       })
     end
-    
+
     # Send monitoring event
     if context.opts[:monitor] do
       SecurityMonitor.record_event(:security_violation, %{
@@ -293,7 +305,7 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
         reason: extract_reason(reason)
       })
     end
-    
+
     :ok
   end
 
@@ -310,11 +322,11 @@ defmodule RubberDuck.Instructions.SecurityPipeline do
   end
 
   def handle_cast({:update_metrics, :failure}, state) do
-    updated_metrics = 
+    updated_metrics =
       state.metrics
       |> Map.update!(:total_processed, &(&1 + 1))
       |> Map.update!(:total_violations, &(&1 + 1))
-    
+
     {:noreply, %{state | metrics: updated_metrics}}
   end
 end

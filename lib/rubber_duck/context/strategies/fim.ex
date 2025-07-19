@@ -24,7 +24,7 @@ defmodule RubberDuck.Context.Strategies.FIM do
   def build(_query, opts) do
     # Enhance options with instruction-driven preferences
     enhanced_opts = InstructionEnhancer.create_enhanced_options(opts)
-    
+
     user_id = Keyword.get(enhanced_opts, :user_id)
     session_id = Keyword.get(enhanced_opts, :session_id)
     max_tokens = Keyword.get(enhanced_opts, :max_tokens, 4000)
@@ -39,7 +39,7 @@ defmodule RubberDuck.Context.Strategies.FIM do
 
     # Build FIM prompt
     base_context = build_fim_context(prefix, suffix, recent_context, max_tokens)
-    
+
     # Enhance with instruction-driven features
     enhanced_context = InstructionEnhancer.enhance_strategy_context(base_context, :fim, enhanced_opts)
 
@@ -52,19 +52,21 @@ defmodule RubberDuck.Context.Strategies.FIM do
   @impl true
   def estimate_quality(query, opts) do
     # FIM is best for completion queries with cursor position
-    base_quality = cond do
-      Keyword.has_key?(opts, :cursor_position) -> 0.9
-      String.contains?(query, ["complete", "finish", "continue"]) -> 0.7
-      true -> 0.3
-    end
-    
+    base_quality =
+      cond do
+        Keyword.has_key?(opts, :cursor_position) -> 0.9
+        String.contains?(query, ["complete", "finish", "continue"]) -> 0.7
+        true -> 0.3
+      end
+
     # Boost quality if instructions prefer this strategy
-    instruction_boost = if Keyword.get(opts, :preferred_strategy) == :fim do
-      0.2
-    else
-      0.0
-    end
-    
+    instruction_boost =
+      if Keyword.get(opts, :preferred_strategy) == :fim do
+        0.2
+      else
+        0.0
+      end
+
     min(base_quality + instruction_boost, 1.0)
   end
 

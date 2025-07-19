@@ -33,12 +33,16 @@ defmodule RubberDuck.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:ash_authentication_phoenix, "~> 2.0"},
+      {:bcrypt_elixir, "~> 3.0"},
+      {:picosat_elixir, "~> 0.2"},
+      {:ash_authentication, "~> 4.0"},
       {:ash_postgres, "~> 2.0"},
       {:usage_rules, "~> 0.1", only: [:dev]},
-      {:sourceror, "~> 1.8", only: [:dev, :test]},
+      {:sourceror, "~> 1.8"},
       {:ash_phoenix, "~> 2.0"},
       {:ash, "~> 3.0"},
-      {:igniter, "~> 0.6", only: [:dev, :test]},
+      {:igniter, "~> 0.6"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:tower, "~> 0.6"},
@@ -86,7 +90,7 @@ defmodule RubberDuck.MixProject do
       {:earmark, "~> 1.4.48"},
       {:cachex, "~> 4.1.1"},
       {:file_system, "~> 1.1.0"},
-      
+
       # JSON Schema validation
       {:ex_json_schema, "~> 0.10"}
       # {:dep_from_hexpm, "~> 0.3.0"},

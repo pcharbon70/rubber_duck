@@ -41,7 +41,7 @@ defmodule RubberDuck.Analysis.AST.SourcerorParserTest do
       """
 
       assert {:ok, ast_info} = SourcerorParser.parse(code)
-      
+
       # Check structure matches expected format
       assert is_map(ast_info)
       assert Map.has_key?(ast_info, :type)
@@ -52,14 +52,14 @@ defmodule RubberDuck.Analysis.AST.SourcerorParserTest do
       assert Map.has_key?(ast_info, :requires)
       assert Map.has_key?(ast_info, :calls)
       assert Map.has_key?(ast_info, :variables)
-      
+
       # Check specific values
       assert ast_info.type == :module
       assert ast_info.name == MyApp.User
       assert length(ast_info.functions) == 3
       assert MyApp.Repo in ast_info.aliases
       assert Ecto.Query in ast_info.imports
-      
+
       # Check function structure
       name_func = Enum.find(ast_info.functions, &(&1.name == :name))
       assert name_func.arity == 1

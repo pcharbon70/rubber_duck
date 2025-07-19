@@ -24,7 +24,8 @@ defmodule RubberDuck.Repo do
       # GIN index support
       "btree_gin",
       # pgvector for embeddings
-      "vector"
+      "vector",
+      "citext"
     ]
   end
 end

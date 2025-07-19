@@ -14,7 +14,7 @@
   plugins: [Spark.Formatter],
 
   # Import dependencies for proper formatting of their macros/functions
-  import_deps: [:ash_postgres, :reactor, :ash_phoenix, :ash],
+  import_deps: [:ash_authentication_phoenix, :ash_authentication, :ash_postgres, :reactor, :ash_phoenix, :ash],
 
   # Subdirectories with their own formatter configuration
   subdirectories: ["apps/*"],

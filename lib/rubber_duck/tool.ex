@@ -1,12 +1,12 @@
 defmodule RubberDuck.Tool do
   @moduledoc """
   Spark DSL for defining and configuring tools in the RubberDuck system.
-  
+
   This module provides a declarative way to define tools with metadata,
   parameters, execution configuration, and security settings.
-  
+
   ## Example
-  
+
       defmodule MyApp.Tools.Calculator do
         use RubberDuck.Tool
         
@@ -53,9 +53,9 @@ defmodule RubberDuck.Tool do
         end
       end
   """
-  
+
   use Spark.Dsl, default_extensions: [extensions: [RubberDuck.Tool.Dsl]]
-  
+
   @doc """
   Get the tool's name.
   """
@@ -63,10 +63,10 @@ defmodule RubberDuck.Tool do
   def name(module) do
     module.__tool__(:name)
   end
-  
+
   @doc """
   Get the tool's metadata.
-  
+
   Returns a map containing all tool configuration including name, description,
   category, version, tags, parameters, execution config, and security settings.
   """
@@ -74,7 +74,7 @@ defmodule RubberDuck.Tool do
   def metadata(module) do
     module.__tool__(:all)
   end
-  
+
   @doc """
   Get the tool's parameters.
   """
@@ -82,7 +82,7 @@ defmodule RubberDuck.Tool do
   def parameters(module) do
     module.__tool__(:parameters)
   end
-  
+
   @doc """
   Get the tool's execution configuration.
   """
@@ -90,7 +90,7 @@ defmodule RubberDuck.Tool do
   def execution(module) do
     module.__tool__(:execution)
   end
-  
+
   @doc """
   Get the tool's security configuration.
   """
@@ -98,7 +98,7 @@ defmodule RubberDuck.Tool do
   def security(module) do
     module.__tool__(:security)
   end
-  
+
   @doc """
   Check if a module is a tool.
   """

@@ -1,11 +1,11 @@
 defmodule RubberDuck.Conversations.Conversation do
   @moduledoc """
   Represents a conversation session with an AI assistant.
-  
+
   A conversation contains multiple messages and maintains metadata about
   the conversation such as the title, associated project, and conversation settings.
   """
-  
+
   use Ash.Resource,
     otp_app: :rubber_duck,
     domain: RubberDuck.Conversations,
@@ -18,7 +18,7 @@ defmodule RubberDuck.Conversations.Conversation do
 
   actions do
     defaults [:read, :destroy, create: :*, update: :*]
-    
+
     read :list_by_user do
       argument :user_id, :uuid, allow_nil?: false
       filter expr(user_id == ^arg(:user_id))
@@ -83,16 +83,14 @@ defmodule RubberDuck.Conversations.Conversation do
       destination_attribute :conversation_id
       sort :inserted_at
     end
-    
+
     has_one :context, RubberDuck.Conversations.ConversationContext do
       destination_attribute :conversation_id
     end
-    
+
     belongs_to :project, RubberDuck.Workspace.Project do
       attribute_writable? true
       allow_nil? true
     end
   end
-
-
 end

@@ -168,7 +168,7 @@ defmodule RubberDuck.Engines.Refactoring do
 
     # Get current provider and model from configuration
     {provider, model} = Config.get_current_provider_and_model()
-    
+
     opts = [
       provider: provider,
       model: model,
@@ -215,7 +215,6 @@ defmodule RubberDuck.Engines.Refactoring do
     Focus on the specific instruction while also addressing any obvious code quality issues.
     """
   end
-
 
   defp get_refactoring_system_prompt(language) do
     """
@@ -322,17 +321,19 @@ defmodule RubberDuck.Engines.Refactoring do
     # Rule-based fallback suggestions
     suggestions = []
 
-    suggestions = if analysis.complexity.max_nesting > 3 do
-      suggestions ++ ["Reduce nesting by extracting functions or using guard clauses"]
-    else
-      suggestions
-    end
+    suggestions =
+      if analysis.complexity.max_nesting > 3 do
+        suggestions ++ ["Reduce nesting by extracting functions or using guard clauses"]
+      else
+        suggestions
+      end
 
-    suggestions = if :long_parameter_list in analysis.code_smells do
-      suggestions ++ ["Consider using a configuration struct instead of many parameters"]
-    else
-      suggestions
-    end
+    suggestions =
+      if :long_parameter_list in analysis.code_smells do
+        suggestions ++ ["Consider using a configuration struct instead of many parameters"]
+      else
+        suggestions
+      end
 
     {:ok,
      %{

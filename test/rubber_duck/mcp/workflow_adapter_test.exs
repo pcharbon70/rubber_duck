@@ -16,7 +16,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, workflow} = WorkflowAdapter.create_workflow("test_workflow", definition)
-      
+
       assert workflow.id == "test_workflow"
       assert workflow.type == "sequential"
       assert length(workflow.steps) == 2
@@ -32,7 +32,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, workflow} = WorkflowAdapter.create_workflow("parallel_test", definition)
-      
+
       assert workflow.id == "parallel_test"
       assert workflow.type == "parallel"
       assert length(workflow.steps) == 2
@@ -47,7 +47,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, workflow} = WorkflowAdapter.create_workflow("conditional_test", definition)
-      
+
       assert workflow.id == "conditional_test"
       assert workflow.type == "conditional"
       assert Map.has_key?(workflow.definition, "condition")
@@ -63,7 +63,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, workflow} = WorkflowAdapter.create_workflow("loop_test", definition)
-      
+
       assert workflow.id == "loop_test"
       assert workflow.type == "loop"
       assert workflow.definition["max_iterations"] == 10
@@ -84,7 +84,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, workflow} = WorkflowAdapter.create_workflow("reactive_test", definition)
-      
+
       assert workflow.id == "reactive_test"
       assert workflow.type == "reactive"
       assert Map.has_key?(workflow.definition, "triggers")
@@ -122,7 +122,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, workflow} = WorkflowAdapter.create_workflow("exec_test", definition)
-      
+
       context = %{
         "session_id" => "test_session",
         "user_id" => "test_user"
@@ -130,7 +130,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
 
       # Mock the tool execution
       result = WorkflowAdapter.execute_workflow(workflow, context)
-      
+
       # Should return some result structure
       case result do
         {:ok, _result} -> assert true
@@ -147,7 +147,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, workflow} = WorkflowAdapter.create_workflow("error_test", definition)
-      
+
       context = %{"session_id" => "test_session"}
 
       assert {:error, _reason} = WorkflowAdapter.execute_workflow(workflow, context)
@@ -162,7 +162,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, workflow} = WorkflowAdapter.create_workflow("context_test", definition)
-      
+
       context = %{
         "session_id" => "test_session",
         "test_value" => "passed_through"
@@ -170,7 +170,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
 
       # The context should be available to tools during execution
       result = WorkflowAdapter.execute_workflow(workflow, context)
-      
+
       # Should not error due to context handling
       case result do
         {:ok, _result} -> assert true
@@ -188,7 +188,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       ]
 
       {:ok, operation} = WorkflowAdapter.create_multi_tool_operation(tool_calls)
-      
+
       assert operation.type == "multi_tool"
       assert length(operation.tool_calls) == 3
       assert operation.execution_mode == "sequential"
@@ -201,7 +201,8 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
 
     test "validates tool call structure" do
       invalid_tool_calls = [
-        %{"params" => %{"input" => "a"}} # Missing "tool"
+        # Missing "tool"
+        %{"params" => %{"input" => "a"}}
       ]
 
       assert {:error, reason} = WorkflowAdapter.create_multi_tool_operation(invalid_tool_calls)
@@ -217,12 +218,12 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       ]
 
       {:ok, operation} = WorkflowAdapter.create_multi_tool_operation(tool_calls)
-      
+
       context = %{"session_id" => "test_session"}
       options = %{"timeout" => 30_000}
 
       result = WorkflowAdapter.execute_multi_tool_operation(operation, context, options)
-      
+
       # Should return results from all tools
       case result do
         {:ok, _results} -> assert true
@@ -237,17 +238,18 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       ]
 
       {:ok, operation} = WorkflowAdapter.create_multi_tool_operation(tool_calls)
-      
+
       context = %{"session_id" => "test_session"}
 
       # Should handle partial failures gracefully
       result = WorkflowAdapter.execute_multi_tool_operation(operation, context)
-      
+
       case result do
-        {:ok, results} -> 
+        {:ok, results} ->
           # Some results may be successful, others may contain errors
           assert is_list(results) or is_map(results)
-        {:error, _reason} -> 
+
+        {:error, _reason} ->
           # Complete failure is also acceptable
           assert true
       end
@@ -257,10 +259,10 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
   describe "list_workflow_templates/0" do
     test "returns available workflow templates" do
       templates = WorkflowAdapter.list_workflow_templates()
-      
+
       assert is_list(templates)
       assert length(templates) > 0
-      
+
       # Check that built-in templates are included
       template_names = Enum.map(templates, & &1.name)
       assert "data_processing_pipeline" in template_names
@@ -270,7 +272,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
 
     test "templates have required fields" do
       templates = WorkflowAdapter.list_workflow_templates()
-      
+
       for template <- templates do
         assert Map.has_key?(template, :name)
         assert Map.has_key?(template, :version)
@@ -284,6 +286,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
   describe "create_workflow_from_template/2" do
     test "creates workflow from template with parameters" do
       template = %{name: "data_processing_pipeline"}
+
       params = %{
         "source" => "api",
         "destination" => "database",
@@ -291,10 +294,10 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, workflow_definition} = WorkflowAdapter.create_workflow_from_template(template, params)
-      
+
       assert Map.has_key?(workflow_definition, "type")
       assert Map.has_key?(workflow_definition, "steps")
-      
+
       # Check that parameters were substituted
       steps_json = Jason.encode!(workflow_definition["steps"])
       assert String.contains?(steps_json, "api")
@@ -304,6 +307,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
 
     test "returns error for missing required parameters" do
       template = %{name: "data_processing_pipeline"}
+
       params = %{
         "source" => "api"
         # Missing required "destination" parameter
@@ -336,11 +340,12 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       options = %{"timeout" => 5_000}
 
       result = WorkflowAdapter.execute_sampling(sampling_config, options)
-      
+
       case result do
         {:ok, selected_tool} ->
           assert is_binary(selected_tool)
           assert selected_tool in ["tool_a", "tool_b", "tool_c"]
+
         {:error, _reason} ->
           # Sampling may fail if tools are not available
           assert true
@@ -367,7 +372,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, trigger} = WorkflowAdapter.create_reactive_trigger(trigger_config)
-      
+
       assert trigger.event == "user_signup"
       assert trigger.workflow == "premium_onboarding"
       assert trigger.delay == 5000
@@ -382,7 +387,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, trigger} = WorkflowAdapter.create_reactive_trigger(trigger_config)
-      
+
       assert trigger.event == "data_received"
       assert trigger.workflow == "data_processing"
       assert trigger.delay == 0
@@ -409,7 +414,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, trigger} = WorkflowAdapter.create_reactive_trigger(trigger_config)
-      
+
       assert :ok = WorkflowAdapter.register_trigger(trigger)
     end
 
@@ -422,7 +427,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       result = WorkflowAdapter.register_trigger(invalid_trigger)
-      
+
       # Should handle invalid trigger gracefully
       case result do
         :ok -> assert true
@@ -443,7 +448,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       context = WorkflowAdapter.create_shared_context(initial_context)
-      
+
       assert is_binary(context.id)
       assert context.data == initial_context
       assert context.version == 1
@@ -453,7 +458,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
 
     test "creates context with empty data" do
       context = WorkflowAdapter.create_shared_context(%{})
-      
+
       assert context.data == %{}
       assert context.version == 1
     end
@@ -461,7 +466,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
     test "generates unique context IDs" do
       context1 = WorkflowAdapter.create_shared_context(%{"test" => "data1"})
       context2 = WorkflowAdapter.create_shared_context(%{"test" => "data2"})
-      
+
       assert context1.id != context2.id
     end
   end
@@ -475,7 +480,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       shared_context = WorkflowAdapter.create_shared_context(initial_context)
-      
+
       # Verify the context was created properly
       assert shared_context.data["user_id"] == "test_user"
       assert shared_context.data["session_data"]["key"] == "value"
@@ -484,12 +489,13 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
     test "workflows can use templates" do
       # This test verifies that WorkflowAdapter properly integrates with TemplateRegistry
       templates = WorkflowAdapter.list_workflow_templates()
-      
+
       # Should have built-in templates
       assert length(templates) > 0
-      
+
       # Should be able to create workflows from templates
       template = %{name: "data_processing_pipeline"}
+
       params = %{
         "source" => "test_source",
         "destination" => "test_destination"
@@ -510,7 +516,7 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, workflow} = WorkflowAdapter.create_workflow("streaming_test", definition)
-      
+
       # Verify workflow structure supports streaming
       assert workflow.id == "streaming_test"
       assert workflow.type == "sequential"
@@ -537,12 +543,13 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
       }
 
       {:ok, workflow} = WorkflowAdapter.create_workflow("timeout_test", definition)
-      
+
       context = %{"session_id" => "test"}
-      options = %{"timeout" => 1000} # 1 second timeout
+      # 1 second timeout
+      options = %{"timeout" => 1000}
 
       result = WorkflowAdapter.execute_workflow(workflow, context, options)
-      
+
       # Should handle timeout gracefully
       case result do
         {:ok, _} -> assert true
@@ -553,12 +560,18 @@ defmodule RubberDuck.MCP.WorkflowAdapterTest do
     test "validates workflow definitions thoroughly" do
       # Test various invalid workflow structures
       invalid_definitions = [
-        %{"type" => "sequential"}, # Missing steps
-        %{"steps" => []}, # Missing type
-        %{"type" => "parallel", "steps" => [%{}]}, # Invalid step structure
-        %{"type" => "conditional"}, # Missing condition
-        %{"type" => "loop", "steps" => []}, # Missing max_iterations
-        %{"type" => "reactive"} # Missing triggers
+        # Missing steps
+        %{"type" => "sequential"},
+        # Missing type
+        %{"steps" => []},
+        # Invalid step structure
+        %{"type" => "parallel", "steps" => [%{}]},
+        # Missing condition
+        %{"type" => "conditional"},
+        # Missing max_iterations
+        %{"type" => "loop", "steps" => []},
+        # Missing triggers
+        %{"type" => "reactive"}
       ]
 
       for definition <- invalid_definitions do

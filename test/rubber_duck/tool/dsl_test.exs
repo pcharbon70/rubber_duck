@@ -9,8 +9,8 @@ defmodule RubberDuck.Tool.DslTest do
         tool do
           name :simple_tool
           description "A simple test tool"
-          category :testing
-          version "1.0.0"
+          category(:testing)
+          version("1.0.0")
         end
       end
 
@@ -26,16 +26,16 @@ defmodule RubberDuck.Tool.DslTest do
 
         tool do
           name :parameterized_tool
-          
+
           parameter :input do
             type :string
-            required true
+            required(true)
             description "The input string to process"
           end
-          
+
           parameter :count do
             type :integer
-            required false
+            required(false)
             default 1
             description "Number of times to repeat"
           end
@@ -44,11 +44,11 @@ defmodule RubberDuck.Tool.DslTest do
 
       parameters = ParameterizedTool.__tool__(:parameters)
       assert length(parameters) == 2
-      
+
       input_param = Enum.find(parameters, &(&1.name == :input))
       assert input_param.type == :string
       assert input_param.required == true
-      
+
       count_param = Enum.find(parameters, &(&1.name == :count))
       assert count_param.type == :integer
       assert count_param.required == false
@@ -61,15 +61,15 @@ defmodule RubberDuck.Tool.DslTest do
 
         tool do
           name :executable_tool
-          
+
           execution do
-            handler &ExecutableTool.execute/2
+            handler(&ExecutableTool.execute/2)
             timeout 5000
-            async true
-            retries 3
+            async(true)
+            retries(3)
           end
         end
-        
+
         def execute(params, context) do
           {:ok, "Executed with #{inspect(params)}"}
         end
@@ -88,11 +88,11 @@ defmodule RubberDuck.Tool.DslTest do
 
         tool do
           name :secure_tool
-          
+
           security do
-            sandbox :restricted
-            capabilities [:file_read, :network]
-            rate_limit per_minute: 10
+            sandbox(:restricted)
+            capabilities([:file_read, :network])
+            rate_limit(per_minute: 10)
           end
         end
       end

@@ -6,7 +6,7 @@ defmodule RubberDuck.Memory.UserLLMConfig do
 
   @moduledoc """
   Detailed LLM configuration records for users.
-  
+
   This resource stores individual LLM configuration entries for users,
   allowing for detailed tracking of model preferences, usage statistics,
   and configuration metadata.
@@ -15,7 +15,7 @@ defmodule RubberDuck.Memory.UserLLMConfig do
   postgres do
     table "user_llm_configs"
     repo RubberDuck.Repo
-    
+
     custom_indexes do
       index [:user_id]
       index [:provider]
@@ -38,19 +38,19 @@ defmodule RubberDuck.Memory.UserLLMConfig do
       accept [:model, :is_default, :metadata]
     end
 
-
     update :increment_usage do
       require_atomic? false
-      
+
       change fn changeset, _context ->
         current_count = Ash.Changeset.get_attribute(changeset, :usage_count) || 0
         updated_metadata = Ash.Changeset.get_attribute(changeset, :metadata) || %{}
-        
-        updated_metadata = Map.merge(updated_metadata, %{
-          "last_used" => DateTime.utc_now(),
-          "usage_count" => current_count + 1
-        })
-        
+
+        updated_metadata =
+          Map.merge(updated_metadata, %{
+            "last_used" => DateTime.utc_now(),
+            "usage_count" => current_count + 1
+          })
+
         changeset
         |> Ash.Changeset.change_attribute(:usage_count, current_count + 1)
         |> Ash.Changeset.change_attribute(:metadata, updated_metadata)
@@ -64,7 +64,7 @@ defmodule RubberDuck.Memory.UserLLMConfig do
 
     read :get_user_default do
       argument :user_id, :string, allow_nil?: false
-      
+
       get? true
       filter expr(user_id == ^arg(:user_id) and is_default == true)
     end
@@ -72,14 +72,14 @@ defmodule RubberDuck.Memory.UserLLMConfig do
     read :get_by_user_and_provider do
       argument :user_id, :string, allow_nil?: false
       argument :provider, :atom, allow_nil?: false
-      
+
       filter expr(user_id == ^arg(:user_id) and provider == ^arg(:provider))
     end
 
     read :get_user_provider_default do
       argument :user_id, :string, allow_nil?: false
       argument :provider, :atom, allow_nil?: false
-      
+
       get? true
       filter expr(user_id == ^arg(:user_id) and provider == ^arg(:provider))
     end
@@ -88,16 +88,16 @@ defmodule RubberDuck.Memory.UserLLMConfig do
       argument :user_id, :string, allow_nil?: false
       argument :provider, :atom, allow_nil?: false
       argument :model, :string, allow_nil?: false
-      
+
       run fn input, _context ->
         user_id = input.arguments.user_id
         provider = input.arguments.provider
         model = input.arguments.model
-        
+
         # Use the identity to find existing config
         case RubberDuck.Memory.UserLLMConfig
-        |> Ash.Query.for_read(:get_by_user_and_provider, %{user_id: user_id, provider: provider})
-        |> Ash.read_one() do
+             |> Ash.Query.for_read(:get_by_user_and_provider, %{user_id: user_id, provider: provider})
+             |> Ash.read_one() do
           {:ok, nil} ->
             # Create new config
             RubberDuck.Memory.UserLLMConfig
@@ -108,7 +108,7 @@ defmodule RubberDuck.Memory.UserLLMConfig do
               is_default: true
             })
             |> Ash.create()
-            
+
           {:ok, config} ->
             # Update existing config
             config
@@ -117,10 +117,26 @@ defmodule RubberDuck.Memory.UserLLMConfig do
               is_default: true
             })
             |> Ash.update()
-            
+
           error ->
             error
         end
+      end
+    end
+  end
+
+  validations do
+    validate fn changeset, _context ->
+      # Validate that model is appropriate for provider
+      provider = Ash.Changeset.get_attribute(changeset, :provider)
+      model = Ash.Changeset.get_attribute(changeset, :model)
+
+      case validate_provider_model(provider, model) do
+        :ok ->
+          :ok
+
+        {:error, message} ->
+          {:error, field: :model, message: message}
       end
     end
   end
@@ -180,18 +196,16 @@ defmodule RubberDuck.Memory.UserLLMConfig do
     end
   end
 
-  identities do
-    identity :unique_user_provider, [:user_id, :provider]
-  end
-
   calculations do
     calculate :is_recently_used, :boolean do
       calculation fn records, _opts ->
         one_week_ago = DateTime.add(DateTime.utc_now(), -7, :day)
-        
+
         Enum.map(records, fn record ->
           case record.metadata["last_used"] do
-            nil -> false
+            nil ->
+              false
+
             last_used_string ->
               case DateTime.from_iso8601(last_used_string) do
                 {:ok, last_used, _} -> DateTime.after?(last_used, one_week_ago)
@@ -211,18 +225,8 @@ defmodule RubberDuck.Memory.UserLLMConfig do
     end
   end
 
-  validations do
-    validate fn changeset, _context ->
-      # Validate that model is appropriate for provider
-      provider = Ash.Changeset.get_attribute(changeset, :provider)
-      model = Ash.Changeset.get_attribute(changeset, :model)
-      
-      case validate_provider_model(provider, model) do
-        :ok -> :ok
-        {:error, message} -> 
-          {:error, field: :model, message: message}
-      end
-    end
+  identities do
+    identity :unique_user_provider, [:user_id, :provider]
   end
 
   # Private helper function for validation

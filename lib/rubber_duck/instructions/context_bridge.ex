@@ -1,23 +1,23 @@
 defmodule RubberDuck.Instructions.ContextBridge do
   @moduledoc """
   Bridge module that integrates the instruction system with context building.
-  
+
   This module coordinates between the hierarchical instruction loading system
   and the context building strategies, enabling instruction-driven context
   enhancement with dynamic system prompts, user preferences, and project-specific
   context rules from AGENTS.md files.
-  
+
   ## Features
-  
+
   - **Instruction-Driven Context**: Load relevant instructions for context enhancement
   - **Hierarchical Resolution**: Project → workspace → global instruction inheritance
   - **Template Processing**: Dynamic system prompts with variable interpolation
   - **User Preferences**: Apply instruction-defined preferences to context building
   - **Project-Specific Rules**: Context customization based on project instructions
   - **Cache Integration**: Leverage existing instruction caching for performance
-  
+
   ## Usage Examples
-  
+
       # Load instructions for a specific context
       {:ok, instructions} = ContextBridge.load_instructions_for_context(%{
         project_path: "/path/to/project",
@@ -36,39 +36,39 @@ defmodule RubberDuck.Instructions.ContextBridge do
   require Logger
 
   @type context_options :: %{
-    project_path: String.t() | nil,
-    user_id: String.t() | nil,
-    context_type: atom(),
-    workspace_path: String.t() | nil,
-    session_id: String.t() | nil
-  }
+          project_path: String.t() | nil,
+          user_id: String.t() | nil,
+          context_type: atom(),
+          workspace_path: String.t() | nil,
+          session_id: String.t() | nil
+        }
 
   @type instruction_context :: %{
-    instructions: [map()],
-    system_prompt: String.t() | nil,
-    user_preferences: map(),
-    context_rules: map(),
-    applied_files: [String.t()],
-    metadata: map()
-  }
+          instructions: [map()],
+          system_prompt: String.t() | nil,
+          user_preferences: map(),
+          context_rules: map(),
+          applied_files: [String.t()],
+          metadata: map()
+        }
 
   @type context_enhancement :: %{
-    system_prompt: String.t() | nil,
-    user_preferences: map(),
-    context_rules: map(),
-    metadata: map()
-  }
+          system_prompt: String.t() | nil,
+          user_preferences: map(),
+          context_rules: map(),
+          metadata: map()
+        }
 
   ## Public API
 
   @doc """
   Loads relevant instructions for a specific context.
-  
+
   Performs hierarchical instruction loading and filters to instructions
   relevant for the given context type and scope.
   """
-  @spec load_instructions_for_context(context_options()) :: 
-    {:ok, instruction_context()} | {:error, term()}
+  @spec load_instructions_for_context(context_options()) ::
+          {:ok, instruction_context()} | {:error, term()}
   def load_instructions_for_context(options) do
     with {:ok, loaded_instructions} <- load_hierarchical_instructions(options),
          filtered_instructions <- filter_instructions_for_context(loaded_instructions, options),
@@ -81,29 +81,32 @@ defmodule RubberDuck.Instructions.ContextBridge do
 
   @doc """
   Enhances a base context with instruction-driven content.
-  
+
   Applies instruction templates, merges system prompts, and includes
   instruction-specific metadata in the context.
   """
   @spec enhance_context(map(), instruction_context()) :: map()
   def enhance_context(base_context, instruction_context) do
-    enhanced_metadata = Map.merge(
-      Map.get(base_context, :metadata, %{}),
-      %{
-        instruction_context: instruction_context.metadata,
-        applied_instructions: instruction_context.applied_files,
-        has_instructions: length(instruction_context.instructions) > 0
-      }
-    )
+    enhanced_metadata =
+      Map.merge(
+        Map.get(base_context, :metadata, %{}),
+        %{
+          instruction_context: instruction_context.metadata,
+          applied_instructions: instruction_context.applied_files,
+          has_instructions: length(instruction_context.instructions) > 0
+        }
+      )
 
     enhanced_context = %{
-      base_context |
-      metadata: enhanced_metadata
+      base_context
+      | metadata: enhanced_metadata
     }
 
     # Add instruction-driven system prompt if available
     case instruction_context.system_prompt do
-      nil -> enhanced_context
+      nil ->
+        enhanced_context
+
       system_prompt ->
         Map.put(enhanced_context, :instruction_system_prompt, system_prompt)
     end
@@ -111,15 +114,17 @@ defmodule RubberDuck.Instructions.ContextBridge do
 
   @doc """
   Gets a dynamic system prompt from instructions with variable interpolation.
-  
+
   Processes instruction templates with provided context variables to generate
   a dynamic system prompt.
   """
-  @spec get_system_prompt(instruction_context(), map()) :: 
-    {:ok, String.t()} | {:error, term()}
+  @spec get_system_prompt(instruction_context(), map()) ::
+          {:ok, String.t()} | {:error, term()}
   def get_system_prompt(instruction_context, context_variables \\ %{}) do
     case find_system_prompt_template(instruction_context.instructions) do
-      nil -> {:ok, nil}
+      nil ->
+        {:ok, nil}
+
       template ->
         case TemplateProcessor.process_template(template, context_variables) do
           {:ok, rendered_prompt} -> {:ok, rendered_prompt}
@@ -130,7 +135,7 @@ defmodule RubberDuck.Instructions.ContextBridge do
 
   @doc """
   Extracts user preferences from loaded instructions.
-  
+
   Merges preferences from multiple instruction files with proper precedence
   (project overrides workspace overrides global).
   """
@@ -141,7 +146,7 @@ defmodule RubberDuck.Instructions.ContextBridge do
 
   @doc """
   Extracts context building rules from instructions.
-  
+
   Returns rules that influence how context should be built, such as
   file inclusion patterns, retrieval preferences, etc.
   """
@@ -152,7 +157,7 @@ defmodule RubberDuck.Instructions.ContextBridge do
 
   @doc """
   Determines the preferred context strategy based on instructions.
-  
+
   Returns the strategy name that instructions suggest should be used
   for the given context type.
   """
@@ -163,7 +168,7 @@ defmodule RubberDuck.Instructions.ContextBridge do
 
   @doc """
   Checks if instructions are available for the given project path.
-  
+
   Quick check without full loading to determine if instruction enhancement
   is possible.
   """
@@ -174,6 +179,7 @@ defmodule RubberDuck.Instructions.ContextBridge do
       _ -> false
     end
   end
+
   def has_instructions?(_), do: false
 
   ## Private Functions
@@ -181,16 +187,16 @@ defmodule RubberDuck.Instructions.ContextBridge do
   defp load_hierarchical_instructions(options) do
     project_path = Map.get(options, :project_path)
     user_id = Map.get(options, :user_id)
-    
+
     cond do
       project_path ->
         # Load project-specific instructions
         HierarchicalLoader.load_instructions(project_path, include_global: true)
-        
+
       user_id ->
         # Load user-specific global instructions
         load_user_global_instructions(user_id)
-        
+
       true ->
         # Load default global instructions
         load_default_instructions()
@@ -204,7 +210,7 @@ defmodule RubberDuck.Instructions.ContextBridge do
       Path.expand("~/.agents.md"),
       Path.expand("~/.config/rubberduck/AGENTS.md")
     ]
-    
+
     load_instructions_from_paths(global_paths)
   end
 
@@ -213,12 +219,12 @@ defmodule RubberDuck.Instructions.ContextBridge do
     system_paths = [
       "/etc/rubberduck/AGENTS.md"
     ]
-    
+
     load_instructions_from_paths(system_paths)
   end
 
   defp load_instructions_from_paths(paths) do
-    loaded_instructions = 
+    loaded_instructions =
       paths
       |> Enum.filter(&File.exists?/1)
       |> Enum.map(fn path ->
@@ -234,7 +240,7 @@ defmodule RubberDuck.Instructions.ContextBridge do
 
   defp filter_instructions_for_context(loaded_result, options) do
     context_type = Map.get(options, :context_type, :general)
-    
+
     loaded_result.loaded
     |> Enum.filter(fn instruction ->
       instruction_applies_to_context?(instruction, context_type)
@@ -244,7 +250,7 @@ defmodule RubberDuck.Instructions.ContextBridge do
   defp instruction_applies_to_context?(instruction, context_type) do
     # Check if instruction metadata indicates it applies to this context type
     applicable_contexts = Map.get(instruction.metadata, "contexts", ["all"])
-    
+
     cond do
       "all" in applicable_contexts -> true
       Atom.to_string(context_type) in applicable_contexts -> true
@@ -256,12 +262,12 @@ defmodule RubberDuck.Instructions.ContextBridge do
   defp process_instruction_context(instructions, options) do
     # Process instructions to extract context-relevant information
     context_variables = build_context_variables(options)
-    
+
     system_prompt = extract_system_prompt(instructions, context_variables)
     user_preferences = extract_user_preferences(instructions)
     context_rules = extract_context_rules(instructions)
     applied_files = Enum.map(instructions, & &1.file_path)
-    
+
     metadata = %{
       instruction_count: length(instructions),
       has_system_prompt: system_prompt != nil,
@@ -283,22 +289,23 @@ defmodule RubberDuck.Instructions.ContextBridge do
 
   defp build_context_variables(options) do
     project_path = Map.get(options, :project_path)
-    
+
     base_variables = %{
       "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601(),
       "context_type" => Map.get(options, :context_type, :general) |> Atom.to_string()
     }
 
     # Add project-specific variables
-    project_variables = if project_path do
-      %{
-        "project_name" => Path.basename(project_path),
-        "project_path" => project_path,
-        "language" => detect_project_language(project_path)
-      }
-    else
-      %{}
-    end
+    project_variables =
+      if project_path do
+        %{
+          "project_name" => Path.basename(project_path),
+          "project_path" => project_path,
+          "language" => detect_project_language(project_path)
+        }
+      else
+        %{}
+      end
 
     Map.merge(base_variables, project_variables)
   end
@@ -318,9 +325,11 @@ defmodule RubberDuck.Instructions.ContextBridge do
   defp extract_system_prompt(instructions, context_variables) do
     # Find system prompt template in instructions
     system_prompt_template = find_system_prompt_template(instructions)
-    
+
     case system_prompt_template do
-      nil -> nil
+      nil ->
+        nil
+
       template ->
         case TemplateProcessor.process_template(template, context_variables) do
           {:ok, rendered} -> rendered
@@ -335,18 +344,19 @@ defmodule RubberDuck.Instructions.ContextBridge do
       cond do
         Map.has_key?(instruction.metadata, "system_prompt") ->
           Map.get(instruction.metadata, "system_prompt")
-          
+
         has_system_prompt_section?(instruction) ->
           extract_system_prompt_from_content(instruction.content)
-          
-        true -> nil
+
+        true ->
+          nil
       end
     end)
   end
 
   defp has_system_prompt_section?(instruction) do
     String.contains?(instruction.content, "## System Prompt") or
-    String.contains?(instruction.content, "# System Prompt")
+      String.contains?(instruction.content, "# System Prompt")
   end
 
   defp extract_system_prompt_from_content(content) do

@@ -1,0 +1,35 @@
+<div class="mx-auto max-w-2xl py-16 px-4">
+  <h1 class="text-4xl font-bold text-center mb-8">Welcome to RubberDuck</h1>
+  
+  <div class="text-center space-y-4">
+    <p class="text-lg text-gray-600">
+      Your AI-powered coding assistant built with Elixir and Ash Framework
+    </p>
+    
+    <div class="space-x-4">
+      <%= if @current_user do %>
+        <p class="mb-4">Welcome back, <%= @current_user.username %>!</p>
+        <.link 
+          href={~p"/auth/user/sign_out"} 
+          method="delete"
+          class="inline-block px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+        >
+          Sign Out
+        </.link>
+      <% else %>
+        <.link 
+          href={~p"/sign-in"} 
+          class="inline-block px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Sign In
+        </.link>
+        <.link 
+          href={~p"/register"} 
+          class="inline-block px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+        >
+          Register
+        </.link>
+      <% end %>
+    </div>
+  </div>
+</div>

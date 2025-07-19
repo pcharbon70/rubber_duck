@@ -1,7 +1,7 @@
 defmodule RubberDuck.Instructions.TemplateBenchmark do
   @moduledoc """
   Template benchmarking utilities for performance testing and optimization.
-  
+
   Provides comprehensive benchmarking features including:
   - Performance measurement
   - Memory usage tracking
@@ -11,14 +11,14 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
   """
 
   alias RubberDuck.Instructions.TemplateProcessor
-  
+
   @type benchmark_result :: %{
-    duration: non_neg_integer(),
-    memory_usage: non_neg_integer(),
-    throughput: float(),
-    errors: non_neg_integer(),
-    metadata: map()
-  }
+          duration: non_neg_integer(),
+          memory_usage: non_neg_integer(),
+          throughput: float(),
+          errors: non_neg_integer(),
+          metadata: map()
+        }
 
   @doc """
   Benchmarks a single template with various configurations.
@@ -27,15 +27,15 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
   def benchmark_template(template_content, variables \\ %{}, opts \\ []) do
     iterations = Keyword.get(opts, :iterations, 1000)
     warmup = Keyword.get(opts, :warmup, 100)
-    
+
     # Warmup runs
     run_warmup(template_content, variables, warmup)
-    
+
     # Actual benchmark
     {duration, memory_usage, errors} = run_benchmark(template_content, variables, iterations)
-    
+
     throughput = iterations / (duration / 1_000_000)
-    
+
     %{
       duration: duration,
       memory_usage: memory_usage,
@@ -55,7 +55,7 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
   """
   @spec compare_templates([{String.t(), String.t(), map()}], keyword()) :: map()
   def compare_templates(templates, opts \\ []) do
-    results = 
+    results =
       templates
       |> Enum.with_index()
       |> Enum.map(fn {{name, template, variables}, index} ->
@@ -63,7 +63,7 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
         {name || "Template #{index + 1}", result}
       end)
       |> Enum.into(%{})
-    
+
     %{
       results: results,
       comparison: generate_comparison(results),
@@ -78,25 +78,25 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
   def load_test(template_content, variables \\ %{}, opts \\ []) do
     concurrency = Keyword.get(opts, :concurrency, 10)
     duration_ms = Keyword.get(opts, :duration_ms, 10_000)
-    
+
     start_time = System.monotonic_time(:millisecond)
-    
+
     # Start concurrent workers
-    workers = 
+    workers =
       1..concurrency
       |> Enum.map(fn _ ->
         Task.async(fn ->
           worker_loop(template_content, variables, start_time, duration_ms)
         end)
       end)
-    
+
     # Collect results
     results = Enum.map(workers, &Task.await/1)
-    
+
     total_requests = Enum.sum(Enum.map(results, & &1.requests))
     total_errors = Enum.sum(Enum.map(results, & &1.errors))
     actual_duration = Enum.max(Enum.map(results, & &1.duration))
-    
+
     %{
       total_requests: total_requests,
       total_errors: total_errors,
@@ -115,8 +115,8 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
   def benchmark_variable_sizes(template_content, opts \\ []) do
     variable_sizes = Keyword.get(opts, :sizes, [1, 10, 100, 1000])
     iterations = Keyword.get(opts, :iterations, 100)
-    
-    results = 
+
+    results =
       variable_sizes
       |> Enum.map(fn size ->
         variables = generate_variables(size)
@@ -124,7 +124,7 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
         {size, result}
       end)
       |> Enum.into(%{})
-    
+
     %{
       results: results,
       analysis: analyze_variable_scaling(results)
@@ -138,8 +138,8 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
   def benchmark_template_sizes(opts \\ []) do
     sizes = Keyword.get(opts, :sizes, [100, 1000, 10_000, 50_000])
     iterations = Keyword.get(opts, :iterations, 100)
-    
-    results = 
+
+    results =
       sizes
       |> Enum.map(fn size ->
         template = generate_template(size)
@@ -148,7 +148,7 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
         {size, result}
       end)
       |> Enum.into(%{})
-    
+
     %{
       results: results,
       analysis: analyze_template_scaling(results)
@@ -163,10 +163,13 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
     case results do
       %{results: template_results, comparison: comparison} ->
         generate_comparison_report(template_results, comparison)
+
       %{total_requests: _} ->
         generate_load_test_report(results)
+
       %{duration: _} ->
         generate_single_benchmark_report(results)
+
       _ ->
         "Unknown benchmark result format"
     end
@@ -184,8 +187,8 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
   defp run_benchmark(template_content, variables, iterations) do
     start_time = System.monotonic_time(:microsecond)
     {memory_before, _} = :erlang.process_info(self(), :memory)
-    
-    errors = 
+
+    errors =
       1..iterations
       |> Enum.count(fn _ ->
         case TemplateProcessor.process_template(template_content, variables) do
@@ -193,13 +196,13 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
           {:error, _} -> true
         end
       end)
-    
+
     {memory_after, _} = :erlang.process_info(self(), :memory)
     end_time = System.monotonic_time(:microsecond)
-    
+
     duration = end_time - start_time
     memory_usage = memory_after - memory_before
-    
+
     {duration, memory_usage, errors}
   end
 
@@ -209,13 +212,14 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
 
   defp worker_loop(template_content, variables, start_time, duration_ms, requests, errors) do
     current_time = System.monotonic_time(:millisecond)
-    
+
     if current_time - start_time < duration_ms do
-      new_errors = case TemplateProcessor.process_template(template_content, variables) do
-        {:ok, _} -> errors
-        {:error, _} -> errors + 1
-      end
-      
+      new_errors =
+        case TemplateProcessor.process_template(template_content, variables) do
+          {:ok, _} -> errors
+          {:error, _} -> errors + 1
+        end
+
       worker_loop(template_content, variables, start_time, duration_ms, requests + 1, new_errors)
     else
       %{
@@ -235,9 +239,9 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
   defp generate_template(size) do
     base_template = "Hello {{ name }}, your value is {{ value }}."
     repetitions = div(size, String.length(base_template))
-    
+
     1..repetitions
-    |> Enum.map(fn i -> 
+    |> Enum.map(fn i ->
       String.replace(base_template, "{{ name }}", "{{ name#{i} }}")
     end)
     |> Enum.join("\n")
@@ -245,7 +249,7 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
 
   defp generate_comparison(results) do
     sorted_results = Enum.sort_by(results, fn {_, result} -> result.throughput end, :desc)
-    
+
     %{
       fastest: List.first(sorted_results),
       slowest: List.last(sorted_results),
@@ -256,7 +260,7 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
 
   defp calculate_performance_ratios(sorted_results) do
     {_fastest_name, fastest_result} = List.first(sorted_results)
-    
+
     sorted_results
     |> Enum.map(fn {name, result} ->
       ratio = fastest_result.throughput / result.throughput
@@ -268,7 +272,7 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
   defp generate_summary(results) do
     throughputs = Enum.map(results, fn {_, result} -> result.throughput end)
     durations = Enum.map(results, fn {_, result} -> result.duration end)
-    
+
     %{
       average_throughput: Enum.sum(throughputs) / length(throughputs),
       total_duration: Enum.sum(durations),
@@ -278,7 +282,7 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
 
   defp analyze_variable_scaling(results) do
     sorted_results = Enum.sort_by(results, fn {size, _} -> size end)
-    
+
     %{
       scaling_factor: calculate_scaling_factor(sorted_results),
       performance_degradation: calculate_performance_degradation(sorted_results)
@@ -287,7 +291,7 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
 
   defp analyze_template_scaling(results) do
     sorted_results = Enum.sort_by(results, fn {size, _} -> size end)
-    
+
     %{
       scaling_factor: calculate_scaling_factor(sorted_results),
       memory_scaling: calculate_memory_scaling(sorted_results)
@@ -300,7 +304,7 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
     else
       [{_size1, result1} | _] = sorted_results
       {_size2, result2} = List.last(sorted_results)
-      
+
       result1.throughput / result2.throughput
     end
   end
@@ -311,8 +315,8 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
     else
       [{_size1, result1} | _] = sorted_results
       {_size2, result2} = List.last(sorted_results)
-      
-      ((result1.throughput - result2.throughput) / result1.throughput) * 100
+
+      (result1.throughput - result2.throughput) / result1.throughput * 100
     end
   end
 
@@ -322,7 +326,7 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
     else
       [{_size1, result1} | _] = sorted_results
       {_size2, result2} = List.last(sorted_results)
-      
+
       result2.memory_usage / result1.memory_usage
     end
   end
@@ -330,13 +334,13 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
   defp generate_single_benchmark_report(result) do
     """
     # Template Benchmark Report
-    
+
     ## Performance Metrics
     - Duration: #{result.duration}μs
     - Memory Usage: #{result.memory_usage} bytes
     - Throughput: #{Float.round(result.throughput, 2)} templates/second
     - Error Rate: #{result.errors}/#{result.metadata.iterations} (#{Float.round(result.errors / result.metadata.iterations * 100, 2)}%)
-    
+
     ## Template Information
     - Template Size: #{result.metadata.template_size} characters
     - Variables: #{result.metadata.variable_count}
@@ -347,50 +351,44 @@ defmodule RubberDuck.Instructions.TemplateBenchmark do
   defp generate_comparison_report(_results, comparison) do
     {fastest_name, fastest_result} = comparison.fastest
     {slowest_name, slowest_result} = comparison.slowest
-    
+
     """
     # Template Comparison Report
-    
+
     ## Performance Rankings
-    #{Enum.map(comparison.rankings, fn {{name, result}, rank} ->
-      "#{rank}. #{name}: #{Float.round(result.throughput, 2)} templates/second"
-    end) |> Enum.join("\n")}
-    
+    #{Enum.map(comparison.rankings, fn {{name, result}, rank} -> "#{rank}. #{name}: #{Float.round(result.throughput, 2)} templates/second" end) |> Enum.join("\n")}
+
     ## Fastest Template
     - Name: #{fastest_name}
     - Throughput: #{Float.round(fastest_result.throughput, 2)} templates/second
     - Duration: #{fastest_result.duration}μs
-    
+
     ## Slowest Template
     - Name: #{slowest_name}
     - Throughput: #{Float.round(slowest_result.throughput, 2)} templates/second
     - Duration: #{slowest_result.duration}μs
-    
+
     ## Performance Ratios
-    #{Enum.map(comparison.performance_ratios, fn {name, ratio} ->
-      "- #{name}: #{Float.round(ratio, 2)}x slower than fastest"
-    end) |> Enum.join("\n")}
+    #{Enum.map(comparison.performance_ratios, fn {name, ratio} -> "- #{name}: #{Float.round(ratio, 2)}x slower than fastest" end) |> Enum.join("\n")}
     """
   end
 
   defp generate_load_test_report(results) do
     """
     # Load Test Report
-    
+
     ## Test Configuration
     - Concurrency: #{results.concurrency}
     - Duration: #{results.actual_duration}ms
-    
+
     ## Results
     - Total Requests: #{results.total_requests}
     - Total Errors: #{results.total_errors}
     - Success Rate: #{Float.round(results.success_rate * 100, 2)}%
     - Requests per Second: #{Float.round(results.requests_per_second, 2)}
-    
+
     ## Worker Performance
-    #{Enum.with_index(results.worker_results, 1) |> Enum.map(fn {worker, i} ->
-      "Worker #{i}: #{worker.requests} requests, #{worker.errors} errors"
-    end) |> Enum.join("\n")}
+    #{Enum.with_index(results.worker_results, 1) |> Enum.map(fn {worker, i} -> "Worker #{i}: #{worker.requests} requests, #{worker.errors} errors" end) |> Enum.join("\n")}
     """
   end
 end

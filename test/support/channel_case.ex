@@ -31,13 +31,13 @@ defmodule RubberDuckWeb.ChannelCase do
   setup tags do
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(RubberDuck.Repo, shared: not tags[:async])
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
-    
+
     # Ensure the Commands Processor is started for channel tests
     case Process.whereis(RubberDuck.Commands.Processor) do
       nil -> start_supervised!(RubberDuck.Commands.Processor)
       _pid -> :ok
     end
-    
+
     :ok
   end
 end

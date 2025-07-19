@@ -1,11 +1,11 @@
 defmodule RubberDuck.Tool.Dsl do
   @moduledoc """
   Spark DSL extension for defining tools declaratively.
-  
+
   This DSL provides sections for metadata, parameters, execution configuration,
   and security settings.
   """
-  
+
   @parameter %Spark.Dsl.Entity{
     name: :parameter,
     describe: "Defines a parameter that the tool accepts",
@@ -45,7 +45,7 @@ defmodule RubberDuck.Tool.Dsl do
       ]
     ]
   }
-  
+
   @execution %Spark.Dsl.Entity{
     name: :execution,
     describe: "Configuration for how the tool executes",
@@ -74,7 +74,7 @@ defmodule RubberDuck.Tool.Dsl do
       ]
     ]
   }
-  
+
   @security %Spark.Dsl.Entity{
     name: :security,
     describe: "Security configuration for the tool",
@@ -118,7 +118,7 @@ defmodule RubberDuck.Tool.Dsl do
       ]
     ]
   }
-  
+
   @tool %Spark.Dsl.Section{
     name: :tool,
     describe: """
@@ -159,9 +159,9 @@ defmodule RubberDuck.Tool.Dsl do
       @security
     ]
   }
-  
+
   @sections [@tool]
-  
+
   use Spark.Dsl.Extension,
     sections: @sections,
     transformers: [

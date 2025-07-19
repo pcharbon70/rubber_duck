@@ -2,7 +2,7 @@ defmodule RubberDuckWeb.CodeChannel do
   @moduledoc """
   Channel for real-time code-related operations including streaming
   completions, generation, refactoring, and collaborative features.
-  
+
   This channel now works directly with the various code engines,
   bypassing the removed commands system.
   """
@@ -79,7 +79,7 @@ defmodule RubberDuckWeb.CodeChannel do
     prompt = params["prompt"] || ""
     language = params["language"] || "elixir"
     context = build_generation_context(params, socket)
-    
+
     # Build input for generation engine
     input = %{
       prompt: prompt,
@@ -88,10 +88,10 @@ defmodule RubberDuckWeb.CodeChannel do
       partial_code: params["partial_code"],
       style: params["style"] && String.to_atom(params["style"])
     }
-    
+
     # Create a unique request ID
     request_id = generate_request_id()
-    
+
     # Start async generation
     Task.start_link(fn ->
       case EngineManager.execute(:generation, input, 30_000) do
@@ -104,7 +104,7 @@ defmodule RubberDuckWeb.CodeChannel do
             explanation: result.explanation,
             alternatives: Map.get(result, :alternatives, [])
           })
-          
+
         {:error, reason} ->
           push(socket, "generation_error", %{
             request_id: request_id,
@@ -112,7 +112,7 @@ defmodule RubberDuckWeb.CodeChannel do
           })
       end
     end)
-    
+
     {:reply, {:ok, %{request_id: request_id}}, socket}
   end
 
@@ -124,7 +124,7 @@ defmodule RubberDuckWeb.CodeChannel do
     cursor_position = parse_cursor_position(params["cursor_position"])
     file_path = params["file_path"] || get_in(socket.assigns, [:file, :path])
     language = params["language"] || detect_language_from_file(file_path)
-    
+
     # Build input for completion engine
     input = %{
       prefix: prefix,
@@ -134,23 +134,27 @@ defmodule RubberDuckWeb.CodeChannel do
       file_path: file_path,
       project_context: build_project_context(socket)
     }
-    
+
     # Create a unique request ID
     request_id = generate_request_id()
-    
+
     # Execute completion synchronously for faster response
     case EngineManager.execute(:completion, input, 5_000) do
       {:ok, suggestions} ->
-        {:reply, {:ok, %{
-          request_id: request_id,
-          suggestions: format_suggestions(suggestions)
-        }}, socket}
-        
+        {:reply,
+         {:ok,
+          %{
+            request_id: request_id,
+            suggestions: format_suggestions(suggestions)
+          }}, socket}
+
       {:error, reason} ->
-        {:reply, {:error, %{
-          request_id: request_id,
-          error: format_error(reason)
-        }}, socket}
+        {:reply,
+         {:error,
+          %{
+            request_id: request_id,
+            error: format_error(reason)
+          }}, socket}
     end
   end
 
@@ -160,7 +164,7 @@ defmodule RubberDuckWeb.CodeChannel do
     code = params["code"] || ""
     refactor_type = params["type"] || "general"
     language = params["language"] || "elixir"
-    
+
     # Build input for refactoring engine
     input = %{
       code: code,
@@ -169,10 +173,10 @@ defmodule RubberDuckWeb.CodeChannel do
       options: params["options"] || %{},
       context: build_refactoring_context(params, socket)
     }
-    
+
     # Create a unique request ID
     request_id = generate_request_id()
-    
+
     # Start async refactoring
     Task.start_link(fn ->
       case EngineManager.execute(:refactoring, input, 30_000) do
@@ -183,7 +187,7 @@ defmodule RubberDuckWeb.CodeChannel do
             changes: result.changes,
             explanation: result.explanation
           })
-          
+
         {:error, reason} ->
           push(socket, "refactor_error", %{
             request_id: request_id,
@@ -191,7 +195,7 @@ defmodule RubberDuckWeb.CodeChannel do
           })
       end
     end)
-    
+
     {:reply, {:ok, %{request_id: request_id}}, socket}
   end
 
@@ -202,7 +206,7 @@ defmodule RubberDuckWeb.CodeChannel do
     analysis_type = params["type"] || "general"
     file_path = params["file_path"] || "temp_file"
     language = params["language"] || detect_language_from_file(file_path)
-    
+
     # Build input for analysis engine
     input = %{
       file_path: file_path,
@@ -213,10 +217,10 @@ defmodule RubberDuckWeb.CodeChannel do
         project_context: params["context"] || %{}
       }
     }
-    
+
     # Create a unique request ID
     request_id = generate_request_id()
-    
+
     # Start async analysis
     Task.start_link(fn ->
       case EngineManager.execute(:analysis, input, 30_000) do
@@ -225,7 +229,7 @@ defmodule RubberDuckWeb.CodeChannel do
             request_id: request_id,
             result: format_analysis_result(result)
           })
-          
+
         {:error, reason} ->
           push(socket, "analysis_error", %{
             request_id: request_id,
@@ -233,7 +237,7 @@ defmodule RubberDuckWeb.CodeChannel do
           })
       end
     end)
-    
+
     {:reply, {:ok, %{request_id: request_id}}, socket}
   end
 
@@ -274,11 +278,11 @@ defmodule RubberDuckWeb.CodeChannel do
       true -> {:error, "Invalid join parameters"}
     end
   end
-  
+
   defp generate_request_id do
     "req_#{:crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)}"
   end
-  
+
   defp build_generation_context(params, socket) do
     %{
       project_files: params["project_files"] || [],
@@ -288,7 +292,7 @@ defmodule RubberDuckWeb.CodeChannel do
       examples: params["examples"] || []
     }
   end
-  
+
   defp build_project_context(socket) do
     %{
       project_id: socket.assigns[:project_id],
@@ -296,7 +300,7 @@ defmodule RubberDuckWeb.CodeChannel do
       current_file: get_in(socket.assigns, [:file, :path])
     }
   end
-  
+
   defp build_refactoring_context(params, socket) do
     %{
       project_context: build_project_context(socket),
@@ -304,14 +308,17 @@ defmodule RubberDuckWeb.CodeChannel do
       preserve_behavior: params["preserve_behavior"] != false
     }
   end
-  
+
   defp parse_cursor_position(nil), do: {0, 0}
+
   defp parse_cursor_position(%{"line" => line, "column" => col}) do
     {line || 0, col || 0}
   end
+
   defp parse_cursor_position(_), do: {0, 0}
-  
+
   defp detect_language_from_file(nil), do: "unknown"
+
   defp detect_language_from_file(file_path) do
     case Path.extname(file_path) do
       ".ex" -> "elixir"
@@ -328,7 +335,7 @@ defmodule RubberDuckWeb.CodeChannel do
       _ -> "unknown"
     end
   end
-  
+
   defp format_suggestions(suggestions) when is_list(suggestions) do
     Enum.map(suggestions, fn suggestion ->
       %{
@@ -340,8 +347,9 @@ defmodule RubberDuckWeb.CodeChannel do
       }
     end)
   end
+
   defp format_suggestions(_), do: []
-  
+
   defp format_analysis_result(result) do
     %{
       file: result.file,
@@ -351,7 +359,7 @@ defmodule RubberDuckWeb.CodeChannel do
       summary: result.summary || %{}
     }
   end
-  
+
   defp format_issues(issues) when is_list(issues) do
     Enum.map(issues, fn issue ->
       %{
@@ -364,8 +372,9 @@ defmodule RubberDuckWeb.CodeChannel do
       }
     end)
   end
+
   defp format_issues(_), do: []
-  
+
   defp format_error(reason) when is_binary(reason), do: reason
   defp format_error(reason) when is_atom(reason), do: to_string(reason)
   defp format_error(reason), do: inspect(reason)

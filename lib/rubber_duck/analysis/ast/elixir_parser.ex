@@ -92,7 +92,7 @@ defmodule RubberDuck.Analysis.AST.ElixirParser do
 
     function_context = %{
       function_context
-      | metadata: Map.update!(function_context.metadata, :function_variables, &(Enum.concat(&1, param_vars)))
+      | metadata: Map.update!(function_context.metadata, :function_variables, &Enum.concat(&1, param_vars))
     }
 
     # Process function body

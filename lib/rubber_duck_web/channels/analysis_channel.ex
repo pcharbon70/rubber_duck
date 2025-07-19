@@ -2,7 +2,7 @@ defmodule RubberDuckWeb.AnalysisChannel do
   @moduledoc """
   Channel dedicated to streaming analysis results and handling
   analysis-specific real-time operations.
-  
+
   This channel now works directly with the analysis engine,
   bypassing the removed commands system.
   """
@@ -49,22 +49,22 @@ defmodule RubberDuckWeb.AnalysisChannel do
   def handle_in("start_analysis", params, socket) do
     project_id = socket.assigns[:project_id]
     options = Map.get(params, "options", %{})
-    
+
     # Create a unique analysis ID
     analysis_id = generate_analysis_id()
-    
+
     # Start async analysis
     Task.start_link(fn ->
       analyze_project(project_id, analysis_id, options, socket)
     end)
-    
+
     # Send initial started message
     push(socket, "analysis_started", %{
       analysis_id: analysis_id,
       project_id: project_id,
       timestamp: DateTime.utc_now()
     })
-    
+
     {:reply, {:ok, %{analysis_id: analysis_id}}, socket}
   end
 
@@ -73,10 +73,10 @@ defmodule RubberDuckWeb.AnalysisChannel do
   def handle_in("analyze", %{"type" => type, "code" => code} = params, socket) do
     file_path = params["file_path"] || "temp_analysis_file"
     language = params["language"] || detect_language(file_path)
-    
+
     # Create a unique analysis ID
     analysis_id = generate_analysis_id()
-    
+
     # Build input for the analysis engine
     input = %{
       file_path: file_path,
@@ -87,7 +87,7 @@ defmodule RubberDuckWeb.AnalysisChannel do
         project_context: params["context"] || %{}
       }
     }
-    
+
     # Start async analysis
     Task.start_link(fn ->
       case EngineManager.execute(:analysis, input, 30_000) do
@@ -97,13 +97,13 @@ defmodule RubberDuckWeb.AnalysisChannel do
             type: type,
             result: format_analysis_result(result)
           })
-          
+
           push(socket, "analysis_complete", %{
             analysis_id: analysis_id,
             status: "success",
             timestamp: DateTime.utc_now()
           })
-          
+
         {:error, reason} ->
           push(socket, "analysis_error", %{
             analysis_id: analysis_id,
@@ -112,7 +112,7 @@ defmodule RubberDuckWeb.AnalysisChannel do
           })
       end
     end)
-    
+
     {:reply, {:ok, %{analysis_id: analysis_id}}, socket}
   end
 
@@ -147,11 +147,11 @@ defmodule RubberDuckWeb.AnalysisChannel do
       _ -> {:error, :unauthorized}
     end
   end
-  
+
   defp generate_analysis_id do
     "analysis_#{:crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)}"
   end
-  
+
   defp detect_language(file_path) do
     case Path.extname(file_path) do
       ".ex" -> "elixir"
@@ -168,18 +168,18 @@ defmodule RubberDuckWeb.AnalysisChannel do
       _ -> "unknown"
     end
   end
-  
+
   defp analyze_project(project_id, analysis_id, options, socket) do
     case Workspace.list_code_files(project_id) do
       {:ok, files} ->
         total_files = length(files)
-        
+
         # Analyze each file
         files
         |> Enum.with_index(1)
         |> Enum.each(fn {file, index} ->
           analyze_file(file, analysis_id, options, socket)
-          
+
           # Send progress update
           push(socket, "analysis_progress", %{
             analysis_id: analysis_id,
@@ -188,7 +188,7 @@ defmodule RubberDuckWeb.AnalysisChannel do
             file: file.path
           })
         end)
-        
+
         # Send completion
         push(socket, "analysis_complete", %{
           analysis_id: analysis_id,
@@ -196,7 +196,7 @@ defmodule RubberDuckWeb.AnalysisChannel do
           total_files: total_files,
           timestamp: DateTime.utc_now()
         })
-        
+
       {:error, reason} ->
         push(socket, "analysis_error", %{
           analysis_id: analysis_id,
@@ -204,13 +204,13 @@ defmodule RubberDuckWeb.AnalysisChannel do
         })
     end
   end
-  
+
   defp analyze_file(file, analysis_id, options, socket) do
     input = %{
       file_path: file.path,
       options: options
     }
-    
+
     case EngineManager.execute(:analysis, input, 30_000) do
       {:ok, result} ->
         push(socket, "file_analyzed", %{
@@ -218,12 +218,12 @@ defmodule RubberDuckWeb.AnalysisChannel do
           file: file.path,
           result: format_analysis_result(result)
         })
-        
+
       {:error, reason} ->
         Logger.warning("Failed to analyze #{file.path}: #{inspect(reason)}")
     end
   end
-  
+
   defp format_analysis_result(result) do
     %{
       file: result.file,
@@ -235,7 +235,7 @@ defmodule RubberDuckWeb.AnalysisChannel do
       suggestions: Map.get(result, :suggestions, [])
     }
   end
-  
+
   defp format_issues(issues) when is_list(issues) do
     Enum.map(issues, fn issue ->
       %{
@@ -248,13 +248,13 @@ defmodule RubberDuckWeb.AnalysisChannel do
       }
     end)
   end
-  
+
   defp format_issues(_), do: []
-  
+
   defp generate_summary(issues) when is_list(issues) do
     issue_count = length(issues)
     by_type = Enum.group_by(issues, & &1.type)
-    
+
     %{
       total_issues: issue_count,
       errors: length(Map.get(by_type, :error, [])),
@@ -262,6 +262,6 @@ defmodule RubberDuckWeb.AnalysisChannel do
       info: length(Map.get(by_type, :info, []))
     }
   end
-  
+
   defp generate_summary(_), do: %{total_issues: 0, errors: 0, warnings: 0, info: 0}
 end

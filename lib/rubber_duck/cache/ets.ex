@@ -1,27 +1,28 @@
 defmodule RubberDuck.Cache.ETS do
   @moduledoc """
   ETS-based caching implementation for tool results.
-  
+
   Provides a simple in-memory cache using ETS tables with TTL support.
   """
-  
+
   use GenServer
   require Logger
-  
+
   @table_name :rubber_duck_cache
-  @cleanup_interval 60_000 # 1 minute
-  
+  # 1 minute
+  @cleanup_interval 60_000
+
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
-  
+
   @doc """
   Stores a value in the cache with optional TTL.
   """
   @spec put(String.t(), term(), non_neg_integer()) :: :ok | {:error, atom()}
   def put(key, value, ttl \\ 3600) do
     expire_at = System.system_time(:second) + ttl
-    
+
     try do
       :ets.insert(@table_name, {key, value, expire_at})
       :ok
@@ -30,22 +31,24 @@ defmodule RubberDuck.Cache.ETS do
       error -> {:error, error}
     end
   end
-  
+
   @doc """
   Retrieves a value from the cache.
   """
   @spec get(String.t()) :: {:ok, term()} | {:error, :not_found}
   def get(key) do
     current_time = System.system_time(:second)
-    
+
     try do
       case :ets.lookup(@table_name, key) do
         [{^key, value, expire_at}] when expire_at > current_time ->
           {:ok, value}
+
         [{^key, _value, _expire_at}] ->
           # Expired, remove it
           :ets.delete(@table_name, key)
           {:error, :not_found}
+
         [] ->
           {:error, :not_found}
       end
@@ -54,7 +57,7 @@ defmodule RubberDuck.Cache.ETS do
       error -> {:error, error}
     end
   end
-  
+
   @doc """
   Removes a value from the cache.
   """
@@ -68,7 +71,7 @@ defmodule RubberDuck.Cache.ETS do
       _error -> :ok
     end
   end
-  
+
   @doc """
   Clears all entries from the cache.
   """
@@ -82,7 +85,7 @@ defmodule RubberDuck.Cache.ETS do
       _error -> :ok
     end
   end
-  
+
   @doc """
   Gets cache statistics.
   """
@@ -90,17 +93,17 @@ defmodule RubberDuck.Cache.ETS do
   def stats do
     try do
       current_time = System.system_time(:second)
-      
+
       all_entries = :ets.tab2list(@table_name)
       total_entries = length(all_entries)
-      
-      {active_entries, expired_entries} = 
+
+      {active_entries, expired_entries} =
         Enum.split_with(all_entries, fn {_key, _value, expire_at} ->
           expire_at > current_time
         end)
-      
+
       memory_usage = :ets.info(@table_name, :memory) || 0
-      
+
       %{
         total_entries: total_entries,
         active_entries: length(active_entries),
@@ -113,9 +116,9 @@ defmodule RubberDuck.Cache.ETS do
       error -> %{error: inspect(error)}
     end
   end
-  
+
   # GenServer callbacks
-  
+
   @impl true
   def init(_opts) do
     # Create ETS table
@@ -126,53 +129,54 @@ defmodule RubberDuck.Cache.ETS do
       {:read_concurrency, true},
       {:write_concurrency, true}
     ])
-    
+
     # Schedule cleanup
     schedule_cleanup()
-    
+
     Logger.info("Started ETS cache with table: #{@table_name}")
-    
+
     {:ok, %{}}
   end
-  
+
   @impl true
   def handle_info(:cleanup, state) do
     cleanup_expired_entries()
     schedule_cleanup()
     {:noreply, state}
   end
-  
+
   @impl true
   def handle_info(_msg, state) do
     {:noreply, state}
   end
-  
+
   # Private functions
-  
+
   defp schedule_cleanup do
     Process.send_after(self(), :cleanup, @cleanup_interval)
   end
-  
+
   defp cleanup_expired_entries do
     current_time = System.system_time(:second)
-    
+
     try do
-      expired_keys = 
+      expired_keys =
         :ets.tab2list(@table_name)
         |> Enum.filter(fn {_key, _value, expire_at} -> expire_at <= current_time end)
         |> Enum.map(fn {key, _value, _expire_at} -> key end)
-      
+
       Enum.each(expired_keys, fn key ->
         :ets.delete(@table_name, key)
       end)
-      
+
       if length(expired_keys) > 0 do
         Logger.debug("Cleaned up #{length(expired_keys)} expired cache entries")
       end
     rescue
-      ArgumentError -> 
+      ArgumentError ->
         Logger.warning("Cache table not found during cleanup")
-      error -> 
+
+      error ->
         Logger.error("Error during cache cleanup: #{inspect(error)}")
     end
   end
