@@ -207,11 +207,10 @@ defmodule RubberDuck.Status.Broadcaster do
       
       # Broadcast each message to the appropriate topic
       Enum.each(msgs, fn msg ->
-        formatted_message = format_message(msg)
         Phoenix.PubSub.broadcast(
           RubberDuck.PubSub,
           topic,
-          {:status_update, formatted_message}
+          {:status_update, msg.category, msg.text, msg.metadata}
         )
       end)
     end)
@@ -231,15 +230,6 @@ defmodule RubberDuck.Status.Broadcaster do
   defp build_topic(nil, category), do: "status:system:#{category}"
   defp build_topic(conversation_id, category), do: "status:#{conversation_id}:#{category}"
 
-  defp format_message(message) do
-    %{
-      conversation_id: message.conversation_id,
-      category: message.category,
-      text: message.text,
-      metadata: message.metadata,
-      timestamp: DateTime.to_iso8601(message.timestamp)
-    }
-  end
 
   defp config(key, default) do
     Application.get_env(:rubber_duck, __MODULE__, [])
