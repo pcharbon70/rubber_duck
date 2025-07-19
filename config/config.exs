@@ -25,6 +25,12 @@ config :rubber_duck, :mcp_server,
   port: 8080,
   path: "/mcp"
 
+# Status broadcasting configuration
+config :rubber_duck, RubberDuck.Status.Broadcaster,
+  queue_limit: 10_000,
+  batch_size: 100,
+  flush_interval: 50
+
 config :ash,
   allow_forbidden_field_for_relationships_by_default?: true,
   include_embedded_source_by_default?: false,
