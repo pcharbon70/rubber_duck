@@ -273,6 +273,10 @@ defmodule RubberDuck.Accounts.User do
     has_many :valid_api_keys, RubberDuck.Accounts.ApiKey do
       filter expr(valid)
     end
+
+    has_many :conversations, RubberDuck.Conversations.Conversation do
+      destination_attribute :user_id
+    end
   end
 
   identities do

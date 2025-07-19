@@ -105,6 +105,8 @@ defmodule RubberDuckWeb.ConversationChannel do
   alias RubberDuck.Engine.Manager, as: EngineManager
   alias RubberDuck.SessionContext
   alias RubberDuck.UserConfig
+  alias RubberDuck.Conversations
+  alias RubberDuck.Accounts
 
   @default_timeout 60_000
   @max_context_messages 20
@@ -113,9 +115,15 @@ defmodule RubberDuckWeb.ConversationChannel do
   def join("conversation:" <> conversation_id, params, socket) do
     Logger.info("User joining conversation: #{conversation_id}")
 
-    user_id = params["user_id"] || generate_user_id()
+    # Use authenticated user_id from socket, fall back to generated ID for anonymous users
+    user_id = socket.assigns[:user_id] || generate_user_id()
     session_id = generate_session_id()
     preferences = Map.get(params, "preferences", %{})
+
+    # For authenticated users, ensure conversation exists in database
+    if socket.assigns[:user_id] do
+      ensure_conversation_exists(conversation_id, user_id, params)
+    end
 
     # Initialize conversation state
     socket =
@@ -558,5 +566,50 @@ defmodule RubberDuckWeb.ConversationChannel do
       _ ->
         "Unknown error: #{inspect(reason)}"
     end
+  end
+
+  defp ensure_conversation_exists(conversation_id, user_id, params) do
+    # First get the user to use as actor
+    case get_user_for_actor(user_id) do
+      {:ok, user} ->
+        # Check if conversation already exists (using authorize?: false for read check)
+        case Conversations.get_conversation(conversation_id, authorize?: false) do
+          {:ok, conversation} ->
+            # Verify the conversation belongs to this user
+            if conversation.user_id == user_id do
+              {:ok, conversation}
+            else
+              Logger.warning("User #{user_id} tried to access conversation #{conversation_id} owned by #{conversation.user_id}")
+              {:error, :unauthorized}
+            end
+
+          {:error, _} ->
+            # Create new conversation for the user
+            attrs = %{
+              user_id: user_id,
+              title: Map.get(params, "title", "New Conversation"),
+              metadata: Map.get(params, "metadata", %{}),
+              status: :active
+            }
+
+            case Conversations.create_conversation(attrs, actor: user, arguments: %{id: conversation_id}) do
+              {:ok, conversation} ->
+                Logger.info("Created conversation #{conversation_id} for user #{user_id}")
+                {:ok, conversation}
+
+              {:error, reason} ->
+                Logger.error("Failed to create conversation: #{inspect(reason)}")
+                {:error, reason}
+            end
+        end
+      
+      {:error, _} ->
+        Logger.error("Could not find user #{user_id} for conversation creation")
+        {:error, :user_not_found}
+    end
+  end
+
+  defp get_user_for_actor(user_id) do
+    RubberDuck.Accounts.get_user(user_id, authorize?: false)
   end
 end

@@ -4,7 +4,12 @@ defmodule RubberDuck.Accounts do
 
   resources do
     resource RubberDuck.Accounts.Token
-    resource RubberDuck.Accounts.User
+    
+    resource RubberDuck.Accounts.User do
+      define :get_user, action: :read, get_by: [:id]
+      define :list_users, action: :read
+    end
+    
     resource RubberDuck.Accounts.ApiKey
   end
 end
