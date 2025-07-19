@@ -9,15 +9,73 @@ defmodule RubberDuck.Conversations.Conversation do
   use Ash.Resource,
     otp_app: :rubber_duck,
     domain: RubberDuck.Conversations,
-    data_layer: AshPostgres.DataLayer
+    data_layer: AshPostgres.DataLayer,
+    authorizers: [Ash.Policy.Authorizer]
 
   postgres do
     table "conversations"
     repo RubberDuck.Repo
   end
 
+  policies do
+    # Allow system operations to bypass authorization
+    bypass actor_attribute_equals(:system, true) do
+      description "System operations can bypass authorization"
+      authorize_if always()
+    end
+
+    # Create policies - authenticated users can create conversations
+    policy action_type(:create) do
+      description "Authenticated users can create conversations"
+      authorize_if actor_present()
+    end
+
+    # Read policies - users can only read their own conversations
+    policy action_type(:read) do
+      description "Users can read their own conversations"
+      authorize_if relates_to_actor_via(:user)
+    end
+
+    # Update policies - only owner can update
+    policy action_type(:update) do
+      description "Users can update their own conversations"
+      authorize_if relates_to_actor_via(:user)
+    end
+
+    # Delete policies - only owner can delete
+    policy action_type(:destroy) do
+      description "Users can delete their own conversations"
+      authorize_if relates_to_actor_via(:user)
+    end
+  end
+
   actions do
-    defaults [:read, :destroy, create: :*, update: :*]
+    defaults [:read, :destroy, update: :*]
+    
+    create :create do
+      accept [:title, :user_id, :project_id, :metadata, :status]
+      primary? true
+      
+      # Allow setting the ID during creation
+      argument :id, :uuid do
+        allow_nil? true
+      end
+      
+      change fn changeset, _ ->
+        case Ash.Changeset.get_argument(changeset, :id) do
+          nil -> changeset
+          id -> Ash.Changeset.force_change_attribute(changeset, :id, id)
+        end
+      end
+      
+      # Ensure users can only create conversations for themselves
+      change fn changeset, context ->
+        case context.actor do
+          nil -> changeset
+          actor -> Ash.Changeset.force_change_attribute(changeset, :user_id, actor.id)
+        end
+      end
+    end
 
     read :list_by_user do
       argument :user_id, :uuid, allow_nil?: false
@@ -79,6 +137,11 @@ defmodule RubberDuck.Conversations.Conversation do
   end
 
   relationships do
+    belongs_to :user, RubberDuck.Accounts.User do
+      allow_nil? false
+      attribute_writable? true
+    end
+
     has_many :messages, RubberDuck.Conversations.Message do
       destination_attribute :conversation_id
       sort :inserted_at
