@@ -1,16 +1,15 @@
 defmodule RubberDuck.Instructions.TemplateFilters do
   @moduledoc """
   Custom Liquid filters for Solid template processing.
-  
+
   Provides a set of safe, useful filters for instruction templates.
   """
 
-
   @doc """
   Converts a string to uppercase.
-  
+
   ## Examples
-  
+
       {{ "hello" | upcase }} => "HELLO"
   """
   def upcase(input, _args, _options) do
@@ -19,9 +18,9 @@ defmodule RubberDuck.Instructions.TemplateFilters do
 
   @doc """
   Converts a string to lowercase.
-  
+
   ## Examples
-  
+
       {{ "HELLO" | downcase }} => "hello"
   """
   def downcase(input, _args, _options) do
@@ -30,9 +29,9 @@ defmodule RubberDuck.Instructions.TemplateFilters do
 
   @doc """
   Capitalizes the first letter of a string.
-  
+
   ## Examples
-  
+
       {{ "hello world" | capitalize }} => "Hello world"
   """
   def capitalize(input, _args, _options) do
@@ -41,9 +40,9 @@ defmodule RubberDuck.Instructions.TemplateFilters do
 
   @doc """
   Truncates a string to a specified length.
-  
+
   ## Examples
-  
+
       {{ "hello world" | truncate: 5 }} => "hello..."
       {{ "hello world" | truncate: 5, "---" }} => "hello---"
   """
@@ -51,7 +50,7 @@ defmodule RubberDuck.Instructions.TemplateFilters do
     string = to_string(input)
     length = get_arg(args, 0, 50) |> to_integer()
     suffix = get_arg(args, 1, "...")
-    
+
     if String.length(string) > length do
       String.slice(string, 0, length) <> suffix
     else
@@ -61,24 +60,24 @@ defmodule RubberDuck.Instructions.TemplateFilters do
 
   @doc """
   Replaces occurrences in a string.
-  
+
   ## Examples
-  
+
       {{ "hello world" | replace: "world", "elixir" }} => "hello elixir"
   """
   def replace(input, args, _options) do
     string = to_string(input)
     pattern = get_arg(args, 0, "") |> to_string()
     replacement = get_arg(args, 1, "") |> to_string()
-    
+
     String.replace(string, pattern, replacement)
   end
 
   @doc """
   Removes whitespace from both ends of a string.
-  
+
   ## Examples
-  
+
       {{ "  hello  " | strip }} => "hello"
   """
   def strip(input, _args, _options) do
@@ -87,36 +86,37 @@ defmodule RubberDuck.Instructions.TemplateFilters do
 
   @doc """
   Splits a string into an array.
-  
+
   ## Examples
-  
+
       {{ "a,b,c" | split: "," }} => ["a", "b", "c"]
   """
   def split(input, args, _options) do
     string = to_string(input)
     delimiter = get_arg(args, 0, ",") |> to_string()
-    
+
     String.split(string, delimiter)
   end
 
   @doc """
   Joins array elements into a string.
-  
+
   ## Examples
-  
+
       {{ ["a", "b", "c"] | join: ", " }} => "a, b, c"
   """
   def join(input, args, _options) when is_list(input) do
     delimiter = get_arg(args, 0, ", ") |> to_string()
     Enum.join(input, delimiter)
   end
+
   def join(input, _args, _options), do: to_string(input)
 
   @doc """
   Returns the size of a string or array.
-  
+
   ## Examples
-  
+
       {{ "hello" | size }} => 5
       {{ ["a", "b", "c"] | size }} => 3
   """
@@ -127,9 +127,9 @@ defmodule RubberDuck.Instructions.TemplateFilters do
 
   @doc """
   Returns the first element of an array.
-  
+
   ## Examples
-  
+
       {{ ["a", "b", "c"] | first }} => "a"
   """
   def first([head | _], _args, _options), do: head
@@ -137,26 +137,27 @@ defmodule RubberDuck.Instructions.TemplateFilters do
 
   @doc """
   Returns the last element of an array.
-  
+
   ## Examples
-  
+
       {{ ["a", "b", "c"] | last }} => "c"
   """
   def last(list, _args, _options) when is_list(list) do
     List.last(list)
   end
+
   def last(_, _args, _options), do: nil
 
   @doc """
   Formats a date/time string.
-  
+
   ## Examples
-  
+
       {{ "2024-01-15T10:30:00Z" | date: "%Y-%m-%d" }} => "2024-01-15"
   """
   def date(input, args, _options) do
     format = get_arg(args, 0, "%Y-%m-%d %H:%M:%S") |> to_string()
-    
+
     case parse_datetime(input) do
       {:ok, datetime} -> format_datetime(datetime, format)
       _ -> to_string(input)
@@ -165,16 +166,16 @@ defmodule RubberDuck.Instructions.TemplateFilters do
 
   @doc """
   Converts a value to a string with default if nil/empty.
-  
+
   ## Examples
-  
+
       {{ nil | default: "N/A" }} => "N/A"
       {{ "" | default: "empty" }} => "empty"
       {{ "hello" | default: "N/A" }} => "hello"
   """
   def default(input, args, _options) do
     default_value = get_arg(args, 0, "") |> to_string()
-    
+
     case input do
       nil -> default_value
       "" -> default_value
@@ -185,9 +186,9 @@ defmodule RubberDuck.Instructions.TemplateFilters do
 
   @doc """
   Escapes HTML entities in a string.
-  
+
   ## Examples
-  
+
       {{ "<script>alert('hi')</script>" | escape }} => "&lt;script&gt;alert('hi')&lt;/script&gt;"
   """
   def escape(input, _args, _options) do
@@ -199,9 +200,9 @@ defmodule RubberDuck.Instructions.TemplateFilters do
 
   @doc """
   Creates a URL slug from a string.
-  
+
   ## Examples
-  
+
       {{ "Hello World!" | slugify }} => "hello-world"
   """
   def slugify(input, _args, _options) do
@@ -220,24 +221,29 @@ defmodule RubberDuck.Instructions.TemplateFilters do
   end
 
   defp to_integer(value) when is_integer(value), do: value
+
   defp to_integer(value) when is_binary(value) do
     case Integer.parse(value) do
       {int, _} -> int
       _ -> 0
     end
   end
+
   defp to_integer(_), do: 0
 
   defp parse_datetime(input) when is_binary(input) do
     case DateTime.from_iso8601(input) do
-      {:ok, datetime, _} -> {:ok, datetime}
-      _ -> 
+      {:ok, datetime, _} ->
+        {:ok, datetime}
+
+      _ ->
         case NaiveDateTime.from_iso8601(input) do
           {:ok, naive} -> {:ok, DateTime.from_naive!(naive, "Etc/UTC")}
           _ -> {:error, :invalid_datetime}
         end
     end
   end
+
   defp parse_datetime(%DateTime{} = datetime), do: {:ok, datetime}
   defp parse_datetime(_), do: {:error, :invalid_input}
 

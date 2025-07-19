@@ -45,20 +45,20 @@ defmodule RubberDuck.Engines.Analysis do
           project_context: Map.get(validated.options, :project_context, %{})
         }
       }
-      
+
       Logger.debug("Executing CoT analysis chain for #{validated.file_path}")
-      
+
       # Execute CoT analysis chain
       case ConversationManager.execute_chain(AnalysisChain, validated.content, cot_context) do
         {:ok, cot_session} ->
           analysis_result = extract_analysis_result_from_cot(cot_session)
-          
+
           # Run traditional static analysis as well
           {:ok, static_results} = run_static_analysis(validated, state)
-          
+
           # Merge CoT insights with static analysis
           merged_issues = merge_analysis_results(static_results, analysis_result)
-          
+
           result = %{
             file: validated.file_path,
             language: validated.language,
@@ -69,19 +69,19 @@ defmodule RubberDuck.Engines.Analysis do
             metrics: calculate_comprehensive_metrics(static_results, analysis_result),
             summary: generate_comprehensive_summary(merged_issues, analysis_result)
           }
-          
+
           {:ok, result}
-          
+
         {:error, reason} ->
           Logger.error("CoT analysis chain error: #{inspect(reason)}")
           Logger.warning("Falling back to legacy analysis")
-          
+
           # Fallback to existing implementation
           legacy_analyze(input, state)
       end
     end
   end
-  
+
   # Legacy analysis function for fallback
   defp legacy_analyze(input, state) do
     with {:ok, validated} <- validate_input(input),
@@ -445,13 +445,13 @@ defmodule RubberDuck.Engines.Analysis do
     # Load configured analyzers
     Keyword.get(config, :analyzers, [:static, :security, :style])
   end
-  
+
   # CoT integration helpers
-  
+
   defp get_analysis_type(options) do
     Map.get(options, :type, "comprehensive")
   end
-  
+
   defp extract_analysis_result_from_cot(cot_session) do
     # Extract results from the CoT session steps
     understanding = get_cot_step_result(cot_session, :understand_code)
@@ -459,7 +459,7 @@ defmodule RubberDuck.Engines.Analysis do
     issues = get_cot_step_result(cot_session, :analyze_issues)
     suggestions = get_cot_step_result(cot_session, :suggest_improvements)
     priorities = get_cot_step_result(cot_session, :prioritize_actions)
-    
+
     # Parse and structure the results
     %{
       understanding: understanding,
@@ -470,14 +470,14 @@ defmodule RubberDuck.Engines.Analysis do
       complexity: estimate_cot_complexity(understanding, patterns)
     }
   end
-  
+
   defp get_cot_step_result(cot_session, step_name) do
     case Map.get(cot_session[:steps], step_name) do
       %{result: result} -> result
       _ -> nil
     end
   end
-  
+
   defp parse_cot_patterns(patterns_text) when is_binary(patterns_text) do
     # Extract patterns from the text
     patterns_text
@@ -485,8 +485,9 @@ defmodule RubberDuck.Engines.Analysis do
     |> Enum.filter(&String.contains?(&1, ["pattern", "design", "structure"]))
     |> Enum.map(&String.trim/1)
   end
+
   defp parse_cot_patterns(_), do: []
-  
+
   defp parse_cot_issues(issues_text) when is_binary(issues_text) do
     # Extract issues from the text
     issues_text
@@ -497,14 +498,16 @@ defmodule RubberDuck.Engines.Analysis do
         type: determine_issue_severity(line),
         category: determine_issue_category(line),
         message: String.replace(line, ~r/^\d+\.\s*/, ""),
-        line: 1,  # CoT doesn't provide line numbers
+        # CoT doesn't provide line numbers
+        line: 1,
         column: 1,
         from_cot: true
       }
     end)
   end
+
   defp parse_cot_issues(_), do: []
-  
+
   defp parse_cot_suggestions(suggestions_text) when is_binary(suggestions_text) do
     # Extract suggestions from the text
     suggestions_text
@@ -512,8 +515,9 @@ defmodule RubberDuck.Engines.Analysis do
     |> Enum.filter(&String.match?(&1, ~r/^\d+\./))
     |> Enum.map(&String.replace(&1, ~r/^\d+\.\s*/, ""))
   end
+
   defp parse_cot_suggestions(_), do: []
-  
+
   defp parse_cot_priorities(priorities_text) when is_binary(priorities_text) do
     # Extract priority actions from the text
     %{
@@ -523,8 +527,9 @@ defmodule RubberDuck.Engines.Analysis do
       low: extract_priority_level(priorities_text, "low")
     }
   end
+
   defp parse_cot_priorities(_), do: %{critical: [], high: [], medium: [], low: []}
-  
+
   defp extract_priority_level(text, level) do
     text
     |> String.downcase()
@@ -535,7 +540,7 @@ defmodule RubberDuck.Engines.Analysis do
     |> Enum.filter(&String.contains?(&1, ["-", "*", "•"]))
     |> Enum.map(&String.trim/1)
   end
-  
+
   defp determine_issue_severity(line) do
     cond do
       String.contains?(String.downcase(line), ["error", "bug", "security", "critical"]) -> :error
@@ -543,7 +548,7 @@ defmodule RubberDuck.Engines.Analysis do
       true -> :info
     end
   end
-  
+
   defp determine_issue_category(line) do
     cond do
       String.contains?(String.downcase(line), ["security", "vulnerability"]) -> :security
@@ -554,7 +559,7 @@ defmodule RubberDuck.Engines.Analysis do
       true -> :general
     end
   end
-  
+
   defp estimate_cot_complexity(understanding, patterns) do
     # Simple heuristic for complexity estimation
     factors = [
@@ -562,33 +567,34 @@ defmodule RubberDuck.Engines.Analysis do
       if(String.contains?(patterns || "", ["recursion", "callback", "metaprogramming"]), do: 3, else: 0),
       if(String.contains?(understanding || "", ["simple", "straightforward", "basic"]), do: -1, else: 0)
     ]
-    
+
     base_complexity = 1
     Enum.sum([base_complexity | factors]) |> max(1) |> min(10)
   end
-  
+
   defp merge_analysis_results(static_results, cot_analysis) do
     # Combine static analysis results with CoT insights
     cot_issues = cot_analysis.issues
-    
+
     # Add CoT issues that don't duplicate static results
-    unique_cot_issues = Enum.filter(cot_issues, fn cot_issue ->
-      not Enum.any?(static_results, fn static_issue ->
-        similar_issue?(static_issue, cot_issue)
+    unique_cot_issues =
+      Enum.filter(cot_issues, fn cot_issue ->
+        not Enum.any?(static_results, fn static_issue ->
+          similar_issue?(static_issue, cot_issue)
+        end)
       end)
-    end)
-    
+
     static_results ++ unique_cot_issues
   end
-  
+
   defp similar_issue?(issue1, issue2) do
     # Simple similarity check based on message content
     String.jaro_distance(issue1.message, issue2.message) > 0.8
   end
-  
+
   defp calculate_comprehensive_metrics(static_results, cot_analysis) do
     base_metrics = calculate_metrics(static_results)
-    
+
     Map.merge(base_metrics, %{
       complexity_score: cot_analysis.complexity,
       patterns_found: length(cot_analysis.patterns),
@@ -596,22 +602,24 @@ defmodule RubberDuck.Engines.Analysis do
       has_critical_issues: length(cot_analysis.priorities.critical) > 0
     })
   end
-  
+
   defp generate_comprehensive_summary(issues, cot_analysis) do
     base_summary = generate_summary(issues)
-    
-    priority_summary = if length(cot_analysis.priorities.critical) > 0 do
-      "\nCritical issues require immediate attention!"
-    else
-      ""
-    end
-    
-    pattern_summary = if length(cot_analysis.patterns) > 0 do
-      "\nDetected patterns: #{Enum.join(Enum.take(cot_analysis.patterns, 3), ", ")}"
-    else
-      ""
-    end
-    
+
+    priority_summary =
+      if length(cot_analysis.priorities.critical) > 0 do
+        "\nCritical issues require immediate attention!"
+      else
+        ""
+      end
+
+    pattern_summary =
+      if length(cot_analysis.patterns) > 0 do
+        "\nDetected patterns: #{Enum.join(Enum.take(cot_analysis.patterns, 3), ", ")}"
+      else
+        ""
+      end
+
     base_summary <> priority_summary <> pattern_summary
   end
 end

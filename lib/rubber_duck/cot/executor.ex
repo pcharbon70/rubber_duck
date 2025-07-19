@@ -167,7 +167,7 @@ defmodule RubberDuck.CoT.Executor do
 
     # Get LLM config from session opts
     llm_config = session.opts[:llm_config] || %{}
-    
+
     # Get engine name from session or use default
     engine_name = session.opts[:engine_name] || :simple_conversation
 
@@ -195,15 +195,17 @@ defmodule RubberDuck.CoT.Executor do
       "step_name" => Atom.to_string(step.name),
       "context" => Map.get(session, :context, %{})
     }
-    
+
     # Add specific step results by name (e.g., {{understand_code_result}})
-    step_results = Enum.reduce(session.steps, %{}, fn step_record, acc ->
-      Map.put(acc, "#{step_record.name}_result", step_record.result)
-    end)
-    
+    step_results =
+      Enum.reduce(session.steps, %{}, fn step_record, acc ->
+        Map.put(acc, "#{step_record.name}_result", step_record.result)
+      end)
+
     # Merge all variables, also include session opts for access to context
-    variables = Map.merge(base_variables, step_results)
-    |> Map.merge(session.opts || %{})
+    variables =
+      Map.merge(base_variables, step_results)
+      |> Map.merge(session.opts || %{})
 
     # Combine base template with step prompt
     full_prompt = """
@@ -219,13 +221,14 @@ defmodule RubberDuck.CoT.Executor do
   defp interpolate_template(template, variables) do
     Enum.reduce(variables, template, fn {key, value}, acc ->
       # Handle different value types
-      string_value = case value do
-        v when is_binary(v) -> v
-        v when is_map(v) -> Jason.encode!(v)
-        v when is_list(v) and length(v) > 0 and is_binary(hd(v)) -> Enum.join(v, "\n")
-        v -> inspect(v)
-      end
-      
+      string_value =
+        case value do
+          v when is_binary(v) -> v
+          v when is_map(v) -> Jason.encode!(v)
+          v when is_list(v) and length(v) > 0 and is_binary(hd(v)) -> Enum.join(v, "\n")
+          v -> inspect(v)
+        end
+
       String.replace(acc, "{{#{key}}}", string_value)
     end)
   end
@@ -242,6 +245,7 @@ defmodule RubberDuck.CoT.Executor do
 
   defp get_last_result(steps) do
     last_step = List.last(steps)
+
     if last_step && Map.has_key?(last_step, :result) do
       last_step.result
     else
@@ -253,18 +257,19 @@ defmodule RubberDuck.CoT.Executor do
     # Build engine input
     engine_input = %{
       query: prompt,
-      context: Map.merge(context_opts, %{
-        step_name: step.name,
-        chain_step: true,
-        messages: [%{role: "user", content: prompt}]
-      }),
+      context:
+        Map.merge(context_opts, %{
+          step_name: step.name,
+          chain_step: true,
+          messages: [%{role: "user", content: prompt}]
+        }),
       options: %{
         temperature: Map.get(step, :temperature, llm_config[:temperature] || 0.7),
         max_tokens: Map.get(step, :max_tokens, llm_config[:max_tokens] || 1000)
       },
       llm_config: llm_config
     }
-    
+
     timeout = llm_config[:timeout] || 30_000
 
     case EngineManager.execute(engine_name, engine_input, timeout) do
@@ -306,11 +311,11 @@ defmodule RubberDuck.CoT.Executor do
       # Handle conversation engine response format
       is_map(response) and Map.has_key?(response, :response) ->
         response.response
-        
+
       # Handle raw response
       is_binary(response) ->
         response
-        
+
       # Handle other formats by delegating to extract_result
       true ->
         extract_result(response)
@@ -329,7 +334,7 @@ defmodule RubberDuck.CoT.Executor do
           %{message: %{"content" => content}} when is_binary(content) -> String.trim(content)
           _ -> ""
         end
-        
+
       # Handle plain maps with choices
       is_map(response) and Map.has_key?(response, :choices) and is_list(response.choices) ->
         response.choices
@@ -341,15 +346,15 @@ defmodule RubberDuck.CoT.Executor do
           %{"text" => content} -> String.trim(content)
           _ -> ""
         end
-        
+
       # Direct content
       is_map(response) and Map.has_key?(response, :content) ->
         String.trim(response.content)
-        
+
       # String response
       is_binary(response) ->
         String.trim(response)
-        
+
       true ->
         ""
     end
@@ -357,24 +362,25 @@ defmodule RubberDuck.CoT.Executor do
 
   defp validate_step_result(result, step) do
     # Get validation function names
-    validators = case Map.get(step, :validates) do
-      nil -> []
-      atom when is_atom(atom) -> [atom]
-      list when is_list(list) -> list
-    end
-    
+    validators =
+      case Map.get(step, :validates) do
+        nil -> []
+        atom when is_atom(atom) -> [atom]
+        list when is_list(list) -> list
+      end
+
     if Enum.empty?(validators) do
       :ok
     else
       # Get the chain module from the step
       chain_module = Map.get(step, :__chain_module__)
-      
+
       # Run each validator
       Enum.reduce_while(validators, :ok, fn validator_name, _acc ->
         if chain_module && function_exported?(chain_module, validator_name, 1) do
           # Call the validation function with result in a map
           validation_context = %{result: result}
-          
+
           if apply(chain_module, validator_name, [validation_context]) do
             {:cont, :ok}
           else
@@ -387,7 +393,6 @@ defmodule RubberDuck.CoT.Executor do
       end)
     end
   end
-
 
   defp add_step_result(session, step, result) do
     step_record = %{

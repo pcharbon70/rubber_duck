@@ -22,10 +22,10 @@ defmodule RubberDuck.Analysis.EnhancedCapabilitiesTest do
 
       assert {:ok, ast_info} = AST.parse(code, :elixir)
       assert {:ok, results} = Analyzer.analyze_ast(ast_info, :elixir, engines: [:semantic])
-      
+
       issues = results.engine_results.semantic.issues
       shadowing_issue = Enum.find(issues, &(&1.type == :variable_shadowing))
-      
+
       assert shadowing_issue != nil
       assert shadowing_issue.message =~ "shadows outer variable"
     end
@@ -45,10 +45,10 @@ defmodule RubberDuck.Analysis.EnhancedCapabilitiesTest do
 
       assert {:ok, ast_info} = AST.parse(code, :elixir)
       assert {:ok, results} = Analyzer.analyze_ast(ast_info, :elixir, engines: [:semantic])
-      
+
       issues = results.engine_results.semantic.issues
       dead_code_issue = Enum.find(issues, &(&1.type == :potentially_dead_code))
-      
+
       assert dead_code_issue != nil
       assert dead_code_issue.message =~ "never called"
     end
@@ -65,10 +65,10 @@ defmodule RubberDuck.Analysis.EnhancedCapabilitiesTest do
 
       assert {:ok, ast_info} = AST.parse(code, :elixir)
       assert {:ok, results} = Analyzer.analyze_ast(ast_info, :elixir, engines: [:semantic])
-      
+
       issues = results.engine_results.semantic.issues
       circular_issue = Enum.find(issues, &(&1.type == :circular_dependency))
-      
+
       assert circular_issue != nil
       assert circular_issue.message =~ "calls itself directly"
     end
@@ -96,10 +96,10 @@ defmodule RubberDuck.Analysis.EnhancedCapabilitiesTest do
 
       assert {:ok, ast_info} = AST.parse(code, :elixir)
       assert {:ok, results} = Analyzer.analyze_ast(ast_info, :elixir, engines: [:style])
-      
+
       issues = results.engine_results.style.issues
       import_issue = Enum.find(issues, &(&1.type == :excessive_imports))
-      
+
       assert import_issue != nil
       assert import_issue.message =~ "imports, consider reducing"
     end
@@ -115,10 +115,10 @@ defmodule RubberDuck.Analysis.EnhancedCapabilitiesTest do
 
       assert {:ok, ast_info} = AST.parse(code, :elixir)
       assert {:ok, results} = Analyzer.analyze_ast(ast_info, :elixir, engines: [:style])
-      
+
       issues = results.engine_results.style.issues
       name_issue = Enum.find(issues, &(&1.type == :long_function_name))
-      
+
       assert name_issue != nil
       assert name_issue.message =~ "characters long"
     end
@@ -134,10 +134,10 @@ defmodule RubberDuck.Analysis.EnhancedCapabilitiesTest do
 
       assert {:ok, ast_info} = AST.parse(code, :elixir)
       assert {:ok, results} = Analyzer.analyze_ast(ast_info, :elixir, engines: [:style])
-      
+
       issues = results.engine_results.style.issues
       arity_issue = Enum.find(issues, &(&1.type == :high_arity))
-      
+
       assert arity_issue != nil
       assert arity_issue.message =~ "too many parameters"
     end
@@ -155,10 +155,10 @@ defmodule RubberDuck.Analysis.EnhancedCapabilitiesTest do
 
       assert {:ok, ast_info} = AST.parse(code, :elixir)
       assert {:ok, results} = Analyzer.analyze_ast(ast_info, :elixir, engines: [:security])
-      
+
       issues = results.engine_results.security.issues
       chain_issue = Enum.find(issues, &(&1.type == :dangerous_call_chain))
-      
+
       assert chain_issue != nil
       assert chain_issue.message =~ "potentially dangerous"
     end
@@ -179,13 +179,13 @@ defmodule RubberDuck.Analysis.EnhancedCapabilitiesTest do
 
       assert {:ok, ast_info} = AST.parse(code, :elixir)
       assert {:ok, results} = Analyzer.analyze_ast(ast_info, :elixir, engines: [:security])
-      
+
       issues = results.engine_results.security.issues
-      
+
       # Should detect unvalidated input
       input_issue = Enum.find(issues, &(&1.type == :unvalidated_input))
       assert input_issue != nil
-      
+
       # Should also detect potential injection
       injection_issue = Enum.find(issues, &(&1.type == :potential_injection))
       assert injection_issue != nil

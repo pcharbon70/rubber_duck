@@ -50,7 +50,7 @@ defmodule RubberDuck.Memory.Summary do
 
     update :increment_frequency do
       require_atomic? false
-      
+
       accept []
 
       change increment(:frequency)

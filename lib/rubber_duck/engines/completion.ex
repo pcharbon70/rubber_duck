@@ -94,11 +94,11 @@ defmodule RubberDuck.Engines.Completion do
     with {:ok, validated_input} <- validate_input(input) do
       # Check cache first
       cache_key = generate_cache_key(validated_input)
-      
+
       case get_from_cache_cot(state, cache_key) do
         {:ok, cached_completions} ->
           {:ok, %{completions: cached_completions, state: state}}
-          
+
         :miss ->
           # Build CoT context
           cot_context = %{
@@ -111,43 +111,43 @@ defmodule RubberDuck.Engines.Completion do
             project_patterns: extract_project_patterns(validated_input.project_context),
             user_preferences: get_user_preferences(state)
           }
-          
+
           Logger.debug("Executing CoT completion chain")
-          
+
           # Execute CoT completion chain
           case ConversationManager.execute_chain(CompletionChain, format_completion_query(validated_input), cot_context) do
             {:ok, cot_session} ->
               completion_result = extract_completion_result_from_cot(cot_session)
-              
+
               # Format completions
               completions = format_completions(completion_result, validated_input)
-              
+
               # Apply confidence filtering
               filtered = filter_by_confidence(completions, state.config[:min_confidence])
-              
+
               # Update cache
               updated_state = update_cache(state, cache_key, filtered)
-              
+
               # Emit telemetry
               :telemetry.execute(
                 [:rubber_duck, :completion, :generated],
                 %{count: length(filtered), cot: true},
                 %{language: validated_input.language}
               )
-              
+
               {:ok, %{completions: filtered, state: updated_state}}
-              
+
             {:error, reason} ->
               Logger.error("CoT completion chain error: #{inspect(reason)}")
               Logger.warning("Falling back to legacy completion")
-              
+
               # Fallback to existing implementation
               legacy_complete(input, state)
           end
       end
     end
   end
-  
+
   # Legacy completion function for fallback
   defp legacy_complete(input, state) do
     with {:ok, validated_input} <- validate_input(input),
@@ -155,16 +155,15 @@ defmodule RubberDuck.Engines.Completion do
          {:ok, completions} <- generate_completions(fim_context, validated_input, state),
          {:ok, ranked} <- rank_completions(completions, validated_input, state),
          {:ok, filtered} <- filter_completions(ranked, state) do
-      
       cache_key = generate_cache_key(validated_input)
       updated_state = update_cache(state, cache_key, filtered)
-      
+
       :telemetry.execute(
         [:rubber_duck, :completion, :generated],
         %{count: length(filtered), fallback: true},
         %{language: validated_input.language}
       )
-      
+
       {:ok, %{completions: filtered, state: updated_state}}
     end
   end
@@ -360,7 +359,7 @@ defmodule RubberDuck.Engines.Completion do
 
     # Get current provider and model from configuration
     {provider, model} = Config.get_current_provider_and_model()
-    
+
     opts = [
       provider: provider,
       model: model,
@@ -406,7 +405,6 @@ defmodule RubberDuck.Engines.Completion do
     Only provide the text to insert, not the entire line.
     """
   end
-
 
   defp get_completion_system_prompt(language) do
     """
@@ -786,16 +784,18 @@ defmodule RubberDuck.Engines.Completion do
       }
     })
   end
-  
+
   # CoT integration helpers
-  
+
   defp get_from_cache_cot(state, cache_key) do
     case Map.get(state.cache, cache_key) do
-      nil -> 
+      nil ->
         :miss
+
       cached ->
         # Check if cache is still valid
         expiry = Map.get(state.cache_expiry, cache_key)
+
         if expiry && DateTime.compare(DateTime.utc_now(), expiry) == :lt do
           {:ok, cached}
         else
@@ -803,7 +803,7 @@ defmodule RubberDuck.Engines.Completion do
         end
     end
   end
-  
+
   defp extract_recent_edits(validated_input) do
     # Extract recent edit patterns from the prefix
     validated_input.prefix
@@ -811,19 +811,19 @@ defmodule RubberDuck.Engines.Completion do
     |> Enum.take(-5)
     |> Enum.join("\n")
   end
-  
+
   defp extract_project_patterns(project_context) do
     Map.get(project_context, :patterns, [])
   end
-  
+
   defp get_user_preferences(state) do
     Map.get(state, :user_preferences, %{})
   end
-  
+
   defp format_completion_query(validated_input) do
     "Complete the code at cursor position (#{elem(validated_input.cursor_position, 0)}, #{elem(validated_input.cursor_position, 1)})"
   end
-  
+
   defp extract_completion_result_from_cot(cot_session) do
     # Extract results from the CoT session steps
     context_analysis = get_cot_step_result(cot_session, :analyze_context)
@@ -833,7 +833,7 @@ defmodule RubberDuck.Engines.Completion do
     ranked_completions = get_cot_step_result(cot_session, :rank_completions)
     validation = get_cot_step_result(cot_session, :validate_fit)
     suggestions = get_cot_step_result(cot_session, :format_suggestions)
-    
+
     %{
       context: context_analysis,
       intent: intent,
@@ -842,22 +842,23 @@ defmodule RubberDuck.Engines.Completion do
       validation: validation
     }
   end
-  
+
   defp get_cot_step_result(cot_session, step_name) do
     case Map.get(cot_session[:steps], step_name) do
       %{result: result} -> result
       _ -> nil
     end
   end
-  
+
   defp parse_cot_completions(completions_text) when is_binary(completions_text) do
     # Extract completions from the text
     # Look for numbered completions or code blocks
-    
+
     # First try to extract code blocks
-    code_blocks = Regex.scan(~r/```(?:elixir|ex|javascript|js|python|py)?\n(.*?)```/s, completions_text)
-    |> Enum.map(fn [_, code] -> String.trim(code) end)
-    
+    code_blocks =
+      Regex.scan(~r/```(?:elixir|ex|javascript|js|python|py)?\n(.*?)```/s, completions_text)
+      |> Enum.map(fn [_, code] -> String.trim(code) end)
+
     if length(code_blocks) > 0 do
       code_blocks
     else
@@ -869,8 +870,9 @@ defmodule RubberDuck.Engines.Completion do
       |> Enum.filter(&(String.length(&1) > 0))
     end
   end
+
   defp parse_cot_completions(_), do: []
-  
+
   defp format_completions(completion_result, validated_input) do
     completion_result.completions
     |> Enum.with_index()
@@ -887,18 +889,18 @@ defmodule RubberDuck.Engines.Completion do
       }
     end)
   end
-  
+
   defp calculate_completion_score_cot(_text, completion_result, index) do
     # Base score decreases with index (first suggestions are ranked higher)
-    base_score = 1.0 - (index * 0.1)
-    
+    base_score = 1.0 - index * 0.1
+
     # Adjust based on validation results
     validation_boost = if String.contains?(completion_result.validation || "", "correct"), do: 0.1, else: 0.0
-    
+
     # Ensure score is between 0 and 1
     min(max(base_score + validation_boost, 0.0), 1.0)
   end
-  
+
   defp infer_completion_type(text, intent, language) do
     cond do
       String.contains?(intent || "", "function") -> :function
@@ -911,7 +913,7 @@ defmodule RubberDuck.Engines.Completion do
       true -> :other
     end
   end
-  
+
   defp filter_by_confidence(completions, min_confidence) do
     Enum.filter(completions, fn completion ->
       completion.score >= min_confidence

@@ -155,9 +155,11 @@ defmodule RubberDuck.CoT.ConversationManager do
 
         # Get steps from chain configuration and add chain module reference
         steps = chain_config.entities[:step] || []
-        steps_with_module = Enum.map(steps, fn step ->
-          Map.put(step, :__chain_module__, session.chain_module)
-        end)
+
+        steps_with_module =
+          Enum.map(steps, fn step ->
+            Map.put(step, :__chain_module__, session.chain_module)
+          end)
 
         # Execute steps
         case Executor.execute_steps(steps_with_module, session, chain_config) do

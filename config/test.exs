@@ -1,5 +1,7 @@
 import Config
 
+config :rubber_duck, token_signing_secret: "/3CPTIsKiAZ6a1sx+Qi1twAJNxRi1lNK"
+config :bcrypt_elixir, log_rounds: 1
 config :logger, level: :warning
 config :ash, disable_async?: true
 

@@ -15,7 +15,8 @@ defmodule RubberDuckWeb.Endpoint do
     websocket: [
       connect_info: [:uri, :peer_data],
       check_origin: false,
-      log: :debug  # Change from :info to :debug to reduce verbosity
+      # Change from :info to :debug to reduce verbosity
+      log: :debug
     ],
     longpoll: false
   )

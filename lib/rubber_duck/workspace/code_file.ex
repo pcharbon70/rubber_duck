@@ -23,7 +23,7 @@ defmodule RubberDuck.Workspace.CodeFile do
     # Parse AST and store in cache
     update :parse_ast do
       require_atomic? false
-      
+
       argument :force, :boolean do
         allow_nil? true
         default false

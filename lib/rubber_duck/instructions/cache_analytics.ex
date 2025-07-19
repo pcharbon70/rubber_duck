@@ -1,7 +1,7 @@
 defmodule RubberDuck.Instructions.CacheAnalytics do
   @moduledoc """
   Comprehensive analytics and monitoring for the instruction cache system.
-  
+
   Provides detailed insights into cache performance, usage patterns, optimization
   opportunities, and real-time monitoring capabilities with seamless integration
   into the existing telemetry infrastructure.
@@ -96,23 +96,27 @@ defmodule RubberDuck.Instructions.CacheAnalytics do
       capacity: %{growth_rate: 5.0},
       recommendations: ["System performing well"]
     }
+
     {:reply, report, state}
   end
 
   def handle_call(:get_dashboard_metrics, _from, state) do
-    metrics = case Cache.get_stats() do
-      stats when is_map(stats) ->
-        %{
-          current_hit_rate: stats.hit_rate,
-          current_cache_size: stats.total_entries,
-          current_memory_usage: 0.5,
-          current_throughput: 100.0,
-          health_status: :healthy,
-          alerts: []
-        }
-      _ ->
-        %{error: "Cache not available"}
-    end
+    metrics =
+      case Cache.get_stats() do
+        stats when is_map(stats) ->
+          %{
+            current_hit_rate: stats.hit_rate,
+            current_cache_size: stats.total_entries,
+            current_memory_usage: 0.5,
+            current_throughput: 100.0,
+            health_status: :healthy,
+            alerts: []
+          }
+
+        _ ->
+          %{error: "Cache not available"}
+      end
+
     {:reply, metrics, state}
   end
 
@@ -128,10 +132,7 @@ defmodule RubberDuck.Instructions.CacheAnalytics do
   def handle_cast(:collect_metrics, state) do
     snapshot = create_metric_snapshot()
     updated_history = [snapshot | Enum.take(state.metrics_history, 99)]
-    updated_state = %{state | 
-      metrics_history: updated_history,
-      collection_counter: state.collection_counter + 1
-    }
+    updated_state = %{state | metrics_history: updated_history, collection_counter: state.collection_counter + 1}
     {:noreply, updated_state}
   end
 
@@ -148,15 +149,16 @@ defmodule RubberDuck.Instructions.CacheAnalytics do
   end
 
   def handle_info(:collect_metrics, state) do
-    updated_state = if state.monitoring_active do
-      snapshot = create_metric_snapshot()
-      check_performance_alerts(snapshot)
-      updated_history = [snapshot | Enum.take(state.metrics_history, 99)]
-      %{state | metrics_history: updated_history}
-    else
-      state
-    end
-    
+    updated_state =
+      if state.monitoring_active do
+        snapshot = create_metric_snapshot()
+        check_performance_alerts(snapshot)
+        updated_history = [snapshot | Enum.take(state.metrics_history, 99)]
+        %{state | metrics_history: updated_history}
+      else
+        state
+      end
+
     schedule_metrics_collection()
     {:noreply, updated_state}
   end
@@ -165,6 +167,7 @@ defmodule RubberDuck.Instructions.CacheAnalytics do
 
   defp create_metric_snapshot() do
     cache_stats = Cache.get_stats()
+
     %{
       timestamp: :os.system_time(:millisecond),
       cache_stats: cache_stats,
@@ -179,6 +182,7 @@ defmodule RubberDuck.Instructions.CacheAnalytics do
 
   defp check_performance_alerts(snapshot) do
     hit_rate = snapshot.performance_data.hit_rate
+
     if hit_rate < @critical_hit_rate_threshold do
       Logger.warning("Cache hit rate critically low: #{hit_rate}")
       emit_alert_telemetry(:critical_hit_rate, hit_rate)

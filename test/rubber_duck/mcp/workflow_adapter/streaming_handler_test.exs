@@ -20,24 +20,24 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
           %{tool: "test_tool", params: %{input: "test"}}
         ]
       }
-      
+
       context = %{
         session_id: "test_session",
         user_id: "test_user"
       }
-      
+
       options = %{
         timeout: 5000,
         streaming: true
       }
 
       {:ok, stream} = StreamingHandler.create_workflow_stream(workflow, context, options)
-      
+
       assert is_function(stream)
-      
+
       # Test that stream produces events
       events = stream |> Enum.take(3)
-      
+
       assert is_list(events)
       # Should receive some events (start, progress, completion/error)
       assert length(events) >= 1
@@ -49,11 +49,11 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
         id: nil,
         type: "invalid_type"
       }
-      
+
       context = %{session_id: "test_session"}
-      
+
       result = StreamingHandler.create_workflow_stream(invalid_workflow, context, %{})
-      
+
       # Should handle errors gracefully
       assert {:error, _reason} = result
     end
@@ -64,17 +64,17 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
         type: "sequential",
         steps: []
       }
-      
+
       context = %{
         session_id: "test_session",
         workflow_id: "stream_test"
       }
 
       {:ok, stream} = StreamingHandler.create_workflow_stream(workflow, context, %{})
-      
+
       # Get first event
       first_event = stream |> Enum.take(1) |> List.first()
-      
+
       assert first_event.type == "workflow_started"
       assert first_event.data.workflow_id == "stream_test"
       assert Map.has_key?(first_event.data, :context)
@@ -89,26 +89,27 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
           %{tool: "mock_tool", params: %{result: "success"}}
         ]
       }
-      
+
       context = %{
         session_id: "test_session",
         workflow_id: "completion_test"
       }
 
       {:ok, stream} = StreamingHandler.create_workflow_stream(workflow, context, %{})
-      
+
       # Collect all events
       events = stream |> Enum.take(10) |> Enum.to_list()
-      
+
       # Should have start event and possibly completion event
       event_types = Enum.map(events, & &1.type)
       assert "workflow_started" in event_types
-      
+
       # May have completion or error event depending on execution
-      completion_events = Enum.filter(event_types, fn type -> 
-        type in ["workflow_completed", "workflow_failed"]
-      end)
-      
+      completion_events =
+        Enum.filter(event_types, fn type ->
+          type in ["workflow_completed", "workflow_failed"]
+        end)
+
       # Should have at least attempted completion
       assert length(completion_events) >= 0
     end
@@ -123,19 +124,19 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
           %{tool: "test_tool", params: %{input: "streaming_test"}}
         ]
       }
-      
+
       context = %{
         session_id: "test_session",
         user_id: "test_user"
       }
-      
+
       options = %{
         timeout: 5000,
         streaming: true
       }
 
       result = StreamingHandler.execute_with_streaming(workflow, context, options)
-      
+
       # Should return execution result
       assert {:ok, _result} = result or {:error, _reason} = result
     end
@@ -146,14 +147,14 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
         type: "sequential",
         steps: []
       }
-      
+
       original_context = %{
         session_id: "test_session"
       }
-      
+
       # Mock the execution to capture enhanced context
       result = StreamingHandler.execute_with_streaming(workflow, original_context, %{})
-      
+
       # Should complete without error (context enhancement is internal)
       assert {:ok, _result} = result or {:error, _reason} = result
     end
@@ -164,7 +165,7 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
         type: "sequential",
         steps: []
       }
-      
+
       context = %{
         session_id: "test_session",
         workflow_id: "completion_event_test"
@@ -174,10 +175,10 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
       stream_id = "test_stream_id"
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       # Execute workflow
       StreamingHandler.execute_with_streaming(workflow, context, %{})
-      
+
       # Check for events (with timeout)
       receive do
         event ->
@@ -198,14 +199,14 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
           %{tool: "failing_tool", params: %{should_fail: true}}
         ]
       }
-      
+
       context = %{
         session_id: "test_session",
         workflow_id: "error_test"
       }
 
       result = StreamingHandler.execute_with_streaming(workflow, context, %{})
-      
+
       # Should handle errors gracefully
       case result do
         {:ok, _} -> assert true
@@ -218,18 +219,18 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
     test "publishes event to PubSub" do
       stream_id = "test_stream_123"
       topic = "workflow_stream:#{stream_id}"
-      
+
       # Subscribe to the topic
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       event_data = %{
         workflow_id: "test_workflow",
         step_name: "test_step",
         progress: 50
       }
-      
+
       :ok = StreamingHandler.publish_workflow_event(stream_id, "step_progress", event_data)
-      
+
       # Should receive the event
       receive do
         event ->
@@ -246,47 +247,51 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
     test "handles multiple subscribers" do
       stream_id = "multi_subscriber_test"
       topic = "workflow_stream:#{stream_id}"
-      
+
       # Subscribe with multiple processes
       parent = self()
-      
-      subscribers = for i <- 1..3 do
-        spawn(fn ->
-          PubSub.subscribe(RubberDuck.PubSub, topic)
-          
-          receive do
-            event ->
-              send(parent, {:received, i, event})
-          after
-            1000 ->
-              send(parent, {:timeout, i})
-          end
-        end)
-      end
-      
+
+      subscribers =
+        for i <- 1..3 do
+          spawn(fn ->
+            PubSub.subscribe(RubberDuck.PubSub, topic)
+
+            receive do
+              event ->
+                send(parent, {:received, i, event})
+            after
+              1000 ->
+                send(parent, {:timeout, i})
+            end
+          end)
+        end
+
       # Publish event
       event_data = %{test: "multi_subscriber"}
       :ok = StreamingHandler.publish_workflow_event(stream_id, "test_event", event_data)
-      
+
       # Collect responses
-      responses = for _i <- 1..3 do
-        receive do
-          {:received, subscriber_id, event} ->
-            {:received, subscriber_id, event}
-          {:timeout, subscriber_id} ->
-            {:timeout, subscriber_id}
-        after
-          1500 ->
-            :no_response
+      responses =
+        for _i <- 1..3 do
+          receive do
+            {:received, subscriber_id, event} ->
+              {:received, subscriber_id, event}
+
+            {:timeout, subscriber_id} ->
+              {:timeout, subscriber_id}
+          after
+            1500 ->
+              :no_response
+          end
         end
-      end
-      
+
       # All subscribers should receive the event
-      received_count = Enum.count(responses, fn
-        {:received, _, _} -> true
-        _ -> false
-      end)
-      
+      received_count =
+        Enum.count(responses, fn
+          {:received, _, _} -> true
+          _ -> false
+        end)
+
       assert received_count >= 1
     end
   end
@@ -295,23 +300,23 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
     test "creates progress reporter function" do
       stream_id = "progress_test"
       step_name = "test_step"
-      
+
       reporter = StreamingHandler.create_step_progress_reporter(stream_id, step_name)
-      
+
       assert is_function(reporter, 1)
-      
+
       # Subscribe to events
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       # Use the reporter
       progress_data = %{
         percentage: 75,
         message: "Processing items"
       }
-      
+
       reporter.(progress_data)
-      
+
       # Should receive progress event
       receive do
         event ->
@@ -329,12 +334,12 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
     test "reporter handles different progress data types" do
       stream_id = "progress_types_test"
       step_name = "flexible_step"
-      
+
       reporter = StreamingHandler.create_step_progress_reporter(stream_id, step_name)
-      
+
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       # Test with different data types
       test_data = [
         %{count: 10, total: 100},
@@ -342,10 +347,10 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
         42,
         ["item1", "item2", "item3"]
       ]
-      
+
       for data <- test_data do
         reporter.(data)
-        
+
         receive do
           event ->
             assert event.type == "step_progress"
@@ -362,10 +367,10 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
     test "streams intermediate results" do
       stream_id = "intermediate_test"
       step_name = "data_processor"
-      
+
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       # Test with different result types
       results = [
         "Text result",
@@ -373,10 +378,10 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
         [1, 2, 3, 4, 5],
         {:ok, "tuple result"}
       ]
-      
+
       for result <- results do
         :ok = StreamingHandler.stream_intermediate_result(stream_id, step_name, result)
-        
+
         receive do
           event ->
             assert event.type == "intermediate_result"
@@ -394,13 +399,13 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
     test "formats different result types correctly" do
       stream_id = "format_test"
       step_name = "formatter"
-      
+
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       # Test text result
       :ok = StreamingHandler.stream_intermediate_result(stream_id, step_name, "text result")
-      
+
       receive do
         event ->
           assert event.data.result.type == "text"
@@ -409,10 +414,10 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
         500 ->
           flunk("Expected text result event")
       end
-      
+
       # Test map result
       :ok = StreamingHandler.stream_intermediate_result(stream_id, step_name, %{key: "value"})
-      
+
       receive do
         event ->
           assert event.data.result.type == "json"
@@ -430,12 +435,12 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
       step_name = "completed_step"
       result = %{status: "success", data: "processed"}
       execution_time = 1500
-      
+
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       :ok = StreamingHandler.stream_step_completion(stream_id, step_name, result, execution_time)
-      
+
       receive do
         event ->
           assert event.type == "step_completed"
@@ -454,13 +459,14 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
       stream_id = "large_time_test"
       step_name = "slow_step"
       result = "completed"
-      execution_time = 60_000  # 1 minute
-      
+      # 1 minute
+      execution_time = 60_000
+
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       :ok = StreamingHandler.stream_step_completion(stream_id, step_name, result, execution_time)
-      
+
       receive do
         event ->
           assert event.data.execution_time_ms == execution_time
@@ -476,12 +482,12 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
       stream_id = "failure_test"
       step_name = "failing_step"
       error = "Something went wrong"
-      
+
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       :ok = StreamingHandler.stream_step_failure(stream_id, step_name, error)
-      
+
       receive do
         event ->
           assert event.type == "step_failed"
@@ -499,12 +505,12 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
       stream_id = "sanitize_test"
       step_name = "secure_step"
       error = "Authentication failed with password=secret123 and token=abc123"
-      
+
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       :ok = StreamingHandler.stream_step_failure(stream_id, step_name, error)
-      
+
       receive do
         event ->
           sanitized_error = event.data.error
@@ -521,6 +527,7 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
     test "handles complex error structures" do
       stream_id = "complex_error_test"
       step_name = "complex_step"
+
       error = %{
         type: "validation_error",
         message: "Invalid input",
@@ -529,12 +536,12 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
           value: "invalid-email"
         }
       }
-      
+
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       :ok = StreamingHandler.stream_step_failure(stream_id, step_name, error)
-      
+
       receive do
         event ->
           assert is_binary(event.data.error)
@@ -549,14 +556,14 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
   describe "data sanitization" do
     test "sanitizes sensitive context data" do
       stream_id = "sanitize_context_test"
-      
+
       # Create workflow with sensitive context
       workflow = %{
         id: "sensitive_test",
         type: "sequential",
         steps: []
       }
-      
+
       sensitive_context = %{
         user_id: "user123",
         credentials: %{username: "admin", password: "secret"},
@@ -564,27 +571,27 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
         tokens: %{access_token: "token123"},
         safe_data: "this is safe"
       }
-      
+
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       {:ok, stream} = StreamingHandler.create_workflow_stream(workflow, sensitive_context, %{})
-      
+
       # Get the first event (workflow started)
       first_event = stream |> Enum.take(1) |> List.first()
-      
+
       if first_event do
         sanitized_context = first_event.data.context
-        
+
         # Should not contain sensitive information
         assert not Map.has_key?(sanitized_context, :credentials)
         assert not Map.has_key?(sanitized_context, :secrets)
         assert not Map.has_key?(sanitized_context, :tokens)
-        
+
         # Should contain safe data
         assert Map.has_key?(sanitized_context, :safe_data)
         assert sanitized_context.safe_data == "this is safe"
-        
+
         # Should be marked as sanitized
         assert sanitized_context.sanitized == true
       end
@@ -593,29 +600,29 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
     test "sanitizes sensitive result data" do
       stream_id = "sanitize_result_test"
       step_name = "sensitive_step"
-      
+
       sensitive_result = %{
         data: "processed successfully",
         credentials: %{username: "admin"},
         secrets: %{api_key: "secret123"},
         tokens: %{jwt: "token456"}
       }
-      
+
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       :ok = StreamingHandler.stream_intermediate_result(stream_id, step_name, sensitive_result)
-      
+
       receive do
         event ->
           result = event.data.result
-          
+
           # Should not contain sensitive keys in formatted result
           result_json = Jason.encode!(result)
           assert not String.contains?(result_json, "credentials")
           assert not String.contains?(result_json, "secrets")
           assert not String.contains?(result_json, "tokens")
-          
+
           # Should contain safe data
           assert String.contains?(result_json, "processed successfully")
       after
@@ -629,19 +636,19 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
     test "events have proper timestamps" do
       stream_id = "timing_test"
       step_name = "timed_step"
-      
+
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       before_time = DateTime.utc_now()
-      
+
       :ok = StreamingHandler.stream_step_completion(stream_id, step_name, "result", 100)
-      
+
       receive do
         event ->
           after_time = DateTime.utc_now()
           event_time = event.data.timestamp
-          
+
           # Event timestamp should be between before and after
           assert DateTime.compare(event_time, before_time) != :lt
           assert DateTime.compare(event_time, after_time) != :gt
@@ -654,32 +661,33 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
     test "handles rapid event publishing" do
       stream_id = "rapid_test"
       step_name = "rapid_step"
-      
+
       topic = "workflow_stream:#{stream_id}"
       PubSub.subscribe(RubberDuck.PubSub, topic)
-      
+
       # Publish multiple events rapidly
       for i <- 1..5 do
         :ok = StreamingHandler.stream_intermediate_result(stream_id, step_name, "result_#{i}")
       end
-      
+
       # Collect all events
-      events = for _i <- 1..5 do
-        receive do
-          event -> event
-        after
-          1000 -> nil
+      events =
+        for _i <- 1..5 do
+          receive do
+            event -> event
+          after
+            1000 -> nil
+          end
         end
-      end
-      
+
       # Should receive all events
       received_events = Enum.reject(events, &is_nil/1)
       assert length(received_events) == 5
-      
+
       # Events should be in order (timestamps should be increasing)
       timestamps = Enum.map(received_events, & &1.data.timestamp)
       sorted_timestamps = Enum.sort(timestamps, DateTime)
-      
+
       assert timestamps == sorted_timestamps
     end
   end
@@ -693,20 +701,20 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
           %{tool: "test_tool", params: %{input: "cleanup"}}
         ]
       }
-      
+
       context = %{
         session_id: "cleanup_session",
         workflow_id: "cleanup_test"
       }
 
       {:ok, stream} = StreamingHandler.create_workflow_stream(workflow, context, %{})
-      
+
       # Consume the stream
       events = stream |> Enum.take(5) |> Enum.to_list()
-      
+
       # Should have received some events
       assert length(events) >= 0
-      
+
       # Stream should complete without hanging
       assert true
     end
@@ -719,17 +727,17 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandlerTest do
           %{tool: "slow_tool", params: %{delay: 30_000}}
         ]
       }
-      
+
       context = %{
         session_id: "term_session",
         workflow_id: "early_term_test"
       }
 
       {:ok, stream} = StreamingHandler.create_workflow_stream(workflow, context, %{})
-      
+
       # Take only first few events and terminate early
       events = stream |> Enum.take(2) |> Enum.to_list()
-      
+
       # Should handle early termination gracefully
       assert length(events) >= 0
     end

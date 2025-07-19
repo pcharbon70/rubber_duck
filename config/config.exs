@@ -3,6 +3,7 @@ import Config
 config :rubber_duck,
   ecto_repos: [RubberDuck.Repo],
   ash_domains: [
+    RubberDuck.Accounts,
     RubberDuck.Instructions,
     RubberDuck.Memory,
     RubberDuck.Workspace,
@@ -40,6 +41,8 @@ config :spark,
     remove_parens?: true,
     "Ash.Resource": [
       section_order: [
+        :authentication,
+        :tokens,
         :postgres,
         :resource,
         :code_interface,

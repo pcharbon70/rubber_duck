@@ -1,11 +1,11 @@
 defmodule RubberDuck.Planning.PatternLibrary do
   @moduledoc """
   Library of common task decomposition patterns.
-  
+
   Provides reusable patterns for common software development tasks,
   including task structures, dependencies, and success criteria.
   """
-  
+
   @patterns %{
     "feature_implementation" => %{
       name: "Feature Implementation",
@@ -102,7 +102,6 @@ defmodule RubberDuck.Planning.PatternLibrary do
       ],
       typical_dependencies: "linear_within_phases"
     },
-    
     "bug_fix" => %{
       name: "Bug Fix",
       description: "Pattern for fixing bugs systematically",
@@ -162,7 +161,6 @@ defmodule RubberDuck.Planning.PatternLibrary do
       ],
       typical_dependencies: "strictly_linear"
     },
-    
     "refactoring" => %{
       name: "Code Refactoring",
       description: "Pattern for refactoring existing code",
@@ -242,7 +240,6 @@ defmodule RubberDuck.Planning.PatternLibrary do
       ],
       typical_dependencies: "linear_within_phases"
     },
-    
     "api_integration" => %{
       name: "API Integration",
       description: "Pattern for integrating with external APIs",
@@ -321,7 +318,6 @@ defmodule RubberDuck.Planning.PatternLibrary do
       ],
       typical_dependencies: "strictly_linear"
     },
-    
     "database_migration" => %{
       name: "Database Migration",
       description: "Pattern for database schema changes",
@@ -385,7 +381,6 @@ defmodule RubberDuck.Planning.PatternLibrary do
       ],
       typical_dependencies: "strictly_linear"
     },
-    
     "performance_optimization" => %{
       name: "Performance Optimization",
       description: "Pattern for improving system performance",
@@ -450,14 +445,14 @@ defmodule RubberDuck.Planning.PatternLibrary do
       typical_dependencies: "mixed"
     }
   }
-  
+
   @doc """
   Get all available patterns.
   """
   def list_patterns do
     Map.keys(@patterns)
   end
-  
+
   @doc """
   Get a specific pattern by name.
   """
@@ -467,59 +462,62 @@ defmodule RubberDuck.Planning.PatternLibrary do
       pattern -> {:ok, pattern}
     end
   end
-  
+
   @doc """
   Find patterns that match given characteristics.
   """
   def find_matching_patterns(characteristics) do
-    matches = @patterns
-    |> Enum.filter(fn {_name, pattern} ->
-      Enum.any?(pattern.applicable_when, fn condition ->
-        String.contains?(
-          String.downcase(characteristics),
-          String.downcase(condition)
-        )
+    matches =
+      @patterns
+      |> Enum.filter(fn {_name, pattern} ->
+        Enum.any?(pattern.applicable_when, fn condition ->
+          String.contains?(
+            String.downcase(characteristics),
+            String.downcase(condition)
+          )
+        end)
       end)
-    end)
-    |> Enum.map(fn {name, pattern} -> {name, pattern} end)
-    
+      |> Enum.map(fn {name, pattern} -> {name, pattern} end)
+
     {:ok, matches}
   end
-  
+
   @doc """
   Apply a pattern to create a task decomposition.
   """
   def apply_pattern(pattern_name, _context \\ %{}) do
     with {:ok, pattern} <- get_pattern(pattern_name) do
-      tasks = pattern.phases
-      |> Enum.with_index()
-      |> Enum.flat_map(fn {phase, phase_idx} ->
-        phase.tasks
+      tasks =
+        pattern.phases
         |> Enum.with_index()
-        |> Enum.map(fn {task, task_idx} ->
-          %{
-            "id" => "#{pattern_name}_#{phase_idx}_#{task_idx}",
-            "name" => task.name,
-            "phase" => phase.name,
-            "complexity" => to_string(task.complexity),
-            "success_criteria" => %{"criteria" => task.success_criteria},
-            "optional" => Map.get(task, :optional, false),
-            "position" => phase_idx * 100 + task_idx
-          }
+        |> Enum.flat_map(fn {phase, phase_idx} ->
+          phase.tasks
+          |> Enum.with_index()
+          |> Enum.map(fn {task, task_idx} ->
+            %{
+              "id" => "#{pattern_name}_#{phase_idx}_#{task_idx}",
+              "name" => task.name,
+              "phase" => phase.name,
+              "complexity" => to_string(task.complexity),
+              "success_criteria" => %{"criteria" => task.success_criteria},
+              "optional" => Map.get(task, :optional, false),
+              "position" => phase_idx * 100 + task_idx
+            }
+          end)
         end)
-      end)
-      
+
       dependencies = generate_dependencies(tasks, pattern.typical_dependencies)
-      
-      {:ok, %{
-        tasks: tasks,
-        dependencies: dependencies,
-        pattern: pattern_name,
-        strategy: pattern.strategy
-      }}
+
+      {:ok,
+       %{
+         tasks: tasks,
+         dependencies: dependencies,
+         pattern: pattern_name,
+         strategy: pattern.strategy
+       }}
     end
   end
-  
+
   @doc """
   Adapt a pattern with custom modifications.
   """
@@ -529,7 +527,7 @@ defmodule RubberDuck.Planning.PatternLibrary do
       {:ok, adapted}
     end
   end
-  
+
   @doc """
   Learn a new pattern from a decomposition.
   """
@@ -542,19 +540,19 @@ defmodule RubberDuck.Planning.PatternLibrary do
       phases: extract_phases(decomposition[:tasks]),
       typical_dependencies: analyze_dependencies(decomposition[:dependencies])
     }
-    
+
     {:ok, pattern}
   end
-  
+
   # Private functions
-  
+
   defp deep_merge(map1, map2) do
     Map.merge(map1, map2, fn
       _k, v1, v2 when is_map(v1) and is_map(v2) -> deep_merge(v1, v2)
       _k, _v1, v2 -> v2
     end)
   end
-  
+
   defp generate_dependencies(tasks, "strictly_linear") do
     tasks
     |> Enum.chunk_every(2, 1, :discard)
@@ -566,7 +564,7 @@ defmodule RubberDuck.Planning.PatternLibrary do
       }
     end)
   end
-  
+
   defp generate_dependencies(tasks, "linear_within_phases") do
     tasks
     |> Enum.group_by(& &1["phase"])
@@ -574,35 +572,36 @@ defmodule RubberDuck.Planning.PatternLibrary do
       generate_dependencies(phase_tasks, "strictly_linear")
     end)
   end
-  
+
   defp generate_dependencies(_tasks, _) do
     []
   end
-  
+
   defp extract_phases(tasks) do
     tasks
     |> Enum.group_by(& &1["phase"])
     |> Enum.map(fn {phase_name, phase_tasks} ->
       %{
         name: phase_name,
-        tasks: Enum.map(phase_tasks, fn task ->
-          %{
-            name: task["name"],
-            complexity: String.to_atom(task["complexity"]),
-            success_criteria: task["success_criteria"]["criteria"]
-          }
-        end)
+        tasks:
+          Enum.map(phase_tasks, fn task ->
+            %{
+              name: task["name"],
+              complexity: String.to_atom(task["complexity"]),
+              success_criteria: task["success_criteria"]["criteria"]
+            }
+          end)
       }
     end)
   end
-  
+
   defp analyze_dependencies(dependencies) when length(dependencies) == 0 do
     "none"
   end
-  
+
   defp analyze_dependencies(dependencies) do
     # Simple analysis - could be made more sophisticated
-    if Enum.all?(dependencies, & &1["type"] == "finish_to_start") do
+    if Enum.all?(dependencies, &(&1["type"] == "finish_to_start")) do
       "strictly_linear"
     else
       "mixed"

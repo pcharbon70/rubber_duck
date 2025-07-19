@@ -29,13 +29,14 @@ defmodule RubberDuckWeb.UserSocket do
     # Log connection without sensitive data
     safe_params = Map.drop(params, ["api_key", "token"])
     Logger.info("WebSocket connection attempt with params: #{inspect(safe_params)}")
-    
+
     # Try to get API key from query params if not in params
-    auth_params = case get_api_key_from_uri(connect_info) do
-      {:ok, api_key} -> Map.put(params, "api_key", api_key)
-      _ -> params
-    end
-    
+    auth_params =
+      case get_api_key_from_uri(connect_info) do
+        {:ok, api_key} -> Map.put(params, "api_key", api_key)
+        _ -> params
+      end
+
     case authenticate(auth_params) do
       {:ok, user_id} ->
         socket =
@@ -68,32 +69,34 @@ defmodule RubberDuckWeb.UserSocket do
   # Private functions
 
   defp authenticate(%{"token" => token}) when is_binary(token) do
-    # Verify the token with a max age of 1 day (86400 seconds)
-    case Phoenix.Token.verify(RubberDuckWeb.Endpoint, "user socket", token, max_age: 86400) do
-      {:ok, user_id} ->
+    # Verify JWT token using Ash Authentication
+    case AshAuthentication.Jwt.verify(token, RubberDuck.Accounts.User) do
+      {:ok, claims, _resource} ->
+        # Extract user_id from the subject claim
+        user_id = claims["sub"]
         {:ok, user_id}
 
-      {:error, :expired} ->
+      {:error, :token_expired} ->
         {:error, "Token expired"}
 
-      {:error, :invalid} ->
-        {:error, "Invalid token"}
+      {:error, :token_revoked} ->
+        {:error, "Token revoked"}
 
-      {:error, _} ->
-        {:error, "Authentication failed"}
+      {:error, reason} ->
+        Logger.debug("Token verification failed: #{inspect(reason)}")
+        {:error, "Invalid token"}
     end
   end
 
   defp authenticate(%{"api_key" => api_key}) when is_binary(api_key) do
-    # TODO: Implement API key authentication
-    # This would check the API key against your database
-    # For now, we'll use a simple check
-    if valid_api_key?(api_key) do
-      # Generate a stable UUID from the API key for development
-      user_id = generate_user_uuid_from_api_key(api_key)
-      {:ok, user_id}
-    else
-      {:error, "Invalid API key"}
+    # Authenticate using Ash Authentication API key strategy
+    case authenticate_api_key(api_key) do
+      {:ok, user} ->
+        # Convert UUID to string
+        {:ok, to_string(user.id)}
+      
+      {:error, _reason} ->
+        {:error, "Invalid API key"}
     end
   end
 
@@ -101,38 +104,26 @@ defmodule RubberDuckWeb.UserSocket do
     {:error, "No authentication credentials provided"}
   end
 
-  defp valid_api_key?(api_key) do
-    # TODO: Implement real API key validation
-    # This is a placeholder - in production, check against database
-    # For development, accept "test_key"
-    api_key == "test_key" || byte_size(api_key) >= 32
+  defp authenticate_api_key(api_key) do
+    # Use the sign_in_with_api_key action to authenticate
+    case Ash.read_one(RubberDuck.Accounts.User, 
+                      action: :sign_in_with_api_key, 
+                      arguments: %{api_key: api_key}) do
+      {:ok, user} -> {:ok, user}
+      {:error, _} -> {:error, :invalid_api_key}
+    end
   end
-  
+
   defp get_api_key_from_uri(%{uri: %{query: query}}) when is_binary(query) do
     case URI.decode_query(query) do
       %{"api_key" => api_key} when is_binary(api_key) and api_key != "" ->
         {:ok, api_key}
+
       _ ->
         :error
     end
   end
-  
+
   defp get_api_key_from_uri(_), do: :error
-  
-  defp generate_user_uuid_from_api_key(api_key) do
-    # Generate a stable UUID from the API key
-    # This ensures the same API key always maps to the same user_id
-    # For development, use a fixed UUID for test_key
-    if api_key == "test_key" do
-      "00000000-0000-0000-0000-000000000001"
-    else
-      # For other keys, generate a UUID v4-like string from the hash
-      hash_hex = :crypto.hash(:md5, "rubber_duck_" <> api_key)
-                |> Base.encode16(case: :lower)
-      
-      String.slice(hash_hex, 0..7) <> "-" <>
-      "0000-4000-8000-" <>  # Version 4 UUID markers
-      String.slice(hash_hex, 8..19)
-    end
-  end
+
 end

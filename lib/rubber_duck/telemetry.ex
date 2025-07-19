@@ -113,7 +113,7 @@ defmodule RubberDuck.Telemetry do
         unit: :millisecond,
         tags: [:model]
       ),
-      
+
       # Security Metrics
       counter("rubber_duck.instructions.security.event.count",
         tags: [:event_type, :user_id],

@@ -1,11 +1,11 @@
 defmodule RubberDuck.Conversations.Message do
   @moduledoc """
   Represents a single message within a conversation.
-  
+
   Messages have a role (user, assistant, system), content, and metadata
   about the message generation including token usage and model information.
   """
-  
+
   use Ash.Resource,
     otp_app: :rubber_duck,
     domain: RubberDuck.Conversations,
@@ -14,9 +14,9 @@ defmodule RubberDuck.Conversations.Message do
   postgres do
     table "conversation_messages"
     repo RubberDuck.Repo
-    
+
     migration_types tokens_used: :bigint
-    
+
     references do
       reference :conversation, on_delete: :delete
     end
@@ -24,17 +24,17 @@ defmodule RubberDuck.Conversations.Message do
 
   actions do
     defaults [:read, :destroy, create: :*, update: :*]
-    
+
     read :list_by_conversation do
       argument :conversation_id, :uuid, allow_nil?: false
       filter expr(conversation_id == ^arg(:conversation_id))
       pagination offset?: true, default_limit: 50, max_page_size: 100
     end
-    
+
     read :get_history do
       argument :conversation_id, :uuid, allow_nil?: false
       argument :limit, :integer, allow_nil?: true, default: 50
-      
+
       filter expr(conversation_id == ^arg(:conversation_id))
       pagination offset?: false, keyset?: true, default_limit: 50
     end
@@ -85,7 +85,7 @@ defmodule RubberDuck.Conversations.Message do
       allow_nil? true
       public? true
       description "Number of tokens used to generate this message"
-      constraints [min: 0]
+      constraints min: 0
     end
 
     attribute :generation_time_ms, :integer do
@@ -115,19 +115,17 @@ defmodule RubberDuck.Conversations.Message do
       attribute_writable? true
       allow_nil? false
     end
-    
+
     belongs_to :parent_message, __MODULE__ do
       attribute_writable? true
       allow_nil? true
       source_attribute :parent_message_id
       destination_attribute :id
     end
-    
+
     has_many :child_messages, __MODULE__ do
       destination_attribute :parent_message_id
       sort :sequence_number
     end
   end
-
-
 end

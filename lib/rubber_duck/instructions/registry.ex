@@ -1,12 +1,12 @@
 defmodule RubberDuck.Instructions.Registry do
   @moduledoc """
   Centralized registry for managing loaded instruction files.
-  
+
   Provides tracking of loaded instructions, version management,
   duplicate handling, and hot reloading capabilities.
-  
+
   ## Features
-  
+
   - Thread-safe instruction storage using ETS
   - Version tracking with content hashing
   - Duplicate detection and resolution
@@ -21,14 +21,14 @@ defmodule RubberDuck.Instructions.Registry do
 
   @type instruction_id :: String.t()
   @type instruction_entry :: %{
-    id: instruction_id(),
-    file: FileManager.instruction_file(),
-    version: String.t(),
-    loaded_at: DateTime.t(),
-    active: boolean(),
-    usage_count: integer(),
-    last_used: DateTime.t()
-  }
+          id: instruction_id(),
+          file: FileManager.instruction_file(),
+          version: String.t(),
+          loaded_at: DateTime.t(),
+          active: boolean(),
+          usage_count: integer(),
+          last_used: DateTime.t()
+        }
 
   # ETS table names
   @instructions_table :instruction_registry
@@ -38,7 +38,7 @@ defmodule RubberDuck.Instructions.Registry do
   # Registry state
   defstruct [
     :instructions_table,
-    :versions_table, 
+    :versions_table,
     :metrics_table,
     :file_watcher_pid,
     :monitored_paths,
@@ -58,7 +58,7 @@ defmodule RubberDuck.Instructions.Registry do
 
   @doc """
   Loads instructions from the specified path into the registry.
-  
+
   Returns the number of instructions loaded.
   """
   @spec load_instructions(String.t(), keyword()) :: {:ok, integer()} | {:error, term()}
@@ -87,9 +87,9 @@ defmodule RubberDuck.Instructions.Registry do
 
   @doc """
   Lists all registered instructions, optionally filtered by criteria.
-  
+
   ## Options
-  
+
   - `:type` - Filter by instruction type (:always, :auto, :agent, :manual)
   - `:scope` - Filter by scope (:project, :workspace, :global, :directory)
   - `:active` - Filter by active status (true/false)
@@ -179,7 +179,7 @@ defmodule RubberDuck.Instructions.Registry do
       {:ok, files} ->
         {loaded_count, new_state} = load_instruction_files(files, state)
         {:reply, {:ok, loaded_count}, new_state}
-        
+
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
@@ -190,7 +190,7 @@ defmodule RubberDuck.Instructions.Registry do
     case register_instruction_file(instruction_file, state) do
       {:ok, instruction_id, new_state} ->
         {:reply, {:ok, instruction_id}, new_state}
-        
+
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
@@ -208,7 +208,7 @@ defmodule RubberDuck.Instructions.Registry do
       :ok ->
         increment_metric(:activations)
         {:reply, :ok, state}
-        
+
       error ->
         {:reply, error, state}
     end
@@ -220,7 +220,7 @@ defmodule RubberDuck.Instructions.Registry do
       :ok ->
         increment_metric(:deactivations)
         {:reply, :ok, state}
-        
+
       error ->
         {:reply, error, state}
     end
@@ -233,7 +233,7 @@ defmodule RubberDuck.Instructions.Registry do
         new_state = remove_from_monitoring(instruction_id, state)
         increment_metric(:unregistrations)
         {:reply, :ok, new_state}
-        
+
       error ->
         {:reply, error, state}
     end
@@ -245,7 +245,7 @@ defmodule RubberDuck.Instructions.Registry do
       {:ok, entry} ->
         increment_metric(:reloads)
         {:reply, {:ok, entry}, state}
-        
+
       error ->
         {:reply, error, state}
     end
@@ -266,22 +266,22 @@ defmodule RubberDuck.Instructions.Registry do
   @impl GenServer
   def handle_info({:file_changed, file_path}, %{auto_reload: true} = state) do
     Logger.debug("File changed: #{file_path}, reloading instruction")
-    
+
     case find_instruction_by_path(file_path) do
       {:ok, instruction_id} ->
         case reload_instruction_by_id(instruction_id) do
           {:ok, _entry} ->
             increment_metric(:auto_reloads)
             Logger.info("Auto-reloaded instruction: #{instruction_id}")
-            
+
           {:error, reason} ->
             Logger.warning("Failed to auto-reload instruction #{instruction_id}: #{inspect(reason)}")
         end
-        
+
       {:error, :not_found} ->
         Logger.debug("File change detected for unregistered file: #{file_path}")
     end
-    
+
     {:noreply, state}
   end
 
@@ -299,14 +299,14 @@ defmodule RubberDuck.Instructions.Registry do
   ## Private Functions
 
   defp load_instruction_files(files, state) do
-    {loaded_count, new_state} = 
+    {loaded_count, new_state} =
       Enum.reduce(files, {0, state}, fn file, {count, acc_state} ->
         case register_instruction_file(file, acc_state) do
           {:ok, _id, updated_state} -> {count + 1, updated_state}
           {:error, _reason} -> {count, acc_state}
         end
       end)
-    
+
     increment_metric(:load_operations)
     {loaded_count, new_state}
   end
@@ -314,7 +314,7 @@ defmodule RubberDuck.Instructions.Registry do
   defp register_instruction_file(instruction_file, state) do
     instruction_id = generate_instruction_id(instruction_file)
     version = calculate_version(instruction_file)
-    
+
     # Check for duplicates
     case check_for_duplicate(instruction_id, version) do
       :ok ->
@@ -327,16 +327,16 @@ defmodule RubberDuck.Instructions.Registry do
           usage_count: 0,
           last_used: DateTime.utc_now()
         }
-        
+
         :ets.insert(@instructions_table, {instruction_id, entry})
         :ets.insert(@versions_table, {instruction_id, version})
-        
+
         new_state = add_to_monitoring(instruction_file.path, state)
         increment_metric(:registrations)
-        
+
         Logger.debug("Registered instruction: #{instruction_id}")
         {:ok, instruction_id, new_state}
-        
+
       {:error, :duplicate} ->
         {:error, :duplicate_instruction}
     end
@@ -353,7 +353,7 @@ defmodule RubberDuck.Instructions.Registry do
     # Calculate version hash based on content and metadata
     content_hash = :crypto.hash(:sha256, instruction_file.content)
     metadata_hash = :crypto.hash(:sha256, :erlang.term_to_binary(instruction_file.metadata))
-    
+
     combined_hash = :crypto.hash(:sha256, content_hash <> metadata_hash)
     Base.encode16(combined_hash, case: :lower) |> String.slice(0, 16)
   end
@@ -375,13 +375,13 @@ defmodule RubberDuck.Instructions.Registry do
     active_filter = Keyword.get(opts, :active)
     limit = Keyword.get(opts, :limit)
 
-    instructions = 
+    instructions =
       @instructions_table
       |> :ets.tab2list()
       |> Enum.map(fn {_id, entry} -> entry end)
       |> apply_filters(type_filter, scope_filter, active_filter)
       |> maybe_limit(limit)
-    
+
     instructions
   end
 
@@ -393,24 +393,29 @@ defmodule RubberDuck.Instructions.Registry do
   end
 
   defp maybe_filter_by_type(instructions, nil), do: instructions
+
   defp maybe_filter_by_type(instructions, type) do
     Enum.filter(instructions, &(&1.file.type == type))
   end
 
   defp maybe_filter_by_scope(instructions, nil), do: instructions
+
   defp maybe_filter_by_scope(instructions, scope) do
     Enum.filter(instructions, &(&1.file.scope == scope))
   end
 
   defp maybe_filter_by_active(instructions, nil), do: instructions
+
   defp maybe_filter_by_active(instructions, active) do
     Enum.filter(instructions, &(&1.active == active))
   end
 
   defp maybe_limit(instructions, nil), do: instructions
+
   defp maybe_limit(instructions, limit) when is_integer(limit) and limit > 0 do
     Enum.take(instructions, limit)
   end
+
   defp maybe_limit(instructions, _), do: instructions
 
   defp update_instruction_status(instruction_id, active) do
@@ -419,7 +424,7 @@ defmodule RubberDuck.Instructions.Registry do
         updated_entry = %{entry | active: active}
         :ets.insert(@instructions_table, {instruction_id, updated_entry})
         :ok
-        
+
       [] ->
         {:error, :not_found}
     end
@@ -431,7 +436,7 @@ defmodule RubberDuck.Instructions.Registry do
         :ets.delete(@instructions_table, instruction_id)
         :ets.delete(@versions_table, instruction_id)
         :ok
-        
+
       [] ->
         {:error, :not_found}
     end
@@ -443,21 +448,17 @@ defmodule RubberDuck.Instructions.Registry do
         case FileManager.load_file(entry.file.path) do
           {:ok, updated_file} ->
             new_version = calculate_version(updated_file)
-            updated_entry = %{entry |
-              file: updated_file,
-              version: new_version,
-              loaded_at: DateTime.utc_now()
-            }
-            
+            updated_entry = %{entry | file: updated_file, version: new_version, loaded_at: DateTime.utc_now()}
+
             :ets.insert(@instructions_table, {instruction_id, updated_entry})
             :ets.insert(@versions_table, {instruction_id, new_version})
-            
+
             {:ok, updated_entry}
-            
+
           error ->
             error
         end
-        
+
       [] ->
         {:error, :not_found}
     end
@@ -465,7 +466,7 @@ defmodule RubberDuck.Instructions.Registry do
 
   defp find_instruction_by_path(file_path) do
     instructions = :ets.tab2list(@instructions_table)
-    
+
     case Enum.find(instructions, fn {_id, entry} -> entry.file.path == file_path end) do
       {instruction_id, _entry} -> {:ok, instruction_id}
       nil -> {:error, :not_found}
@@ -482,7 +483,7 @@ defmodule RubberDuck.Instructions.Registry do
       [{^instruction_id, entry}] ->
         new_monitored_paths = MapSet.delete(state.monitored_paths, entry.file.path)
         %{state | monitored_paths: new_monitored_paths}
-        
+
       [] ->
         state
     end
@@ -507,12 +508,12 @@ defmodule RubberDuck.Instructions.Registry do
   defp get_current_stats(state) do
     instruction_count = :ets.info(@instructions_table, :size)
     active_count = count_active_instructions()
-    
-    metrics = 
+
+    metrics =
       @metrics_table
       |> :ets.tab2list()
       |> Enum.into(%{})
-    
+
     %{
       total_instructions: instruction_count,
       active_instructions: active_count,

@@ -1,13 +1,13 @@
 defmodule RubberDuck.Instructions.FormatParser do
   @moduledoc """
   Parser for different instruction file formats.
-  
+
   Supports multiple instruction file formats including:
   - Standard Markdown (.md)
   - Markdown with metadata (.mdc)
   - RubberDuck-specific format (AGENTS.md)
   - Cursor IDE rules (.cursorrules)
-  
+
   Provides format detection, content extraction, and normalization
   to a consistent internal format.
   """
@@ -16,22 +16,22 @@ defmodule RubberDuck.Instructions.FormatParser do
 
   @type format :: :markdown | :rubberduck_md | :cursorrules | :mdc
   @type parsed_content :: %{
-    format: format(),
-    metadata: map(),
-    content: String.t(),
-    sections: [section()],
-    raw_content: String.t()
-  }
+          format: format(),
+          metadata: map(),
+          content: String.t(),
+          sections: [section()],
+          raw_content: String.t()
+        }
   @type section :: %{
-    title: String.t(),
-    content: String.t(),
-    level: integer(),
-    type: atom()
-  }
+          title: String.t(),
+          content: String.t(),
+          level: integer(),
+          type: atom()
+        }
 
   @doc """
   Parses an instruction file based on its format.
-  
+
   Automatically detects the format and extracts content accordingly.
   """
   @spec parse_file(String.t()) :: {:ok, parsed_content()} | {:error, term()}
@@ -64,17 +64,18 @@ defmodule RubberDuck.Instructions.FormatParser do
   def detect_format(file_path, content) do
     filename = Path.basename(file_path)
     extension = Path.extname(file_path)
-    
-    format = cond do
-      String.ends_with?(filename, ".cursorrules") -> :cursorrules
-      extension == ".mdc" -> :mdc
-      filename in ["AGENTS.md", "agents.md", ".agents.md"] -> :rubberduck_md
-      extension == ".md" -> :markdown
-      has_cursorrules_markers?(content) -> :cursorrules
-      has_rubberduck_markers?(content) -> :rubberduck_md
-      true -> :markdown
-    end
-    
+
+    format =
+      cond do
+        String.ends_with?(filename, ".cursorrules") -> :cursorrules
+        extension == ".mdc" -> :mdc
+        filename in ["AGENTS.md", "agents.md", ".agents.md"] -> :rubberduck_md
+        extension == ".md" -> :markdown
+        has_cursorrules_markers?(content) -> :cursorrules
+        has_rubberduck_markers?(content) -> :rubberduck_md
+        true -> :markdown
+      end
+
     {:ok, format}
   end
 
@@ -100,14 +101,15 @@ defmodule RubberDuck.Instructions.FormatParser do
     case TemplateProcessor.extract_metadata(content) do
       {:ok, metadata, markdown_content} ->
         sections = extract_markdown_sections(markdown_content)
-        
-        {:ok, %{
-          format: :markdown,
-          metadata: metadata,
-          content: markdown_content,
-          sections: sections
-        }}
-        
+
+        {:ok,
+         %{
+           format: :markdown,
+           metadata: metadata,
+           content: markdown_content,
+           sections: sections
+         }}
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -119,14 +121,15 @@ defmodule RubberDuck.Instructions.FormatParser do
       {:ok, metadata, markdown_content} ->
         sections = extract_rubberduck_sections(markdown_content)
         enhanced_metadata = enhance_rubberduck_metadata(metadata, sections)
-        
-        {:ok, %{
-          format: :rubberduck_md,
-          metadata: enhanced_metadata,
-          content: markdown_content,
-          sections: sections
-        }}
-        
+
+        {:ok,
+         %{
+           format: :rubberduck_md,
+           metadata: enhanced_metadata,
+           content: markdown_content,
+           sections: sections
+         }}
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -135,17 +138,18 @@ defmodule RubberDuck.Instructions.FormatParser do
   defp parse_cursorrules(content) do
     # .cursorrules files typically use a specific format
     {:ok, rules, metadata} = parse_cursorrules_content(content)
-    
+
     # Convert rules to markdown-like sections
     sections = convert_rules_to_sections(rules)
     markdown_content = rules_to_markdown(rules)
-    
-    {:ok, %{
-      format: :cursorrules,
-      metadata: metadata,
-      content: markdown_content,
-      sections: sections
-    }}
+
+    {:ok,
+     %{
+       format: :cursorrules,
+       metadata: metadata,
+       content: markdown_content,
+       sections: sections
+     }}
   end
 
   defp parse_mdc(content) do
@@ -155,14 +159,15 @@ defmodule RubberDuck.Instructions.FormatParser do
         # Enhanced metadata processing for .mdc files
         enhanced_metadata = enhance_mdc_metadata(metadata)
         sections = extract_markdown_sections(markdown_content)
-        
-        {:ok, %{
-          format: :mdc,
-          metadata: enhanced_metadata,
-          content: markdown_content,
-          sections: sections
-        }}
-        
+
+        {:ok,
+         %{
+           format: :mdc,
+           metadata: enhanced_metadata,
+           content: markdown_content,
+           sections: sections
+         }}
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -177,7 +182,7 @@ defmodule RubberDuck.Instructions.FormatParser do
       ~r/- Always .+/i,
       ~r/- Never .+/i
     ]
-    
+
     Enum.any?(cursorrules_patterns, &Regex.match?(&1, content))
   end
 
@@ -190,15 +195,15 @@ defmodule RubberDuck.Instructions.FormatParser do
       ~r/## Response Guidelines/mi,
       ~r/# RubberDuck/mi
     ]
-    
+
     Enum.any?(rubberduck_patterns, &Regex.match?(&1, content))
   end
 
   defp extract_markdown_sections(content) do
     # Parse markdown headers and content
     lines = String.split(content, "\n")
-    
-    {sections, _} = 
+
+    {sections, _} =
       lines
       |> Enum.with_index()
       |> Enum.reduce({[], nil}, fn {line, index}, {sections, current_section} ->
@@ -212,59 +217,67 @@ defmodule RubberDuck.Instructions.FormatParser do
               type: classify_section_type(title),
               start_line: index
             }
-            
+
             # Finish previous section if exists
-            updated_sections = case current_section do
-              nil -> sections
-              section -> [finish_section(section, index) | sections]
-            end
-            
+            updated_sections =
+              case current_section do
+                nil -> sections
+                section -> [finish_section(section, index) | sections]
+              end
+
             {updated_sections, new_section}
-            
+
           :not_header ->
             # Add content to current section
             case current_section do
-              nil -> {sections, nil}
+              nil ->
+                {sections, nil}
+
               section ->
-                updated_content = if section.content == "" do
-                  line
-                else
-                  section.content <> "\n" <> line
-                end
+                updated_content =
+                  if section.content == "" do
+                    line
+                  else
+                    section.content <> "\n" <> line
+                  end
+
                 updated_section = %{section | content: updated_content}
                 {sections, updated_section}
             end
         end
       end)
-    
+
     # Finish last section
-    final_sections = case sections do
-      [] -> []
-      [current | rest] when is_map(current) -> [current | rest]
-      _ -> sections
-    end
-    
+    final_sections =
+      case sections do
+        [] -> []
+        [current | rest] when is_map(current) -> [current | rest]
+        _ -> sections
+      end
+
     Enum.reverse(final_sections)
   end
 
   defp extract_rubberduck_sections(content) do
     # Enhanced section extraction for AGENTS.md format
     sections = extract_markdown_sections(content)
-    
+
     # Enhance with RubberDuck-specific section types
     Enum.map(sections, fn section ->
       title_lower = String.downcase(section.title)
-      enhanced_type = cond do
-        String.contains?(title_lower, "critical rules") -> :critical_rules
-        String.contains?(title_lower, "absolute rule") -> :absolute_rule
-        String.contains?(title_lower, "about me") -> :context
-        String.contains?(title_lower, "communication") -> :communication_rules
-        String.contains?(title_lower, "response") -> :response_guidelines
-        String.contains?(title_lower, "workflow") -> :workflow_rules
-        String.contains?(title_lower, "hierarchy") -> :rule_hierarchy
-        true -> section.type
-      end
-      
+
+      enhanced_type =
+        cond do
+          String.contains?(title_lower, "critical rules") -> :critical_rules
+          String.contains?(title_lower, "absolute rule") -> :absolute_rule
+          String.contains?(title_lower, "about me") -> :context
+          String.contains?(title_lower, "communication") -> :communication_rules
+          String.contains?(title_lower, "response") -> :response_guidelines
+          String.contains?(title_lower, "workflow") -> :workflow_rules
+          String.contains?(title_lower, "hierarchy") -> :rule_hierarchy
+          true -> section.type
+        end
+
       %{section | type: enhanced_type}
     end)
   end
@@ -272,38 +285,38 @@ defmodule RubberDuck.Instructions.FormatParser do
   defp parse_cursorrules_content(content) do
     # Parse .cursorrules format
     lines = String.split(content, "\n")
-    
-    rules = 
+
+    rules =
       lines
       |> Enum.filter(&(String.trim(&1) != ""))
       |> Enum.map(&parse_cursorrules_line/1)
       |> Enum.filter(&(&1 != nil))
-    
+
     # Extract metadata from rules
     metadata = extract_cursorrules_metadata(rules)
-    
+
     {:ok, rules, metadata}
   end
 
   defp parse_cursorrules_line(line) do
     trimmed = String.trim(line)
-    
+
     cond do
       String.starts_with?(trimmed, "# ") ->
         {:header, 1, String.slice(trimmed, 2..-1//1)}
-        
+
       String.starts_with?(trimmed, "## ") ->
         {:header, 2, String.slice(trimmed, 3..-1//1)}
-        
+
       String.starts_with?(trimmed, "- ") ->
         {:rule, String.slice(trimmed, 2..-1//1)}
-        
+
       String.starts_with?(trimmed, "* ") ->
         {:rule, String.slice(trimmed, 2..-1//1)}
-        
+
       trimmed != "" ->
         {:text, trimmed}
-        
+
       true ->
         nil
     end
@@ -313,7 +326,7 @@ defmodule RubberDuck.Instructions.FormatParser do
     # Extract common metadata patterns from .cursorrules
     title = find_title_from_rules(rules)
     role = find_role_from_rules(rules)
-    
+
     %{
       "title" => title,
       "role" => role,
@@ -332,25 +345,28 @@ defmodule RubberDuck.Instructions.FormatParser do
 
   defp find_role_from_rules(rules) do
     # Look for "You are a/an X expert" patterns
-    role_rule = Enum.find(rules, fn rule ->
-      case rule do
-        {:rule, text} -> String.match?(text, ~r/You are an? .+ expert/i)
-        _ -> false
-      end
-    end)
-    
+    role_rule =
+      Enum.find(rules, fn rule ->
+        case rule do
+          {:rule, text} -> String.match?(text, ~r/You are an? .+ expert/i)
+          _ -> false
+        end
+      end)
+
     case role_rule do
       {:rule, text} ->
         case Regex.run(~r/You are an? (.+) expert/i, text) do
           [_, role] -> role
           _ -> "assistant"
         end
-      _ -> "assistant"
+
+      _ ->
+        "assistant"
     end
   end
 
   defp convert_rules_to_sections(rules) do
-    {sections, current_section} = 
+    {sections, current_section} =
       Enum.reduce(rules, {[], nil}, fn rule, {sections, current} ->
         case rule do
           {:header, level, title} ->
@@ -360,14 +376,15 @@ defmodule RubberDuck.Instructions.FormatParser do
               level: level,
               type: classify_section_type(title)
             }
-            
-            finished_sections = case current do
-              nil -> sections
-              section -> [section | sections]
-            end
-            
+
+            finished_sections =
+              case current do
+                nil -> sections
+                section -> [section | sections]
+              end
+
             {finished_sections, new_section}
-            
+
           {:rule, text} ->
             case current do
               nil ->
@@ -378,37 +395,45 @@ defmodule RubberDuck.Instructions.FormatParser do
                   level: 1,
                   type: :rules
                 }
+
                 {sections, default_section}
-                
+
               section ->
-                updated_content = if section.content == "" do
-                  "- " <> text
-                else
-                  section.content <> "\n- " <> text
-                end
+                updated_content =
+                  if section.content == "" do
+                    "- " <> text
+                  else
+                    section.content <> "\n- " <> text
+                  end
+
                 {sections, %{section | content: updated_content}}
             end
-            
+
           {:text, text} ->
             case current do
-              nil -> {sections, nil}
+              nil ->
+                {sections, nil}
+
               section ->
-                updated_content = if section.content == "" do
-                  text
-                else
-                  section.content <> "\n" <> text
-                end
+                updated_content =
+                  if section.content == "" do
+                    text
+                  else
+                    section.content <> "\n" <> text
+                  end
+
                 {sections, %{section | content: updated_content}}
             end
         end
       end)
-    
+
     # Add final section
-    final_sections = case current_section do
-      nil -> sections
-      section -> [section | sections]
-    end
-    
+    final_sections =
+      case current_section do
+        nil -> sections
+        section -> [section | sections]
+      end
+
     Enum.reverse(final_sections)
   end
 
@@ -429,20 +454,22 @@ defmodule RubberDuck.Instructions.FormatParser do
   defp enhance_rubberduck_metadata(metadata, sections) do
     # Enhance metadata based on AGENTS.md content analysis
     critical_sections = Enum.filter(sections, &(&1.type == :critical_rules))
-    
-    enhanced = Map.merge(metadata, %{
-      "format" => "rubberduck_md",
-      "has_critical_rules" => length(critical_sections) > 0,
-      "section_count" => length(sections)
-    })
-    
+
+    enhanced =
+      Map.merge(metadata, %{
+        "format" => "rubberduck_md",
+        "has_critical_rules" => length(critical_sections) > 0,
+        "section_count" => length(sections)
+      })
+
     # Determine priority based on content
-    priority = cond do
-      Enum.any?(sections, &(&1.type == :critical_rules)) -> "critical"
-      Enum.any?(sections, &(&1.type == :absolute_rule)) -> "high"
-      true -> Map.get(metadata, "priority", "normal")
-    end
-    
+    priority =
+      cond do
+        Enum.any?(sections, &(&1.type == :critical_rules)) -> "critical"
+        Enum.any?(sections, &(&1.type == :absolute_rule)) -> "high"
+        true -> Map.get(metadata, "priority", "normal")
+      end
+
     Map.put(enhanced, "priority", priority)
   end
 
@@ -456,26 +483,26 @@ defmodule RubberDuck.Instructions.FormatParser do
 
   defp parse_header(line) do
     trimmed = String.trim(line)
-    
+
     cond do
       String.starts_with?(trimmed, "# ") ->
         {:header, 1, String.slice(trimmed, 2..-1//1)}
-        
+
       String.starts_with?(trimmed, "## ") ->
         {:header, 2, String.slice(trimmed, 3..-1//1)}
-        
+
       String.starts_with?(trimmed, "### ") ->
         {:header, 3, String.slice(trimmed, 4..-1//1)}
-        
+
       String.starts_with?(trimmed, "#### ") ->
         {:header, 4, String.slice(trimmed, 5..-1//1)}
-        
+
       String.starts_with?(trimmed, "##### ") ->
         {:header, 5, String.slice(trimmed, 6..-1//1)}
-        
+
       String.starts_with?(trimmed, "###### ") ->
         {:header, 6, String.slice(trimmed, 7..-1//1)}
-        
+
       true ->
         :not_header
     end
@@ -483,7 +510,7 @@ defmodule RubberDuck.Instructions.FormatParser do
 
   defp classify_section_type(title) do
     title_lower = String.downcase(title)
-    
+
     cond do
       title_lower =~ "rule" -> :rules
       title_lower =~ "instruction" -> :instructions
@@ -510,7 +537,7 @@ defmodule RubberDuck.Instructions.FormatParser do
       "scope" => "project",
       "format" => to_string(format)
     }
-    
+
     Map.merge(base_metadata, metadata)
   end
 
@@ -545,10 +572,11 @@ defmodule RubberDuck.Instructions.FormatParser do
     # Extract tags from metadata and content
     metadata_tags = Map.get(parsed.metadata, "tags", [])
     content_tags = extract_content_tags(parsed.content)
-    
+
     (metadata_tags ++ content_tags)
     |> Enum.uniq()
-    |> Enum.take(10)  # Limit to 10 tags
+    # Limit to 10 tags
+    |> Enum.take(10)
   end
 
   defp extract_content_tags(content) do

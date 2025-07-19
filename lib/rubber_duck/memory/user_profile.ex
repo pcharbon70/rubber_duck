@@ -37,7 +37,7 @@ defmodule RubberDuck.Memory.UserProfile do
 
     update :add_learned_pattern do
       require_atomic? false
-      
+
       argument :pattern_key, :string, allow_nil?: false
       argument :pattern_data, :map, allow_nil?: false
 
@@ -60,7 +60,7 @@ defmodule RubberDuck.Memory.UserProfile do
 
     update :set_llm_preference do
       require_atomic? false
-      
+
       argument :provider, :atom, allow_nil?: false
       argument :model, :string, allow_nil?: false
       argument :is_default, :boolean, default: false
@@ -74,22 +74,26 @@ defmodule RubberDuck.Memory.UserProfile do
 
         # Update provider preferences
         provider_prefs = Map.get(current_prefs, "provider_preferences", %{})
-        updated_provider_prefs = Map.put(provider_prefs, to_string(provider), %{
-          "models" => [model],
-          "default" => model
-        })
+
+        updated_provider_prefs =
+          Map.put(provider_prefs, to_string(provider), %{
+            "models" => [model],
+            "default" => model
+          })
 
         # Update overall preferences
-        updated_prefs = Map.merge(current_prefs, %{
-          "provider_preferences" => updated_provider_prefs
-        })
+        updated_prefs =
+          Map.merge(current_prefs, %{
+            "provider_preferences" => updated_provider_prefs
+          })
 
         # Set as default if requested
         if is_default do
-          updated_prefs = Map.merge(updated_prefs, %{
-            "default_provider" => to_string(provider),
-            "default_model" => model
-          })
+          updated_prefs =
+            Map.merge(updated_prefs, %{
+              "default_provider" => to_string(provider),
+              "default_model" => model
+            })
         end
 
         Ash.Changeset.change_attribute(changeset, :llm_preferences, updated_prefs)
@@ -98,7 +102,7 @@ defmodule RubberDuck.Memory.UserProfile do
 
     update :add_llm_model do
       require_atomic? false
-      
+
       argument :provider, :atom, allow_nil?: false
       argument :model, :string, allow_nil?: false
 
@@ -108,24 +112,26 @@ defmodule RubberDuck.Memory.UserProfile do
 
         current_prefs = Ash.Changeset.get_attribute(changeset, :llm_preferences) || %{}
         provider_prefs = Map.get(current_prefs, "provider_preferences", %{})
-        
+
         provider_config = Map.get(provider_prefs, to_string(provider), %{"models" => [], "default" => nil})
         current_models = provider_config["models"] || []
-        
+
         # Add model if not already present
-        updated_models = if model in current_models do
-          current_models
-        else
-          [model | current_models]
-        end
+        updated_models =
+          if model in current_models do
+            current_models
+          else
+            [model | current_models]
+          end
 
         # Set as default if no default exists
         updated_default = provider_config["default"] || model
 
-        updated_provider_config = Map.merge(provider_config, %{
-          "models" => updated_models,
-          "default" => updated_default
-        })
+        updated_provider_config =
+          Map.merge(provider_config, %{
+            "models" => updated_models,
+            "default" => updated_default
+          })
 
         updated_provider_prefs = Map.put(provider_prefs, to_string(provider), updated_provider_config)
         updated_prefs = Map.put(current_prefs, "provider_preferences", updated_provider_prefs)
@@ -136,7 +142,7 @@ defmodule RubberDuck.Memory.UserProfile do
 
     update :clear_llm_preferences do
       require_atomic? false
-      
+
       change fn changeset, _context ->
         Ash.Changeset.change_attribute(changeset, :llm_preferences, %{})
       end
