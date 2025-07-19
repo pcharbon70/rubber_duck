@@ -149,6 +149,24 @@ defmodule RubberDuck.Errors do
       |> Map.put(:application, :rubber_duck)
       |> Map.put(:reported_at, DateTime.utc_now())
 
+    # Report to status system if conversation_id is present
+    if conversation_id = metadata[:conversation_id] do
+      error_details = normalize_error(exception)
+      
+      RubberDuck.Status.error(
+        conversation_id,
+        "Exception: #{error_details.message}",
+        RubberDuck.Status.build_error_metadata(
+          error_details.type,
+          error_details.message,
+          Map.merge(error_details.details, %{
+            stacktrace: format_stacktrace(stacktrace),
+            metadata: metadata
+          })
+        )
+      )
+    end
+
     # Tower expects a keyword list, not a map
     Tower.report_exception(exception, stacktrace, Map.to_list(metadata))
   end
@@ -172,6 +190,22 @@ defmodule RubberDuck.Errors do
       |> normalize_metadata()
       |> Map.put(:application, :rubber_duck)
       |> Map.put(:reported_at, DateTime.utc_now())
+
+    # Report to status system if conversation_id is present
+    if conversation_id = metadata[:conversation_id] do
+      status_category = case level do
+        :error -> :error
+        :warning -> :warning
+        _ -> :info
+      end
+      
+      RubberDuck.Status.update(
+        conversation_id,
+        status_category,
+        message,
+        Map.merge(metadata, %{level: level})
+      )
+    end
 
     # Tower expects a keyword list, not a map
     Tower.report_message(level, message, Map.to_list(metadata))
@@ -246,5 +280,12 @@ defmodule RubberDuck.Errors do
     |> Map.from_struct()
     |> Map.delete(:__exception__)
     |> Map.delete(:message)
+  end
+  
+  defp format_stacktrace(stacktrace) do
+    stacktrace
+    |> Enum.take(10)  # Limit stacktrace depth
+    |> Enum.map(&Exception.format_stacktrace_entry/1)
+    |> Enum.join("\n")
   end
 end

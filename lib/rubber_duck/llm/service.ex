@@ -51,6 +51,8 @@ defmodule RubberDuck.LLM.Service do
     CostTracker,
     HealthMonitor
   }
+  
+  alias RubberDuck.Status
 
   @type provider_name :: atom()
   @type model_name :: String.t()
@@ -555,33 +557,94 @@ defmodule RubberDuck.LLM.Service do
   defp execute_request(request, provider_state, _state) do
     # Direct LLM call
     adapter = provider_state.config.adapter
+    conversation_id = get_in(request.options, [:user_id])
 
     Logger.debug("[LLM Service] Executing direct request with adapter: #{inspect(adapter)}")
     Logger.debug("[LLM Service] Request: #{inspect(request.model)} - #{inspect(request.provider)}")
 
+    # Send status update for request start
+    Status.engine(
+      conversation_id,
+      "Starting #{request.provider} request",
+      Status.build_llm_metadata(request.model, to_string(request.provider), %{
+        request_id: request.id,
+        priority: request.options.priority
+      })
+    )
+
+    start_time = System.monotonic_time(:millisecond)
+
     try do
       # Execute with retry logic
-      result = execute_with_retry(request, adapter, provider_state.config)
+      result = execute_with_retry(request, adapter, provider_state.config, conversation_id)
+      
+      # Send completion status
+      case result do
+        {:ok, response} ->
+          Status.with_timing(
+            conversation_id,
+            :engine,
+            "Completed #{request.provider} request",
+            start_time,
+            Status.build_llm_metadata(request.model, to_string(request.provider), %{
+              request_id: request.id,
+              usage: response[:usage],
+              finish_reason: response[:finish_reason]
+            })
+          )
+          
+        {:error, reason} ->
+          Status.error(
+            conversation_id,
+            "#{request.provider} request failed",
+            Status.build_error_metadata(:provider_error, inspect(reason), %{
+              request_id: request.id,
+              provider: request.provider,
+              model: request.model
+            })
+          )
+      end
+      
       Logger.debug("[LLM Service] Request completed with result: #{inspect(result)}")
       result
     rescue
       error ->
+        Status.error(
+          conversation_id,
+          "LLM request exception",
+          Status.build_error_metadata(:exception, Exception.message(error), %{
+            request_id: request.id,
+            provider: request.provider,
+            model: request.model
+          })
+        )
         Logger.error("LLM request failed: #{inspect(error)}")
         {:error, error}
     end
   end
 
-  defp execute_with_retry(request, adapter, config, attempt \\ 1) do
+  defp execute_with_retry(request, adapter, config, conversation_id, attempt \\ 1) do
     case adapter.execute(request, config) do
       {:ok, response} ->
         {:ok, response}
 
-      {:error, _reason} when attempt < config.max_retries ->
+      {:error, reason} when attempt < config.max_retries ->
+        # Send retry status
+        Status.engine(
+          conversation_id,
+          "Retrying #{request.provider} request (attempt #{attempt + 1}/#{config.max_retries})",
+          Status.build_llm_metadata(request.model, to_string(request.provider), %{
+            request_id: request.id,
+            retry_attempt: attempt + 1,
+            error: inspect(reason)
+          })
+        )
+        
         # Exponential backoff
         delay = (:math.pow(2, attempt) * 1000) |> round()
         Process.sleep(delay)
 
-        execute_with_retry(request, adapter, config, attempt + 1)
+        execute_with_retry(request, adapter, config, conversation_id, attempt + 1)
 
       {:error, reason} ->
         {:error, reason}
@@ -769,16 +832,66 @@ defmodule RubberDuck.LLM.Service do
   end
 
   defp handle_streaming_request(request, provider_name, provider_state, callback) do
+    conversation_id = get_in(request.options, [:user_id])
+    
+    # Send streaming start status
+    Status.engine(
+      conversation_id,
+      "Starting streaming response",
+      Status.build_llm_metadata(request.model, to_string(provider_name), %{
+        request_id: request.id,
+        streaming: true
+      })
+    )
+    
+    start_time = System.monotonic_time(:millisecond)
+    token_count = 0
+    
+    # Wrap callback to track tokens
+    tracking_callback = fn chunk ->
+      # Count tokens (approximate)
+      if chunk.content do
+        token_count = token_count + String.split(chunk.content) |> length()
+      end
+      
+      # Call original callback
+      callback.(chunk)
+      
+      # Send completion status on final chunk
+      if chunk.finish_reason do
+        Status.with_timing(
+          conversation_id,
+          :engine,
+          "Streaming completed",
+          start_time,
+          Status.build_llm_metadata(request.model, to_string(provider_name), %{
+            request_id: request.id,
+            streaming: true,
+            approximate_tokens: token_count,
+            finish_reason: chunk.finish_reason
+          })
+        )
+      end
+    end
+    
     # For mock provider, simulate streaming
     if provider_name == :mock do
-      simulate_mock_streaming(request, callback)
+      simulate_mock_streaming(request, tracking_callback)
     else
       # Use provider's streaming capability
       adapter = provider_state.config.adapter
 
       if function_exported?(adapter, :stream_completion, 3) do
-        adapter.stream_completion(request, provider_state.config, callback)
+        adapter.stream_completion(request, provider_state.config, tracking_callback)
       else
+        Status.error(
+          conversation_id,
+          "Streaming not supported",
+          Status.build_error_metadata(:capability_error, "Provider does not support streaming", %{
+            provider: provider_name,
+            model: request.model
+          })
+        )
         {:error, :streaming_not_supported}
       end
     end

@@ -106,6 +106,7 @@ defmodule RubberDuckWeb.ConversationChannel do
   alias RubberDuck.SessionContext
   alias RubberDuck.UserConfig
   alias RubberDuck.Conversations
+  alias RubberDuck.Status
 
   @default_timeout 60_000
   @max_context_messages 20
@@ -149,6 +150,18 @@ defmodule RubberDuckWeb.ConversationChannel do
   @impl true
   def handle_in("message", %{"content" => content} = params, socket) do
     Logger.debug("Received message: #{String.slice(content, 0, 50)}...")
+    conversation_id = socket.assigns.conversation_id
+
+    # Send status for message received
+    Status.info(
+      conversation_id,
+      "Message received",
+      %{
+        message_length: String.length(content),
+        user_id: socket.assigns.user_id,
+        session_id: socket.assigns.session_id
+      }
+    )
 
     # Send thinking indicator
     push(socket, "thinking", %{})
@@ -163,6 +176,16 @@ defmodule RubberDuckWeb.ConversationChannel do
     messages = add_message(socket.assigns.messages, user_message)
     socket = assign(socket, :messages, messages)
 
+    # Send status for processing start
+    Status.progress(
+      conversation_id,
+      "Processing message",
+      %{
+        message_count: length(messages),
+        context_size: map_size(socket.assigns.context)
+      }
+    )
+
     # Build input for conversation router
     input = %{
       query: content,
@@ -170,6 +193,8 @@ defmodule RubberDuckWeb.ConversationChannel do
       options: Map.get(params, "options", %{}),
       llm_config: build_llm_config(socket, params)
     }
+
+    start_time = System.monotonic_time(:millisecond)
 
     # Process through conversation router
     case EngineManager.execute(:conversation_router, input, @default_timeout) do
@@ -194,12 +219,37 @@ defmodule RubberDuckWeb.ConversationChannel do
           )
         end
 
+        # Send completion status
+        Status.with_timing(
+          conversation_id,
+          :info,
+          "Response sent",
+          start_time,
+          %{
+            response_length: String.length(result.response),
+            conversation_type: result.conversation_type,
+            routed_to: result[:routed_to],
+            model_used: input.llm_config[:model]
+          }
+        )
+
         # Send response
         push(socket, "response", format_response(result, content))
         {:noreply, socket}
 
       {:error, reason} ->
         Logger.error("Conversation processing failed: #{inspect(reason)}")
+
+        # Send error status
+        Status.error(
+          conversation_id,
+          "Failed to process message",
+          Status.build_error_metadata(:conversation_error, format_error(reason), %{
+            user_id: socket.assigns.user_id,
+            session_id: socket.assigns.session_id,
+            message_length: String.length(content)
+          })
+        )
 
         push(socket, "error", %{
           message: "I encountered an error processing your message.",
@@ -213,6 +263,17 @@ defmodule RubberDuckWeb.ConversationChannel do
   @impl true
   def handle_in("new_conversation", _params, socket) do
     Logger.info("Starting new conversation")
+    conversation_id = socket.assigns.conversation_id
+
+    # Send status for conversation reset
+    Status.info(
+      conversation_id,
+      "Conversation reset",
+      %{
+        user_id: socket.assigns.user_id,
+        previous_message_count: length(socket.assigns.messages)
+      }
+    )
 
     # Reset conversation state
     socket =

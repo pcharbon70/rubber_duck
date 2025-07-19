@@ -9,7 +9,7 @@ defmodule RubberDuck.Engine.Manager do
   require Logger
 
   alias RubberDuck.Engine.{CapabilityRegistry, Server, Supervisor}
-  alias RubberDuck.EngineSystem
+  alias RubberDuck.{EngineSystem, Status}
 
   @doc """
   Loads engines from an EngineSystem DSL module.
@@ -99,13 +99,35 @@ defmodule RubberDuck.Engine.Manager do
 
       %{pool_size: pool_size} when pool_size > 1 ->
         # Use pool transaction for pooled engines
-        RubberDuck.Engine.Pool.transaction(
+        case RubberDuck.Engine.Pool.transaction(
           engine_name,
           fn worker ->
             RubberDuck.Engine.Pool.Worker.execute(worker, input, timeout)
           end,
           engine_config.checkout_timeout
-        )
+        ) do
+          {:error, reason} = error ->
+            # Report pool transaction error
+            if conversation_id = input[:conversation_id] || input["conversation_id"] do
+              Status.error(
+                conversation_id,
+                "Engine pool transaction failed",
+                Status.build_error_metadata(
+                  :pool_error,
+                  inspect(reason),
+                  %{
+                    engine: engine_name,
+                    pool_size: pool_size,
+                    reason: reason
+                  }
+                )
+              )
+            end
+            error
+            
+          result ->
+            result
+        end
 
       _ ->
         # Use direct call for single instance engines
