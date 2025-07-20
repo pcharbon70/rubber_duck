@@ -148,16 +148,15 @@ func (m Model) renderStatusBar() string {
 		Width(m.width).
 		Padding(0, 1)
 		
-	// Connection indicator
-	connStatus := "●"
+	// Connection indicator only
+	var connStatus string
 	if m.connected {
-		connStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Render("●")
+		connStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Render("● Connected")
 	} else {
-		connStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("●")
+		connStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("● Disconnected")
 	}
 	
-	status := connStatus + " " + m.statusBar
-	return statusStyle.Render(status)
+	return statusStyle.Render(connStatus)
 }
 
 // renderWithCommandPalette renders the UI with command palette overlay
