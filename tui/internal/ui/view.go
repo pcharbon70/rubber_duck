@@ -20,6 +20,11 @@ func (m Model) View() string {
 		return m.renderWithCommandPalette()
 	}
 	
+	return m.renderBase()
+}
+
+// renderBase renders the base UI without overlays
+func (m Model) renderBase() string {
 	// Define styles
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -63,10 +68,53 @@ func (m Model) View() string {
 		chatWidth -= 42 // 40 + 2 for borders
 	}
 	
+	// Build chat content with header, status messages at top, conversation at bottom
+	// Calculate heights for chat and status sections
+	headerHeight := 3 // chat header takes 3 lines
+	availableHeight := contentHeight - headerHeight - 2 // -2 for main borders
+	
+	// Status messages take 30% of available conversation area
+	statusHeight := int(float64(availableHeight) * 0.3)
+	if statusHeight < 5 {
+		statusHeight = 5 // Minimum height
+	}
+	chatHeight := availableHeight - statusHeight - 2 // -2 for spacing between sections
+	
+	// Update component sizes
+	m.statusMessages.SetSize(chatWidth-4, statusHeight-2) // -4 for borders, -2 for height borders
+	// Update chat size to account for borders
+	m.chat.SetSize(chatWidth-4, chatHeight-2) // -4 for borders, -2 for height borders
+	
+	// Create styles for rounded borders
+	statusBorderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Width(chatWidth - 2).
+		Height(statusHeight).
+		Padding(0, 1)
+		
+	chatBorderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("62")).
+		Width(chatWidth - 2).
+		Height(chatHeight).
+		Padding(0, 1)
+	
+	// Apply borders to sections
+	statusSection := statusBorderStyle.Render(m.statusMessages.View())
+	chatSection := chatBorderStyle.Render(m.chat.View())
+	
+	chatContent := lipgloss.JoinVertical(
+		lipgloss.Left,
+		m.chatHeader.View(),
+		statusSection,
+		chatSection,
+	)
+	
 	chat := chatStyle.
 		Width(chatWidth).
 		Height(contentHeight).
-		Render(m.chat.View())
+		Render(chatContent)
 	components = append(components, chat)
 	
 	// Editor (if visible)
@@ -112,20 +160,42 @@ func (m Model) renderStatusBar() string {
 	return statusStyle.Render(status)
 }
 
+// renderWithCommandPalette renders the UI with command palette overlay
+func (m Model) renderWithCommandPalette() string {
+	// Create command palette overlay
+	paletteStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(1, 2).
+		Width(60).
+		MaxHeight(20).
+		Background(lipgloss.Color("235"))
+	
+	palette := paletteStyle.Render(m.commandPalette.View())
+	
+	// Center the palette
+	y := 5 // Near the top
+	
+	// Render base and overlay the palette
+	_ = m.renderBase()
+	
+	// Create the full screen with palette centered
+	overlay := lipgloss.Place(
+		m.width, m.height,
+		lipgloss.Center, lipgloss.Top,
+		lipgloss.NewStyle().MarginTop(y).Render(palette),
+	)
+	
+	// Simply return the overlay - it will appear on top of the terminal
+	return overlay
+}
+
 // renderWithModal renders the UI with a modal overlay
 func (m Model) renderWithModal() string {
 	// Render base view
-	base := m.View()
+	base := m.renderBase()
 	
 	// TODO: Implement modal overlay
 	return base
 }
 
-// renderWithCommandPalette renders the UI with command palette overlay
-func (m Model) renderWithCommandPalette() string {
-	// Render base view
-	base := m.View()
-	
-	// TODO: Implement command palette overlay
-	return base
-}
