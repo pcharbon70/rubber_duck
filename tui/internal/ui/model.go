@@ -5,6 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/nshafer/phx"
+	"github.com/rubber_duck/tui/internal/phoenix"
 )
 
 // Pane represents the different panes in the UI
@@ -27,6 +28,10 @@ type Model struct {
 	
 	// Chat state
 	chat         *Chat
+	chatHeader   *ChatHeader
+	
+	// Status messages state
+	statusMessages *StatusMessages
 	
 	// File tree state (optional)
 	fileTree     *FileTree
@@ -41,11 +46,23 @@ type Model struct {
 	output       viewport.Model
 	
 	// Phoenix WebSocket state
+	phoenixClient interface{} // Will be *phoenix.Client
+	authClient   interface{} // Will be *phoenix.AuthClient
+	statusClient interface{} // Will be *phoenix.StatusClient
+	apiKeyClient interface{} // Will be *phoenix.ApiKeyClient
 	socket       *phx.Socket
+	authSocket   *phx.Socket // Separate socket for auth operations
 	channel      *phx.Channel
 	connected    bool
 	phoenixURL   string
+	authSocketURL string
 	apiKey       string
+	jwtToken     string // JWT token received after authentication
+	
+	// Auth state
+	authenticated bool
+	username      string
+	userID        string // User ID for api_keys channel
 	
 	// Status bar
 	statusBar    string
@@ -53,6 +70,17 @@ type Model struct {
 	// Modal states
 	modal        Modal
 	commandPalette CommandPalette
+	
+	// LLM configuration
+	currentModel    string
+	currentProvider string
+	temperature     float64
+	
+	// Conversation metadata
+	conversationID string
+	messageCount   int
+	tokenUsage     int
+	tokenLimit     int
 }
 
 // NewModel creates a new TUI model with default state
@@ -68,21 +96,51 @@ func NewModel() *Model {
 	// Create output viewport
 	output := viewport.New(0, 0)
 	
+	// Create Phoenix client
+	phoenixClient := phoenix.NewClient()
+	authClient := phoenix.NewAuthClient()
+	statusClient := phoenix.NewStatusClient()
+	apiKeyClient := phoenix.NewApiKeyClient()
+	
+	// Create chat header
+	chatHeader := NewChatHeader()
+	
+	// Create status messages component
+	statusMessages := NewStatusMessages()
+	
 	return &Model{
 		activePane:   ChatPane, // Chat is primary
 		width:        80,       // Default width
 		height:       24,       // Default height
 		chat:         chat,
+		chatHeader:   chatHeader,
+		statusMessages: statusMessages,
 		fileTree:     NewFileTree(),
 		editor:       editor,
 		output:       output,
 		showFileTree: false,    // Hidden by default
 		showEditor:   false,    // Hidden by default
-		statusBar:    "Welcome to RubberDuck TUI | Press Ctrl+H for help",
+		statusBar:    "Welcome to RubberDuck TUI | Connecting to auth server...",
 		modal:        NewModal(),
 		commandPalette: NewCommandPalette(),
-		phoenixURL:   "ws://localhost:4000/socket",
-		apiKey:       "test_key",
+		phoenixURL:   "ws://localhost:5555/socket",
+		authSocketURL: "ws://localhost:5555/auth_socket",
+		apiKey:       "",
+		jwtToken:     "",
+		phoenixClient: phoenixClient,
+		authClient:   authClient,
+		statusClient: statusClient,
+		apiKeyClient: apiKeyClient,
+		currentModel:    "",  // Empty means use default
+		currentProvider: "",  // Empty means unknown
+		temperature:     0.7,
+		authenticated:   false,
+		username:     "",
+		userID:       "",
+		conversationID: "lobby",
+		messageCount:  0,
+		tokenUsage:    0,
+		tokenLimit:    4096,
 	}
 }
 
@@ -131,10 +189,52 @@ func (m *Model) updateComponentSizes() {
 		m.editor.SetHeight(contentHeight)
 	}
 	
-	// Update chat size (it takes remaining space)
-	m.chat.SetSize(chatWidth-2, contentHeight) // -2 for borders
+	// Update chat header size
+	m.chatHeader.SetSize(chatWidth-2) // -2 for borders
+	
+	// Calculate heights for chat and status sections
+	headerHeight := 3 // chat header takes 3 lines
+	availableHeight := contentHeight - headerHeight - 2 // -2 for main borders
+	
+	// Status messages take 30% of available conversation area
+	statusHeight := int(float64(availableHeight) * 0.3)
+	if statusHeight < 5 {
+		statusHeight = 5 // Minimum height
+	}
+	chatHeight := availableHeight - statusHeight - 2 // -2 for spacing between sections
+	
+	// Update chat and status message sizes (account for borders)
+	m.chat.SetSize(chatWidth-4, chatHeight-2) // -4 for borders, -2 for height borders
+	m.statusMessages.SetSize(chatWidth-4, statusHeight-2) // -4 for borders, -2 for height borders
 	
 	// Update output viewport size
 	m.output.Width = 40
 	m.output.Height = contentHeight
+}
+
+// SetPhoenixConfig updates the Phoenix connection configuration
+func (m *Model) SetPhoenixConfig(url, authURL, apiKey string) {
+	m.phoenixURL = url
+	m.authSocketURL = authURL
+	m.apiKey = apiKey
+}
+
+// GetPhoenixClient returns the Phoenix client interface
+func (m *Model) GetPhoenixClient() interface{} {
+	return m.phoenixClient
+}
+
+// GetAuthClient returns the Auth client interface
+func (m *Model) GetAuthClient() interface{} {
+	return m.authClient
+}
+
+// GetStatusClient returns the Status client interface
+func (m *Model) GetStatusClient() interface{} {
+	return m.statusClient
+}
+
+// GetApiKeyClient returns the ApiKey client interface
+func (m *Model) GetApiKeyClient() interface{} {
+	return m.apiKeyClient
 }
