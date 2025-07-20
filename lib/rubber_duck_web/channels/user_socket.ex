@@ -3,8 +3,7 @@ defmodule RubberDuckWeb.UserSocket do
 
   require Logger
 
-  # Channels
-  channel("auth:*", RubberDuckWeb.AuthChannel)
+  # Channels - AuthChannel moved to AuthSocket
   channel("code:*", RubberDuckWeb.CodeChannel)
   channel("analysis:*", RubberDuckWeb.AnalysisChannel)
   channel("workspace:*", RubberDuckWeb.WorkspaceChannel)
