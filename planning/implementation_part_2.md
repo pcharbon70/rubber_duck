@@ -817,61 +817,61 @@ To complete Phase 6, focus should be on:
 
 This phase implements a sophisticated planning system based on the LLM-Modulo framework, where LLMs generate plans that are validated by external critics. The system provides hierarchical task decomposition, repository-level planning, and dynamic execution with ReAct-based adaptation.
 
-### 7.1 Planning Domain & Resources
+### 7.1 Planning Domain & Resources ✅
 
 Set up the core Ash domain and resources for the planning system, including plan tracking, task management, and validation results.
 
 #### Tasks:
-- [ ] 7.1.1 Create Planning domain module with Ash.Domain
-- [ ] 7.1.2 Design Plan resource with attributes:
-  - [ ] 7.1.2.1 Basic fields (id, name, description, type, status)
-  - [ ] 7.1.2.2 Context storage (project context, dependencies, constraints)
-  - [ ] 7.1.2.3 Validation results and execution history
-  - [ ] 7.1.2.4 Timestamps and metadata
-- [ ] 7.1.3 Design Task resource with attributes:
-  - [ ] 7.1.3.1 Task details (name, description, complexity, status)
-  - [ ] 7.1.3.2 Dependencies and ordering information
-  - [ ] 7.1.3.3 Success criteria and validation rules
-  - [ ] 7.1.3.4 Execution metadata and results
-- [ ] 7.1.4 Create Constraint resource for plan constraints
-- [ ] 7.1.5 Create Validation resource for tracking validation results
-- [ ] 7.1.6 Set up relationships between resources
-- [ ] 7.1.7 Create database migrations for planning tables
-- [ ] 7.1.8 Implement Ash actions for CRUD operations
-- [ ] 7.1.9 Add authorization policies for plan access
+- [x] 7.1.1 Create Planning domain module with Ash.Domain
+- [x] 7.1.2 Design Plan resource with attributes:
+  - [x] 7.1.2.1 Basic fields (id, name, description, type, status)
+  - [x] 7.1.2.2 Context storage (project context, dependencies, constraints)
+  - [x] 7.1.2.3 Validation results and execution history
+  - [x] 7.1.2.4 Timestamps and metadata
+- [x] 7.1.3 Design Task resource with attributes:
+  - [x] 7.1.3.1 Task details (name, description, complexity, status)
+  - [x] 7.1.3.2 Dependencies and ordering information
+  - [x] 7.1.3.3 Success criteria and validation rules
+  - [x] 7.1.3.4 Execution metadata and results
+- [x] 7.1.4 Create Constraint resource for plan constraints
+- [x] 7.1.5 Create Validation resource for tracking validation results
+- [x] 7.1.6 Set up relationships between resources
+- [x] 7.1.7 Create database migrations for planning tables
+- [x] 7.1.8 Implement Ash actions for CRUD operations
+- [x] 7.1.9 Add authorization policies for plan access
 
 #### Unit Tests:
-- [ ] 7.1.10 Test Plan resource creation and validation
-- [ ] 7.1.11 Test Task resource with dependency management
-- [ ] 7.1.12 Test constraint enforcement
-- [ ] 7.1.13 Test validation result tracking
-- [ ] 7.1.14 Test authorization policies
+- [x] 7.1.10 Test Plan resource creation and validation
+- [x] 7.1.11 Test Task resource with dependency management
+- [x] 7.1.12 Test constraint enforcement
+- [x] 7.1.13 Test validation result tracking
+- [x] 7.1.14 Test authorization policies
 
-### 7.2 Task Decomposition Engine
+### 7.2 Task Decomposition Engine ~70% Complete
 
 Implement the task decomposition engine that breaks down high-level requests into actionable tasks using LLM-guided decomposition with validation.
 
 #### Tasks:
-- [ ] 7.2.1 Create TaskDecomposer engine using RubberDuck.Engine behavior
-- [ ] 7.2.2 Implement decomposition strategies:
-  - [ ] 7.2.2.1 Linear decomposition for simple tasks
-  - [ ] 7.2.2.2 Hierarchical decomposition for complex features
-  - [ ] 7.2.2.3 Tree-of-Thought decomposition for exploratory tasks
-- [ ] 7.2.3 Integrate with CoT for reasoning during decomposition
-- [ ] 7.2.4 Create planning-specific prompt templates
-- [ ] 7.2.5 Implement dependency graph builder
-- [ ] 7.2.6 Add task complexity estimation
-- [ ] 7.2.7 Create success criteria generator
+- [x] 7.2.1 Create TaskDecomposer engine using RubberDuck.Engine behavior
+- [x] 7.2.2 Implement decomposition strategies:
+  - [x] 7.2.2.1 Linear decomposition for simple tasks
+  - [x] 7.2.2.2 Hierarchical decomposition for complex features
+  - [x] 7.2.2.3 Tree-of-Thought decomposition for exploratory tasks
+- [x] 7.2.3 Integrate with CoT for reasoning during decomposition
+- [x] 7.2.4 Create planning-specific prompt templates
+- [x] 7.2.5 Implement dependency graph builder
+- [x] 7.2.6 Add task complexity estimation
+- [x] 7.2.7 Create success criteria generator
 - [ ] 7.2.8 Implement task validation with critics
 - [ ] 7.2.9 Add support for iterative refinement
-- [ ] 7.2.10 Create planning pattern library
-- [ ] 7.2.11 Integrate with dynamic LLM configuration
+- [x] 7.2.10 Create planning pattern library
+- [x] 7.2.11 Integrate with dynamic LLM configuration
 
 #### Unit Tests:
-- [ ] 7.2.12 Test simple task decomposition
-- [ ] 7.2.13 Test complex feature decomposition
-- [ ] 7.2.14 Test dependency graph generation
-- [ ] 7.2.15 Test complexity estimation accuracy
+- [x] 7.2.12 Test simple task decomposition
+- [x] 7.2.13 Test complex feature decomposition
+- [x] 7.2.14 Test dependency graph generation
+- [x] 7.2.15 Test complexity estimation accuracy
 - [ ] 7.2.16 Test iterative refinement process
 
 ### 7.3 Critics System (Hard & Soft Critics)
