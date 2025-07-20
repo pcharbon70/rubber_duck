@@ -112,7 +112,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 		
 	case InitiateConnectionMsg:
-		m.statusBar = "Connecting to auth server..."
+		// Check if connection is blocked due to too many attempts
+		if m.connectionBlocked {
+			m.statusBar = "Connection blocked - too many failed attempts"
+			return m, nil
+		}
+		
+		// Increment total connection attempts
+		m.totalConnectionAttempts++
+		const maxTotalAttempts = 5
+		
+		// Block further connections if we've tried too many times
+		if m.totalConnectionAttempts > maxTotalAttempts {
+			m.connectionBlocked = true
+			m.statusBar = "Connection blocked after repeated failures. Please restart TUI."
+			m.chat.AddMessage(ErrorMessage, fmt.Sprintf("Connection blocked after %d failed attempts. Please verify the server is running and restart the TUI.", maxTotalAttempts), "system")
+			return m, nil
+		}
+		
+		m.statusBar = fmt.Sprintf("Connecting to auth server... (attempt %d)", m.totalConnectionAttempts)
 		client := m.phoenixClient.(*phoenix.Client)
 		// First connect to auth socket
 		config := phoenix.Config{
@@ -124,8 +142,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case phoenix.ConnectedMsg:
 		m.connected = true
-		// Reset reconnect attempts on successful connection
+		// Reset all connection counters on successful connection
 		m.reconnectAttempts = 0
+		m.totalConnectionAttempts = 0
+		m.connectionBlocked = false
 		
 		// Check if this is auth socket or user socket
 		if m.socket == nil {
@@ -969,6 +989,7 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 // handleReconnect attempts to reconnect with exponential backoff
 func (m *Model) handleReconnect() (Model, tea.Cmd) {
 	now := time.Now()
+	const maxReconnectAttempts = 3
 	
 	// Calculate backoff duration
 	timeSinceLastAttempt := now.Sub(m.lastReconnectTime)
@@ -976,6 +997,13 @@ func (m *Model) handleReconnect() (Model, tea.Cmd) {
 	// Reset attempts if it's been more than 5 minutes
 	if timeSinceLastAttempt > 5*time.Minute {
 		m.reconnectAttempts = 0
+	}
+	
+	// Check if we've exceeded maximum attempts
+	if m.reconnectAttempts >= maxReconnectAttempts {
+		m.statusBar = "Maximum reconnection attempts reached. Please check server and restart TUI."
+		m.chat.AddMessage(ErrorMessage, fmt.Sprintf("Failed to reconnect after %d attempts. Please verify the server is running and restart the TUI.", maxReconnectAttempts), "system")
+		return *m, nil
 	}
 	
 	// Calculate backoff: 1s, 2s, 4s, 8s, 16s, 32s, max 60s

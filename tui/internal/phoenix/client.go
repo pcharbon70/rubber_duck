@@ -64,7 +64,14 @@ func (c *Client) Connect(config Config) tea.Cmd {
 		
 		// Create the socket
 		socket := phx.NewSocket(endPoint)
-		socket.Logger = phx.NewSimpleLogger(phx.LoggerLevel(phx.LogInfo))
+		// Use silent logger to prevent console spam
+		socket.Logger = NewSilentLogger()
+		
+		// Disable automatic reconnection to prevent spam
+		socket.ReconnectAfterFunc = func(tries int) time.Duration {
+			// Return a very large duration to effectively disable auto-reconnect
+			return time.Hour * 24 // 24 hours - effectively disabled
+		}
 		
 		// Set up event handlers
 		socket.OnOpen(func() {

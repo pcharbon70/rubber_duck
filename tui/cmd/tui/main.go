@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -14,6 +15,11 @@ import (
 )
 
 func main() {
+	// IMMEDIATELY suppress all logging to prevent Phoenix library spam
+	// This must happen before ANY other operations
+	log.SetOutput(io.Discard)
+	log.SetFlags(0)
+	
 	// Parse command line flags
 	var (
 		url      = flag.String("url", "ws://localhost:5555/socket", "Phoenix WebSocket URL (authenticated)")
@@ -22,6 +28,15 @@ func main() {
 		debug    = flag.Bool("debug", false, "Enable debug logging")
 	)
 	flag.Parse()
+	
+	// Redirect stderr immediately after flag parsing to catch all Phoenix output
+	// IMPORTANT: Do NOT redirect stdout as the TUI needs it for display
+	if !*debug {
+		devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0755)
+		if err == nil {
+			os.Stderr = devNull
+		}
+	}
 	
 	// Load API key from various sources
 	finalAPIKey := loadAPIKey(*apiKey)
@@ -61,14 +76,18 @@ func main() {
 		}
 	}
 
-	// Enable debug logging if requested
+	// Enable debug logging if requested (stderr redirection already handled above)
 	if *debug {
+		// Re-enable stderr for debug mode
 		f, err := tea.LogToFile("debug.log", "debug")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "fatal: %v\n", err)
 			os.Exit(1)
 		}
 		defer f.Close()
+		// Re-enable standard logging for debug
+		log.SetOutput(f)
+		log.SetFlags(log.LstdFlags)
 	}
 
 	// Run the program

@@ -29,6 +29,11 @@ func (e *ErrorHandler) HandleError(err error, component string) (display bool, m
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	
+	// Handle nil errors
+	if err == nil {
+		return false, ""
+	}
+	
 	now := time.Now()
 	errorKey := fmt.Sprintf("%s:%v", component, err)
 	
@@ -49,12 +54,18 @@ func (e *ErrorHandler) HandleError(err error, component string) (display bool, m
 				e.backoffDuration = 30*time.Second
 			}
 			
-			message = fmt.Sprintf("%s: %v (suppressing repeated errors for %v)", 
-				component, err, e.backoffDuration)
+			// Show suppression message only once, then stay silent
+			message = fmt.Sprintf("%s: Connection failed. Further errors suppressed to prevent spam.", component)
 			return true, message
 		}
 		
-		// Don't display repeated errors
+		// Show second occurrence but suppress subsequent ones until threshold
+		if e.errorCount == 2 {
+			message = formatErrorMessage(err, component)
+			return true, message
+		}
+		
+		// Don't display other repeated errors
 		return false, ""
 	}
 	

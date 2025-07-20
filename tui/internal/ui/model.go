@@ -73,6 +73,8 @@ type Model struct {
 	errorHandler *ErrorHandler
 	reconnectAttempts int
 	lastReconnectTime time.Time
+	totalConnectionAttempts int
+	connectionBlocked bool
 	
 	// Modal states
 	modal        Modal
