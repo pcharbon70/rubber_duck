@@ -3,6 +3,7 @@ package ui
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 	
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rubber_duck/tui/internal/phoenix"
@@ -75,6 +76,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.chat.Focus()
 			m.statusBar = "Chat focused"
 			return m, nil
+		case "ctrl+r":
+			// Reconnect with backoff
+			return m.handleReconnect()
 		}
 		
 		// Handle pane-specific input
@@ -120,6 +124,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case phoenix.ConnectedMsg:
 		m.connected = true
+		// Reset reconnect attempts on successful connection
+		m.reconnectAttempts = 0
+		
 		// Check if this is auth socket or user socket
 		if m.socket == nil {
 			// First connection is to auth socket
@@ -139,12 +146,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case phoenix.DisconnectedMsg:
 		m.connected = false
+		m.updateHeaderState()
+		
 		if msg.Error != nil {
-			m.statusBar = fmt.Sprintf("Disconnected: %v", msg.Error)
+			// Use error handler for disconnect errors
+			if display, message := m.errorHandler.HandleError(msg.Error, "Connection"); display {
+				m.statusBar = message
+				m.chat.AddMessage(ErrorMessage, message, "system")
+				
+				// Add reconnection advice
+				m.chat.AddMessage(SystemMessage, "Connection lost. You can try reconnecting with Ctrl+R or restart the TUI.", "system")
+			}
 		} else {
 			m.statusBar = "Disconnected"
+			// Reset error handler on clean disconnect
+			m.errorHandler.Reset()
 		}
-		m.updateHeaderState()
 		return m, nil
 		
 	case phoenix.SocketCreatedMsg:
@@ -226,7 +243,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case ErrorMsg:
 		m.err = msg.Err
-		m.statusBar = fmt.Sprintf("Error in %s: %v", msg.Component, msg.Err)
+		// Use error handler to prevent spam
+		if display, message := m.errorHandler.HandleError(msg.Err, msg.Component); display {
+			m.statusBar = message
+			m.chat.AddMessage(ErrorMessage, message, "system")
+			
+			// Add connection advice if available
+			if advice := GetConnectionAdvice(msg.Err); advice != "" {
+				m.chat.AddMessage(SystemMessage, advice, "system")
+			}
+		}
 		return m, nil
 		
 	case ExecuteCommandMsg:
@@ -320,11 +346,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Phoenix error handling
 	case phoenix.ErrorMsg:
 		m.err = msg.Err
-		m.statusBar = fmt.Sprintf("Error in %s: %v", msg.Component, msg.Err)
-		m.chat.AddMessage(ErrorMessage, fmt.Sprintf("Error: %v", msg.Err), "system")
-		// If retry command is available, could offer to retry
-		if msg.Retry != nil {
-			// TODO: Could show retry option
+		// Use error handler to prevent spam
+		if display, message := m.errorHandler.HandleError(msg.Err, msg.Component); display {
+			m.statusBar = message
+			m.chat.AddMessage(ErrorMessage, message, "system")
+			
+			// Add connection advice if available
+			if advice := GetConnectionAdvice(msg.Err); advice != "" {
+				m.chat.AddMessage(SystemMessage, advice, "system")
+			}
+			
+			// If retry command is available, offer to retry
+			if msg.Retry != nil {
+				m.chat.AddMessage(SystemMessage, "You can retry this operation by pressing Ctrl+R", "system")
+			}
 		}
 		return m, nil
 		
@@ -608,6 +643,7 @@ func (m Model) buildHelpContent() string {
 	help += "━━━━━━━━━━━━━━━━━━━━━\n"
 	help += "Ctrl+P    - Command palette (all commands)\n"
 	help += "Ctrl+H    - This help\n"
+	help += "Ctrl+R    - Reconnect to server\n"
 	help += "Tab       - Switch panes\n"
 	help += "Ctrl+C/q  - Quit\n\n"
 	
@@ -928,4 +964,60 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 	}
 	
 	return m, nil
+}
+
+// handleReconnect attempts to reconnect with exponential backoff
+func (m *Model) handleReconnect() (Model, tea.Cmd) {
+	now := time.Now()
+	
+	// Calculate backoff duration
+	timeSinceLastAttempt := now.Sub(m.lastReconnectTime)
+	
+	// Reset attempts if it's been more than 5 minutes
+	if timeSinceLastAttempt > 5*time.Minute {
+		m.reconnectAttempts = 0
+	}
+	
+	// Calculate backoff: 1s, 2s, 4s, 8s, 16s, 32s, max 60s
+	backoffSeconds := 1 << m.reconnectAttempts
+	if backoffSeconds > 60 {
+		backoffSeconds = 60
+	}
+	backoffDuration := time.Duration(backoffSeconds) * time.Second
+	
+	// Check if we should wait before reconnecting
+	if timeSinceLastAttempt < backoffDuration {
+		waitTime := backoffDuration - timeSinceLastAttempt
+		m.statusBar = fmt.Sprintf("Please wait %v before reconnecting", waitTime.Round(time.Second))
+		m.chat.AddMessage(SystemMessage, fmt.Sprintf("Reconnection cooldown: please wait %v", waitTime.Round(time.Second)), "system")
+		return *m, nil
+	}
+	
+	// Reset error handler for fresh start
+	m.errorHandler.Reset()
+	
+	// Disconnect existing connections
+	if m.authSocket != nil {
+		m.authSocket.Disconnect()
+		m.authSocket = nil
+	}
+	if m.socket != nil {
+		m.socket.Disconnect()
+		m.socket = nil
+	}
+	
+	// Reset connection state
+	m.connected = false
+	m.authenticated = false
+	m.channel = nil
+	
+	// Update reconnect tracking
+	m.reconnectAttempts++
+	m.lastReconnectTime = now
+	
+	m.statusBar = fmt.Sprintf("Reconnecting... (attempt %d)", m.reconnectAttempts)
+	m.chat.AddMessage(SystemMessage, fmt.Sprintf("Initiating reconnection (attempt %d)...", m.reconnectAttempts), "system")
+	
+	// Initiate new connection
+	return *m, func() tea.Msg { return InitiateConnectionMsg{} }
 }

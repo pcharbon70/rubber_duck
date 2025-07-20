@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"time"
+	
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -67,6 +69,11 @@ type Model struct {
 	// Status bar
 	statusBar    string
 	
+	// Error handling
+	errorHandler *ErrorHandler
+	reconnectAttempts int
+	lastReconnectTime time.Time
+	
 	// Modal states
 	modal        Modal
 	commandPalette CommandPalette
@@ -108,6 +115,9 @@ func NewModel() *Model {
 	// Create status messages component
 	statusMessages := NewStatusMessages()
 	
+	// Create error handler
+	errorHandler := NewErrorHandler()
+	
 	return &Model{
 		activePane:   ChatPane, // Chat is primary
 		width:        80,       // Default width
@@ -121,6 +131,7 @@ func NewModel() *Model {
 		showFileTree: false,    // Hidden by default
 		showEditor:   false,    // Hidden by default
 		statusBar:    "Welcome to RubberDuck TUI | Connecting to auth server...",
+		errorHandler: errorHandler,
 		modal:        NewModal(),
 		commandPalette: NewCommandPalette(),
 		phoenixURL:   "ws://localhost:5555/socket",
