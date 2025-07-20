@@ -10,6 +10,7 @@ defmodule RubberDuckWeb.UserSocket do
   channel("conversation:*", RubberDuckWeb.ConversationChannel)
   channel("mcp:*", RubberDuckWeb.MCPChannel)
   channel("status:*", RubberDuckWeb.StatusChannel)
+  channel("api_keys:*", RubberDuckWeb.ApiKeyChannel)
 
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After
