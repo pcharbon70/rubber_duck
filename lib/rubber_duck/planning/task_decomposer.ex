@@ -12,6 +12,7 @@ defmodule RubberDuck.Planning.TaskDecomposer do
   alias RubberDuck.CoT
   # alias RubberDuck.Planning.{Plan, Task, TaskDependency}
   alias RubberDuck.LLM.Service, as: LLM
+  alias RubberDuck.Planning.Critics.Orchestrator
 
   require Logger
 
@@ -460,11 +461,57 @@ defmodule RubberDuck.Planning.TaskDecomposer do
 
       case Enum.find(validations, &match?({:error, _}, &1)) do
         {:error, _} = error -> error
-        nil -> {:ok, %{tasks: tasks, valid: true}}
+        nil -> 
+          # If basic validations pass, run critics
+          case run_critic_validation(tasks, dependencies, state) do
+            :ok -> {:ok, %{tasks: tasks, valid: true}}
+            {:error, reason} -> {:error, reason}
+          end
       end
     else
       {:ok, %{tasks: tasks, valid: true}}
     end
+  end
+
+  defp run_critic_validation(tasks, dependencies, state) do
+    orchestrator = Orchestrator.new(
+      cache_enabled: true,
+      parallel_execution: true,
+      config: state.llm_config
+    )
+
+    # Create a mock plan structure for validation
+    plan = %{
+      tasks: tasks,
+      dependencies: dependencies,
+      metadata: %{
+        strategy: state.default_strategy,
+        created_by: "TaskDecomposer"
+      }
+    }
+
+    case Orchestrator.validate(orchestrator, plan) do
+      {:ok, results} ->
+        aggregated = Orchestrator.aggregate_results(results)
+        
+        if aggregated.summary == :failed do
+          {:error, format_critic_errors(aggregated)}
+        else
+          :ok
+        end
+        
+      # Orchestrator.validate always returns {:ok, results}
+      # So we don't need this error case
+    end
+  end
+
+  defp format_critic_errors(aggregated) do
+    blocking_messages = 
+      aggregated.blocking_issues
+      |> Enum.map(& &1.message)
+      |> Enum.join("; ")
+    
+    "Validation failed: #{blocking_messages}"
   end
 
   def validate_task_completeness(tasks) do
