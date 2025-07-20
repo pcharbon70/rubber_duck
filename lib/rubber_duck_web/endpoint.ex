@@ -20,6 +20,16 @@ defmodule RubberDuckWeb.Endpoint do
     ],
     longpoll: false
   )
+  
+  # Separate socket for authentication that doesn't require credentials
+  socket("/auth_socket", RubberDuckWeb.AuthSocket,
+    websocket: [
+      connect_info: [:uri, :peer_data],
+      check_origin: false,
+      log: :debug
+    ],
+    longpoll: false
+  )
 
   socket("/live", Phoenix.LiveView.Socket, websocket: [connect_info: [session: @session_options]])
 
