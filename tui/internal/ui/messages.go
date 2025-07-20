@@ -1,32 +1,12 @@
 package ui
 
 import (
-	"encoding/json"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/nshafer/phx"
 )
 
 // Message types for the TUI
 
-// Phoenix WebSocket messages
-type ConnectedMsg struct{}
-type DisconnectedMsg struct{ Error error }
-type SocketCreatedMsg struct{ Socket *phx.Socket }
-type ChannelJoinedMsg struct{ Channel *phx.Channel }
-type ChannelJoiningMsg struct{}
-
-type ChannelResponseMsg struct {
-	Event   string
-	Payload json.RawMessage
-}
-
-// Streaming messages
-type StreamStartMsg struct{ ID string }
-type StreamDataMsg struct {
-	ID   string
-	Data string
-}
-type StreamEndMsg struct{ ID string }
+// These are now imported from phoenix package - we'll use them directly
 
 // UI messages
 type WindowSizeMsg struct{ Width, Height int }
@@ -48,7 +28,7 @@ type ChatMessageReceivedMsg struct {
 // Command messages
 type ExecuteCommandMsg struct {
 	Command string
-	Args    []string
+	Args    map[string]string
 }
 
 // Modal messages
@@ -60,6 +40,11 @@ type ShowModalMsg struct {
 
 // Connection messages
 type InitiateConnectionMsg struct{}
+type JoinConversationChannelMsg struct{}
+type JoinStatusChannelMsg struct{}
+type JoinApiKeyChannelMsg struct{}
+type SwitchToUserSocketMsg struct{}
+type AuthSocketConnectedMsg struct{}
 
 // RetryMsg for retrying failed operations
 type RetryMsg struct {
