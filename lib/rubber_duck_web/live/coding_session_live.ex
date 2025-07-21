@@ -32,22 +32,38 @@ defmodule RubberDuckWeb.CodingSessionLive do
       :timer.send_interval(30_000, self(), :update_presence)
     end
     
+    # Generate conversation ID for this project session
+    conversation_id = "project-#{project_id}-#{Ecto.UUID.generate()}"
+    
     socket =
       socket
       |> assign(:page_title, "Coding Session")
       |> assign(:project_id, project_id)
       |> assign(:user, user)
+      |> assign(:conversation_id, conversation_id)
+      |> assign(:conversation_connected, false)
       |> assign_initial_state()
       |> assign_layout_preferences()
       |> fetch_project_data()
     
-    {:ok, socket}
+    # Push event to join conversation channel after socket is established
+    if connected?(socket) do
+      {:ok, push_event(socket, "join_conversation", %{
+        conversation_id: conversation_id,
+        project_id: project_id
+      })}
+    else
+      {:ok, socket}
+    end
   end
   
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="coding-session h-screen flex flex-col bg-gray-50" phx-window-keydown="window_keydown">
+    <div class="coding-session h-screen flex flex-col bg-gray-50" 
+         phx-window-keydown="window_keydown"
+         id="coding-session"
+         phx-hook="ConversationChannel">
       <!-- Header -->
       <header class="bg-white shadow-sm border-b border-gray-200 px-4 py-2">
         <div class="flex items-center justify-between">
@@ -85,6 +101,8 @@ defmodule RubberDuckWeb.CodingSessionLive do
             module={ChatPanelComponent}
             id="chat-panel"
             project_id={@project_id}
+            conversation_id={@conversation_id}
+            conversation_connected={@conversation_connected}
             current_user={@user}
             messages={@chat_messages}
             streaming_message={@streaming_message}
@@ -128,6 +146,176 @@ defmodule RubberDuckWeb.CodingSessionLive do
   end
   
   
+  # Channel event handlers from client
+  
+  @impl true
+  def handle_event("conversation_joined", %{"conversation_id" => _conv_id}, socket) do
+    {:noreply, assign(socket, :conversation_connected, true)}
+  end
+  
+  @impl true
+  def handle_event("conversation_response", %{"response" => response}, socket) do
+    # Create assistant message from channel response
+    message = %{
+      id: Map.get(response, "id", Ecto.UUID.generate()),
+      type: :assistant,
+      content: response["content"],
+      user_id: nil,
+      username: "AI Assistant",
+      metadata: %{
+        timestamp: DateTime.utc_now(),
+        status: :complete,
+        model: response["model"],
+        provider: response["provider"],
+        tokens: response["tokens"]
+      }
+    }
+    
+    socket = 
+      socket
+      |> update(:chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
+      |> update(:streaming_message, fn _ -> nil end)
+    
+    {:noreply, socket}
+  end
+  
+  @impl true
+  def handle_event("conversation_thinking", _params, socket) do
+    # Show thinking indicator
+    streaming_message = %{
+      id: "thinking-#{Ecto.UUID.generate()}",
+      type: :assistant,
+      content: "",
+      metadata: %{
+        timestamp: DateTime.utc_now(),
+        status: :streaming
+      }
+    }
+    
+    {:noreply, assign(socket, :streaming_message, streaming_message)}
+  end
+  
+  @impl true
+  def handle_event("conversation_error", %{"error" => error}, socket) do
+    # Create error message
+    message = %{
+      id: Ecto.UUID.generate(),
+      type: :error,
+      content: error["message"] || "An error occurred",
+      metadata: %{
+        timestamp: DateTime.utc_now(),
+        status: :error,
+        details: error["details"]
+      }
+    }
+    
+    socket = 
+      socket
+      |> update(:chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
+      |> update(:streaming_message, fn _ -> nil end)
+    
+    {:noreply, socket}
+  end
+  
+  @impl true
+  def handle_event("auth_success", %{"user" => user, "token" => token}, socket) do
+    message = %{
+      id: Ecto.UUID.generate(),
+      type: :system,
+      content: "✅ Successfully logged in as #{user["username"]}",
+      metadata: %{timestamp: DateTime.utc_now(), status: :complete}
+    }
+    
+    socket = 
+      socket
+      |> assign(:auth_token, token)
+      |> assign(:authenticated_user, user)
+      |> update(:chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
+    
+    {:noreply, socket}
+  end
+  
+  @impl true
+  def handle_event("auth_error", %{"message" => msg}, socket) do
+    message = %{
+      id: Ecto.UUID.generate(),
+      type: :error,
+      content: "❌ Authentication failed: #{msg}",
+      metadata: %{timestamp: DateTime.utc_now(), status: :error}
+    }
+    
+    socket = update(socket, :chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
+    {:noreply, socket}
+  end
+  
+  @impl true
+  def handle_event("api_key_generated", %{"api_key" => api_key, "warning" => warning}, socket) do
+    message = %{
+      id: Ecto.UUID.generate(),
+      type: :system,
+      content: """
+      ✅ API Key Generated:
+      
+      Name: #{api_key["name"]}
+      Key: `#{api_key["key"]}`
+      Expires: #{api_key["expires_at"] || "Never"}
+      
+      ⚠️ #{warning}
+      """,
+      metadata: %{timestamp: DateTime.utc_now(), status: :complete}
+    }
+    
+    socket = update(socket, :chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
+    {:noreply, socket}
+  end
+  
+  @impl true
+  def handle_event("api_key_list", %{"api_keys" => keys}, socket) do
+    keys_text = Enum.map_join(keys, "\n", fn key ->
+      "- #{key["name"]} (ID: #{key["id"]}, Created: #{key["created_at"]})"
+    end)
+    
+    message = %{
+      id: Ecto.UUID.generate(),
+      type: :system,
+      content: """
+      📋 Your API Keys:
+      
+      #{if keys_text == "", do: "No API keys found.", else: keys_text}
+      """,
+      metadata: %{timestamp: DateTime.utc_now(), status: :complete}
+    }
+    
+    socket = update(socket, :chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
+    {:noreply, socket}
+  end
+  
+  @impl true
+  def handle_event("api_key_revoked", %{"api_key_id" => key_id}, socket) do
+    message = %{
+      id: Ecto.UUID.generate(),
+      type: :system,
+      content: "✅ API Key #{key_id} has been revoked successfully.",
+      metadata: %{timestamp: DateTime.utc_now(), status: :complete}
+    }
+    
+    socket = update(socket, :chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
+    {:noreply, socket}
+  end
+  
+  @impl true
+  def handle_event("api_key_error", %{"message" => msg}, socket) do
+    message = %{
+      id: Ecto.UUID.generate(),
+      type: :error,
+      content: "❌ API Key Error: #{msg}",
+      metadata: %{timestamp: DateTime.utc_now(), status: :error}
+    }
+    
+    socket = update(socket, :chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
+    {:noreply, socket}
+  end
+  
   # PubSub Handlers
   
   @impl true
@@ -163,6 +351,53 @@ defmodule RubberDuckWeb.CodingSessionLive do
         current_file: socket.assigns.current_file
       }
     )
+    {:noreply, socket}
+  end
+  
+  def handle_info({:send_to_conversation, message}, socket) do
+    # Push event to client to send through ConversationChannel
+    socket = push_event(socket, "send_to_conversation", %{
+      content: message.content,
+      conversation_id: socket.assigns.conversation_id
+    })
+    
+    {:noreply, socket}
+  end
+  
+  def handle_info({:update_llm_preferences, preferences}, socket) do
+    # Push event to update preferences through ConversationChannel
+    socket = push_event(socket, "update_llm_preferences", preferences)
+    
+    {:noreply, socket}
+  end
+  
+  def handle_info({:auth_login, %{username: username, password: password}}, socket) do
+    # Push event to handle login through AuthChannel
+    socket = push_event(socket, "auth_login", %{username: username, password: password})
+    {:noreply, socket}
+  end
+  
+  def handle_info({:auth_logout}, socket) do
+    # Push event to handle logout through AuthChannel
+    socket = push_event(socket, "auth_logout", %{})
+    {:noreply, socket}
+  end
+  
+  def handle_info({:api_key_generate, params}, socket) do
+    # Push event to generate API key
+    socket = push_event(socket, "api_key_generate", params)
+    {:noreply, socket}
+  end
+  
+  def handle_info({:api_key_list}, socket) do
+    # Push event to list API keys
+    socket = push_event(socket, "api_key_list", %{})
+    {:noreply, socket}
+  end
+  
+  def handle_info({:api_key_revoke, key_id}, socket) do
+    # Push event to revoke API key
+    socket = push_event(socket, "api_key_revoke", %{key_id: key_id})
     {:noreply, socket}
   end
   
