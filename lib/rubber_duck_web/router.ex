@@ -43,6 +43,9 @@ defmodule RubberDuckWeb.Router do
       
       # Status System Dashboard (requires authentication)
       live "/status", StatusDashboardLive, :index
+      
+      # Collaborative Coding Session
+      live "/projects/:project_id/session", CodingSessionLive, :index
     end
   end
 

@@ -17,3 +17,9 @@ config :rubber_duck, RubberDuck.Repo,
 # Minimal configuration to avoid noise during tests
 config :tower,
   reporters: []
+
+# Phoenix endpoint configuration for testing
+config :rubber_duck, RubberDuckWeb.Endpoint,
+  http: [ip: {127, 0, 0, 1}, port: 4002],
+  secret_key_base: "test_secret_key_base_must_be_at_least_64_bytes_long_for_phoenix_security",
+  server: false
