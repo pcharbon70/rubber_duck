@@ -82,6 +82,13 @@ defmodule RubberDuck.Application do
       RubberDuck.Instructions.SecurityPipeline,
       # Analysis and metrics system
       RubberDuck.Analysis.MetricsCollector,
+      # Collaboration system components
+      {Registry, keys: :unique, name: RubberDuckWeb.Collaboration.EditorRegistry},
+      RubberDuckWeb.Collaboration.EditorSupervisor,
+      RubberDuckWeb.Collaboration.PresenceTracker,
+      RubberDuckWeb.Collaboration.SharedSelections,
+      RubberDuckWeb.Collaboration.SessionManager,
+      RubberDuckWeb.Collaboration.Communication,
       # Web endpoint - start last
       RubberDuckWeb.Endpoint,
       {AshAuthentication.Supervisor, [otp_app: :rubber_duck]}
