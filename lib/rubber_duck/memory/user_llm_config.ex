@@ -35,6 +35,7 @@ defmodule RubberDuck.Memory.UserLLMConfig do
 
     update :update do
       primary? true
+      require_atomic? false
       accept [:model, :is_default, :metadata]
     end
 
