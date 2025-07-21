@@ -80,6 +80,8 @@ defmodule RubberDuck.Application do
       RubberDuckWeb.MessageQueue,
       # Instruction template security system
       RubberDuck.Instructions.SecurityPipeline,
+      # Analysis and metrics system
+      RubberDuck.Analysis.MetricsCollector,
       # Web endpoint - start last
       RubberDuckWeb.Endpoint,
       {AshAuthentication.Supervisor, [otp_app: :rubber_duck]}
