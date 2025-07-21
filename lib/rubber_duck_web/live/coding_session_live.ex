@@ -19,6 +19,11 @@ defmodule RubberDuckWeb.CodingSessionLive do
   alias RubberDuck.Projects.FileTree
   alias RubberDuck.Analysis.CodeAnalyzer
   alias RubberDuck.Analysis.MetricsCollector
+  alias RubberDuckWeb.Collaboration.{
+    PresenceTracker,
+    SessionManager,
+    Communication
+  }
   
   # Require authentication
   on_mount {RubberDuckWeb.LiveUserAuth, :live_user_required}
@@ -81,6 +86,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
           </div>
           
           <div class="flex items-center space-x-2">
+            <.collaboration_controls socket={@socket} />
             <.panel_toggles layout={@layout} />
             <.user_presence users={@presence_users} current_user={@user} />
           </div>
@@ -153,6 +159,15 @@ defmodule RubberDuckWeb.CodingSessionLive do
         <% end %>
       </div>
       
+      <!-- Collaborator Sidebar -->
+      <%= if @is_collaborative && @show_collaborators do %>
+        <.collaborator_sidebar 
+          collaborators={@active_collaborators}
+          current_user={@user}
+          session={@collaboration_session}
+        />
+      <% end %>
+      
       <!-- Loading Overlay -->
       <%= if @loading do %>
         <.loading_overlay />
@@ -172,6 +187,65 @@ defmodule RubberDuckWeb.CodingSessionLive do
   def handle_event("toggle_panel", %{"panel" => panel}, socket) do
     layout = update_layout_visibility(socket.assigns.layout, panel)
     {:noreply, assign(socket, :layout, layout)}
+  end
+  
+  @impl true
+  def handle_event("start_collaboration", _params, socket) do
+    # Create a new collaborative session
+    case SessionManager.create_session(socket.assigns.project_id, socket.assigns.user.id, %{
+      name: "Collaborative Coding - #{socket.assigns.project_name}",
+      record: true,
+      enable_voice: false,
+      enable_screen_share: false
+    }) do
+      {:ok, session} ->
+        socket = 
+          socket
+          |> assign(:collaboration_session, session)
+          |> assign(:is_collaborative, true)
+          |> push_event("collaboration_started", %{session_id: session.id})
+        
+        {:noreply, socket}
+        
+      {:error, reason} ->
+        socket = put_flash(socket, :error, "Failed to start collaboration: #{reason}")
+        {:noreply, socket}
+    end
+  end
+  
+  @impl true
+  def handle_event("end_collaboration", _params, socket) do
+    if socket.assigns.collaboration_session do
+      SessionManager.end_session(
+        socket.assigns.collaboration_session.id, 
+        socket.assigns.user.id
+      )
+    end
+    
+    socket = 
+      socket
+      |> assign(:collaboration_session, nil)
+      |> assign(:is_collaborative, false)
+      |> assign(:active_collaborators, [])
+      |> push_event("collaboration_ended", %{})
+    
+    {:noreply, socket}
+  end
+  
+  @impl true
+  def handle_event("toggle_collaborators", _params, socket) do
+    socket = update(socket, :show_collaborators, &(!&1))
+    {:noreply, socket}
+  end
+  
+  @impl true
+  def handle_event("send_reaction", %{"emoji" => emoji}, socket) do
+    Communication.send_reaction(
+      socket.assigns.project_id,
+      socket.assigns.user.id,
+      emoji
+    )
+    {:noreply, socket}
   end
   
   
@@ -611,6 +685,50 @@ defmodule RubberDuckWeb.CodingSessionLive do
     {:noreply, socket}
   end
   
+  # Collaboration Event Handlers
+  
+  def handle_info({:user_joined, presence_data}, socket) do
+    # Handle user joining collaboration
+    socket = update(socket, :active_collaborators, &[presence_data | &1])
+    {:noreply, socket}
+  end
+  
+  def handle_info({:user_left, %{user_id: user_id}}, socket) do
+    # Handle user leaving
+    socket = 
+      socket
+      |> update(:active_collaborators, &Enum.reject(&1, fn c -> c.user_id == user_id end))
+      |> update(:user_cursors, &Map.delete(&1, user_id))
+      |> update(:user_selections, &Map.delete(&1, user_id))
+    
+    {:noreply, socket}
+  end
+  
+  def handle_info({:cursor_moved, cursor_data}, socket) do
+    # Update user cursor position
+    socket = put_in(socket.assigns.user_cursors[cursor_data.user_id], cursor_data)
+    {:noreply, socket}
+  end
+  
+  def handle_info({:selection_changed, selection_data}, socket) do
+    # Update user selection
+    socket = put_in(socket.assigns.user_selections[selection_data.user_id], selection_data)
+    {:noreply, socket}
+  end
+  
+  def handle_info({:reaction, reaction_data}, socket) do
+    # Show reaction animation
+    socket = push_event(socket, "show_reaction", reaction_data)
+    {:noreply, socket}
+  end
+  
+  def handle_info({:operation_applied, operation}, socket) do
+    # Handle collaborative edit operation
+    # This would be forwarded to the Monaco editor
+    socket = push_event(socket, "apply_operation", operation)
+    {:noreply, socket}
+  end
+  
   # Private Functions
   
   defp assign_initial_state(socket) do
@@ -625,6 +743,13 @@ defmodule RubberDuckWeb.CodingSessionLive do
     |> assign(:streaming_message, nil)
     |> assign(:connection_status, :connected)
     |> assign(:loading, false)
+    # Collaboration state
+    |> assign(:collaboration_session, nil)
+    |> assign(:active_collaborators, [])
+    |> assign(:user_cursors, %{})
+    |> assign(:user_selections, %{})
+    |> assign(:show_collaborators, true)
+    |> assign(:is_collaborative, false)
   end
   
   defp assign_layout_preferences(socket) do
@@ -651,9 +776,22 @@ defmodule RubberDuckWeb.CodingSessionLive do
     PubSub.subscribe(RubberDuck.PubSub, "project:#{project_id}")
     PubSub.subscribe(RubberDuck.PubSub, "editor:#{project_id}")
     PubSub.subscribe(RubberDuck.PubSub, "chat:#{project_id}")
+    # Collaboration subscriptions
+    PubSub.subscribe(RubberDuck.PubSub, "project:#{project_id}:presence")
+    PubSub.subscribe(RubberDuck.PubSub, "project:#{project_id}:selections")
+    PubSub.subscribe(RubberDuck.PubSub, "project:#{project_id}:sessions")
+    PubSub.subscribe(RubberDuck.PubSub, "project:#{project_id}:communication")
   end
   
   defp track_user_presence(project_id, user) do
+    # Use enhanced presence tracker
+    PresenceTracker.track_user(project_id, user.id, %{
+      username: user.username,
+      email: user.email,
+      avatar_url: user.avatar_url
+    })
+    
+    # Also track in Phoenix Presence for compatibility
     {:ok, _} = Presence.track(
       self(),
       "project:#{project_id}",
@@ -741,6 +879,40 @@ defmodule RubberDuckWeb.CodingSessionLive do
   end
   
   # Components
+  
+  defp collaboration_controls(assigns) do
+    ~H"""
+    <div class="flex items-center space-x-2">
+      <%= if @socket.assigns.is_collaborative do %>
+        <button
+          class="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-md hover:bg-green-200"
+          phx-click="end_collaboration"
+        >
+          <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          Collaborative Session
+        </button>
+        
+        <button
+          class="p-1.5 rounded hover:bg-gray-100"
+          phx-click="toggle_collaborators"
+          title="Toggle collaborator list"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                  d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        </button>
+      <% else %>
+        <button
+          class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          phx-click="start_collaboration"
+        >
+          Start Collaboration
+        </button>
+      <% end %>
+    </div>
+    """
+  end
   
   defp connection_status(assigns) do
     ~H"""
@@ -860,6 +1032,107 @@ defmodule RubberDuckWeb.CodingSessionLive do
     end
   end
   
+  defp collaborator_sidebar(assigns) do
+    ~H"""
+    <div class="fixed right-0 top-0 h-full w-80 bg-white shadow-lg border-l border-gray-200 z-40 overflow-hidden flex flex-col">
+      <!-- Header -->
+      <div class="px-4 py-3 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-800">Collaborators</h3>
+        <p class="text-sm text-gray-500">
+          <%= length(@collaborators) %> active participants
+        </p>
+      </div>
+      
+      <!-- Session Info -->
+      <%= if @session do %>
+        <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-medium text-gray-700">Session</span>
+            <%= if @session.is_recording do %>
+              <span class="flex items-center gap-1 text-xs text-red-600">
+                <span class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                Recording
+              </span>
+            <% end %>
+          </div>
+          <p class="text-xs text-gray-500 mt-1"><%= @session.name %></p>
+        </div>
+      <% end %>
+      
+      <!-- Collaborator List -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-3">
+        <%= for collaborator <- @collaborators do %>
+          <div class="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50">
+            <div class="relative">
+              <img 
+                src={collaborator.avatar_url} 
+                alt={collaborator.username}
+                class="w-10 h-10 rounded-full"
+              />
+              <div class={[
+                "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white",
+                collaborator.status == :active && "bg-green-500",
+                collaborator.status == :idle && "bg-yellow-500",
+                collaborator.status == :away && "bg-gray-400"
+              ]} />
+            </div>
+            
+            <div class="flex-1">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-gray-900">
+                  <%= collaborator.username %>
+                </span>
+                <%= if collaborator.user_id == @current_user.id do %>
+                  <span class="text-xs text-gray-500">(You)</span>
+                <% end %>
+              </div>
+              
+              <div class="flex items-center gap-2 text-xs text-gray-500">
+                <%= if collaborator.current_file do %>
+                  <span>📄 <%= Path.basename(collaborator.current_file) %></span>
+                <% end %>
+                <%= if collaborator.activity do %>
+                  <span><%= format_activity(collaborator.activity) %></span>
+                <% end %>
+              </div>
+            </div>
+            
+            <div 
+              class="w-4 h-4 rounded"
+              style={"background-color: #{collaborator.color}"}
+              title="User color"
+            />
+          </div>
+        <% end %>
+      </div>
+      
+      <!-- Actions -->
+      <div class="px-4 py-3 border-t border-gray-200 space-y-2">
+        <button
+          class="w-full px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          phx-click="invite_collaborator"
+        >
+          Invite Collaborator
+        </button>
+        
+        <!-- Reaction Buttons -->
+        <div class="flex items-center justify-center gap-2">
+          <%= for emoji <- ["👍", "👎", "❤️", "🎉", "🤔", "👀", "🚀", "💡"] do %>
+            <button
+              class="p-1.5 hover:bg-gray-100 rounded transition-colors"
+              phx-click="send_reaction"
+              phx-value-emoji={emoji}
+              title="Send reaction"
+            >
+              <%= emoji %>
+            </button>
+          <% end %>
+        </div>
+      </div>
+    </div>
+    """
+  end
+  
   defp loading_overlay(assigns) do
     ~H"""
     <div class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
@@ -870,4 +1143,11 @@ defmodule RubberDuckWeb.CodingSessionLive do
     </div>
     """
   end
+  
+  defp format_activity(:typing), do: "✏️ Typing"
+  defp format_activity(:reading), do: "👀 Reading"
+  defp format_activity(:debugging), do: "🐛 Debugging"
+  defp format_activity(:testing), do: "🧪 Testing"
+  defp format_activity(:reviewing), do: "🔍 Reviewing"
+  defp format_activity(_), do: "💭 Thinking"
 end
