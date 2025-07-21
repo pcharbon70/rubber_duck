@@ -12,6 +12,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
   
   alias Phoenix.PubSub
   alias RubberDuckWeb.Presence
+  alias RubberDuckWeb.Components.ChatPanelComponent
   
   # Require authentication
   on_mount {RubberDuckWeb.LiveUserAuth, :live_user_required}
@@ -79,43 +80,15 @@ defmodule RubberDuckWeb.CodingSessionLive do
         <% end %>
         
         <!-- Chat Panel (Center - Primary) -->
-        <main class={@layout.chat_width <> " bg-white flex flex-col"}>
-          <div class="flex-1 overflow-hidden flex flex-col">
-            <!-- Chat Messages -->
-            <div class="flex-1 overflow-y-auto p-4" id="chat-messages" phx-hook="ChatScroll">
-              <div class="space-y-4">
-                <%= for message <- @chat_messages do %>
-                  <.chat_message message={message} current_user={@user} />
-                <% end %>
-                
-                <%= if @streaming_message do %>
-                  <.streaming_message message={@streaming_message} />
-                <% end %>
-              </div>
-            </div>
-            
-            <!-- Chat Input -->
-            <div class="border-t border-gray-200 p-4">
-              <form phx-submit="send_message" class="flex space-x-2">
-                <input
-                  type="text"
-                  name="message"
-                  value={@chat_input}
-                  phx-change="update_chat_input"
-                  placeholder="Type a message or / for commands..."
-                  class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  phx-keydown="chat_keydown"
-                />
-                <button
-                  type="submit"
-                  disabled={@chat_input == ""}
-                  class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Send
-                </button>
-              </form>
-            </div>
-          </div>
+        <main class={@layout.chat_width <> " flex flex-col"}>
+          <.live_component
+            module={ChatPanelComponent}
+            id="chat-panel"
+            project_id={@project_id}
+            current_user={@user}
+            messages={@chat_messages}
+            streaming_message={@streaming_message}
+          />
         </main>
         
         <!-- Editor Panel (Right) -->
@@ -154,23 +127,6 @@ defmodule RubberDuckWeb.CodingSessionLive do
     {:noreply, assign(socket, :layout, layout)}
   end
   
-  def handle_event("send_message", %{"message" => content}, socket) do
-    socket = 
-      socket
-      |> send_chat_message(content)
-      |> assign(:chat_input, "")
-    
-    {:noreply, socket}
-  end
-  
-  def handle_event("update_chat_input", %{"message" => value}, socket) do
-    {:noreply, assign(socket, :chat_input, value)}
-  end
-  
-  def handle_event("chat_keydown", %{"key" => "Enter", "shiftKey" => true}, socket) do
-    # Allow multiline with Shift+Enter
-    {:noreply, socket}
-  end
   
   # PubSub Handlers
   
@@ -181,7 +137,9 @@ defmodule RubberDuckWeb.CodingSessionLive do
   end
   
   def handle_info({:chat_message, message}, socket) do
-    socket = append_chat_message(socket, message)
+    # The ChatPanelComponent will handle its own messages via PubSub
+    # We just need to update our local state for the component
+    socket = update(socket, :chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
     {:noreply, socket}
   end
   
@@ -309,33 +267,6 @@ defmodule RubberDuckWeb.CodingSessionLive do
     Map.put(layout, :show_editor, !layout.show_editor)
   end
   
-  defp send_chat_message(socket, content) do
-    message = %{
-      id: Ecto.UUID.generate(),
-      user_id: socket.assigns.user.id,
-      username: socket.assigns.user.username,
-      content: content,
-      timestamp: DateTime.utc_now(),
-      type: determine_message_type(content)
-    }
-    
-    # Broadcast to all users
-    PubSub.broadcast(
-      RubberDuck.PubSub,
-      "chat:#{socket.assigns.project_id}",
-      {:chat_message, message}
-    )
-    
-    # Add to local state immediately
-    append_chat_message(socket, message)
-  end
-  
-  defp determine_message_type("/" <> _command), do: :command
-  defp determine_message_type(_), do: :user
-  
-  defp append_chat_message(socket, message) do
-    update(socket, :chat_messages, &(&1 ++ [message]))
-  end
   
   defp apply_project_update(socket, update) do
     Logger.debug("Received project update: #{inspect(update)}")
@@ -439,54 +370,6 @@ defmodule RubberDuckWeb.CodingSessionLive do
     """
   end
   
-  defp chat_message(assigns) do
-    ~H"""
-    <div class="flex space-x-3">
-      <div class="flex-shrink-0">
-        <div class="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center">
-          <span class="text-xs text-white font-medium">
-            <%= String.first(@message.username) |> String.upcase() %>
-          </span>
-        </div>
-      </div>
-      
-      <div class="flex-1">
-        <div class="flex items-baseline space-x-2">
-          <span class="font-medium text-gray-900"><%= @message.username %></span>
-          <span class="text-xs text-gray-500">
-            <%= Calendar.strftime(@message.timestamp, "%H:%M") %>
-          </span>
-        </div>
-        <div class="mt-1 text-gray-700">
-          <%= @message.content %>
-        </div>
-      </div>
-    </div>
-    """
-  end
-  
-  defp streaming_message(assigns) do
-    ~H"""
-    <div class="flex space-x-3">
-      <div class="flex-shrink-0">
-        <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center">
-          <span class="text-xs text-white font-medium">AI</span>
-        </div>
-      </div>
-      
-      <div class="flex-1">
-        <div class="flex items-baseline space-x-2">
-          <span class="font-medium text-gray-900">Assistant</span>
-          <span class="text-xs text-gray-500">typing...</span>
-        </div>
-        <div class="mt-1 text-gray-700">
-          <%= @message.content %>
-          <span class="inline-block w-2 h-4 bg-gray-400 animate-pulse"></span>
-        </div>
-      </div>
-    </div>
-    """
-  end
   
   defp file_tree_placeholder(assigns) do
     ~H"""
