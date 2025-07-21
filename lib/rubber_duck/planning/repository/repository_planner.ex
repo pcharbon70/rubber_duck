@@ -115,7 +115,7 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
       }
     }
     
-    case Plan.create(plan_attrs) do
+    case Ash.create(Plan, plan_attrs) do
       {:ok, plan} ->
         case create_execution_tasks(plan, repo_plan) do
           {:ok, _tasks} ->
@@ -126,7 +126,7 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
             {:ok, updated_repo_plan}
           
           error ->
-            Plan.destroy(plan)
+            Ash.destroy!(plan)
             error
         end
       

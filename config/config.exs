@@ -9,7 +9,8 @@ config :rubber_duck,
     RubberDuck.Workspace,
     RubberDuck.Context,
     RubberDuck.Conversations,
-    RubberDuck.Planning
+    RubberDuck.Planning,
+    RubberDuck.Prompts
   ]
 
 # Instructions system configuration
