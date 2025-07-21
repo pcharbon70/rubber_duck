@@ -583,12 +583,12 @@ defmodule RubberDuck.Tool.Composition.Metrics do
 
     # Clean up old workflows
     :ets.select_delete(@workflow_table, [
-      {{~c"$1", %{start_time: ~c"$2"}}, [{~c"<", ~c"$2", cutoff_time}], [true]}
+      {{:"$1", %{start_time: :"$2"}}, [{:<, :"$2", cutoff_time}], [true]}
     ])
 
     # Clean up old steps
     :ets.select_delete(@step_table, [
-      {{~c"$1", %{start_time: ~c"$2"}}, [{~c"<", ~c"$2", cutoff_time}], [true]}
+      {{:"$1", %{start_time: :"$2"}}, [{:<, :"$2", cutoff_time}], [true]}
     ])
   end
 
