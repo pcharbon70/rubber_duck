@@ -13,6 +13,7 @@ import topbar from "../vendor/topbar"
 import {ConversationChannel} from "./hooks/conversation_hooks"
 import {AutoResize, ChatScroll, CopyToClipboard} from "./hooks/chat_hooks"
 import {FocusOnMount, FileTreeKeyboard, FileTreeDragDrop, FileTreeVirtualScroll} from "./hooks/file_tree_hooks"
+import {MonacoEditor} from "./hooks/monaco_editor"
 
 // Define all hooks
 let Hooks = {
@@ -23,7 +24,8 @@ let Hooks = {
   FocusOnMount: FocusOnMount,
   FileTreeKeyboard: FileTreeKeyboard,
   FileTreeDragDrop: FileTreeDragDrop,
-  FileTreeVirtualScroll: FileTreeVirtualScroll
+  FileTreeVirtualScroll: FileTreeVirtualScroll,
+  MonacoEditor: MonacoEditor
 }
 
 // Get CSRF token

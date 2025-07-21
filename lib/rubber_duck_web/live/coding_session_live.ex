@@ -14,6 +14,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
   alias RubberDuckWeb.Presence
   alias RubberDuckWeb.Components.ChatPanelComponent
   alias RubberDuckWeb.Components.FileTreeComponent
+  alias RubberDuckWeb.Components.MonacoEditorComponent
   alias RubberDuck.Projects.FileTree
   
   # Require authentication
@@ -125,7 +126,13 @@ defmodule RubberDuckWeb.CodingSessionLive do
               </h2>
             </div>
             <div class="flex-1 overflow-hidden">
-              <.editor_placeholder />
+              <.live_component
+                module={MonacoEditorComponent}
+                id="monaco-editor"
+                project_id={@project_id}
+                file_path={@current_file}
+                current_user_id={@user.id}
+              />
             </div>
           </aside>
         <% end %>
@@ -462,8 +469,35 @@ defmodule RubberDuckWeb.CodingSessionLive do
         
       {:error, component_id, error} ->
         FileTreeComponent.update_tree_error(component_id, error)
+        
+      {:file_content, component_id, content, language} ->
+        MonacoEditorComponent.update_content(component_id, content, language)
     end
     
+    {:noreply, socket}
+  end
+  
+  def handle_info({:load_file_content, component_id, file_path}, socket) do
+    # Load file content asynchronously
+    Task.async(fn ->
+      case File.read(file_path) do
+        {:ok, content} ->
+          # Detect language from file extension
+          language = detect_language_from_path(file_path)
+          {:file_content, component_id, content, language}
+          
+        {:error, reason} ->
+          {:file_content, component_id, "# Error loading file: #{inspect(reason)}", "plaintext"}
+      end
+    end)
+    
+    {:noreply, socket}
+  end
+  
+  def handle_info({:auto_save, component_id}, socket) do
+    # Auto-save functionality can be implemented here
+    # For now, just log
+    Logger.debug("Auto-save triggered for component: #{component_id}")
     {:noreply, socket}
   end
   
@@ -672,12 +706,25 @@ defmodule RubberDuckWeb.CodingSessionLive do
   end
   
   
-  defp editor_placeholder(assigns) do
-    ~H"""
-    <div class="text-sm text-gray-500 italic p-4">
-      Editor component will be implemented in Phase 12.4
-    </div>
-    """
+  defp detect_language_from_path(file_path) do
+    case Path.extname(file_path) do
+      ".ex" -> "elixir"
+      ".exs" -> "elixir"
+      ".js" -> "javascript"
+      ".jsx" -> "javascript"
+      ".ts" -> "typescript"
+      ".tsx" -> "typescript"
+      ".py" -> "python"
+      ".rb" -> "ruby"
+      ".go" -> "go"
+      ".rs" -> "rust"
+      ".json" -> "json"
+      ".html" -> "html"
+      ".heex" -> "html"
+      ".css" -> "css"
+      ".md" -> "markdown"
+      _ -> "plaintext"
+    end
   end
   
   defp loading_overlay(assigns) do
