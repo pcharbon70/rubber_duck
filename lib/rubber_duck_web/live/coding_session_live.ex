@@ -15,7 +15,10 @@ defmodule RubberDuckWeb.CodingSessionLive do
   alias RubberDuckWeb.Components.ChatPanelComponent
   alias RubberDuckWeb.Components.FileTreeComponent
   alias RubberDuckWeb.Components.MonacoEditorComponent
+  alias RubberDuckWeb.Components.ContextPanelComponent
   alias RubberDuck.Projects.FileTree
+  alias RubberDuck.Analysis.CodeAnalyzer
+  alias RubberDuck.Analysis.MetricsCollector
   
   # Require authentication
   on_mount {RubberDuckWeb.LiveUserAuth, :live_user_required}
@@ -134,6 +137,18 @@ defmodule RubberDuckWeb.CodingSessionLive do
                 current_user_id={@user.id}
               />
             </div>
+          </aside>
+        <% end %>
+        
+        <!-- Context Panel (Far Right) -->
+        <%= if @layout.show_context do %>
+          <aside class={"#{@layout.context_width} bg-white border-l border-gray-200 overflow-hidden flex flex-col"}>
+            <.live_component
+              module={ContextPanelComponent}
+              id="context-panel"
+              project_id={@project_id}
+              current_file={@current_file}
+            />
           </aside>
         <% end %>
       </div>
@@ -422,6 +437,9 @@ defmodule RubberDuckWeb.CodingSessionLive do
       |> assign(:current_file, file_path)
       |> push_event("file_opened", %{path: file_path})
     
+    # Update context panel with new file
+    ContextPanelComponent.update_current_file("context-panel", file_path)
+    
     # Broadcast file selection to other users
     PubSub.broadcast(
       RubberDuck.PubSub,
@@ -472,6 +490,20 @@ defmodule RubberDuckWeb.CodingSessionLive do
         
       {:file_content, component_id, content, language} ->
         MonacoEditorComponent.update_content(component_id, content, language)
+        
+      {:file_analysis, component_id, analysis, related_files, metrics} ->
+        # Update context panel with analysis results
+        send_update(ContextPanelComponent,
+          id: component_id,
+          file_analysis: analysis,
+          symbol_outline: analysis.symbols,
+          related_files: related_files,
+          code_metrics: metrics,
+          loading: false
+        )
+        
+      {:file_analysis_error, component_id, reason} ->
+        ContextPanelComponent.add_notification(component_id, :error, "Analysis failed: #{reason}")
     end
     
     {:noreply, socket}
@@ -501,6 +533,84 @@ defmodule RubberDuckWeb.CodingSessionLive do
     {:noreply, socket}
   end
   
+  def handle_info({:analyze_file, component_id, file_path}, socket) do
+    # Analyze file asynchronously
+    Task.async(fn ->
+      case CodeAnalyzer.analyze_file(file_path) do
+        {:ok, analysis} ->
+          # Get related files
+          project_path = File.cwd!()
+          related_files = CodeAnalyzer.find_related_files(file_path, project_path)
+          
+          # Get metrics
+          metrics = %{
+            complexity: %{
+              cyclomatic: analysis.complexity,
+              cognitive: analysis.complexity + 5 # Mock cognitive complexity
+            },
+            test_coverage: MetricsCollector.get_test_coverage(socket.assigns.project_id),
+            performance: MetricsCollector.get_performance_metrics(socket.assigns.project_id),
+            security_score: elem(MetricsCollector.get_security_score(socket.assigns.project_id), 0),
+            security_issues: elem(MetricsCollector.get_security_score(socket.assigns.project_id), 1)
+          }
+          
+          {:file_analysis, component_id, analysis, related_files, metrics}
+          
+        {:error, reason} ->
+          {:file_analysis_error, component_id, reason}
+      end
+    end)
+    
+    {:noreply, socket}
+  end
+  
+  def handle_info({:run_action, action, file_path}, socket) do
+    # Handle context panel actions
+    case action do
+      :analysis ->
+        # Trigger full analysis
+        send(self(), {:analyze_file, "context-panel", file_path})
+        
+      :generate_tests ->
+        # TODO: Implement test generation
+        ContextPanelComponent.add_notification("context-panel", :info, "Test generation not yet implemented")
+        
+      :refactoring ->
+        # TODO: Implement refactoring suggestions
+        ContextPanelComponent.add_notification("context-panel", :info, "Refactoring suggestions coming soon")
+        
+      :generate_docs ->
+        # TODO: Implement documentation generation
+        ContextPanelComponent.add_notification("context-panel", :info, "Documentation generation coming soon")
+        
+      :security_scan ->
+        # TODO: Implement security scanning
+        ContextPanelComponent.add_notification("context-panel", :info, "Security scan coming soon")
+        
+      :performance ->
+        # TODO: Implement performance analysis
+        ContextPanelComponent.add_notification("context-panel", :info, "Performance analysis coming soon")
+    end
+    
+    {:noreply, socket}
+  end
+  
+  def handle_info({:goto_line, _file_path, line_number}, socket) do
+    # Send event to Monaco editor to go to line
+    push_event(socket, "goto_line", %{
+      editor_id: "monaco-editor-editor",
+      line: line_number
+    })
+    
+    {:noreply, socket}
+  end
+  
+  def handle_info({:open_file, file_path}, socket) do
+    # Simulate file selection
+    send(self(), {:file_selected, file_path})
+    {:noreply, socket}
+  end
+  
   # Private Functions
   
   defp assign_initial_state(socket) do
@@ -522,21 +632,19 @@ defmodule RubberDuckWeb.CodingSessionLive do
     layout = %{
       show_file_tree: true,
       show_editor: true,
-      chat_width: calculate_chat_width(true, true),
+      show_context: true,
+      chat_width: calculate_chat_width(true, true, true),
       tree_width: "w-64",
-      editor_width: "w-1/2"
+      editor_width: "flex-1",
+      context_width: "w-80"
     }
     
     assign(socket, :layout, layout)
   end
   
-  defp calculate_chat_width(show_tree, show_editor) do
-    case {show_tree, show_editor} do
-      {false, false} -> "flex-1"
-      {true, false} -> "flex-1"
-      {false, true} -> "flex-1"
-      {true, true} -> "flex-1"
-    end
+  defp calculate_chat_width(_show_tree, _show_editor, _show_context \\ false) do
+    # Chat panel takes remaining space after fixed-width panels
+    "flex-1"
   end
   
   defp subscribe_to_project_updates(project_id) do
@@ -586,6 +694,12 @@ defmodule RubberDuckWeb.CodingSessionLive do
     push_event(socket, "focus_chat", %{})
   end
   
+  defp handle_keyboard_shortcut("i", socket) do
+    # Ctrl+I: Toggle context panel
+    update_in(socket.assigns.layout.show_context, &(!&1))
+    |> recalculate_layout()
+  end
+  
   defp handle_keyboard_shortcut(_, socket), do: socket
   
   defp recalculate_layout(socket) do
@@ -600,6 +714,10 @@ defmodule RubberDuckWeb.CodingSessionLive do
   
   defp update_layout_visibility(layout, "editor") do
     Map.put(layout, :show_editor, !layout.show_editor)
+  end
+  
+  defp update_layout_visibility(layout, "context") do
+    Map.put(layout, :show_context, !layout.show_context)
   end
   
   
@@ -674,6 +792,21 @@ defmodule RubberDuckWeb.CodingSessionLive do
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                 d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+        </svg>
+      </button>
+      
+      <button
+        phx-click="toggle_panel"
+        phx-value-panel="context"
+        class={[
+          "p-2 rounded hover:bg-gray-100",
+          @layout.show_context && "bg-gray-100"
+        ]}
+        title="Toggle context panel (Ctrl+I)"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       </button>
     </div>
