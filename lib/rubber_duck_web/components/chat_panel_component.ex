@@ -13,8 +13,6 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
   
   import RubberDuckWeb.CoreComponents
   
-  alias Phoenix.PubSub
-  
   @impl true
   def mount(socket) do
     {:ok,
@@ -41,6 +39,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     {:ok,
      socket
      |> assign(assigns)
+     |> assign_new(:conversation_connected, fn -> false end)
      |> maybe_subscribe_to_chat()}
   end
   
@@ -59,6 +58,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
           </div>
           
           <div class="flex items-center gap-2">
+            <.connection_indicator connected={@conversation_connected} />
             <.token_usage messages={@messages} />
             <.chat_actions {assigns} />
           </div>
@@ -149,16 +149,16 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
         socket
         |> add_message(message)
         |> assign(input_value: "")
-        |> handle_command_or_message(message)
       
-      # Broadcast the message
-      PubSub.broadcast(
-        RubberDuck.PubSub,
-        "chat:#{socket.assigns.project_id}",
-        {:chat_message, message}
-      )
-      
-      {:noreply, socket}
+      # Check if it's a command or regular message
+      if String.starts_with?(content, "/") do
+        socket = handle_command(socket, message)
+        {:noreply, socket}
+      else
+        # Send to parent LiveView to handle through ConversationChannel
+        send(self(), {:send_to_conversation, message})
+        {:noreply, socket}
+      end
     else
       {:noreply, socket}
     end
@@ -233,6 +233,9 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
   
   @impl true
   def handle_event("update_model", %{"provider" => provider, "model" => model}, socket) do
+    # Notify parent to update conversation channel preferences
+    send(self(), {:update_llm_preferences, %{provider: provider, model: model}})
+    
     {:noreply,
      assign(socket,
        selected_provider: provider,
@@ -275,31 +278,43 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     end)
   end
   
-  defp handle_command_or_message(socket, message) do
-    if String.starts_with?(message.content, "/") do
-      handle_command(socket, message)
-    else
-      send_to_llm(socket, message)
-    end
-  end
   
   defp handle_command(socket, message) do
-    [command | _args] = String.split(message.content, " ", trim: true)
+    parts = String.split(message.content, " ", trim: true)
+    [command | args] = parts
     
     case command do
       "/help" ->
         help_message = create_help_message()
         add_message(socket, help_message)
         
+      "/login" ->
+        handle_login_command(socket, args)
+        
+      "/logout" ->
+        handle_logout_command(socket)
+        
+      "/api-key" ->
+        handle_api_key_command(socket, args)
+        
       "/clear" ->
         assign(socket, messages: [])
         
       "/export" ->
         # TODO: Implement export
-        socket
+        error_message = create_message("Export functionality coming soon!", :system, nil)
+        add_message(socket, error_message)
         
       "/model" ->
         assign(socket, show_model_settings: true)
+        
+      "/retry" ->
+        # TODO: Implement retry
+        error_message = create_message("Retry functionality coming soon!", :system, nil)
+        add_message(socket, error_message)
+        
+      "/status" ->
+        handle_status_command(socket)
         
       _ ->
         error_message = create_message(
@@ -311,28 +326,6 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     end
   end
   
-  defp send_to_llm(socket, _message) do
-    # Start streaming
-    streaming_message = %{
-      id: Ecto.UUID.generate(),
-      type: :assistant,
-      content: "",
-      metadata: %{
-        timestamp: DateTime.utc_now(),
-        status: :streaming,
-        model: socket.assigns.selected_model,
-        provider: socket.assigns.selected_provider
-      }
-    }
-    
-    socket = assign(socket, streaming_message: streaming_message)
-    
-    # TODO: Actually send to LLM service
-    # For now, simulate streaming
-    send(self(), {:simulate_streaming})
-    
-    socket
-  end
   
   
   defp maybe_show_commands(socket, value) do
@@ -348,10 +341,14 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
   defp filter_commands(query) do
     commands = [
       %{command: "/help", description: "Show available commands"},
+      %{command: "/login", description: "Login with username/password"},
+      %{command: "/logout", description: "Logout from current session"},
+      %{command: "/api-key", description: "Manage API keys"},
       %{command: "/clear", description: "Clear chat history"},
       %{command: "/export", description: "Export conversation"},
       %{command: "/model", description: "Change model settings"},
-      %{command: "/retry", description: "Retry last message"}
+      %{command: "/retry", description: "Retry last message"},
+      %{command: "/status", description: "Show connection status"}
     ]
     
     Enum.filter(commands, fn cmd ->
@@ -364,14 +361,87 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     min(max(lines, 1), 10)
   end
   
+  defp handle_login_command(socket, args) do
+    case args do
+      [username, password] ->
+        # Send login request to parent
+        send(self(), {:auth_login, %{username: username, password: password}})
+        message = create_message("Attempting to login as #{username}...", :system, nil)
+        add_message(socket, message)
+        
+      _ ->
+        message = create_message(
+          "Usage: /login <username> <password>\nExample: /login myuser mypassword",
+          :system,
+          nil
+        )
+        add_message(socket, message)
+    end
+  end
+  
+  defp handle_logout_command(socket) do
+    send(self(), {:auth_logout})
+    message = create_message("Logging out...", :system, nil)
+    add_message(socket, message)
+  end
+  
+  defp handle_api_key_command(socket, args) do
+    case args do
+      ["generate" | rest] ->
+        name = Enum.join(rest, " ")
+        send(self(), {:api_key_generate, %{name: name}})
+        message = create_message("Generating new API key#{if name != "", do: ": #{name}", else: ""}...", :system, nil)
+        add_message(socket, message)
+        
+      ["list"] ->
+        send(self(), {:api_key_list})
+        message = create_message("Fetching API keys...", :system, nil)
+        add_message(socket, message)
+        
+      ["revoke", key_id] ->
+        send(self(), {:api_key_revoke, key_id})
+        message = create_message("Revoking API key #{key_id}...", :system, nil)
+        add_message(socket, message)
+        
+      _ ->
+        message = create_message(
+          """
+          API Key Commands:
+          - `/api-key generate [name]` - Generate a new API key
+          - `/api-key list` - List all your API keys
+          - `/api-key revoke <key_id>` - Revoke an API key
+          """,
+          :system,
+          nil
+        )
+        add_message(socket, message)
+    end
+  end
+  
+  defp handle_status_command(socket) do
+    status_content = """
+    Connection Status:
+    - Chat: #{if socket.assigns.conversation_connected, do: "✅ Connected", else: "❌ Disconnected"}
+    - Model: #{socket.assigns.selected_provider}/#{socket.assigns.selected_model}
+    - Messages: #{length(socket.assigns.messages)}
+    """
+    
+    message = create_message(status_content, :system, nil)
+    add_message(socket, message)
+  end
+  
   defp create_help_message do
     content = """
     Available commands:
     - `/help` - Show this help message
+    - `/login <username> <password>` - Login to your account
+    - `/logout` - Logout from current session
+    - `/api-key` - Manage API keys (generate/list/revoke)
     - `/clear` - Clear chat history
-    - `/export` - Export conversation
+    - `/export` - Export conversation (coming soon)
     - `/model` - Open model settings
-    - `/retry` - Retry the last message
+    - `/retry` - Retry the last message (coming soon)
+    - `/status` - Show connection status
     
     You can also use @ to mention files or # to reference code blocks.
     """
@@ -523,6 +593,21 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     ~H"""
     <div :if={@typing_users != []} class="mt-2 text-xs text-gray-500 dark:text-gray-400">
       <%= format_typing_users(@typing_users) %> typing...
+    </div>
+    """
+  end
+  
+  defp connection_indicator(assigns) do
+    ~H"""
+    <div class="flex items-center gap-1.5">
+      <div class={[
+        "w-2 h-2 rounded-full",
+        @connected && "bg-green-500",
+        !@connected && "bg-red-500"
+      ]} />
+      <span class="text-xs text-gray-500 dark:text-gray-400">
+        <%= if @connected, do: "Connected", else: "Disconnected" %>
+      </span>
     </div>
     """
   end
