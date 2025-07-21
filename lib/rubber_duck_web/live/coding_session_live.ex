@@ -13,6 +13,8 @@ defmodule RubberDuckWeb.CodingSessionLive do
   alias Phoenix.PubSub
   alias RubberDuckWeb.Presence
   alias RubberDuckWeb.Components.ChatPanelComponent
+  alias RubberDuckWeb.Components.FileTreeComponent
+  alias RubberDuck.Projects.FileTree
   
   # Require authentication
   on_mount {RubberDuckWeb.LiveUserAuth, :live_user_required}
@@ -89,8 +91,13 @@ defmodule RubberDuckWeb.CodingSessionLive do
             <div class="p-4 border-b border-gray-200">
               <h2 class="text-sm font-medium text-gray-700">Files</h2>
             </div>
-            <div class="flex-1 overflow-y-auto p-2">
-              <.file_tree_placeholder />
+            <div class="flex-1 overflow-hidden">
+              <.live_component
+                module={FileTreeComponent}
+                id="file-tree"
+                project_id={@project_id}
+                current_file={@current_file}
+              />
             </div>
           </aside>
         <% end %>
@@ -401,6 +408,65 @@ defmodule RubberDuckWeb.CodingSessionLive do
     {:noreply, socket}
   end
   
+  def handle_info({:file_selected, file_path}, socket) do
+    # Handle file selection from FileTreeComponent
+    socket = 
+      socket
+      |> assign(:current_file, file_path)
+      |> push_event("file_opened", %{path: file_path})
+    
+    # Broadcast file selection to other users
+    PubSub.broadcast(
+      RubberDuck.PubSub,
+      "project:#{socket.assigns.project_id}",
+      {:user_opened_file, %{
+        user_id: socket.assigns.user.id,
+        file_path: file_path
+      }}
+    )
+    
+    {:noreply, socket}
+  end
+  
+  def handle_info({:load_file_tree, component_id, show_hidden}, socket) do
+    # Load file tree asynchronously
+    project_path = File.cwd!() # TODO: Get from project record
+    
+    Task.async(fn ->
+      case FileTree.list_tree(project_path, show_hidden: show_hidden) do
+        {:ok, tree} ->
+          # Get git status
+          git_status = 
+            case FileTree.get_git_status(project_path) do
+              {:ok, status} -> status
+              _ -> %{}
+            end
+            
+          {:ok, component_id, tree.children || [], git_status}
+          
+        {:error, reason} ->
+          {:error, component_id, "Failed to load file tree: #{inspect(reason)}"}
+      end
+    end)
+    
+    {:noreply, socket}
+  end
+  
+  def handle_info({ref, result}, socket) when is_reference(ref) do
+    # Handle async task results
+    Process.demonitor(ref, [:flush])
+    
+    case result do
+      {:ok, component_id, tree_nodes, git_status} ->
+        FileTreeComponent.update_tree_data(component_id, tree_nodes, git_status)
+        
+      {:error, component_id, error} ->
+        FileTreeComponent.update_tree_error(component_id, error)
+    end
+    
+    {:noreply, socket}
+  end
+  
   # Private Functions
   
   defp assign_initial_state(socket) do
@@ -605,14 +671,6 @@ defmodule RubberDuckWeb.CodingSessionLive do
     """
   end
   
-  
-  defp file_tree_placeholder(assigns) do
-    ~H"""
-    <div class="text-sm text-gray-500 italic p-4">
-      File tree component will be implemented in Phase 12.3
-    </div>
-    """
-  end
   
   defp editor_placeholder(assigns) do
     ~H"""
