@@ -299,51 +299,370 @@ This document covers Phases 12-13 of the RubberDuck implementation, focusing on 
 
 ---
 
-## Phase 13: Advanced Features & Production Readiness
+## Phase 13: Per-Project File Sandbox System
+
+**Goal:** Implement a secure, project-based file sandboxing system that provides isolated file system access for each project, supporting multiple users working on different or shared projects with real-time collaboration.
+
+### 13.1 Project Resource Enhancement & Security Architecture
+
+#### Tasks:
+1. **Update Project Resource**
+   - Add `root_path` attribute to store project directory path
+   - Add `sandbox_config` map attribute for configuration options
+   - Create `file_access_enabled` boolean attribute
+   - Add `max_file_size` and `allowed_extensions` attributes
+   - Implement project directory validation on create/update
+
+2. **Path Validation Module**
+   - Create `RubberDuck.Projects.FileAccess` module
+   - Implement `validate_and_normalize/2` for path validation
+   - Add path traversal prevention with `Path.safe_relative/1`
+   - Create forbidden character validation
+   - Implement path length limits
+
+3. **Symbolic Link Security**
+   - Create `RubberDuck.Projects.SymlinkSecurity` module
+   - Implement `check_symlink_safety/2` for link validation
+   - Add `scan_project_for_unsafe_symlinks/1`
+   - Create symlink resolution within project bounds
+   - Build symlink audit reporting
+
+4. **Project Authorization**
+   - Create project collaborator relationship
+   - Implement user access validation
+   - Add read/write permission levels
+   - Create project owner verification
+   - Build permission inheritance system
+
+5. **Security Audit Tools**
+   - Implement security scanning for projects
+   - Create vulnerability reporting
+   - Add configuration validation
+   - Build compliance checking
+   - Create security event logging
+
+#### Unit Tests:
+- Test path validation with various attack vectors
+- Test symlink detection and prevention
+- Test authorization at project boundaries
+- Test path normalization edge cases
+- Test security audit functionality
+
+### 13.2 Dynamic File Watcher Infrastructure
+
+#### Tasks:
+1. **File Watcher Supervisor**
+   - Create `RubberDuck.Projects.FileWatcher.Supervisor`
+   - Implement DynamicSupervisor pattern
+   - Add one-for-one supervision strategy
+   - Create watcher start/stop functions
+   - Build supervisor monitoring
+
+2. **Project File Watcher**
+   - Create `RubberDuck.Projects.FileWatcher` GenServer
+   - Integrate FileSystem library for watching
+   - Implement Registry-based process tracking
+   - Add recursive directory watching
+   - Create configurable latency settings
+
+3. **Event Processing**
+   - Implement event batching with buffers
+   - Add debouncing with configurable intervals
+   - Create event type categorization
+   - Build path validation for events
+   - Implement event filtering rules
+
+4. **PubSub Integration**
+   - Create project-specific topics
+   - Implement efficient broadcast patterns
+   - Add event aggregation
+   - Build subscriber management
+   - Create presence tracking
+
+5. **Lifecycle Management**
+   - Implement graceful shutdown
+   - Add crash recovery
+   - Create state persistence
+   - Build health monitoring
+   - Implement automatic restarts
+
+#### Unit Tests:
+- Test watcher lifecycle (start/stop/restart)
+- Test event batching and debouncing
+- Test PubSub message delivery
+- Test concurrent watcher management
+- Test crash recovery mechanisms
+
+### 13.3 Multi-Project Management System
+
+#### Tasks:
+1. **Project Watcher Manager**
+   - Create `RubberDuck.Projects.WatcherManager` GenServer
+   - Implement active watcher tracking
+   - Add LRU eviction strategy
+   - Create activity timestamp tracking
+   - Build watcher count limits
+
+2. **Resource Pooling**
+   - Implement max concurrent watchers limit
+   - Create watcher reuse strategies
+   - Add priority-based allocation
+   - Build queue management
+   - Implement fairness algorithms
+
+3. **Activity Tracking**
+   - Track last activity per project
+   - Implement inactivity timeout
+   - Create usage statistics
+   - Build activity reporting
+   - Add telemetry integration
+
+4. **Cleanup Strategies**
+   - Implement periodic cleanup tasks
+   - Create configurable timeout values
+   - Add graceful watcher termination
+   - Build resource reclamation
+   - Implement cleanup notifications
+
+5. **Performance Optimization**
+   - Add watcher pooling
+   - Implement lazy initialization
+   - Create adaptive timeouts
+   - Build load balancing
+   - Add performance metrics
+
+#### Unit Tests:
+- Test LRU eviction under load
+- Test resource pooling limits
+- Test activity tracking accuracy
+- Test cleanup timer behavior
+- Test performance under scale
+
+### 13.4 LiveView Integration for Project Files
+
+#### Tasks:
+1. **ProjectFilesLive Module**
+   - Create `RubberDuckWeb.Live.ProjectFilesLive`
+   - Implement mount with project context
+   - Add authorization checks
+   - Create file tree state management
+   - Build real-time update handling
+
+2. **File Change Streaming**
+   - Subscribe to project file events
+   - Implement stream-based updates
+   - Add efficient diff algorithms
+   - Create batched UI updates
+   - Build optimistic UI patterns
+
+3. **Presence Integration**
+   - Implement Phoenix.Presence tracking
+   - Add user avatar display
+   - Create activity indicators
+   - Build collaborative cursors
+   - Implement user list component
+
+4. **File Operations UI**
+   - Create file/folder creation UI
+   - Implement rename with inline editing
+   - Add delete with confirmation
+   - Build drag-and-drop support
+   - Create context menus
+
+5. **Performance Features**
+   - Implement virtual scrolling
+   - Add lazy loading for large trees
+   - Create intelligent caching
+   - Build progressive rendering
+   - Add request debouncing
+
+#### Unit Tests:
+- Test LiveView mount and authorization
+- Test real-time file updates
+- Test presence synchronization
+- Test UI operations
+- Test performance with large file trees
+
+### 13.5 Project File Manager Implementation
+
+#### Tasks:
+1. **Core File Manager**
+   - Create `RubberDuck.Projects.FileManager` module
+   - Implement struct with project/user context
+   - Add authorization integration
+   - Create operation logging
+   - Build error handling
+
+2. **File Operations**
+   - Implement secure `read_file/2`
+   - Create atomic `write_file/3`
+   - Add `delete_file/2` with trash support
+   - Build `create_directory/2`
+   - Implement `list_directory/2`
+
+3. **Security Features**
+   - Add file size validation
+   - Implement content type checking
+   - Create virus scanning hooks
+   - Build encryption support
+   - Add audit trail logging
+
+4. **Search Functionality**
+   - Implement pattern-based search
+   - Add file type filtering
+   - Create content search
+   - Build result ranking
+   - Add search caching
+
+5. **Collaborative Features**
+   - Track file modifications by user
+   - Implement file locking
+   - Create conflict detection
+   - Build merge strategies
+   - Add change notifications
+
+#### Unit Tests:
+- Test all file operations
+- Test security validations
+- Test atomic write behavior
+- Test search functionality
+- Test collaborative scenarios
+
+### 13.6 Caching & Performance Optimization
+
+#### Tasks:
+1. **Project File Cache**
+   - Create `RubberDuck.Projects.FileCache` module
+   - Implement ETS-based caching
+   - Add project-based partitioning
+   - Create TTL management
+   - Build cache statistics
+
+2. **Cache Key Strategy**
+   - Design hierarchical key structure
+   - Implement project isolation
+   - Add version tracking
+   - Create efficient lookups
+   - Build key expiration
+
+3. **Invalidation System**
+   - Implement file change invalidation
+   - Add cascading invalidation
+   - Create selective clearing
+   - Build invalidation hooks
+   - Add cache coherency
+
+4. **Performance Monitoring**
+   - Track cache hit rates
+   - Monitor memory usage
+   - Create performance dashboards
+   - Build alerting system
+   - Add optimization recommendations
+
+5. **Distributed Caching**
+   - Plan for multi-node support
+   - Create cache synchronization
+   - Build consistency protocols
+   - Add partition tolerance
+   - Implement cache replication
+
+#### Unit Tests:
+- Test cache operations
+- Test invalidation accuracy
+- Test memory efficiency
+- Test distributed scenarios
+- Test performance gains
+
+### 13.7 Security & Monitoring
+
+#### Tasks:
+1. **Telemetry Integration**
+   - Add file operation metrics
+   - Create performance tracking
+   - Implement error monitoring
+   - Build usage analytics
+   - Add security events
+
+2. **Rate Limiting**
+   - Implement per-user limits
+   - Add per-project limits
+   - Create operation-specific limits
+   - Build adaptive throttling
+   - Add quota management
+
+3. **Security Monitoring**
+   - Track suspicious patterns
+   - Implement anomaly detection
+   - Create security alerts
+   - Build incident response
+   - Add forensic logging
+
+4. **Audit System**
+   - Log all file operations
+   - Track permission changes
+   - Create compliance reports
+   - Build audit queries
+   - Add retention policies
+
+5. **Performance Metrics**
+   - Monitor file operation latency
+   - Track watcher resource usage
+   - Create capacity planning data
+   - Build optimization insights
+   - Add SLA monitoring
+
+#### Unit Tests:
+- Test telemetry emission
+- Test rate limiting accuracy
+- Test security detection
+- Test audit completeness
+- Test metric collection
+
+### 13.8 Integration Tests
+
+#### Tasks:
+1. **End-to-End File Operations**
+   - Test complete file CRUD cycle
+   - Test multi-user collaboration
+   - Test real-time synchronization
+   - Test error recovery
+   - Test performance at scale
+
+2. **Security Boundary Testing**
+   - Test path traversal prevention
+   - Test symlink restrictions
+   - Test authorization enforcement
+   - Test quota limits
+   - Test attack scenarios
+
+3. **Multi-Project Scenarios**
+   - Test concurrent project access
+   - Test resource sharing
+   - Test isolation boundaries
+   - Test switching performance
+   - Test cleanup behavior
+
+4. **Load Testing**
+   - Test with many concurrent users
+   - Test with large file trees
+   - Test with high change frequency
+   - Test resource limits
+   - Test degradation behavior
+
+5. **Integration Points**
+   - Test with existing Project system
+   - Test with User authentication
+   - Test with LiveView interface
+   - Test with monitoring systems
+   - Test with deployment configs
+
+---
+
+## Phase 14: Advanced Features & Production Readiness
 
 **Goal:** Implement advanced features for power users and ensure the system is production-ready with proper scaling, monitoring, and deployment strategies.
 
-### 13.1 Per-Project File Sandbox Implementation
-
-Based on the research in `015-per-project-file-sandbox.md`, implement a secure, project-based file sandboxing system.
-
-#### Tasks:
-1. **Project Sandbox Architecture**
-   - Update Project resource with sandbox configuration
-   - Implement `RubberDuck.ProjectFileAccess` module
-   - Create path validation with project boundaries
-   - Add symbolic link detection and validation
-   - Implement sandbox security audit tools
-
-2. **File Watcher Management**
-   - Create `RubberDuck.ProjectFileWatcher.Supervisor`
-   - Implement dynamic watcher lifecycle management
-   - Add resource pooling for file watchers
-   - Create watcher health monitoring
-   - Implement automatic cleanup for inactive watchers
-
-3. **Multi-Project Support**
-   - Implement `RubberDuck.ProjectWatcherManager`
-   - Add concurrent project limits
-   - Create LRU eviction for watchers
-   - Implement project switching optimization
-   - Add cross-project file operations
-
-4. **Performance Optimization**
-   - Implement project-aware caching system
-   - Add ETS-based file metadata cache
-   - Create adaptive caching strategies
-   - Implement cache invalidation patterns
-   - Add cache warming for frequently accessed projects
-
-#### Unit Tests:
-- Test path validation and normalization
-- Test symbolic link security
-- Test watcher lifecycle management
-- Test cache operations and invalidation
-- Test concurrent project access
-
-### 13.2 Background Job Processing
+### 14.1 Background Job Processing
 
 #### Tasks:
 1. **Oban Integration**
@@ -381,7 +700,7 @@ Based on the research in `015-per-project-file-sandbox.md`, implement a secure, 
 - Test progress tracking
 - Test maintenance operations
 
-### 13.3 Advanced Security Implementation
+### 14.2 Advanced Security Implementation
 
 #### Tasks:
 1. **Authentication Enhancement**
@@ -419,7 +738,7 @@ Based on the research in `015-per-project-file-sandbox.md`, implement a secure, 
 - Test API security features
 - Test audit logging
 
-### 13.4 Monitoring and Observability
+### 14.3 Monitoring and Observability
 
 #### Tasks:
 1. **Telemetry Implementation**
@@ -457,7 +776,7 @@ Based on the research in `015-per-project-file-sandbox.md`, implement a secure, 
 - Test alert conditions
 - Test monitoring integrations
 
-### 13.5 Performance Optimization
+### 14.4 Performance Optimization
 
 #### Tasks:
 1. **Database Optimization**
@@ -495,7 +814,7 @@ Based on the research in `015-per-project-file-sandbox.md`, implement a secure, 
 - Test frontend loading
 - Test scalability limits
 
-### 13.6 Deployment and Scaling
+### 14.5 Deployment and Scaling
 
 #### Tasks:
 1. **Container Strategy**
@@ -533,7 +852,7 @@ Based on the research in `015-per-project-file-sandbox.md`, implement a secure, 
 - Test failover mechanisms
 - Test CDN integration
 
-### 13.7 Documentation and Training
+### 14.6 Documentation and Training
 
 #### Tasks:
 1. **User Documentation**
@@ -571,7 +890,7 @@ Based on the research in `015-per-project-file-sandbox.md`, implement a secure, 
 - Test help system
 - Test API playground
 
-### 13.8 Integration Tests
+### 14.7 Integration Tests
 
 #### Tasks:
 1. **End-to-End Testing**
@@ -607,11 +926,18 @@ Based on the research in `015-per-project-file-sandbox.md`, implement a secure, 
 - Monaco editor requires careful hook implementation
 
 ### Phase 13 Notes:
-- File sandboxing is critical for multi-tenant security
+- Project-based sandboxing provides better isolation than user-based
+- File watchers must be carefully managed to avoid resource exhaustion
+- Use Registry for process tracking and discovery
+- Implement defense-in-depth security with multiple validation layers
+- Cache aggressively but maintain coherency across operations
+
+### Phase 14 Notes:
 - Background jobs should be idempotent
 - Monitor resource usage carefully in production
 - Plan for horizontal scaling from the start
 - Security should be layered and comprehensive
+- Consider using external storage (S3, NFS) for distributed deployments
 
 ### Testing Strategy:
 - Each component needs comprehensive unit tests
