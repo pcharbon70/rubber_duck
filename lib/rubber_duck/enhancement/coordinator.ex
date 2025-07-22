@@ -92,17 +92,7 @@ defmodule RubberDuck.Enhancement.Coordinator do
       active_enhancements: %{}
     }
 
-    # Subscribe to telemetry events
-    :telemetry.attach_many(
-      "enhancement-coordinator",
-      [
-        [:rubber_duck, :enhancement, :start],
-        [:rubber_duck, :enhancement, :stop],
-        [:rubber_duck, :enhancement, :exception]
-      ],
-      &handle_telemetry_event/4,
-      nil
-    )
+    # Telemetry events are now handled by RubberDuck.Telemetry.EnhancementHandler
 
     {:ok, state}
   end
@@ -401,10 +391,6 @@ defmodule RubberDuck.Enhancement.Coordinator do
     "enh_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}"
   end
 
-  defp handle_telemetry_event(_event, _measurements, _metadata, _config) do
-    # Telemetry handling is done elsewhere
-    :ok
-  end
 
   # Simplified CoT application for now
   defp apply_cot_reasoning(content, config) do

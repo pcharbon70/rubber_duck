@@ -17,7 +17,6 @@ defmodule RubberDuckWeb.CoreComponents do
   use Phoenix.Component
 
   alias Phoenix.LiveView.JS
-  import RubberDuckWeb.Gettext
 
   @doc """
   Renders a modal.

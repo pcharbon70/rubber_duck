@@ -93,8 +93,8 @@ defmodule RubberDuckWeb.CodingSessionLive do
           </div>
           
           <div class="flex items-center space-x-2">
-            <.collaboration_controls socket={@socket} />
-            <.panel_toggles layout={@layout} />
+            <.collaboration_controls is_collaborative={@is_collaborative} />
+            <.panel_toggles panel_layout={@panel_layout} />
             <.user_presence users={@presence_users} current_user={@user} />
           </div>
         </div>
@@ -103,8 +103,8 @@ defmodule RubberDuckWeb.CodingSessionLive do
       <!-- Main Content -->
       <div class="flex-1 flex overflow-hidden">
         <!-- File Tree Panel (Left) -->
-        <%= if @layout.show_file_tree do %>
-          <aside class={"#{@layout.tree_width} bg-white border-r border-gray-200 overflow-hidden flex flex-col"}>
+        <%= if @panel_layout.show_file_tree do %>
+          <aside class={"#{@panel_layout.tree_width} bg-white border-r border-gray-200 overflow-hidden flex flex-col"}>
             <div class="p-4 border-b border-gray-200">
               <h2 class="text-sm font-medium text-gray-700">Files</h2>
             </div>
@@ -120,7 +120,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
         <% end %>
         
         <!-- Chat Panel (Center - Primary) -->
-        <main class={@layout.chat_width <> " flex flex-col"}>
+        <main class={@panel_layout.chat_width <> " flex flex-col"}>
           <.live_component
             module={ChatPanelComponent}
             id="chat-panel"
@@ -134,8 +134,8 @@ defmodule RubberDuckWeb.CodingSessionLive do
         </main>
         
         <!-- Editor Panel (Right) -->
-        <%= if @layout.show_editor do %>
-          <aside class={"#{@layout.editor_width} bg-white border-l border-gray-200 overflow-hidden flex flex-col"}>
+        <%= if @panel_layout.show_editor do %>
+          <aside class={"#{@panel_layout.editor_width} bg-white border-l border-gray-200 overflow-hidden flex flex-col"}>
             <div class="p-4 border-b border-gray-200">
               <h2 class="text-sm font-medium text-gray-700">
                 <%= @current_file || "No file selected" %>
@@ -154,8 +154,8 @@ defmodule RubberDuckWeb.CodingSessionLive do
         <% end %>
         
         <!-- Context Panel (Far Right) -->
-        <%= if @layout.show_context do %>
-          <aside class={"#{@layout.context_width} bg-white border-l border-gray-200 overflow-hidden flex flex-col"}>
+        <%= if @panel_layout.show_context do %>
+          <aside class={"#{@panel_layout.context_width} bg-white border-l border-gray-200 overflow-hidden flex flex-col"}>
             <.live_component
               module={ContextPanelComponent}
               id="context-panel"
@@ -192,8 +192,8 @@ defmodule RubberDuckWeb.CodingSessionLive do
   end
   
   def handle_event("toggle_panel", %{"panel" => panel}, socket) do
-    layout = update_layout_visibility(socket.assigns.layout, panel)
-    {:noreply, assign(socket, :layout, layout)}
+    layout = update_layout_visibility(socket.assigns.panel_layout, panel)
+    {:noreply, assign(socket, :panel_layout, layout)}
   end
   
   @impl true
@@ -771,7 +771,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
       context_width: "w-80"
     }
     
-    assign(socket, :layout, layout)
+    assign(socket, :panel_layout, layout)
   end
   
   defp calculate_chat_width(_show_tree, _show_editor, _show_context \\ false) do
@@ -795,7 +795,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
     PresenceTracker.track_user(project_id, user.id, %{
       username: user.username,
       email: user.email,
-      avatar_url: user.avatar_url
+      avatar_url: nil  # User model doesn't have avatar_url yet
     })
     
     # Also track in Phoenix Presence for compatibility
@@ -890,7 +890,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
   defp collaboration_controls(assigns) do
     ~H"""
     <div class="flex items-center space-x-2">
-      <%= if @socket.assigns.is_collaborative do %>
+      <%= if @is_collaborative do %>
         <button
           class="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-md hover:bg-green-200"
           phx-click="end_collaboration"
@@ -949,7 +949,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
         phx-value-panel="file_tree"
         class={[
           "p-2 rounded hover:bg-gray-100",
-          @layout.show_file_tree && "bg-gray-100"
+          @panel_layout.show_file_tree && "bg-gray-100"
         ]}
         title="Toggle file tree (Ctrl+F)"
       >
@@ -964,7 +964,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
         phx-value-panel="editor"
         class={[
           "p-2 rounded hover:bg-gray-100",
-          @layout.show_editor && "bg-gray-100"
+          @panel_layout.show_editor && "bg-gray-100"
         ]}
         title="Toggle editor (Ctrl+E)"
       >
@@ -979,7 +979,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
         phx-value-panel="context"
         class={[
           "p-2 rounded hover:bg-gray-100",
-          @layout.show_context && "bg-gray-100"
+          @panel_layout.show_context && "bg-gray-100"
         ]}
         title="Toggle context panel (Ctrl+I)"
       >
