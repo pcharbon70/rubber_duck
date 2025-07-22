@@ -110,7 +110,7 @@ defmodule RubberDuckWeb.UserSocket do
     # Use the sign_in_with_api_key action to authenticate
     case Ash.read_one(RubberDuck.Accounts.User, 
                       action: :sign_in_with_api_key, 
-                      arguments: %{api_key: api_key}) do
+                      input: %{api_key: api_key}) do
       {:ok, user} -> {:ok, user}
       {:error, _} -> {:error, :invalid_api_key}
     end

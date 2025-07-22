@@ -175,7 +175,7 @@ defmodule RubberDuckWeb.AuthChannel do
   # Private helper functions
   
   defp authenticate_user(username, password) do
-    case Ash.read_one(User, action: :sign_in_with_password, arguments: %{
+    case Ash.read_one(User, action: :sign_in_with_password, input: %{
       username: username,
       password: password
     }) do
