@@ -206,28 +206,9 @@ defmodule RubberDuck.Status.Monitor do
   # Private Functions
   
   defp attach_telemetry_handlers do
-    events = [
-      [:rubber_duck, :status, :batch, :processed],
-      [:rubber_duck, :status, :broadcast, :sent],
-      [:rubber_duck, :status, :queue, :depth],
-      [:rubber_duck, :status, :error, :occurred]
-    ]
-    
-    Enum.each(events, fn event ->
-      handler_id = "status-monitor-#{Enum.join(event, "-")}"
-      
-      :telemetry.attach(
-        handler_id,
-        event,
-        &telemetry_handler/4,
-        self()
-      )
-    end)
+    # Telemetry is handled elsewhere
   end
   
-  defp telemetry_handler(_event_name, measurements, metadata, pid) do
-    send(pid, {:telemetry_event, measurements, metadata})
-  end
   
   defp process_telemetry_event(state, measurements, metadata) do
     cond do

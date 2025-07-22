@@ -11,8 +11,6 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
   """
   use RubberDuckWeb, :live_component
   
-  import RubberDuckWeb.CoreComponents
-  
   @impl true
   def mount(socket) do
     {:ok,

@@ -9,6 +9,8 @@ defmodule RubberDuck.Application do
     children = [
       RubberDuck.Repo,
       RubberDuck.Telemetry,
+      # Telemetry handlers supervisor
+      RubberDuck.Telemetry.Supervisor,
       # Registry for circuit breakers
       {Registry, keys: :unique, name: RubberDuck.CircuitBreakerRegistry},
       # Registry for engines

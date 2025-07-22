@@ -257,132 +257,10 @@ defmodule RubberDuck.Tool.Monitoring do
   # Private functions
 
   defp setup_telemetry_handlers do
-    # Tool execution events
-    :telemetry.attach_many(
-      "tool-monitoring-execution",
-      [
-        [:rubber_duck, :tool, :execution, :start],
-        [:rubber_duck, :tool, :execution, :stop],
-        [:rubber_duck, :tool, :execution, :exception]
-      ],
-      &handle_telemetry_event/4,
-      nil
-    )
-
-    # Validation events
-    :telemetry.attach_many(
-      "tool-monitoring-validation",
-      [
-        [:rubber_duck, :tool, :validation, :start],
-        [:rubber_duck, :tool, :validation, :stop]
-      ],
-      &handle_telemetry_event/4,
-      nil
-    )
-
-    # Authorization events
-    :telemetry.attach_many(
-      "tool-monitoring-authorization",
-      [
-        [:rubber_duck, :tool, :authorization, :start],
-        [:rubber_duck, :tool, :authorization, :stop]
-      ],
-      &handle_telemetry_event/4,
-      nil
-    )
-
-    # Sandbox events
-    :telemetry.attach_many(
-      "tool-monitoring-sandbox",
-      [
-        [:rubber_duck, :tool, :sandbox, :execution],
-        [:rubber_duck, :tool, :sandbox, :violation]
-      ],
-      &handle_telemetry_event/4,
-      nil
-    )
-
-    # Result processing events
-    :telemetry.attach_many(
-      "tool-monitoring-result",
-      [
-        [:rubber_duck, :tool, :result, :processed],
-        [:rubber_duck, :tool, :result, :cached]
-      ],
-      &handle_telemetry_event/4,
-      nil
-    )
+    # Telemetry events are now handled by RubberDuck.Telemetry.ToolHandler
+    :ok
   end
 
-  defp handle_telemetry_event(event_name, measurements, metadata, _config) do
-    case event_name do
-      [:rubber_duck, :tool, :execution, :start] ->
-        increment_counter("tool_executions_total", %{tool: metadata.tool})
-        set_gauge("tool_executions_active", get_active_executions() + 1, %{})
-
-      [:rubber_duck, :tool, :execution, :stop] ->
-        observe_histogram("tool_execution_duration_ms", measurements.duration, %{tool: metadata.tool})
-        set_gauge("tool_executions_active", max(0, get_active_executions() - 1), %{})
-
-        if metadata[:status] == :success do
-          increment_counter("tool_executions_success_total", %{tool: metadata.tool})
-        else
-          increment_counter("tool_executions_failure_total", %{tool: metadata.tool, reason: metadata[:reason]})
-        end
-
-      [:rubber_duck, :tool, :execution, :exception] ->
-        increment_counter("tool_executions_exception_total", %{tool: metadata.tool, kind: metadata.kind})
-        set_gauge("tool_executions_active", max(0, get_active_executions() - 1), %{})
-
-      [:rubber_duck, :tool, :validation, :stop] ->
-        observe_histogram("tool_validation_duration_ms", measurements.duration, %{tool: metadata.tool})
-
-        if metadata[:valid] do
-          increment_counter("tool_validations_success_total", %{tool: metadata.tool})
-        else
-          increment_counter("tool_validations_failure_total", %{tool: metadata.tool})
-        end
-
-      [:rubber_duck, :tool, :authorization, :stop] ->
-        observe_histogram("tool_authorization_duration_ms", measurements.duration, %{tool: metadata.tool})
-
-        if metadata[:authorized] do
-          increment_counter("tool_authorizations_success_total", %{tool: metadata.tool})
-        else
-          increment_counter("tool_authorizations_denied_total", %{tool: metadata.tool, reason: metadata[:reason]})
-        end
-
-      [:rubber_duck, :tool, :sandbox, :execution] ->
-        observe_histogram("tool_sandbox_execution_duration_ms", measurements.duration, %{
-          tool: metadata.tool,
-          sandbox_level: metadata.sandbox_level
-        })
-
-      [:rubber_duck, :tool, :sandbox, :violation] ->
-        increment_counter("tool_sandbox_violations_total", %{
-          tool: metadata.tool,
-          violation_type: metadata.violation_type
-        })
-
-      [:rubber_duck, :tool, :result, :processed] ->
-        observe_histogram("tool_result_processing_duration_ms", measurements.processing_time, %{
-          tool: metadata.tool,
-          format: metadata.format
-        })
-
-        observe_histogram("tool_result_size_bytes", measurements.output_size, %{tool: metadata.tool})
-
-      [:rubber_duck, :tool, :result, :cached] ->
-        increment_counter("tool_result_cache_operations_total", %{
-          tool: metadata.tool,
-          operation: metadata.operation,
-          status: metadata.status
-        })
-
-      _ ->
-        Logger.debug("Unhandled telemetry event: #{inspect(event_name)}")
-    end
-  end
 
   defp store_execution_record(record) do
     key = {record.timestamp, record.tool_name, :rand.uniform(1000)}
@@ -897,12 +775,6 @@ defmodule RubberDuck.Tool.Monitoring do
     "{#{label_pairs}}"
   end
 
-  defp get_active_executions do
-    case :ets.lookup(@table_name, {"tool_executions_active", %{}}) do
-      [{{_, _}, %{value: value}}] -> value
-      [] -> 0
-    end
-  end
 
   defp aggregate_metrics do
     # Perform periodic aggregation of metrics

@@ -206,13 +206,13 @@ defmodule RubberDuckWeb.StatusDashboardLive do
       :telemetry.attach(
         "dashboard-#{Enum.join(event, "-")}",
         event,
-        &handle_telemetry_event/4,
+        &__MODULE__.handle_telemetry_event/4,
         self()
       )
     end)
   end
   
-  defp handle_telemetry_event(event, measurements, metadata, pid) do
+  def handle_telemetry_event(event, measurements, metadata, pid) do
     send(pid, {:telemetry_event, event, measurements, metadata})
   end
   
