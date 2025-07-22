@@ -4,20 +4,28 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
+	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rubber_duck/tui/internal/phoenix"
 	"github.com/rubber_duck/tui/internal/ui"
 )
 
+func init() {
+	// Suppress logging at the earliest possible moment - even before main()
+	log.SetOutput(ioutil.Discard)
+	log.SetFlags(0)
+	log.SetPrefix("")
+}
+
 func main() {
-	// IMMEDIATELY suppress all logging to prevent Phoenix library spam
-	// This must happen before ANY other operations
-	log.SetOutput(io.Discard)
+	// Re-ensure logging is suppressed (belt and suspenders)
+	log.SetOutput(ioutil.Discard)
 	log.SetFlags(0)
 	
 	// Parse command line flags
@@ -29,13 +37,31 @@ func main() {
 	)
 	flag.Parse()
 	
-	// Redirect stderr immediately after flag parsing to catch all Phoenix output
-	// IMPORTANT: Do NOT redirect stdout as the TUI needs it for display
+	// More aggressive suppression for non-debug mode
 	if !*debug {
+		// Create a devnull file
 		devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0755)
 		if err == nil {
-			os.Stderr = devNull
+			// Redirect stderr file descriptor directly using dup2
+			// This catches output at the lowest level
+			err = syscall.Dup2(int(devNull.Fd()), 2) // 2 is stderr
+			if err != nil {
+				// Fallback to high-level redirect
+				os.Stderr = devNull
+			}
 		}
+		
+		// Additional suppression: disable all Go default loggers
+		log.SetOutput(ioutil.Discard)
+		log.SetFlags(0)
+		log.SetPrefix("")
+		
+		// Clear any existing terminal content that might interfere
+		fmt.Print("\033[2J\033[H") // Clear screen and move cursor to top
+		
+		// Additional terminal control to prevent output leakage
+		fmt.Print("\033[?1049h") // Save screen and use alternate buffer
+		fmt.Print("\033[3J")     // Clear scrollback buffer
 	}
 	
 	// Load API key from various sources
@@ -49,8 +75,13 @@ func main() {
 		model.SetPhoenixConfig(*url, *authURL, finalAPIKey)
 	}
 
-	// Create the program
-	p := tea.NewProgram(model, tea.WithAltScreen())
+	// Create the program with additional options to ensure full terminal usage
+	p := tea.NewProgram(model, 
+		tea.WithAltScreen(),     // Use alternate screen buffer
+		tea.WithMouseCellMotion(), // Enable mouse support
+		tea.WithoutCatchPanics(), // Let us handle panics
+		tea.WithInputTTY(),       // Force TTY input handling
+	)
 	
 	// Store program reference for UI components
 	ui.SetProgramHolder(p)
@@ -90,9 +121,22 @@ func main() {
 		log.SetFlags(log.LstdFlags)
 	}
 
-	// Run the program
+	// Set up cleanup on exit
+	defer func() {
+		if !*debug {
+			// Restore terminal state
+			fmt.Print("\033[?1049l") // Restore screen from alternate buffer
+			fmt.Print("\033[2J\033[H") // Clear screen one more time
+		}
+	}()
+	
+	// Run the program with better error handling
 	if _, err := p.Run(); err != nil {
-		log.Fatal(err)
+		// Don't use log.Fatal as it might output to stderr
+		if *debug {
+			fmt.Fprintln(os.Stderr, "TUI Error:", err)
+		}
+		os.Exit(1)
 	}
 }
 
@@ -126,4 +170,24 @@ func loadAPIKey(flagValue string) string {
 	}
 	
 	return ""
+}
+
+// containsErrorMarkers checks if output contains error message markers
+func containsErrorMarkers(output string) bool {
+	errorMarkers := []string{
+		"[ERROR]",
+		"[WARN]",
+		"Connection error:",
+		"dial tcp",
+		"connection refused",
+		"<socket>",
+		"<channel>",
+	}
+	
+	for _, marker := range errorMarkers {
+		if strings.Contains(output, marker) {
+			return true
+		}
+	}
+	return false
 }

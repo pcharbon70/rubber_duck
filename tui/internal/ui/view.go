@@ -34,8 +34,8 @@ func (m Model) renderBase() string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("62"))
 	
-	// Calculate content height (minus status bar)
-	contentHeight := m.height - 1
+	// Use full height (no status bar)
+	contentHeight := m.height
 	
 	// Build the layout based on visible components
 	var components []string
@@ -130,34 +130,28 @@ func (m Model) renderBase() string {
 		components = append(components, editor)
 	}
 	
-	// Join components horizontally
-	main := lipgloss.JoinHorizontal(lipgloss.Top, components...)
-	
-	// Add status bar
-	statusBar := m.renderStatusBar()
-	
-	// Join vertically
-	return lipgloss.JoinVertical(lipgloss.Left, main, statusBar)
+	// Join components horizontally and return (no status bar)
+	return lipgloss.JoinHorizontal(lipgloss.Top, components...)
 }
 
-// renderStatusBar renders the status bar
-func (m Model) renderStatusBar() string {
-	statusStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
-		Background(lipgloss.Color("235")).
-		Width(m.width).
-		Padding(0, 1)
-		
-	// Connection indicator only
-	var connStatus string
-	if m.connected {
-		connStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Render("● Connected")
-	} else {
-		connStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("● Disconnected")
-	}
-	
-	return statusStyle.Render(connStatus)
-}
+// renderStatusBar is no longer used - status bar has been removed
+// func (m Model) renderStatusBar() string {
+// 	statusStyle := lipgloss.NewStyle().
+// 		Foreground(lipgloss.Color("240")).
+// 		Background(lipgloss.Color("235")).
+// 		Width(m.width).
+// 		Padding(0, 1)
+// 		
+// 	// Connection indicator only
+// 	var connStatus string
+// 	if m.connected {
+// 		connStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Render("● Connected")
+// 	} else {
+// 		connStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("● Disconnected")
+// 	}
+// 	
+// 	return statusStyle.Render(connStatus)
+// }
 
 // renderWithCommandPalette renders the UI with command palette overlay
 func (m Model) renderWithCommandPalette() string {
