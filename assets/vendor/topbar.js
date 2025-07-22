@@ -163,5 +163,3 @@
     this.topbar = topbar;
   }
 }.call(this, window, document));
-
-export default topbar;
