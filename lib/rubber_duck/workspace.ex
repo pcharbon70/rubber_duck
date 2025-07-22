@@ -1,6 +1,8 @@
 defmodule RubberDuck.Workspace do
   use Ash.Domain,
     otp_app: :rubber_duck
+  
+  require Ash.Query
 
   resources do
     resource RubberDuck.Workspace.Project do
@@ -27,5 +29,39 @@ defmodule RubberDuck.Workspace do
       define :update_analysis_result, action: :update
       define :delete_analysis_result, action: :destroy
     end
+
+    resource RubberDuck.Workspace.ProjectCollaborator do
+      # We'll implement custom functions for collaborator management
+      # since they need special authorization logic
+    end
+
+    resource RubberDuck.Projects.SecurityAudit do
+      define :log_security_event, action: :log_access
+      define :list_project_audits, action: :by_project
+      define :list_security_violations, action: :security_violations
+      define :list_recent_activity, action: :recent_activity
+    end
+  end
+
+  # Custom functions for collaborator management
+  def add_project_collaborator(project, user, permission, opts \\ []) do
+    actor = Keyword.get(opts, :actor)
+    
+    # Check if actor is the project owner
+    if actor && actor.id == project.owner_id do
+      Ash.create(RubberDuck.Workspace.ProjectCollaborator, %{
+        project_id: project.id,
+        user_id: user.id,
+        permission: permission
+      })
+    else
+      {:error, Ash.Error.Forbidden.exception([])}
+    end
+  end
+
+  def list_project_collaborators!(project, opts \\ []) do
+    RubberDuck.Workspace.ProjectCollaborator
+    |> Ash.Query.filter(project_id: project.id)
+    |> Ash.read!(opts)
   end
 end
