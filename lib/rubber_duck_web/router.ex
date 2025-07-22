@@ -44,7 +44,10 @@ defmodule RubberDuckWeb.Router do
       # Status System Dashboard (requires authentication)
       live "/status", StatusDashboardLive, :index
       
-      # Collaborative Coding Session
+      # Default coding session (no project ID required)
+      live "/chat", CodingSessionLive, :index
+      
+      # Project-specific Coding Session
       live "/projects/:project_id/session", CodingSessionLive, :index
     end
   end

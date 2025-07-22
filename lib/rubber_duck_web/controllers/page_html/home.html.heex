@@ -7,10 +7,16 @@
     </p>
     
     <div class="space-x-4">
-      <%= if @current_user do %>
+      <%= if assigns[:current_user] do %>
         <p class="mb-4">Welcome back, <%= @current_user.username %>!</p>
         <.link 
-          href={~p"/auth/user/sign_out"} 
+          href={~p"/chat"} 
+          class="inline-block px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Start Chatting
+        </.link>
+        <.link 
+          href={~p"/sign-out"} 
           method="delete"
           class="inline-block px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700"
         >

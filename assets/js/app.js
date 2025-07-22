@@ -7,7 +7,7 @@ import "phoenix_html"
 // Establish Phoenix Socket and LiveView configuration.
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
-import topbar from "../vendor/topbar"
+import topbar from "../vendor/topbar.js"
 
 // Import our custom hooks
 import {ConversationChannel} from "./hooks/conversation_hooks"

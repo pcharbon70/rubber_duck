@@ -29,8 +29,11 @@ defmodule RubberDuckWeb.CodingSessionLive do
   on_mount {RubberDuckWeb.LiveUserAuth, :live_user_required}
   
   @impl true
-  def mount(%{"project_id" => project_id}, _session, socket) do
+  def mount(params, _session, socket) do
     user = socket.assigns.current_user
+    
+    # Handle both with and without project_id
+    project_id = params["project_id"] || "default"
     
     if connected?(socket) do
       # Subscribe to PubSub topics
@@ -43,12 +46,16 @@ defmodule RubberDuckWeb.CodingSessionLive do
       :timer.send_interval(30_000, self(), :update_presence)
     end
     
-    # Generate conversation ID for this project session
-    conversation_id = "project-#{project_id}-#{Ecto.UUID.generate()}"
+    # Generate conversation ID
+    conversation_id = if project_id == "default" do
+      "user-#{user.id}-#{Ecto.UUID.generate()}"
+    else
+      "project-#{project_id}-#{Ecto.UUID.generate()}"
+    end
     
     socket =
       socket
-      |> assign(:page_title, "Coding Session")
+      |> assign(:page_title, "RubberDuck Chat")
       |> assign(:project_id, project_id)
       |> assign(:user, user)
       |> assign(:conversation_id, conversation_id)
