@@ -1,6 +1,9 @@
 package ui
 
 import (
+	"fmt"
+	"strings"
+	
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -71,7 +74,8 @@ func (m Model) renderBase() string {
 	// Build chat content with header, status messages at top, conversation at bottom
 	// Calculate heights for chat and status sections
 	headerHeight := 3 // chat header takes 3 lines
-	availableHeight := contentHeight - headerHeight - 2 // -2 for main borders
+	statusBarHeight := 1 // new status bar takes 1 line
+	availableHeight := contentHeight - headerHeight - statusBarHeight - 2 // -2 for main borders
 	
 	// Status messages take 30% of available conversation area
 	statusHeight := int(float64(availableHeight) * 0.3)
@@ -80,8 +84,8 @@ func (m Model) renderBase() string {
 	}
 	chatHeight := availableHeight - statusHeight - 2 // -2 for spacing between sections
 	
-	// Update component sizes
-	m.statusMessages.SetSize(chatWidth-4, statusHeight-2) // -4 for borders, -2 for height borders
+	// Update component sizes - reduce status messages height to account for status bar
+	m.statusMessages.SetSize(chatWidth-4, statusHeight-3) // -4 for borders, -3 for height borders and status bar
 	// Update chat size to account for borders
 	m.chat.SetSize(chatWidth-4, chatHeight-2) // -4 for borders, -2 for height borders
 	
@@ -100,8 +104,18 @@ func (m Model) renderBase() string {
 		Height(chatHeight).
 		Padding(0, 1)
 	
+	// Create mini status bar for status messages area
+	statusBar := m.renderMiniStatusBar(chatWidth - 2)
+	
+	// Combine status bar with status messages
+	statusContent := lipgloss.JoinVertical(
+		lipgloss.Left,
+		statusBar,
+		m.statusMessages.View(),
+	)
+	
 	// Apply borders to sections
-	statusSection := statusBorderStyle.Render(m.statusMessages.View())
+	statusSection := statusBorderStyle.Render(statusContent)
 	chatSection := chatBorderStyle.Render(m.chat.View())
 	
 	chatContent := lipgloss.JoinVertical(
@@ -134,24 +148,68 @@ func (m Model) renderBase() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, components...)
 }
 
-// renderStatusBar is no longer used - status bar has been removed
-// func (m Model) renderStatusBar() string {
-// 	statusStyle := lipgloss.NewStyle().
-// 		Foreground(lipgloss.Color("240")).
-// 		Background(lipgloss.Color("235")).
-// 		Width(m.width).
-// 		Padding(0, 1)
-// 		
-// 	// Connection indicator only
-// 	var connStatus string
-// 	if m.connected {
-// 		connStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Render("● Connected")
-// 	} else {
-// 		connStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("● Disconnected")
-// 	}
-// 	
-// 	return statusStyle.Render(connStatus)
-// }
+// renderMiniStatusBar renders a compact status bar for the status messages area
+func (m Model) renderMiniStatusBar(width int) string {
+	statusStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Background(lipgloss.Color("235")).
+		Width(width).
+		Padding(0, 1)
+		
+	// Connection indicator
+	var connStatus string
+	if m.connected {
+		connStatus = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("46")).
+			Bold(true).
+			Render("● Connected")
+	} else {
+		connStatus = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Bold(true).
+			Render("● Disconnected")
+	}
+	
+	// Build status components
+	var components []string
+	components = append(components, connStatus)
+	
+	// Add username if authenticated
+	if m.authenticated && m.username != "" {
+		userInfo := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("220")).
+			Render("@" + m.username)
+		components = append(components, userInfo)
+	}
+	
+	// Add provider and model info
+	if m.currentProvider != "" || m.currentModel != "" {
+		var modelInfo string
+		if m.currentProvider != "" && m.currentModel != "" {
+			modelInfo = fmt.Sprintf("%s/%s", m.currentProvider, m.currentModel)
+		} else if m.currentModel != "" {
+			modelInfo = m.currentModel
+		} else {
+			modelInfo = m.currentProvider
+		}
+		
+		modelStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("117")).
+			Render(modelInfo)
+		components = append(components, modelStyle)
+	}
+	
+	// Add "Status Messages" label at the end
+	label := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("250")).
+		Render("Status Messages")
+	components = append(components, label)
+	
+	// Join components with separator
+	content := strings.Join(components, "  |  ")
+	
+	return statusStyle.Render(content)
+}
 
 // renderWithCommandPalette renders the UI with command palette overlay
 func (m Model) renderWithCommandPalette() string {
