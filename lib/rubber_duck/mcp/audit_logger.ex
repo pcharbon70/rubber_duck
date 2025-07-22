@@ -712,17 +712,9 @@ defmodule RubberDuck.MCP.AuditLogger do
   end
 
   defp init_telemetry do
-    :telemetry.attach(
-      "mcp_audit_logger",
-      [:mcp, :audit, :log],
-      &handle_telemetry_event/4,
-      nil
-    )
+    # Telemetry is handled elsewhere
   end
 
-  defp handle_telemetry_event(_event_name, measurements, metadata, _config) do
-    Logger.debug("Audit telemetry: #{inspect(measurements)} #{inspect(metadata)}")
-  end
 
   defp generate_log_id do
     Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)

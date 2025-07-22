@@ -32,11 +32,10 @@ defmodule RubberDuck.Accounts.User do
     end
 
     strategies do
-      # Temporarily disabled API key strategy to fix sign-in page
-      # api_key :api_key do
-      #   api_key_relationship :valid_api_keys
-      #   api_key_hash_attribute :api_key_hash
-      # end
+      api_key :api_key do
+        api_key_relationship :valid_api_keys
+        api_key_hash_attribute :api_key_hash
+      end
 
       password :password do
         identity_field :username
@@ -67,11 +66,10 @@ defmodule RubberDuck.Accounts.User do
       prepare AshAuthentication.Preparations.FilterBySubject
     end
 
-    # Temporarily disabled API key sign-in
-    # read :sign_in_with_api_key do
-    #   argument :api_key, :string, allow_nil?: false
-    #   prepare AshAuthentication.Strategy.ApiKey.SignInPreparation
-    # end
+    read :sign_in_with_api_key do
+      argument :api_key, :string, allow_nil?: false
+      prepare AshAuthentication.Strategy.ApiKey.SignInPreparation
+    end
 
     update :change_password do
       # Use this action to allow users to change their password by providing

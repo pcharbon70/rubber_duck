@@ -271,23 +271,13 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandler do
 
   defp setup_progress_monitoring(workflow_id, stream_id, _options) do
     # Set up telemetry handlers for progress monitoring
-    telemetry_metadata = %{
+    _telemetry_metadata = %{
       workflow_id: workflow_id,
       stream_id: stream_id,
       streaming_enabled: true
     }
 
-    # Attach telemetry handlers
-    :telemetry.attach_many(
-      "workflow_streaming_#{stream_id}",
-      [
-        [:reactor, :step, :start],
-        [:reactor, :step, :stop],
-        [:reactor, :step, :exception]
-      ],
-      &handle_telemetry_event/4,
-      telemetry_metadata
-    )
+    # Telemetry is handled elsewhere
   end
 
   defp cleanup_progress_monitoring(workflow_id, stream_id) do
@@ -297,34 +287,6 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandler do
     Logger.debug("Cleaned up progress monitoring for workflow: #{workflow_id}")
   end
 
-  defp handle_telemetry_event([:reactor, :step, :start], measurements, metadata, config) do
-    emit_workflow_event(config.stream_id, "step_started", %{
-      step_name: metadata.step_name,
-      workflow_id: config.workflow_id,
-      measurements: measurements,
-      timestamp: DateTime.utc_now()
-    })
-  end
-
-  defp handle_telemetry_event([:reactor, :step, :stop], measurements, metadata, config) do
-    emit_workflow_event(config.stream_id, "step_completed", %{
-      step_name: metadata.step_name,
-      workflow_id: config.workflow_id,
-      measurements: measurements,
-      result: sanitize_result(metadata.result),
-      timestamp: DateTime.utc_now()
-    })
-  end
-
-  defp handle_telemetry_event([:reactor, :step, :exception], measurements, metadata, config) do
-    emit_workflow_event(config.stream_id, "step_failed", %{
-      step_name: metadata.step_name,
-      workflow_id: config.workflow_id,
-      measurements: measurements,
-      error: sanitize_error(metadata.error),
-      timestamp: DateTime.utc_now()
-    })
-  end
 
   defp emit_workflow_event(stream_id, event_type, event_data) do
     event = %{

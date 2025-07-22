@@ -58,7 +58,9 @@ defmodule RubberDuckWeb.Components.MonacoEditorComponent do
        ai_suggestions: [],
        collaborators: %{},
        loading: false,
-       error: nil
+       error: nil,
+       git_status: nil,
+       show_ai_suggestions: true
      )
      |> assign_new(:file_path, fn -> nil end)
      |> assign_new(:project_id, fn -> nil end)}

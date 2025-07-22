@@ -664,20 +664,8 @@ defmodule RubberDuck.MCP.SecurityManager do
   defp update_component_config(_, _), do: {:error, :unknown_component}
 
   defp init_telemetry do
-    # Set up telemetry events
-    :telemetry.attach(
-      "mcp_security_auth",
-      [:mcp, :security, :authenticate],
-      &handle_telemetry_event/4,
-      nil
-    )
-
-    :telemetry.attach(
-      "mcp_security_authz",
-      [:mcp, :security, :authorize],
-      &handle_telemetry_event/4,
-      nil
-    )
+    # Telemetry events are now handled by RubberDuck.Telemetry.SecurityHandler
+    :ok
   end
 
   defp emit_telemetry(operation, start_time, result) do
@@ -699,9 +687,6 @@ defmodule RubberDuck.MCP.SecurityManager do
     )
   end
 
-  defp handle_telemetry_event(_event_name, measurements, metadata, _config) do
-    Logger.debug("Security telemetry: #{inspect(measurements)} #{inspect(metadata)}")
-  end
 
   defp generate_client_id do
     "mcp_client_" <> Base.encode16(:crypto.strong_rand_bytes(8), case: :lower)

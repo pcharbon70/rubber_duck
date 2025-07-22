@@ -71,15 +71,6 @@ defmodule RubberDuck.Tool.Composition.Metrics do
     :cpu_usage
   ]
 
-  # Telemetry events to handle
-  @telemetry_events [
-    [:rubber_duck, :tool, :composition, :workflow_start],
-    [:rubber_duck, :tool, :composition, :workflow_complete],
-    [:rubber_duck, :tool, :composition, :workflow_error],
-    [:rubber_duck, :tool, :composition, :workflow_step_start],
-    [:rubber_duck, :tool, :composition, :workflow_step_complete],
-    [:rubber_duck, :tool, :composition, :workflow_step_error]
-  ]
 
   @doc """
   Starts the metrics collection server.
@@ -222,14 +213,7 @@ defmodule RubberDuck.Tool.Composition.Metrics do
   end
 
   defp attach_telemetry_handlers do
-    Enum.each(@telemetry_events, fn event ->
-      :telemetry.attach(
-        "composition_metrics_#{Enum.join(event, "_")}",
-        event,
-        &handle_telemetry_event/4,
-        nil
-      )
-    end)
+    # Telemetry is handled elsewhere
   end
 
   defp handle_telemetry_event(event, measurements, metadata) do
@@ -597,8 +581,4 @@ defmodule RubberDuck.Tool.Composition.Metrics do
     Process.send_after(self(), :cleanup, 30 * 60 * 1000)
   end
 
-  # Telemetry handler wrapper
-  defp handle_telemetry_event(event, measurements, metadata, _config) do
-    send(__MODULE__, {:telemetry, event, measurements, metadata})
-  end
 end
