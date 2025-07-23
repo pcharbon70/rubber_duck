@@ -455,11 +455,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			URL:      m.phoenixURL,
 			IsAuth:   false,
 		}
-		// Use JWT token if we have one (from login), otherwise use API key
-		if m.jwtToken != "" {
-			config.JWTToken = m.jwtToken
-		} else if m.apiKey != "" {
+		// Prefer API key over JWT token if we have one, as it's more reliable
+		if m.apiKey != "" {
 			config.APIKey = m.apiKey
+		} else if m.jwtToken != "" {
+			config.JWTToken = m.jwtToken
 		}
 		m.statusBar = "Connecting to authenticated socket..."
 		return m, client.Connect(config)

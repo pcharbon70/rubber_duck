@@ -67,15 +67,6 @@ func (c *Client) Connect(config Config) tea.Cmd {
 		// Use silent logger to prevent console spam
 		socket.Logger = NewSilentLogger()
 		
-		// Debug: Log the connection URL (only for user socket)
-		if !config.IsAuth && c.program != nil {
-			debugMsg := fmt.Sprintf("Connecting to user socket: %s", endPoint.String())
-			c.program.Send(ErrorMsg{
-				Err:       fmt.Errorf(debugMsg),
-				Component: "Debug",
-			})
-		}
-		
 		// Disable automatic reconnection to prevent spam
 		socket.ReconnectAfterFunc = func(tries int) time.Duration {
 			// Return a very large duration to effectively disable auto-reconnect
