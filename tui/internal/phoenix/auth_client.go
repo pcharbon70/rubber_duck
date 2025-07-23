@@ -15,6 +15,7 @@ type AuthClient struct {
 	authChannel *phx.Channel
 	program     *tea.Program
 	connected   bool
+	joining     bool // Track if join is in progress
 }
 
 // NewAuthClient creates a new auth client
@@ -42,6 +43,15 @@ func (a *AuthClient) JoinAuthChannel() tea.Cmd {
 			}
 		}
 
+		// Check if already connected or joining
+		if a.connected || a.joining {
+			// This is not an error, just skip the duplicate join
+			return nil
+		}
+
+		// Mark as joining
+		a.joining = true
+
 		// Join auth:lobby channel
 		channel := a.socket.Channel("auth:lobby", map[string]string{})
 		
@@ -56,12 +66,14 @@ func (a *AuthClient) JoinAuthChannel() tea.Cmd {
 		// Handle join response
 		join.Receive("ok", func(response any) {
 			a.connected = true
+			a.joining = false
 			if a.program != nil {
 				a.program.Send(AuthChannelJoinedMsg{})
 			}
 		})
 
 		join.Receive("error", func(response any) {
+			a.joining = false
 			if a.program != nil {
 				a.program.Send(ErrorMsg{
 					Err:       fmt.Errorf("failed to join auth channel: %v", response),
@@ -252,6 +264,7 @@ func (a *AuthClient) Disconnect() tea.Cmd {
 			a.authChannel.Leave()
 			a.authChannel = nil
 			a.connected = false
+			a.joining = false
 		}
 		return nil
 	}

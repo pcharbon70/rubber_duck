@@ -126,7 +126,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.totalConnectionAttempts > maxTotalAttempts {
 			m.connectionBlocked = true
 			m.statusBar = "Connection blocked after repeated failures. Please restart TUI."
-			m.chat.AddMessage(ErrorMessage, fmt.Sprintf("Connection blocked after %d failed attempts. Please verify the server is running and restart the TUI.", maxTotalAttempts), "system")
+			m.statusMessages.AddMessage(StatusCategoryError, fmt.Sprintf("Connection blocked after %d failed attempts. Please verify the server is running and restart the TUI.", maxTotalAttempts), nil)
 			return m, nil
 		}
 		
@@ -172,10 +172,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Use error handler for disconnect errors
 			if display, message := m.errorHandler.HandleError(msg.Error, "Connection"); display {
 				m.statusBar = message
-				m.chat.AddMessage(ErrorMessage, message, "system")
+				m.statusMessages.AddMessage(StatusCategoryError, message, nil)
 				
 				// Add reconnection advice
-				m.chat.AddMessage(SystemMessage, "Connection lost. You can try reconnecting with Ctrl+R or restart the TUI.", "system")
+				m.statusMessages.AddMessage(StatusCategoryInfo, "Connection lost. You can try reconnecting with Ctrl+R or restart the TUI.", nil)
 			}
 		} else {
 			m.statusBar = "Disconnected"
@@ -211,12 +211,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ChatMessageSentMsg:
 		// Check if authenticated first
 		if !m.authenticated {
-			m.chat.AddMessage(ErrorMessage, "You must be authenticated to send messages. Use /login <username> <password>", "system")
+			m.statusMessages.AddMessage(StatusCategoryError, "You must be authenticated to send messages. Use /login <username> <password>", nil)
 			return m, nil
 		}
 		// Check if conversation channel is joined
 		if m.channel == nil {
-			m.chat.AddMessage(ErrorMessage, "Not connected to conversation channel", "system")
+			m.statusMessages.AddMessage(StatusCategoryError, "Not connected to conversation channel", nil)
 			return m, nil
 		}
 		// Send message through Phoenix channel
@@ -235,7 +235,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, client.SendMessage(msg.Content)
 		}
 		// If not connected, show error
-		m.chat.AddMessage(ErrorMessage, "Not connected to server", "system")
+		m.statusMessages.AddMessage(StatusCategoryError, "Not connected to server", nil)
 		return m, nil
 		
 	case ChatMessageReceivedMsg:
@@ -266,11 +266,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Use error handler to prevent spam
 		if display, message := m.errorHandler.HandleError(msg.Err, msg.Component); display {
 			m.statusBar = message
-			m.chat.AddMessage(ErrorMessage, message, "system")
+			m.statusMessages.AddMessage(StatusCategoryError, message, nil)
 			
 			// Add connection advice if available
 			if advice := GetConnectionAdvice(msg.Err); advice != "" {
-				m.chat.AddMessage(SystemMessage, advice, "system")
+				m.statusMessages.AddMessage(StatusCategoryInfo, advice, nil)
 			}
 		}
 		return m, nil
@@ -369,11 +369,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Use error handler to prevent spam
 		if display, message := m.errorHandler.HandleError(msg.Err, msg.Component); display {
 			m.statusBar = message
-			m.chat.AddMessage(ErrorMessage, message, "system")
+			m.statusMessages.AddMessage(StatusCategoryError, message, nil)
 			
 			// Add connection advice if available
 			if advice := GetConnectionAdvice(msg.Err); advice != "" {
-				m.chat.AddMessage(SystemMessage, advice, "system")
+				m.statusMessages.AddMessage(StatusCategoryInfo, advice, nil)
 			}
 			
 			// If retry command is available, offer to retry
@@ -396,7 +396,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		} else {
 			m.statusBar = "Cannot join conversation - not authenticated"
-			m.chat.AddMessage(ErrorMessage, "Authentication required to join conversation", "system")
+			m.statusMessages.AddMessage(StatusCategoryError, "Authentication required to join conversation", nil)
 		}
 		return m, nil
 		
@@ -476,7 +476,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case phoenix.LoginErrorMsg:
 		m.statusBar = fmt.Sprintf("Login failed: %s", msg.Message)
-		m.chat.AddMessage(ErrorMessage, fmt.Sprintf("Login failed: %s - %s", msg.Message, msg.Details), "system")
+		m.statusMessages.AddMessage(StatusCategoryError, fmt.Sprintf("Login failed: %s - %s", msg.Message, msg.Details), nil)
 		return m, nil
 		
 	case phoenix.LogoutSuccessMsg:
@@ -552,7 +552,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case phoenix.APIKeyErrorMsg:
 		m.statusBar = fmt.Sprintf("API key error: %s", msg.Message)
-		m.chat.AddMessage(ErrorMessage, fmt.Sprintf("API key %s failed: %s - %s", msg.Operation, msg.Message, msg.Details), "system")
+		m.statusMessages.AddMessage(StatusCategoryError, fmt.Sprintf("API key %s failed: %s - %s", msg.Operation, msg.Message, msg.Details), nil)
 		return m, nil
 		
 	case phoenix.TokenRefreshedMsg:
@@ -562,7 +562,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case phoenix.TokenErrorMsg:
 		m.statusBar = fmt.Sprintf("Token error: %s", msg.Message)
-		m.chat.AddMessage(ErrorMessage, fmt.Sprintf("Token refresh failed: %s - %s", msg.Message, msg.Details), "system")
+		m.statusMessages.AddMessage(StatusCategoryError, fmt.Sprintf("Token refresh failed: %s - %s", msg.Message, msg.Details), nil)
 		return m, nil
 		
 	case phoenix.RetryMsg:
@@ -808,11 +808,11 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 		m.chat.Focus()
 	case "new_conversation":
 		if !m.authenticated {
-			m.chat.AddMessage(ErrorMessage, "You must be authenticated to start a new conversation", "system")
+			m.statusMessages.AddMessage(StatusCategoryError, "You must be authenticated to start a new conversation", nil)
 			return m, nil
 		}
 		if m.channel == nil {
-			m.chat.AddMessage(ErrorMessage, "Not connected to conversation channel", "system")
+			m.statusMessages.AddMessage(StatusCategoryError, "Not connected to conversation channel", nil)
 			return m, nil
 		}
 		m.statusBar = "Starting new conversation..."
@@ -914,7 +914,7 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 		
 	case "auth_apikey_generate":
 		if !m.authenticated {
-			m.chat.AddMessage(ErrorMessage, "You must be authenticated to manage API keys", "system")
+			m.statusMessages.AddMessage(StatusCategoryError, "You must be authenticated to manage API keys", nil)
 			return m, nil
 		}
 		m.statusBar = "Generating API key..."
@@ -924,7 +924,7 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 		
 	case "auth_apikey_list":
 		if !m.authenticated {
-			m.chat.AddMessage(ErrorMessage, "You must be authenticated to manage API keys", "system")
+			m.statusMessages.AddMessage(StatusCategoryError, "You must be authenticated to manage API keys", nil)
 			return m, nil
 		}
 		m.statusBar = "Listing API keys..."
@@ -934,7 +934,7 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 		
 	case "auth_apikey_revoke":
 		if !m.authenticated {
-			m.chat.AddMessage(ErrorMessage, "You must be authenticated to manage API keys", "system")
+			m.statusMessages.AddMessage(StatusCategoryError, "You must be authenticated to manage API keys", nil)
 			return m, nil
 		}
 		if args := msg.Args; args != nil {
@@ -1002,7 +1002,7 @@ func (m *Model) handleReconnect() (Model, tea.Cmd) {
 	// Check if we've exceeded maximum attempts
 	if m.reconnectAttempts >= maxReconnectAttempts {
 		m.statusBar = "Maximum reconnection attempts reached. Please check server and restart TUI."
-		m.chat.AddMessage(ErrorMessage, fmt.Sprintf("Failed to reconnect after %d attempts. Please verify the server is running and restart the TUI.", maxReconnectAttempts), "system")
+		m.statusMessages.AddMessage(StatusCategoryError, fmt.Sprintf("Failed to reconnect after %d attempts. Please verify the server is running and restart the TUI.", maxReconnectAttempts), nil)
 		return *m, nil
 	}
 	
