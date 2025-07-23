@@ -57,10 +57,7 @@ func (c *Client) Connect(config Config) tea.Cmd {
 				endPoint.RawQuery = q.Encode()
 			} else if config.JWTToken != "" {
 				q := endPoint.Query()
-				// Try different parameter names that Phoenix might expect
 				q.Set("token", config.JWTToken)
-				// Also set jwt parameter in case server expects that
-				q.Set("jwt", config.JWTToken)
 				endPoint.RawQuery = q.Encode()
 			}
 		}
@@ -69,6 +66,15 @@ func (c *Client) Connect(config Config) tea.Cmd {
 		socket := phx.NewSocket(endPoint)
 		// Use silent logger to prevent console spam
 		socket.Logger = NewSilentLogger()
+		
+		// Debug: Log the connection URL (only for user socket)
+		if !config.IsAuth && c.program != nil {
+			debugMsg := fmt.Sprintf("Connecting to user socket: %s", endPoint.String())
+			c.program.Send(ErrorMsg{
+				Err:       fmt.Errorf(debugMsg),
+				Component: "Debug",
+			})
+		}
 		
 		// Disable automatic reconnection to prevent spam
 		socket.ReconnectAfterFunc = func(tries int) time.Duration {

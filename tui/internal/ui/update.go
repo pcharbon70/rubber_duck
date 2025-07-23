@@ -453,9 +453,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		client := m.phoenixClient.(*phoenix.Client)
 		config := phoenix.Config{
 			URL:      m.phoenixURL,
-			APIKey:   m.apiKey,
-			JWTToken: m.jwtToken,
 			IsAuth:   false,
+		}
+		// Use JWT token if we have one (from login), otherwise use API key
+		if m.jwtToken != "" {
+			config.JWTToken = m.jwtToken
+		} else if m.apiKey != "" {
+			config.APIKey = m.apiKey
 		}
 		m.statusBar = "Connecting to authenticated socket..."
 		return m, client.Connect(config)
