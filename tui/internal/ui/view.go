@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 	
 	"github.com/charmbracelet/lipgloss"
@@ -174,36 +173,50 @@ func (m Model) renderMiniStatusBar(width int) string {
 	var components []string
 	components = append(components, connStatus)
 	
-	// Add username if authenticated
+	// Add authentication status
 	if m.authenticated && m.username != "" {
-		userInfo := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("220")).
-			Render("@" + m.username)
-		components = append(components, userInfo)
+		authStatus := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("46")).
+			Bold(true).
+			Render("● " + m.username)
+		components = append(components, authStatus)
+	} else {
+		authStatus := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Bold(true).
+			Render("● Not authenticated")
+		components = append(components, authStatus)
 	}
 	
-	// Add provider and model info
-	if m.currentProvider != "" || m.currentModel != "" {
-		var modelInfo string
-		if m.currentProvider != "" && m.currentModel != "" {
-			modelInfo = fmt.Sprintf("%s/%s", m.currentProvider, m.currentModel)
-		} else if m.currentModel != "" {
-			modelInfo = m.currentModel
-		} else {
-			modelInfo = m.currentProvider
-		}
-		
-		modelStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("117")).
-			Render(modelInfo)
-		components = append(components, modelStyle)
+	// Add provider status
+	if m.currentProvider != "" {
+		providerStatus := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("46")).
+			Bold(true).
+			Render("● " + m.currentProvider)
+		components = append(components, providerStatus)
+	} else {
+		providerStatus := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Bold(true).
+			Render("● No provider")
+		components = append(components, providerStatus)
 	}
 	
-	// Add "Status Messages" label at the end
-	label := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("250")).
-		Render("Status Messages")
-	components = append(components, label)
+	// Add model status
+	if m.currentModel != "" {
+		modelStatus := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("46")).
+			Bold(true).
+			Render("● " + m.currentModel)
+		components = append(components, modelStatus)
+	} else {
+		modelStatus := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Bold(true).
+			Render("● No model")
+		components = append(components, modelStatus)
+	}
 	
 	// Join components with separator
 	content := strings.Join(components, "  |  ")
