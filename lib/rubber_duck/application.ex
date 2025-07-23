@@ -97,6 +97,15 @@ defmodule RubberDuck.Application do
       RubberDuck.Projects.FileWatcher.Supervisor,
       # Multi-project watcher manager
       RubberDuck.Projects.WatcherManager,
+      # File cache system
+      RubberDuck.Projects.FileCache,
+      # Registry for FileManagerWatcher
+      {Registry, keys: :unique, name: RubberDuck.Projects.FileManagerWatcher.Registry},
+      # FileManagerWatcher supervisor
+      RubberDuck.Projects.FileManagerWatcher.Supervisor,
+      # File collaboration system
+      {Registry, keys: :unique, name: RubberDuck.CollaborationRegistry},
+      RubberDuck.Projects.CollaborationSupervisor,
       # Web endpoint - start last
       RubberDuckWeb.Endpoint,
       {AshAuthentication.Supervisor, [otp_app: :rubber_duck]}
