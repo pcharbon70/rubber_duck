@@ -74,27 +74,32 @@ func (c *Client) Connect(config Config) tea.Cmd {
 		}
 		
 		// Set up event handlers
+		socketType := UserSocketType
+		if config.IsAuth {
+			socketType = AuthSocketType
+		}
+		
 		socket.OnOpen(func() {
 			if c.program != nil {
-				c.program.Send(ConnectedMsg{})
+				c.program.Send(ConnectedMsg{SocketType: socketType})
 			}
 		})
 		
 		socket.OnClose(func() {
 			if c.program != nil {
-				c.program.Send(DisconnectedMsg{Error: nil})
+				c.program.Send(DisconnectedMsg{Error: nil, SocketType: socketType})
 			}
 		})
 		
 		socket.OnError(func(err error) {
 			if c.program != nil {
-				c.program.Send(DisconnectedMsg{Error: err})
+				c.program.Send(DisconnectedMsg{Error: err, SocketType: socketType})
 			}
 		})
 		
 		// Connect to the socket
 		if err := socket.Connect(); err != nil {
-			return DisconnectedMsg{Error: err}
+			return DisconnectedMsg{Error: err, SocketType: socketType}
 		}
 		
 		c.socket = socket

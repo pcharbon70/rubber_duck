@@ -6,10 +6,21 @@ import (
 	"github.com/nshafer/phx"
 )
 
+// SocketType represents the type of socket (auth or user)
+type SocketType string
+
+const (
+	AuthSocketType SocketType = "auth"
+	UserSocketType SocketType = "user"
+)
+
 // Message types used by Phoenix client
 type (
-	ConnectedMsg      struct{}
-	DisconnectedMsg   struct{ Error error }
+	ConnectedMsg      struct{ SocketType SocketType }
+	DisconnectedMsg   struct{ 
+		Error      error
+		SocketType SocketType
+	}
 	SocketCreatedMsg  struct{ Socket *phx.Socket }
 	ChannelJoinedMsg  struct{ Channel *phx.Channel }
 	ChannelJoiningMsg struct{}

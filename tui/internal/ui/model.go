@@ -65,6 +65,7 @@ type Model struct {
 	authenticated bool
 	username      string
 	userID        string // User ID for api_keys channel
+	switchingSocket bool // True when switching from auth to user socket
 	
 	// Status bar
 	statusBar    string

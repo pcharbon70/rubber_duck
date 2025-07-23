@@ -141,20 +141,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, client.Connect(config)
 		
 	case phoenix.ConnectedMsg:
-		m.connected = true
 		// Reset all connection counters on successful connection
 		m.reconnectAttempts = 0
 		m.totalConnectionAttempts = 0
 		m.connectionBlocked = false
 		
-		// Check if this is auth socket or user socket
-		if m.socket == nil {
-			// First connection is to auth socket
+		// Update connection status based on socket type
+		if msg.SocketType == phoenix.AuthSocketType {
+			// Auth socket connected, but don't set m.connected yet
 			m.statusBar = "Connected to auth server - Checking authentication..."
 			m.updateHeaderState()
 			return m, func() tea.Msg { return phoenix.AuthConnectedMsg{} }
 		} else {
-			// Second connection is to user socket
+			// User socket connected - now we're truly connected
+			m.connected = true
+			m.switchingSocket = false // Clear the switching flag
 			m.statusBar = "Connected to authenticated socket - Joining channels..."
 			m.updateHeaderState()
 			// Join conversation, status, and api_keys channels
@@ -165,7 +166,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		
 	case phoenix.DisconnectedMsg:
-		m.connected = false
+		// Only update connection status if it's the user socket disconnecting
+		// or if we're not switching sockets
+		if msg.SocketType == phoenix.UserSocketType || !m.switchingSocket {
+			m.connected = false
+		}
 		m.updateHeaderState()
 		
 		if msg.Error != nil {
@@ -428,7 +433,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	// Switch to authenticated user socket
 	case SwitchToUserSocketMsg:
-		m.statusBar = "Disconnecting from auth socket..."
+		m.statusBar = "Switching to authenticated connection..."
+		m.switchingSocket = true // Set flag to indicate we're switching
 		// First disconnect from auth socket
 		if m.authSocket != nil {
 			m.authSocket.Disconnect()
