@@ -41,6 +41,14 @@ defmodule RubberDuck.Workspace do
       define :list_security_violations, action: :security_violations
       define :list_recent_activity, action: :recent_activity
     end
+    
+    resource RubberDuck.Projects.FileAudit do
+      define :log_operation, action: :log_operation
+      define :list_by_project, action: :by_project
+      define :list_by_user, action: :by_user
+      define :list_recent_failures, action: :recent_failures
+      define :list_security_events, action: :security_events
+    end
   end
 
   # Custom functions for collaborator management
@@ -63,5 +71,37 @@ defmodule RubberDuck.Workspace do
     RubberDuck.Workspace.ProjectCollaborator
     |> Ash.Query.filter(project_id: project.id)
     |> Ash.read!(opts)
+  end
+
+  @doc """
+  Checks if a user can perform a specific operation on a project.
+  
+  This function checks project ownership and collaborator permissions.
+  """
+  def can?(user, operation, project) do
+    cond do
+      # Owner can do anything
+      project.owner_id == user.id ->
+        true
+        
+      # Check collaborator permissions
+      true ->
+        case get_collaborator_permission(project, user) do
+          :admin -> true
+          :write -> operation in [:read, :write, :create, :list, :copy]
+          :read -> operation in [:read, :list]
+          nil -> false
+        end
+    end
+  end
+  
+  defp get_collaborator_permission(project, user) do
+    case RubberDuck.Workspace.ProjectCollaborator
+         |> Ash.Query.filter(project_id: project.id, user_id: user.id)
+         |> Ash.read_one(authorize?: false) do
+      {:ok, nil} -> nil
+      {:ok, collaborator} -> collaborator.permission
+      {:error, _} -> nil
+    end
   end
 end
