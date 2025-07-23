@@ -71,7 +71,6 @@ defmodule RubberDuck.Tool.Composition.Metrics do
     :cpu_usage
   ]
 
-
   @doc """
   Starts the metrics collection server.
   """
@@ -580,5 +579,4 @@ defmodule RubberDuck.Tool.Composition.Metrics do
     # Schedule cleanup every 30 minutes
     Process.send_after(self(), :cleanup, 30 * 60 * 1000)
   end
-
 end

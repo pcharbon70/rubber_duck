@@ -687,7 +687,6 @@ defmodule RubberDuck.MCP.SecurityManager do
     )
   end
 
-
   defp generate_client_id do
     "mcp_client_" <> Base.encode16(:crypto.strong_rand_bytes(8), case: :lower)
   end

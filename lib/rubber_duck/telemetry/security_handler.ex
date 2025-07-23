@@ -1,15 +1,15 @@
 defmodule RubberDuck.Telemetry.SecurityHandler do
   @moduledoc """
   Telemetry handler for security-related events.
-  
+
   Handles events from:
   - MCP security authentication and authorization
   - Security event monitoring
   - Audit logging
   """
-  
+
   require Logger
-  
+
   @doc """
   Attaches telemetry handlers for security events.
   """
@@ -18,14 +18,14 @@ defmodule RubberDuck.Telemetry.SecurityHandler do
       # MCP Security events
       [:mcp, :security, :authenticate],
       [:mcp, :security, :authorize],
-      
+
       # Security monitoring events
       [:rubber_duck, :security, :event],
-      
+
       # Audit events
       [:mcp, :audit, :log]
     ]
-    
+
     :telemetry.attach_many(
       "rubber-duck-security-handler",
       events,
@@ -33,7 +33,7 @@ defmodule RubberDuck.Telemetry.SecurityHandler do
       nil
     )
   end
-  
+
   @doc """
   Handles security telemetry events.
   """
@@ -46,7 +46,7 @@ defmodule RubberDuck.Telemetry.SecurityHandler do
           method: metadata[:method],
           duration_ms: div(measurements[:duration] || 0, 1_000)
         )
-        
+
       :failure ->
         Logger.warning("MCP authentication failed",
           reason: metadata[:reason],
@@ -54,9 +54,10 @@ defmodule RubberDuck.Telemetry.SecurityHandler do
           duration_ms: div(measurements[:duration] || 0, 1_000)
         )
     end
+
     :ok
   end
-  
+
   def handle_event([:mcp, :security, :authorize], measurements, metadata, _config) do
     case metadata[:result] do
       :granted ->
@@ -66,7 +67,7 @@ defmodule RubberDuck.Telemetry.SecurityHandler do
           action: metadata[:action],
           duration_ms: div(measurements[:duration] || 0, 1_000)
         )
-        
+
       :denied ->
         Logger.warning("MCP authorization denied",
           user_id: metadata[:user_id],
@@ -76,13 +77,14 @@ defmodule RubberDuck.Telemetry.SecurityHandler do
           duration_ms: div(measurements[:duration] || 0, 1_000)
         )
     end
+
     :ok
   end
-  
+
   # Security monitoring events
   def handle_event([:rubber_duck, :security, :event], measurements, metadata, _config) do
     severity = metadata[:severity] || :info
-    
+
     case severity do
       :critical ->
         Logger.error("Critical security event",
@@ -91,7 +93,7 @@ defmodule RubberDuck.Telemetry.SecurityHandler do
           source: metadata[:source],
           timestamp: measurements[:timestamp]
         )
-        
+
       :warning ->
         Logger.warning("Security warning event",
           event_type: metadata.event_type,
@@ -99,7 +101,7 @@ defmodule RubberDuck.Telemetry.SecurityHandler do
           source: metadata[:source],
           timestamp: measurements[:timestamp]
         )
-        
+
       _ ->
         Logger.info("Security event",
           event_type: metadata.event_type,
@@ -108,9 +110,10 @@ defmodule RubberDuck.Telemetry.SecurityHandler do
           timestamp: measurements[:timestamp]
         )
     end
+
     :ok
   end
-  
+
   # Audit events
   def handle_event([:mcp, :audit, :log], measurements, metadata, _config) do
     Logger.info("Audit log entry",
@@ -122,11 +125,11 @@ defmodule RubberDuck.Telemetry.SecurityHandler do
       result: metadata[:result],
       timestamp: measurements[:timestamp]
     )
-    
+
     # Could write to dedicated audit log here
     :ok
   end
-  
+
   def handle_event(_event, _measurements, _metadata, _config) do
     :ok
   end

@@ -12,13 +12,16 @@ defmodule RubberDuck.Prompts.ResourcesTest do
 
     test "creates a prompt for a user", %{user: user} do
       assert {:ok, prompt} =
-               Prompts.create_prompt(%{
-                 title: "Test Prompt",
-                 description: "A test prompt",
-                 content: "This is a {{variable}} prompt",
-                 template_variables: %{"variable" => "string"},
-                 is_active: true
-               }, actor: user)
+               Prompts.create_prompt(
+                 %{
+                   title: "Test Prompt",
+                   description: "A test prompt",
+                   content: "This is a {{variable}} prompt",
+                   template_variables: %{"variable" => "string"},
+                   is_active: true
+                 },
+                 actor: user
+               )
 
       assert prompt.title == "Test Prompt"
       assert prompt.user_id == user.id
@@ -26,25 +29,31 @@ defmodule RubberDuck.Prompts.ResourcesTest do
 
     test "prevents access to other users' prompts", %{user: user} do
       other_user = create_user(username: "other_user", email: "other@example.com")
-      
+
       {:ok, prompt} =
-        Prompts.create_prompt(%{
-          title: "Private Prompt",
-          content: "Secret content"
-        }, actor: other_user)
+        Prompts.create_prompt(
+          %{
+            title: "Private Prompt",
+            content: "Secret content"
+          },
+          actor: other_user
+        )
 
       # User should not be able to read other user's prompt
       # Ash returns NotFound instead of Forbidden to avoid information leakage
-      assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{}]}} = 
-        Prompts.get_prompt(prompt.id, actor: user)
+      assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{}]}} =
+               Prompts.get_prompt(prompt.id, actor: user)
     end
 
     test "automatically creates version on update", %{user: user} do
       {:ok, prompt} =
-        Prompts.create_prompt(%{
-          title: "Versioned Prompt",
-          content: "Original content"
-        }, actor: user)
+        Prompts.create_prompt(
+          %{
+            title: "Versioned Prompt",
+            content: "Original content"
+          },
+          actor: user
+        )
 
       assert {:ok, _updated_prompt} =
                Prompts.update_prompt(prompt, %{content: "Updated content"}, actor: user)
@@ -59,16 +68,22 @@ defmodule RubberDuck.Prompts.ResourcesTest do
       other_user = create_user(username: "other_user2", email: "other2@example.com")
 
       {:ok, _user_prompt} =
-        Prompts.create_prompt(%{
-          title: "My Searchable Prompt",
-          content: "Unique content"
-        }, actor: user)
+        Prompts.create_prompt(
+          %{
+            title: "My Searchable Prompt",
+            content: "Unique content"
+          },
+          actor: user
+        )
 
       {:ok, _other_prompt} =
-        Prompts.create_prompt(%{
-          title: "Other Searchable Prompt", 
-          content: "Unique content"
-        }, actor: other_user)
+        Prompts.create_prompt(
+          %{
+            title: "Other Searchable Prompt",
+            content: "Unique content"
+          },
+          actor: other_user
+        )
 
       # Search should only return user's prompt
       assert {:ok, results} = Prompts.search_prompts("Searchable", actor: user)
@@ -85,10 +100,14 @@ defmodule RubberDuck.Prompts.ResourcesTest do
 
     test "creates default 'General' category for new user", %{user: user} do
       # First, manually create the default General category
-      {:ok, _category} = Prompts.create_category(%{
-        name: "General",
-        description: "Default category for prompts"
-      }, actor: user)
+      {:ok, _category} =
+        Prompts.create_category(
+          %{
+            name: "General",
+            description: "Default category for prompts"
+          },
+          actor: user
+        )
 
       assert {:ok, categories} = Prompts.list_categories(actor: user)
       assert length(categories) == 1
@@ -98,10 +117,13 @@ defmodule RubberDuck.Prompts.ResourcesTest do
 
     test "creates user-scoped categories", %{user: user} do
       assert {:ok, category} =
-               Prompts.create_category(%{
-                 name: "Code Templates",
-                 description: "Templates for code generation"
-               }, actor: user)
+               Prompts.create_category(
+                 %{
+                   name: "Code Templates",
+                   description: "Templates for code generation"
+                 },
+                 actor: user
+               )
 
       assert category.user_id == user.id
       assert category.name == "Code Templates"
@@ -109,13 +131,13 @@ defmodule RubberDuck.Prompts.ResourcesTest do
 
     test "prevents access to other users' categories", %{user: user} do
       other_user = create_user(username: "category_user", email: "cat@example.com")
-      
+
       {:ok, category} =
         Prompts.create_category(%{name: "Private Category"}, actor: other_user)
 
       # Ash returns NotFound instead of Forbidden to avoid information leakage
-      assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{}]}} = 
-        Prompts.get_category(category.id, actor: user)
+      assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{}]}} =
+               Prompts.get_category(category.id, actor: user)
     end
   end
 
@@ -127,10 +149,13 @@ defmodule RubberDuck.Prompts.ResourcesTest do
 
     test "creates user-scoped tags", %{user: user} do
       assert {:ok, tag} =
-               Prompts.create_tag(%{
-                 name: "javascript",
-                 color: "#f7df1e"
-               }, actor: user)
+               Prompts.create_tag(
+                 %{
+                   name: "javascript",
+                   color: "#f7df1e"
+                 },
+                 actor: user
+               )
 
       assert tag.user_id == user.id
       assert tag.name == "javascript"
@@ -138,15 +163,15 @@ defmodule RubberDuck.Prompts.ResourcesTest do
 
     test "prevents duplicate tag names for same user", %{user: user} do
       {:ok, _tag} = Prompts.create_tag(%{name: "python"}, actor: user)
-      
+
       # Should fail with unique constraint violation
-      assert {:error, _error} = 
-        Prompts.create_tag(%{name: "python"}, actor: user)
+      assert {:error, _error} =
+               Prompts.create_tag(%{name: "python"}, actor: user)
     end
 
     test "allows same tag name for different users", %{user: user} do
       other_user = create_user(username: "tag_user", email: "tag@example.com")
-      
+
       {:ok, _tag1} = Prompts.create_tag(%{name: "shared"}, actor: user)
       assert {:ok, _tag2} = Prompts.create_tag(%{name: "shared"}, actor: other_user)
     end

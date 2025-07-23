@@ -59,13 +59,13 @@ defmodule RubberDuck.Projects.SymlinkSecurityTest do
       # Create a symlink directory that points outside
       sub_dir = Path.join(project_root, "subdir")
       File.mkdir_p!(sub_dir)
-      
+
       link_dir = Path.join(project_root, "linkdir")
       File.ln_s!(outside_dir, link_dir)
 
       # Try to access a file through the symlink directory
       file_through_link = Path.join(link_dir, "file.txt")
-      
+
       assert {:error, :symlink_escape_attempt} = SymlinkSecurity.check_symlinks(file_through_link, project_root)
     end
 
@@ -147,7 +147,7 @@ defmodule RubberDuck.Projects.SymlinkSecurityTest do
       # Symlinks
       link1 = Path.join(project_root, "link1.txt")
       link2 = Path.join(sub_dir, "link2.txt")
-      
+
       File.ln_s!("file1.txt", link1)
       File.ln_s!("file2.txt", link2)
 
@@ -165,25 +165,25 @@ defmodule RubberDuck.Projects.SymlinkSecurityTest do
   describe "validate_symlink_target/3" do
     test "validates relative symlink targets", %{project_root: project_root} do
       link_path = Path.join(project_root, "subdir/link.txt")
-      
+
       # Target within project (relative to link location)
       assert :ok = SymlinkSecurity.validate_symlink_target(link_path, "../file.txt", project_root)
-      
+
       # Target escaping project
-      assert {:error, :symlink_escape_attempt} = 
-        SymlinkSecurity.validate_symlink_target(link_path, "../../outside.txt", project_root)
+      assert {:error, :symlink_escape_attempt} =
+               SymlinkSecurity.validate_symlink_target(link_path, "../../outside.txt", project_root)
     end
 
     test "validates absolute symlink targets", %{project_root: project_root} do
       link_path = Path.join(project_root, "link.txt")
-      
+
       # Absolute path within project
       target_within = Path.join(project_root, "target.txt")
       assert :ok = SymlinkSecurity.validate_symlink_target(link_path, target_within, project_root)
-      
+
       # Absolute path outside project
-      assert {:error, :symlink_escape_attempt} = 
-        SymlinkSecurity.validate_symlink_target(link_path, "/etc/passwd", project_root)
+      assert {:error, :symlink_escape_attempt} =
+               SymlinkSecurity.validate_symlink_target(link_path, "/etc/passwd", project_root)
     end
   end
 end

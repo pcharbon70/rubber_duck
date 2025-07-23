@@ -26,7 +26,7 @@ defmodule RubberDuckWeb.Router do
 
   scope "/", RubberDuckWeb do
     pipe_through :browser
-    
+
     get "/", PageController, :home
 
     ash_authentication_live_session :authenticated_routes do
@@ -40,13 +40,13 @@ defmodule RubberDuckWeb.Router do
       #
       # If an authenticated user must *not* be present:
       # on_mount {RubberDuckWeb.LiveUserAuth, :live_no_user}
-      
+
       # Status System Dashboard (requires authentication)
       live "/status", StatusDashboardLive, :index
-      
+
       # Default coding session (no project ID required)
       live "/chat", CodingSessionLive, :index
-      
+
       # Project-specific Coding Session
       live "/projects/:project_id/session", CodingSessionLive, :index
     end

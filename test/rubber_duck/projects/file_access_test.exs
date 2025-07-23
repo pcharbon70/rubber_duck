@@ -126,7 +126,7 @@ defmodule RubberDuck.Projects.FileAccessTest do
     test "detects symbolic links", %{project_root: project_root} do
       target = Path.join(project_root, "target.txt")
       link = Path.join(project_root, "link.txt")
-      
+
       File.write!(target, "content")
       File.ln_s!(target, link)
 

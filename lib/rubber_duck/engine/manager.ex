@@ -100,12 +100,12 @@ defmodule RubberDuck.Engine.Manager do
       %{pool_size: pool_size} when pool_size > 1 ->
         # Use pool transaction for pooled engines
         case RubberDuck.Engine.Pool.transaction(
-          engine_name,
-          fn worker ->
-            RubberDuck.Engine.Pool.Worker.execute(worker, input, timeout)
-          end,
-          engine_config.checkout_timeout
-        ) do
+               engine_name,
+               fn worker ->
+                 RubberDuck.Engine.Pool.Worker.execute(worker, input, timeout)
+               end,
+               engine_config.checkout_timeout
+             ) do
           {:error, reason} = error ->
             # Report pool transaction error
             if conversation_id = input[:conversation_id] || input["conversation_id"] do
@@ -123,8 +123,9 @@ defmodule RubberDuck.Engine.Manager do
                 )
               )
             end
+
             error
-            
+
           result ->
             result
         end

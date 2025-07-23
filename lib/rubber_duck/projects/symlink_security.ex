@@ -1,7 +1,7 @@
 defmodule RubberDuck.Projects.SymlinkSecurity do
   @moduledoc """
   Security module for detecting and preventing symbolic link attacks.
-  
+
   Provides comprehensive symlink validation to prevent escaping project
   sandboxes through symbolic links.
   """
@@ -10,7 +10,7 @@ defmodule RubberDuck.Projects.SymlinkSecurity do
 
   @doc """
   Checks if a path contains or resolves through symbolic links.
-  
+
   Returns {:ok, :safe} if no symlinks detected, {:error, reason} otherwise.
   """
   @spec check_symlinks(String.t(), String.t()) :: {:ok, :safe} | {:error, atom()}
@@ -66,7 +66,7 @@ defmodule RubberDuck.Projects.SymlinkSecurity do
       {:ok, entries} ->
         symlinks = scan_directory_recursive(directory, entries, [])
         {:ok, symlinks}
-      
+
       error ->
         error
     end
@@ -86,15 +86,15 @@ defmodule RubberDuck.Projects.SymlinkSecurity do
 
   defp normalize_within_root(path, project_root) do
     normalized_root = Path.expand(project_root)
-    
-    normalized_path = 
+
+    normalized_path =
       if Path.absname(path) == path do
         path
       else
         Path.join(normalized_root, path)
       end
       |> Path.expand()
-    
+
     {:ok, normalized_path}
   end
 
@@ -102,7 +102,7 @@ defmodule RubberDuck.Projects.SymlinkSecurity do
     # Check each component of the path for symlinks
     components = Path.split(path)
     root_components = Path.split(project_root)
-    
+
     # Start checking from the first component after project root
     check_components_recursive(components, length(root_components), project_root)
   end
@@ -114,7 +114,7 @@ defmodule RubberDuck.Projects.SymlinkSecurity do
     |> check_remaining_components(components, start_index + 1, project_root)
   end
 
-  defp check_remaining_components(_current_path, components, index, _project_root) 
+  defp check_remaining_components(_current_path, components, index, _project_root)
        when index >= length(components) do
     :ok
   end
@@ -122,7 +122,7 @@ defmodule RubberDuck.Projects.SymlinkSecurity do
   defp check_remaining_components(current_path, components, index, project_root) do
     next_component = Enum.at(components, index)
     next_path = Path.join(current_path, next_component)
-    
+
     case File.lstat(next_path) do
       {:ok, %File.Stat{type: :symlink}} ->
         # Found a symlink in the path
@@ -130,15 +130,15 @@ defmodule RubberDuck.Projects.SymlinkSecurity do
           :ok -> check_remaining_components(next_path, components, index + 1, project_root)
           error -> error
         end
-      
+
       {:ok, _} ->
         # Regular file or directory, continue checking
         check_remaining_components(next_path, components, index + 1, project_root)
-      
+
       {:error, :enoent} ->
         # Path doesn't exist yet, that's okay for new files
         :ok
-      
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -150,7 +150,7 @@ defmodule RubberDuck.Projects.SymlinkSecurity do
         # Check if the symlink target escapes the project root
         resolved = resolve_symlink_target(symlink_path, target)
         verify_resolved_within_root(resolved, project_root)
-      
+
       {:error, reason} ->
         Logger.error("Failed to read symlink #{symlink_path}: #{inspect(reason)}")
         {:error, :symlink_read_failed}
@@ -159,7 +159,7 @@ defmodule RubberDuck.Projects.SymlinkSecurity do
 
   defp resolve_symlink_target(symlink_path, target) do
     link_dir = Path.dirname(symlink_path)
-    
+
     if Path.absname(target) == target do
       # Absolute target
       target
@@ -174,20 +174,21 @@ defmodule RubberDuck.Projects.SymlinkSecurity do
       {:ok, %File.Stat{type: :symlink}} ->
         # The final component is a symlink
         validate_symlink_in_path(path, project_root)
-      
+
       {:ok, _} ->
         # Not a symlink, verify it's within root
         verify_resolved_within_root(path, project_root)
-      
+
       {:error, :enoent} ->
         # File doesn't exist, check parent directory
         parent = Path.dirname(path)
+
         if parent == path do
           :ok
         else
           verify_final_destination(parent, project_root)
         end
-      
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -207,25 +208,27 @@ defmodule RubberDuck.Projects.SymlinkSecurity do
       {:ok, target} ->
         resolved = resolve_symlink_target(path, target)
         resolve_with_limit(resolved, depth + 1, max_depth)
-      
+
       {:error, :einval} ->
         # Not a symlink, we're done
         {:ok, path}
-      
+
       {:error, :enoent} ->
         # Path doesn't exist, check parent
         parent = Path.dirname(path)
+
         if parent == path do
           {:ok, path}
         else
           case resolve_with_limit(parent, depth, max_depth) do
             {:ok, resolved_parent} ->
               {:ok, Path.join(resolved_parent, Path.basename(path))}
+
             error ->
               error
           end
         end
-      
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -234,9 +237,9 @@ defmodule RubberDuck.Projects.SymlinkSecurity do
   defp verify_resolved_within_root(resolved_path, project_root) do
     normalized_root = Path.expand(project_root)
     normalized_resolved = Path.expand(resolved_path)
-    
+
     if String.starts_with?(normalized_resolved, normalized_root <> "/") or
-       normalized_resolved == normalized_root do
+         normalized_resolved == normalized_root do
       :ok
     else
       Logger.warning("Symlink escape attempt: #{resolved_path} resolves outside #{project_root}")
@@ -260,20 +263,21 @@ defmodule RubberDuck.Projects.SymlinkSecurity do
   defp scan_directory_recursive(directory, entries, symlinks) do
     Enum.reduce(entries, symlinks, fn entry, acc ->
       full_path = Path.join(directory, entry)
-      
+
       case File.lstat(full_path) do
         {:ok, %File.Stat{type: :symlink}} ->
           [full_path | acc]
-        
+
         {:ok, %File.Stat{type: :directory}} ->
           # Recursively scan subdirectories
           case File.ls(full_path) do
             {:ok, subentries} ->
               scan_directory_recursive(full_path, subentries, acc)
+
             _ ->
               acc
           end
-        
+
         _ ->
           acc
       end

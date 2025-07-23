@@ -1,12 +1,12 @@
 defmodule RubberDuck.Prompts do
   use Ash.Domain,
     otp_app: :rubber_duck
-    
+
   require Ash.Query
 
   def list_prompt_versions(prompt_id, opts \\ []) do
     actor = Keyword.get(opts, :actor)
-    
+
     # First check if the user owns the prompt
     case get_prompt(prompt_id, actor: actor) do
       {:ok, _prompt} ->
@@ -14,8 +14,9 @@ defmodule RubberDuck.Prompts do
         |> Ash.Query.filter(prompt_id: prompt_id)
         |> Ash.Query.sort(version_number: :desc)
         |> Ash.read(actor: actor)
-      
-      error -> error
+
+      error ->
+        error
     end
   end
 

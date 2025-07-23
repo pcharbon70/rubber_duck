@@ -16,7 +16,7 @@ defmodule RubberDuck.Prompts.Prompt do
     create :create do
       primary? true
       accept [:title, :description, :content, :template_variables, :is_active, :metadata]
-      
+
       argument :category_ids, {:array, :uuid}, allow_nil?: true
       argument :tag_ids, {:array, :uuid}, allow_nil?: true
 
@@ -29,27 +29,26 @@ defmodule RubberDuck.Prompts.Prompt do
       primary? true
       require_atomic? false
       accept [:title, :description, :content, :template_variables, :is_active, :metadata]
-      
+
       argument :category_ids, {:array, :uuid}, allow_nil?: true
       argument :tag_ids, {:array, :uuid}, allow_nil?: true
 
       # Create version before update
       change {RubberDuck.Prompts.Changes.CreateVersion, []}
-      
+
       change manage_relationship(:category_ids, :categories, type: :direct_control)
       change manage_relationship(:tag_ids, :tags, type: :direct_control)
     end
 
     read :search do
       argument :query, :string, allow_nil?: false
-      
-      filter expr(
-        contains(title, ^arg(:query)) or
-        contains(description, ^arg(:query)) or
-        contains(content, ^arg(:query))
-      )
-    end
 
+      filter expr(
+               contains(title, ^arg(:query)) or
+                 contains(description, ^arg(:query)) or
+                 contains(content, ^arg(:query))
+             )
+    end
   end
 
   policies do
@@ -57,7 +56,7 @@ defmodule RubberDuck.Prompts.Prompt do
     policy action_type(:create) do
       authorize_if actor_present()
     end
-    
+
     # For reads, updates, and destroys, users can only access their own prompts
     policy action_type([:read, :update, :destroy]) do
       authorize_if expr(user_id == ^actor(:id))

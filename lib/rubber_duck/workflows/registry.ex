@@ -199,12 +199,13 @@ defmodule RubberDuck.Workflows.Registry do
         rescue
           e ->
             Logger.warning("Failed to register workflow #{inspect(module)}: #{inspect(e)}")
-            
+
             # Report to status system if we have a session/conversation context
             # Since this is during registration/startup, we won't have a conversation_id
             # But we can still track this as a system-level error
             Status.error(
-              nil,  # No conversation context
+              # No conversation context
+              nil,
               "Workflow registration failed",
               Status.build_error_metadata(
                 :registration_error,

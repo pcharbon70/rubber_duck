@@ -15,6 +15,8 @@ defmodule RubberDuck.Application do
       {Registry, keys: :unique, name: RubberDuck.CircuitBreakerRegistry},
       # Registry for engines
       {Registry, keys: :unique, name: RubberDuck.Engine.Registry, id: RubberDuck.Engine.ProcessRegistry},
+      # Registry for file watchers
+      {Registry, keys: :unique, name: RubberDuck.Projects.FileWatcher.Registry},
       # Engine system components
       RubberDuck.Engine.CapabilityRegistry,
       RubberDuck.Engine.Supervisor,
@@ -91,6 +93,10 @@ defmodule RubberDuck.Application do
       RubberDuckWeb.Collaboration.SharedSelections,
       RubberDuckWeb.Collaboration.SessionManager,
       RubberDuckWeb.Collaboration.Communication,
+      # Project file watcher system
+      RubberDuck.Projects.FileWatcher.Supervisor,
+      # Multi-project watcher manager
+      RubberDuck.Projects.WatcherManager,
       # Web endpoint - start last
       RubberDuckWeb.Endpoint,
       {AshAuthentication.Supervisor, [otp_app: :rubber_duck]}

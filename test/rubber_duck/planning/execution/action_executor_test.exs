@@ -9,9 +9,9 @@ defmodule RubberDuck.Planning.Execution.ActionExecutorTest do
       task = build_simple_task()
       thought = build_direct_thought()
       state = build_execution_state()
-      
+
       result = ActionExecutor.execute_action(task, thought, state)
-      
+
       assert {:ok, _pid} = result
     end
 
@@ -19,9 +19,9 @@ defmodule RubberDuck.Planning.Execution.ActionExecutorTest do
       task = build_workflow_task()
       thought = build_direct_thought()
       state = build_execution_state()
-      
+
       result = ActionExecutor.execute_action(task, thought, state)
-      
+
       assert {:ok, _pid} = result
     end
 
@@ -29,9 +29,9 @@ defmodule RubberDuck.Planning.Execution.ActionExecutorTest do
       task = build_engine_task()
       thought = build_direct_thought()
       state = build_execution_state()
-      
+
       result = ActionExecutor.execute_action(task, thought, state)
-      
+
       assert {:ok, _pid} = result
     end
 
@@ -39,9 +39,9 @@ defmodule RubberDuck.Planning.Execution.ActionExecutorTest do
       task = build_tool_task()
       thought = build_direct_thought()
       state = build_execution_state()
-      
+
       result = ActionExecutor.execute_action(task, thought, state)
-      
+
       assert {:ok, _pid} = result
     end
   end
@@ -51,9 +51,9 @@ defmodule RubberDuck.Planning.Execution.ActionExecutorTest do
       task = build_simple_task()
       thought = build_careful_thought()
       state = build_execution_state()
-      
+
       result = ActionExecutor.execute_action(task, thought, state)
-      
+
       assert {:ok, _pid} = result
     end
   end
@@ -64,12 +64,13 @@ defmodule RubberDuck.Planning.Execution.ActionExecutorTest do
         id: "dependent_task",
         name: "Dependent Task"
       }
+
       thought = build_validation_thought()
       state = build_execution_state()
-      
+
       # For now, this will pass since we don't have dependency validation implemented yet
       result = ActionExecutor.execute_action(task, thought, state)
-      
+
       assert {:ok, _pid} = result
     end
 
@@ -78,15 +79,17 @@ defmodule RubberDuck.Planning.Execution.ActionExecutorTest do
         id: "dependent_task",
         name: "Dependent Task"
       }
+
       thought = build_validation_thought()
+
       state = %{
         completed_tasks: MapSet.new(["completed_dep"]),
         failed_tasks: MapSet.new(),
         history: %{}
       }
-      
+
       result = ActionExecutor.execute_action(task, thought, state)
-      
+
       assert {:ok, _pid} = result
     end
   end
@@ -96,9 +99,9 @@ defmodule RubberDuck.Planning.Execution.ActionExecutorTest do
       task = build_complex_task()
       thought = build_timeout_thought()
       state = build_execution_state()
-      
+
       result = ActionExecutor.execute_action(task, thought, state)
-      
+
       assert {:ok, _pid} = result
     end
   end
@@ -108,11 +111,11 @@ defmodule RubberDuck.Planning.Execution.ActionExecutorTest do
       task = build_simple_task()
       thought = build_delay_thought()
       state = build_retry_state()
-      
+
       start_time = :os.system_time(:millisecond)
       result = ActionExecutor.execute_action(task, thought, state)
       end_time = :os.system_time(:millisecond)
-      
+
       assert {:ok, _pid} = result
       # Should have applied some delay (at least 1 second for first retry)
       assert end_time - start_time >= 1000
@@ -124,9 +127,9 @@ defmodule RubberDuck.Planning.Execution.ActionExecutorTest do
       task = build_task_with_invalid_input()
       thought = build_fix_thought()
       state = build_state_with_input_failure()
-      
+
       result = ActionExecutor.execute_action(task, thought, state)
-      
+
       assert {:ok, _pid} = result
     end
   end
@@ -136,21 +139,22 @@ defmodule RubberDuck.Planning.Execution.ActionExecutorTest do
       task = build_simple_task()
       thought = build_modification_thought()
       state = build_state_with_multiple_attempts()
-      
+
       result = ActionExecutor.execute_action(task, thought, state)
-      
+
       assert {:ok, _pid} = result
     end
   end
 
   describe "error handling" do
     test "handles execution errors gracefully" do
-      task = %Task{id: nil}  # Invalid task to trigger error
+      # Invalid task to trigger error
+      task = %Task{id: nil}
       thought = build_direct_thought()
       state = build_execution_state()
-      
+
       result = ActionExecutor.execute_action(task, thought, state)
-      
+
       assert {:error, _reason} = result
     end
   end
@@ -185,7 +189,7 @@ defmodule RubberDuck.Planning.Execution.ActionExecutorTest do
   defp build_tool_task do
     %Task{
       id: "tool_task",
-      name: "Tool Task", 
+      name: "Tool Task",
       metadata: %{tool: :test_tool}
     }
   end

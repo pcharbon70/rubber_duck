@@ -12,23 +12,23 @@ defmodule RubberDuck.Workspace.ProjectCollaborator do
 
   actions do
     defaults [:read, :destroy]
-    
+
     create :create do
       accept [:permission]
       primary? true
-      
+
       argument :project_id, :uuid do
         allow_nil? false
       end
-      
+
       argument :user_id, :uuid do
         allow_nil? false
       end
-      
+
       change set_attribute(:project_id, arg(:project_id))
       change set_attribute(:user_id, arg(:user_id))
     end
-    
+
     update :update do
       accept [:permission]
     end
@@ -81,7 +81,7 @@ defmodule RubberDuck.Workspace.ProjectCollaborator do
       attribute_writable? true
       primary_key? true
     end
-    
+
     belongs_to :user, RubberDuck.Accounts.User do
       allow_nil? false
       attribute_writable? true

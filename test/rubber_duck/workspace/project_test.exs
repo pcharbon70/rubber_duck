@@ -12,10 +12,13 @@ defmodule RubberDuck.Workspace.ProjectTest do
 
     test "can create a project with valid attributes", %{user: user} do
       assert {:ok, project} =
-               Workspace.create_project(%{
-                 name: "Test Project",
-                 description: "A test project for RubberDuck"
-               }, actor: user)
+               Workspace.create_project(
+                 %{
+                   name: "Test Project",
+                   description: "A test project for RubberDuck"
+                 },
+                 actor: user
+               )
 
       assert project.name == "Test Project"
       assert project.description == "A test project for RubberDuck"
@@ -27,9 +30,12 @@ defmodule RubberDuck.Workspace.ProjectTest do
 
     test "name attribute is required", %{user: user} do
       assert {:error, error} =
-               Workspace.create_project(%{
-                 description: "Missing name"
-               }, actor: user)
+               Workspace.create_project(
+                 %{
+                   description: "Missing name"
+                 },
+                 actor: user
+               )
 
       assert %Ash.Error.Invalid{} = error
     end
@@ -47,7 +53,8 @@ defmodule RubberDuck.Workspace.ProjectTest do
         description: "A test project with file sandbox",
         root_path: "/home/user/projects/test",
         file_access_enabled: true,
-        max_file_size: 10_485_760, # 10MB
+        # 10MB
+        max_file_size: 10_485_760,
         allowed_extensions: [".ex", ".exs", ".md", ".txt"],
         sandbox_config: %{
           "allow_symlinks" => false,
@@ -92,12 +99,16 @@ defmodule RubberDuck.Workspace.ProjectTest do
     setup do
       owner = AccountsFixtures.user_fixture()
       collaborator = AccountsFixtures.user_fixture()
-      
-      {:ok, project} = Workspace.create_project(%{
-        name: "Test Project #{System.unique_integer()}",
-        description: "Test description"
-      }, actor: owner)
-      
+
+      {:ok, project} =
+        Workspace.create_project(
+          %{
+            name: "Test Project #{System.unique_integer()}",
+            description: "Test description"
+          },
+          actor: owner
+        )
+
       {:ok, owner: owner, collaborator: collaborator, project: project}
     end
 
@@ -110,13 +121,13 @@ defmodule RubberDuck.Workspace.ProjectTest do
 
     test "only owner can add collaborators", %{project: project, collaborator: collaborator} do
       non_owner = AccountsFixtures.user_fixture()
-      
+
       assert {:error, _} = Workspace.add_project_collaborator(project, collaborator, :write, actor: non_owner)
     end
 
     test "lists project collaborators", %{project: project, collaborator: collaborator, owner: owner} do
       {:ok, _} = Workspace.add_project_collaborator(project, collaborator, :read, actor: owner)
-      
+
       collaborators = Workspace.list_project_collaborators!(project, actor: owner)
       assert length(collaborators) == 1
       assert hd(collaborators).user_id == collaborator.id

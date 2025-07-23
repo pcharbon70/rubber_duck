@@ -1,15 +1,15 @@
 defmodule RubberDuckWeb.CodingSessionLive do
   @moduledoc """
   Main LiveView coordinator for the collaborative coding interface.
-  
+
   Provides a chat-centric interface with toggleable file tree and editor panels,
   real-time collaboration features, and AI-powered assistance.
   """
-  
+
   use RubberDuckWeb, :live_view
-  
+
   require Logger
-  
+
   alias Phoenix.PubSub
   alias RubberDuckWeb.Presence
   alias RubberDuckWeb.Components.ChatPanelComponent
@@ -19,40 +19,42 @@ defmodule RubberDuckWeb.CodingSessionLive do
   alias RubberDuck.Projects.FileTree
   alias RubberDuck.Analysis.CodeAnalyzer
   alias RubberDuck.Analysis.MetricsCollector
+
   alias RubberDuckWeb.Collaboration.{
     PresenceTracker,
     SessionManager,
     Communication
   }
-  
+
   # Require authentication
   on_mount {RubberDuckWeb.LiveUserAuth, :live_user_required}
-  
+
   @impl true
   def mount(params, _session, socket) do
     user = socket.assigns.current_user
-    
+
     # Handle both with and without project_id
     project_id = params["project_id"] || "default"
-    
+
     if connected?(socket) do
       # Subscribe to PubSub topics
       subscribe_to_project_updates(project_id)
-      
+
       # Track presence
       track_user_presence(project_id, user)
-      
+
       # Set up periodic presence updates
       :timer.send_interval(30_000, self(), :update_presence)
     end
-    
+
     # Generate conversation ID
-    conversation_id = if project_id == "default" do
-      "user-#{user.id}-#{Ecto.UUID.generate()}"
-    else
-      "project-#{project_id}-#{Ecto.UUID.generate()}"
-    end
-    
+    conversation_id =
+      if project_id == "default" do
+        "user-#{user.id}-#{Ecto.UUID.generate()}"
+      else
+        "project-#{project_id}-#{Ecto.UUID.generate()}"
+      end
+
     socket =
       socket
       |> assign(:page_title, "RubberDuck Chat")
@@ -63,18 +65,19 @@ defmodule RubberDuckWeb.CodingSessionLive do
       |> assign_initial_state()
       |> assign_layout_preferences()
       |> fetch_project_data()
-    
+
     # Push event to join conversation channel after socket is established
     if connected?(socket) do
-      {:ok, push_event(socket, "join_conversation", %{
-        conversation_id: conversation_id,
-        project_id: project_id
-      })}
+      {:ok,
+       push_event(socket, "join_conversation", %{
+         conversation_id: conversation_id,
+         project_id: project_id
+       })}
     else
       {:ok, socket}
     end
   end
-  
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -182,69 +185,69 @@ defmodule RubberDuckWeb.CodingSessionLive do
     </div>
     """
   end
-  
+
   # Event Handlers
-  
+
   @impl true
   def handle_event("window_keydown", %{"key" => key, "ctrlKey" => true}, socket) do
     socket = handle_keyboard_shortcut(key, socket)
     {:noreply, socket}
   end
-  
+
   def handle_event("toggle_panel", %{"panel" => panel}, socket) do
     layout = update_layout_visibility(socket.assigns.panel_layout, panel)
     {:noreply, assign(socket, :panel_layout, layout)}
   end
-  
+
   @impl true
   def handle_event("start_collaboration", _params, socket) do
     # Create a new collaborative session
     case SessionManager.create_session(socket.assigns.project_id, socket.assigns.user.id, %{
-      name: "Collaborative Coding - #{socket.assigns.project_name}",
-      record: true,
-      enable_voice: false,
-      enable_screen_share: false
-    }) do
+           name: "Collaborative Coding - #{socket.assigns.project_name}",
+           record: true,
+           enable_voice: false,
+           enable_screen_share: false
+         }) do
       {:ok, session} ->
-        socket = 
+        socket =
           socket
           |> assign(:collaboration_session, session)
           |> assign(:is_collaborative, true)
           |> push_event("collaboration_started", %{session_id: session.id})
-        
+
         {:noreply, socket}
-        
+
       {:error, reason} ->
         socket = put_flash(socket, :error, "Failed to start collaboration: #{reason}")
         {:noreply, socket}
     end
   end
-  
+
   @impl true
   def handle_event("end_collaboration", _params, socket) do
     if socket.assigns.collaboration_session do
       SessionManager.end_session(
-        socket.assigns.collaboration_session.id, 
+        socket.assigns.collaboration_session.id,
         socket.assigns.user.id
       )
     end
-    
-    socket = 
+
+    socket =
       socket
       |> assign(:collaboration_session, nil)
       |> assign(:is_collaborative, false)
       |> assign(:active_collaborators, [])
       |> push_event("collaboration_ended", %{})
-    
+
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("toggle_collaborators", _params, socket) do
     socket = update(socket, :show_collaborators, &(!&1))
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("send_reaction", %{"emoji" => emoji}, socket) do
     Communication.send_reaction(
@@ -252,17 +255,17 @@ defmodule RubberDuckWeb.CodingSessionLive do
       socket.assigns.user.id,
       emoji
     )
+
     {:noreply, socket}
   end
-  
-  
+
   # Channel event handlers from client
-  
+
   @impl true
   def handle_event("conversation_joined", %{"conversation_id" => _conv_id}, socket) do
     {:noreply, assign(socket, :conversation_connected, true)}
   end
-  
+
   @impl true
   def handle_event("conversation_response", %{"response" => response}, socket) do
     # Create assistant message from channel response
@@ -280,15 +283,15 @@ defmodule RubberDuckWeb.CodingSessionLive do
         tokens: response["tokens"]
       }
     }
-    
-    socket = 
+
+    socket =
       socket
       |> update(:chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
       |> update(:streaming_message, fn _ -> nil end)
-    
+
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("conversation_thinking", _params, socket) do
     # Show thinking indicator
@@ -301,10 +304,10 @@ defmodule RubberDuckWeb.CodingSessionLive do
         status: :streaming
       }
     }
-    
+
     {:noreply, assign(socket, :streaming_message, streaming_message)}
   end
-  
+
   @impl true
   def handle_event("conversation_error", %{"error" => error}, socket) do
     # Create error message
@@ -318,15 +321,15 @@ defmodule RubberDuckWeb.CodingSessionLive do
         details: error["details"]
       }
     }
-    
-    socket = 
+
+    socket =
       socket
       |> update(:chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
       |> update(:streaming_message, fn _ -> nil end)
-    
+
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("auth_success", %{"user" => user, "token" => token}, socket) do
     message = %{
@@ -335,16 +338,16 @@ defmodule RubberDuckWeb.CodingSessionLive do
       content: "✅ Successfully logged in as #{user["username"]}",
       metadata: %{timestamp: DateTime.utc_now(), status: :complete}
     }
-    
-    socket = 
+
+    socket =
       socket
       |> assign(:auth_token, token)
       |> assign(:authenticated_user, user)
       |> update(:chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
-    
+
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("auth_error", %{"message" => msg}, socket) do
     message = %{
@@ -353,11 +356,11 @@ defmodule RubberDuckWeb.CodingSessionLive do
       content: "❌ Authentication failed: #{msg}",
       metadata: %{timestamp: DateTime.utc_now(), status: :error}
     }
-    
+
     socket = update(socket, :chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("api_key_generated", %{"api_key" => api_key, "warning" => warning}, socket) do
     message = %{
@@ -365,41 +368,42 @@ defmodule RubberDuckWeb.CodingSessionLive do
       type: :system,
       content: """
       ✅ API Key Generated:
-      
+
       Name: #{api_key["name"]}
       Key: `#{api_key["key"]}`
       Expires: #{api_key["expires_at"] || "Never"}
-      
+
       ⚠️ #{warning}
       """,
       metadata: %{timestamp: DateTime.utc_now(), status: :complete}
     }
-    
+
     socket = update(socket, :chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("api_key_list", %{"api_keys" => keys}, socket) do
-    keys_text = Enum.map_join(keys, "\n", fn key ->
-      "- #{key["name"]} (ID: #{key["id"]}, Created: #{key["created_at"]})"
-    end)
-    
+    keys_text =
+      Enum.map_join(keys, "\n", fn key ->
+        "- #{key["name"]} (ID: #{key["id"]}, Created: #{key["created_at"]})"
+      end)
+
     message = %{
       id: Ecto.UUID.generate(),
       type: :system,
       content: """
       📋 Your API Keys:
-      
+
       #{if keys_text == "", do: "No API keys found.", else: keys_text}
       """,
       metadata: %{timestamp: DateTime.utc_now(), status: :complete}
     }
-    
+
     socket = update(socket, :chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("api_key_revoked", %{"api_key_id" => key_id}, socket) do
     message = %{
@@ -408,11 +412,11 @@ defmodule RubberDuckWeb.CodingSessionLive do
       content: "✅ API Key #{key_id} has been revoked successfully.",
       metadata: %{timestamp: DateTime.utc_now(), status: :complete}
     }
-    
+
     socket = update(socket, :chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("api_key_error", %{"message" => msg}, socket) do
     message = %{
@@ -421,36 +425,36 @@ defmodule RubberDuckWeb.CodingSessionLive do
       content: "❌ API Key Error: #{msg}",
       metadata: %{timestamp: DateTime.utc_now(), status: :error}
     }
-    
+
     socket = update(socket, :chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
     {:noreply, socket}
   end
-  
+
   # PubSub Handlers
-  
+
   @impl true
   def handle_info({:project_update, update}, socket) do
     socket = apply_project_update(socket, update)
     {:noreply, socket}
   end
-  
+
   def handle_info({:chat_message, message}, socket) do
     # The ChatPanelComponent will handle its own messages via PubSub
     # We just need to update our local state for the component
     socket = update(socket, :chat_messages, &(&1 ++ [{"message-#{message.id}", message}]))
     {:noreply, socket}
   end
-  
+
   def handle_info({:editor_update, update}, socket) do
     socket = apply_editor_update(socket, update)
     {:noreply, socket}
   end
-  
+
   def handle_info({:presence_diff, diff}, socket) do
     socket = handle_presence_diff(socket, diff)
     {:noreply, socket}
   end
-  
+
   def handle_info(:update_presence, socket) do
     Presence.update(
       self(),
@@ -461,117 +465,121 @@ defmodule RubberDuckWeb.CodingSessionLive do
         current_file: socket.assigns.current_file
       }
     )
+
     {:noreply, socket}
   end
-  
+
   def handle_info({:send_to_conversation, message}, socket) do
     # Push event to client to send through ConversationChannel
-    socket = push_event(socket, "send_to_conversation", %{
-      content: message.content,
-      conversation_id: socket.assigns.conversation_id
-    })
-    
+    socket =
+      push_event(socket, "send_to_conversation", %{
+        content: message.content,
+        conversation_id: socket.assigns.conversation_id
+      })
+
     {:noreply, socket}
   end
-  
+
   def handle_info({:update_llm_preferences, preferences}, socket) do
     # Push event to update preferences through ConversationChannel
     socket = push_event(socket, "update_llm_preferences", preferences)
-    
+
     {:noreply, socket}
   end
-  
+
   def handle_info({:auth_login, %{username: username, password: password}}, socket) do
     # Push event to handle login through AuthChannel
     socket = push_event(socket, "auth_login", %{username: username, password: password})
     {:noreply, socket}
   end
-  
+
   def handle_info({:auth_logout}, socket) do
     # Push event to handle logout through AuthChannel
     socket = push_event(socket, "auth_logout", %{})
     {:noreply, socket}
   end
-  
+
   def handle_info({:api_key_generate, params}, socket) do
     # Push event to generate API key
     socket = push_event(socket, "api_key_generate", params)
     {:noreply, socket}
   end
-  
+
   def handle_info({:api_key_list}, socket) do
     # Push event to list API keys
     socket = push_event(socket, "api_key_list", %{})
     {:noreply, socket}
   end
-  
+
   def handle_info({:api_key_revoke, key_id}, socket) do
     # Push event to revoke API key
     socket = push_event(socket, "api_key_revoke", %{key_id: key_id})
     {:noreply, socket}
   end
-  
+
   def handle_info({:file_selected, file_path}, socket) do
     # Handle file selection from FileTreeComponent
-    socket = 
+    socket =
       socket
       |> assign(:current_file, file_path)
       |> push_event("file_opened", %{path: file_path})
-    
+
     # Update context panel with new file
     ContextPanelComponent.update_current_file("context-panel", file_path)
-    
+
     # Broadcast file selection to other users
     PubSub.broadcast(
       RubberDuck.PubSub,
       "project:#{socket.assigns.project_id}",
-      {:user_opened_file, %{
-        user_id: socket.assigns.user.id,
-        file_path: file_path
-      }}
+      {:user_opened_file,
+       %{
+         user_id: socket.assigns.user.id,
+         file_path: file_path
+       }}
     )
-    
+
     {:noreply, socket}
   end
-  
+
   def handle_info({:load_file_tree, component_id, show_hidden}, socket) do
     # Load file tree asynchronously
-    project_path = File.cwd!() # TODO: Get from project record
-    
+    # TODO: Get from project record
+    project_path = File.cwd!()
+
     Task.async(fn ->
       case FileTree.list_tree(project_path, show_hidden: show_hidden) do
         {:ok, tree} ->
           # Get git status
-          git_status = 
+          git_status =
             case FileTree.get_git_status(project_path) do
               {:ok, status} -> status
               _ -> %{}
             end
-            
+
           {:ok, component_id, tree.children || [], git_status}
-          
+
         {:error, reason} ->
           {:error, component_id, "Failed to load file tree: #{inspect(reason)}"}
       end
     end)
-    
+
     {:noreply, socket}
   end
-  
+
   def handle_info({ref, result}, socket) when is_reference(ref) do
     # Handle async task results
     Process.demonitor(ref, [:flush])
-    
+
     case result do
       {:ok, component_id, tree_nodes, git_status} ->
         FileTreeComponent.update_tree_data(component_id, tree_nodes, git_status)
-        
+
       {:error, component_id, error} ->
         FileTreeComponent.update_tree_error(component_id, error)
-        
+
       {:file_content, component_id, content, language} ->
         MonacoEditorComponent.update_content(component_id, content, language)
-        
+
       {:file_analysis, component_id, analysis, related_files, metrics} ->
         # Update context panel with analysis results
         send_update(ContextPanelComponent,
@@ -582,14 +590,14 @@ defmodule RubberDuckWeb.CodingSessionLive do
           code_metrics: metrics,
           loading: false
         )
-        
+
       {:file_analysis_error, component_id, reason} ->
         ContextPanelComponent.add_notification(component_id, :error, "Analysis failed: #{reason}")
     end
-    
+
     {:noreply, socket}
   end
-  
+
   def handle_info({:load_file_content, component_id, file_path}, socket) do
     # Load file content asynchronously
     Task.async(fn ->
@@ -598,22 +606,22 @@ defmodule RubberDuckWeb.CodingSessionLive do
           # Detect language from file extension
           language = detect_language_from_path(file_path)
           {:file_content, component_id, content, language}
-          
+
         {:error, reason} ->
           {:file_content, component_id, "# Error loading file: #{inspect(reason)}", "plaintext"}
       end
     end)
-    
+
     {:noreply, socket}
   end
-  
+
   def handle_info({:auto_save, component_id}, socket) do
     # Auto-save functionality can be implemented here
     # For now, just log
     Logger.debug("Auto-save triggered for component: #{component_id}")
     {:noreply, socket}
   end
-  
+
   def handle_info({:analyze_file, component_id, file_path}, socket) do
     # Analyze file asynchronously
     Task.async(fn ->
@@ -622,122 +630,123 @@ defmodule RubberDuckWeb.CodingSessionLive do
           # Get related files
           project_path = File.cwd!()
           related_files = CodeAnalyzer.find_related_files(file_path, project_path)
-          
+
           # Get metrics
           metrics = %{
             complexity: %{
               cyclomatic: analysis.complexity,
-              cognitive: analysis.complexity + 5 # Mock cognitive complexity
+              # Mock cognitive complexity
+              cognitive: analysis.complexity + 5
             },
             test_coverage: MetricsCollector.get_test_coverage(socket.assigns.project_id),
             performance: MetricsCollector.get_performance_metrics(socket.assigns.project_id),
             security_score: elem(MetricsCollector.get_security_score(socket.assigns.project_id), 0),
             security_issues: elem(MetricsCollector.get_security_score(socket.assigns.project_id), 1)
           }
-          
+
           {:file_analysis, component_id, analysis, related_files, metrics}
-          
+
         {:error, reason} ->
           {:file_analysis_error, component_id, reason}
       end
     end)
-    
+
     {:noreply, socket}
   end
-  
+
   def handle_info({:run_action, action, file_path}, socket) do
     # Handle context panel actions
     case action do
       :analysis ->
         # Trigger full analysis
         send(self(), {:analyze_file, "context-panel", file_path})
-        
+
       :generate_tests ->
         # TODO: Implement test generation
         ContextPanelComponent.add_notification("context-panel", :info, "Test generation not yet implemented")
-        
+
       :refactoring ->
         # TODO: Implement refactoring suggestions
         ContextPanelComponent.add_notification("context-panel", :info, "Refactoring suggestions coming soon")
-        
+
       :generate_docs ->
         # TODO: Implement documentation generation
         ContextPanelComponent.add_notification("context-panel", :info, "Documentation generation coming soon")
-        
+
       :security_scan ->
         # TODO: Implement security scanning
         ContextPanelComponent.add_notification("context-panel", :info, "Security scan coming soon")
-        
+
       :performance ->
         # TODO: Implement performance analysis
         ContextPanelComponent.add_notification("context-panel", :info, "Performance analysis coming soon")
     end
-    
+
     {:noreply, socket}
   end
-  
+
   def handle_info({:goto_line, _file_path, line_number}, socket) do
     # Send event to Monaco editor to go to line
     push_event(socket, "goto_line", %{
       editor_id: "monaco-editor-editor",
       line: line_number
     })
-    
+
     {:noreply, socket}
   end
-  
+
   def handle_info({:open_file, file_path}, socket) do
     # Simulate file selection
     send(self(), {:file_selected, file_path})
     {:noreply, socket}
   end
-  
+
   # Collaboration Event Handlers
-  
+
   def handle_info({:user_joined, presence_data}, socket) do
     # Handle user joining collaboration
     socket = update(socket, :active_collaborators, &[presence_data | &1])
     {:noreply, socket}
   end
-  
+
   def handle_info({:user_left, %{user_id: user_id}}, socket) do
     # Handle user leaving
-    socket = 
+    socket =
       socket
       |> update(:active_collaborators, &Enum.reject(&1, fn c -> c.user_id == user_id end))
       |> update(:user_cursors, &Map.delete(&1, user_id))
       |> update(:user_selections, &Map.delete(&1, user_id))
-    
+
     {:noreply, socket}
   end
-  
+
   def handle_info({:cursor_moved, cursor_data}, socket) do
     # Update user cursor position
     socket = put_in(socket.assigns.user_cursors[cursor_data.user_id], cursor_data)
     {:noreply, socket}
   end
-  
+
   def handle_info({:selection_changed, selection_data}, socket) do
     # Update user selection
     socket = put_in(socket.assigns.user_selections[selection_data.user_id], selection_data)
     {:noreply, socket}
   end
-  
+
   def handle_info({:reaction, reaction_data}, socket) do
     # Show reaction animation
     socket = push_event(socket, "show_reaction", reaction_data)
     {:noreply, socket}
   end
-  
+
   def handle_info({:operation_applied, operation}, socket) do
     # Handle collaborative edit operation
     # This would be forwarded to the Monaco editor
     socket = push_event(socket, "apply_operation", operation)
     {:noreply, socket}
   end
-  
+
   # Private Functions
-  
+
   defp assign_initial_state(socket) do
     socket
     |> assign(:project_name, "Loading...")
@@ -758,7 +767,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
     |> assign(:show_collaborators, true)
     |> assign(:is_collaborative, false)
   end
-  
+
   defp assign_layout_preferences(socket) do
     # TODO: Load from user preferences
     layout = %{
@@ -770,15 +779,15 @@ defmodule RubberDuckWeb.CodingSessionLive do
       editor_width: "flex-1",
       context_width: "w-80"
     }
-    
+
     assign(socket, :panel_layout, layout)
   end
-  
+
   defp calculate_chat_width(_show_tree, _show_editor, _show_context \\ false) do
     # Chat panel takes remaining space after fixed-width panels
     "flex-1"
   end
-  
+
   defp subscribe_to_project_updates(project_id) do
     PubSub.subscribe(RubberDuck.PubSub, "project:#{project_id}")
     PubSub.subscribe(RubberDuck.PubSub, "editor:#{project_id}")
@@ -789,29 +798,31 @@ defmodule RubberDuckWeb.CodingSessionLive do
     PubSub.subscribe(RubberDuck.PubSub, "project:#{project_id}:sessions")
     PubSub.subscribe(RubberDuck.PubSub, "project:#{project_id}:communication")
   end
-  
+
   defp track_user_presence(project_id, user) do
     # Use enhanced presence tracker
     PresenceTracker.track_user(project_id, user.id, %{
       username: user.username,
       email: user.email,
-      avatar_url: nil  # User model doesn't have avatar_url yet
+      # User model doesn't have avatar_url yet
+      avatar_url: nil
     })
-    
+
     # Also track in Phoenix Presence for compatibility
-    {:ok, _} = Presence.track(
-      self(),
-      "project:#{project_id}",
-      user.id,
-      %{
-        username: user.username,
-        email: user.email,
-        online_at: System.system_time(:second),
-        current_file: nil
-      }
-    )
+    {:ok, _} =
+      Presence.track(
+        self(),
+        "project:#{project_id}",
+        user.id,
+        %{
+          username: user.username,
+          email: user.email,
+          online_at: System.system_time(:second),
+          current_file: nil
+        }
+      )
   end
-  
+
   defp fetch_project_data(socket) do
     # TODO: Implement actual project data fetching
     socket
@@ -821,72 +832,71 @@ defmodule RubberDuckWeb.CodingSessionLive do
       %{id: "2", name: "README.md", type: :file}
     ])
   end
-  
+
   defp handle_keyboard_shortcut("f", socket) do
     # Ctrl+F: Toggle file tree
     update_in(socket.assigns.layout.show_file_tree, &(!&1))
     |> recalculate_layout()
   end
-  
+
   defp handle_keyboard_shortcut("e", socket) do
     # Ctrl+E: Toggle editor
     update_in(socket.assigns.layout.show_editor, &(!&1))
     |> recalculate_layout()
   end
-  
+
   defp handle_keyboard_shortcut("/", socket) do
     # Ctrl+/: Focus chat input
     push_event(socket, "focus_chat", %{})
   end
-  
+
   defp handle_keyboard_shortcut("i", socket) do
     # Ctrl+I: Toggle context panel
     update_in(socket.assigns.layout.show_context, &(!&1))
     |> recalculate_layout()
   end
-  
+
   defp handle_keyboard_shortcut(_, socket), do: socket
-  
+
   defp recalculate_layout(socket) do
     layout = socket.assigns.layout
     chat_width = calculate_chat_width(layout.show_file_tree, layout.show_editor)
     put_in(socket.assigns.layout.chat_width, chat_width)
   end
-  
+
   defp update_layout_visibility(layout, "file_tree") do
     Map.put(layout, :show_file_tree, !layout.show_file_tree)
   end
-  
+
   defp update_layout_visibility(layout, "editor") do
     Map.put(layout, :show_editor, !layout.show_editor)
   end
-  
+
   defp update_layout_visibility(layout, "context") do
     Map.put(layout, :show_context, !layout.show_context)
   end
-  
-  
+
   defp apply_project_update(socket, update) do
     Logger.debug("Received project update: #{inspect(update)}")
     socket
   end
-  
+
   defp apply_editor_update(socket, update) do
     Logger.debug("Received editor update: #{inspect(update)}")
     socket
   end
-  
+
   defp handle_presence_diff(socket, %{joins: joins, leaves: leaves}) do
-    presence_users = 
+    presence_users =
       socket.assigns.presence_users
       |> Map.merge(joins)
       |> Map.drop(Map.keys(leaves))
-    
+
     assign(socket, :presence_users, presence_users)
   end
-  
+
   # Components
-  
+
   defp collaboration_controls(assigns) do
     ~H"""
     <div class="flex items-center space-x-2">
@@ -920,7 +930,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
     </div>
     """
   end
-  
+
   defp connection_status(assigns) do
     ~H"""
     <div class="flex items-center space-x-2">
@@ -940,7 +950,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
     </div>
     """
   end
-  
+
   defp panel_toggles(assigns) do
     ~H"""
     <div class="flex items-center space-x-1">
@@ -991,7 +1001,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
     </div>
     """
   end
-  
+
   defp user_presence(assigns) do
     ~H"""
     <div class="flex items-center -space-x-2">
@@ -1016,8 +1026,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
     </div>
     """
   end
-  
-  
+
   defp detect_language_from_path(file_path) do
     case Path.extname(file_path) do
       ".ex" -> "elixir"
@@ -1038,7 +1047,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
       _ -> "plaintext"
     end
   end
-  
+
   defp collaborator_sidebar(assigns) do
     ~H"""
     <div class="fixed right-0 top-0 h-full w-80 bg-white shadow-lg border-l border-gray-200 z-40 overflow-hidden flex flex-col">
@@ -1139,7 +1148,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
     </div>
     """
   end
-  
+
   defp loading_overlay(assigns) do
     ~H"""
     <div class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
@@ -1150,7 +1159,7 @@ defmodule RubberDuckWeb.CodingSessionLive do
     </div>
     """
   end
-  
+
   defp format_activity(:typing), do: "✏️ Typing"
   defp format_activity(:reading), do: "👀 Reading"
   defp format_activity(:debugging), do: "🐛 Debugging"

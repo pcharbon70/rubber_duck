@@ -17,7 +17,7 @@ defmodule RubberDuck.Prompts.PromptVersion do
       primary? true
       accept [:prompt_id, :version_number, :content, :variables_schema, :change_description]
       argument :created_by_id, :uuid, allow_nil?: false
-      
+
       change set_attribute(:created_by_id, arg(:created_by_id))
     end
   end
@@ -27,7 +27,7 @@ defmodule RubberDuck.Prompts.PromptVersion do
     policy action_type(:create) do
       authorize_if actor_present()
     end
-    
+
     # For reads, users can only access versions of their own prompts
     policy action_type(:read) do
       authorize_if expr(prompt.user_id == ^actor(:id))
