@@ -199,12 +199,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 		
 	case phoenix.SocketCreatedMsg:
-		// Store socket - auth socket first, then user socket
-		if m.socket == nil && m.authSocket == nil {
-			// First socket is auth socket
+		// Store socket based on authenticated state
+		if !m.authenticated {
+			// Before authentication, we're creating auth socket
 			m.authSocket = msg.Socket
 		} else {
-			// Second socket is user socket
+			// After authentication, we're creating user socket
 			m.socket = msg.Socket
 			// Update clients with new socket
 			if statusClient, ok := m.statusClient.(*phoenix.StatusClient); ok {

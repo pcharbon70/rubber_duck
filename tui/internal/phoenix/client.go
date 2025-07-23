@@ -57,7 +57,10 @@ func (c *Client) Connect(config Config) tea.Cmd {
 				endPoint.RawQuery = q.Encode()
 			} else if config.JWTToken != "" {
 				q := endPoint.Query()
+				// Try different parameter names that Phoenix might expect
 				q.Set("token", config.JWTToken)
+				// Also set jwt parameter in case server expects that
+				q.Set("jwt", config.JWTToken)
 				endPoint.RawQuery = q.Encode()
 			}
 		}

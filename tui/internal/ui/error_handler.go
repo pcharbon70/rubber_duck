@@ -106,7 +106,8 @@ func formatErrorMessage(err error, component string) string {
 	}
 	
 	if strings.Contains(errStr, "websocket") && strings.Contains(errStr, "bad handshake") {
-		return fmt.Sprintf("%s: WebSocket handshake failed. Check the server URL and protocol.", component)
+		// Include the actual error for debugging
+		return fmt.Sprintf("%s: WebSocket handshake failed - %v", component, err)
 	}
 	
 	if strings.Contains(errStr, "authentication") || strings.Contains(errStr, "unauthorized") {
