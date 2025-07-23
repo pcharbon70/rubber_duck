@@ -148,12 +148,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 		// Update connection status based on socket type
 		if msg.SocketType == phoenix.AuthSocketType {
-			// Auth socket connected, but don't set m.connected yet
+			// Auth socket connected
+			m.connected = true
 			m.statusBar = "Connected to auth server - Checking authentication..."
 			m.updateHeaderState()
 			return m, func() tea.Msg { return phoenix.AuthConnectedMsg{} }
 		} else {
-			// User socket connected - now we're truly connected
+			// User socket connected
 			m.connected = true
 			m.switchingSocket = false // Clear the switching flag
 			m.statusBar = "Connected to authenticated socket - Joining channels..."
@@ -166,10 +167,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		
 	case phoenix.DisconnectedMsg:
-		// Only update connection status if it's the user socket disconnecting
-		// or if we're not switching sockets
-		if msg.SocketType == phoenix.UserSocketType || !m.switchingSocket {
+		// Handle disconnection based on socket type and switching state
+		if msg.SocketType == phoenix.AuthSocketType {
+			// Auth socket disconnected
+			if !m.switchingSocket {
+				// Only set disconnected if we're not switching to user socket
+				m.connected = false
+			}
+			// If we're switching, keep m.connected true since we're about to connect to user socket
+		} else {
+			// User socket disconnected - always set disconnected
 			m.connected = false
+			m.switchingSocket = false // Clear switching flag if set
 		}
 		m.updateHeaderState()
 		
