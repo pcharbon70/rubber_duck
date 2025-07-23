@@ -49,6 +49,9 @@ defmodule RubberDuckWeb.Router do
 
       # Project-specific Coding Session
       live "/projects/:project_id/session", CodingSessionLive, :index
+      
+      # Project Files Manager
+      live "/projects/:project_id/files", Live.ProjectFilesLive, :index
     end
   end
 

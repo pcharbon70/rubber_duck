@@ -44,6 +44,41 @@ defmodule RubberDuck.Projects.FileTree do
         {:error, reason}
     end
   end
+  
+  @doc """
+  Builds the initial tree structure for a project path.
+  """
+  def build_tree(project_path) do
+    case list_tree(project_path) do
+      {:ok, tree} -> tree
+      {:error, _} -> %{name: "/", type: :directory, children: []}
+    end
+  end
+  
+  @doc """
+  Adds a path to the tree structure.
+  """
+  def add_path(tree, path, root_path) do
+    segments = Path.split(path)
+    do_add_path(tree, segments, path, root_path)
+  end
+  
+  @doc """
+  Removes a path from the tree structure.
+  """
+  def remove_path(tree, path) do
+    segments = Path.split(path)
+    do_remove_path(tree, segments)
+  end
+  
+  @doc """
+  Updates a path in the tree structure (for renames).
+  """
+  def update_path(tree, old_path, new_path, root_path) do
+    tree
+    |> remove_path(old_path)
+    |> add_path(new_path, root_path)
+  end
 
   @doc """
   Searches for files matching the given query.
@@ -165,7 +200,7 @@ defmodule RubberDuck.Projects.FileTree do
                     name: entry,
                     type: :file,
                     size: stat.size,
-                    modified: stat.mtime |> elem(0) |> DateTime.from_unix!()
+                    modified: NaiveDateTime.from_erl!(stat.mtime) |> DateTime.from_naive!("Etc/UTC")
                   }
 
                 {:error, _} ->
@@ -237,10 +272,12 @@ defmodule RubberDuck.Projects.FileTree do
   end
 
   defp parse_git_status_line(line) do
-    case String.split(line, " ", parts: 2, trim: true) do
-      [status_code, file_path] ->
+    # Git status format: XY filename
+    # where X is staged status, Y is unstaged status
+    case line do
+      <<status_code::binary-size(2), " ", file_path::binary>> ->
         status =
-          case status_code do
+          case String.trim(status_code) do
             "M" -> :modified
             "MM" -> :modified
             "A" -> :added
@@ -252,10 +289,130 @@ defmodule RubberDuck.Projects.FileTree do
             _ -> :unknown
           end
 
-        {file_path, status}
+        {String.trim(file_path), status}
 
       _ ->
         nil
+    end
+  end
+  
+  defp do_add_path(tree, segments, full_path, root_path) do
+    case segments do
+      [] -> 
+        tree
+        
+      [name] ->
+        # This is a file at the current level
+        absolute_path = Path.join(root_path, full_path)
+        
+        node = case File.stat(absolute_path) do
+          {:ok, %File.Stat{type: :directory}} ->
+            %{
+              path: full_path,
+              name: name,
+              type: :directory,
+              children: []
+            }
+            
+          {:ok, stat} ->
+            %{
+              path: full_path,
+              name: name,
+              type: :file,
+              size: stat.size,
+              modified: stat.mtime |> elem(0) |> DateTime.from_unix!()
+            }
+            
+          {:error, _} ->
+            # Default to file if we can't stat
+            %{
+              path: full_path,
+              name: name,
+              type: :file
+            }
+        end
+        
+        # Add to children if this is a directory
+        if tree[:type] == :directory do
+          children = tree[:children] || []
+          # Remove existing node with same name if any
+          children = Enum.reject(children, &(&1.name == name))
+          # Add new node and sort
+          children = [node | children]
+            |> Enum.sort_by(fn n ->
+              {n.type != :directory, String.downcase(n.name)}
+            end)
+          Map.put(tree, :children, children)
+        else
+          tree
+        end
+        
+      [dir | rest] ->
+        # Navigate deeper into the tree
+        if tree[:type] == :directory do
+          children = tree[:children] || []
+          
+          # Find or create the directory node
+          {dir_node, other_children} = 
+            case Enum.split_with(children, &(&1.name == dir)) do
+              {[existing], others} -> 
+                {existing, others}
+              {[], others} ->
+                # Create new directory node
+                new_dir = %{
+                  path: Path.join(tree[:path] || "", dir),
+                  name: dir,
+                  type: :directory,
+                  children: []
+                }
+                {new_dir, others}
+            end
+          
+          # Recursively add to the directory
+          updated_dir = do_add_path(dir_node, rest, full_path, root_path)
+          
+          # Update children and sort
+          children = [updated_dir | other_children]
+            |> Enum.sort_by(fn n ->
+              {n.type != :directory, String.downcase(n.name)}
+            end)
+            
+          Map.put(tree, :children, children)
+        else
+          tree
+        end
+    end
+  end
+  
+  defp do_remove_path(tree, segments) do
+    case segments do
+      [] -> 
+        tree
+        
+      [name] ->
+        # Remove the file/folder at this level
+        if tree[:type] == :directory && tree[:children] do
+          children = Enum.reject(tree[:children], &(&1.name == name))
+          Map.put(tree, :children, children)
+        else
+          tree
+        end
+        
+      [dir | rest] ->
+        # Navigate deeper into the tree
+        if tree[:type] == :directory && tree[:children] do
+          children = Enum.map(tree[:children], fn child ->
+            if child.name == dir do
+              do_remove_path(child, rest)
+            else
+              child
+            end
+          end)
+          
+          Map.put(tree, :children, children)
+        else
+          tree
+        end
     end
   end
 end
