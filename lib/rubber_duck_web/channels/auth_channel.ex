@@ -175,13 +175,21 @@ defmodule RubberDuckWeb.AuthChannel do
   # Private helper functions
   
   defp authenticate_user(username, password) do
-    case Ash.read_one(User, action: :sign_in_with_password, input: %{
-      username: username,
-      password: password
-    }) do
+    require Ash.Query
+    
+    # Build a query with the sign_in_with_password action
+    query = RubberDuck.Accounts.User
+      |> Ash.Query.for_read(:sign_in_with_password, %{
+        username: username,
+        password: password
+      })
+    
+    # Execute the query with authorization bypassed
+    case Ash.read_one(query, authorize?: false) do
       {:ok, user} ->
         case AshAuthentication.Jwt.token_for_user(user) do
-          {:ok, token} -> {:ok, user, token}
+          {:ok, token, _claims} -> {:ok, user, token}
+          {:ok, token} -> {:ok, user, token}  # Handle both return formats
           error -> error
         end
         
@@ -194,7 +202,8 @@ defmodule RubberDuckWeb.AuthChannel do
     case Ash.get(User, user_id) do
       {:ok, user} ->
         case AshAuthentication.Jwt.token_for_user(user) do
-          {:ok, token} -> {:ok, user, token}
+          {:ok, token, _claims} -> {:ok, user, token}
+          {:ok, token} -> {:ok, user, token}  # Handle both return formats
           error -> error
         end
         
