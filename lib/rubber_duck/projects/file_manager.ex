@@ -13,7 +13,7 @@ defmodule RubberDuck.Projects.FileManager do
   
   alias RubberDuck.Workspace
   alias RubberDuck.Projects.{
-    FileCache, SecurityValidator, FileAudit, FileEncryption, FileSearch,
+    FileCacheWrapper, SecurityValidator, FileAudit, FileEncryption, FileSearch,
     FileCollaboration, CollaborationSupervisor
   }
   require Logger
@@ -722,7 +722,7 @@ defmodule RubberDuck.Projects.FileManager do
   
   defp get_from_cache(%__MODULE__{options: opts, project: project}, key) do
     if Keyword.get(opts, :enable_cache, true) do
-      FileCache.get(project.id, key)
+      FileCacheWrapper.get(project.id, key)
     else
       :miss
     end
@@ -730,23 +730,23 @@ defmodule RubberDuck.Projects.FileManager do
   
   defp put_in_cache(%__MODULE__{options: opts, project: project}, key, value) do
     if Keyword.get(opts, :enable_cache, true) do
-      FileCache.put(project.id, key, value)
+      FileCacheWrapper.put(project.id, key, value)
     end
   end
   
   defp invalidate_cache_for_path(%__MODULE__{options: opts, project: project}, path) do
     if Keyword.get(opts, :enable_cache, true) do
       # Invalidate the specific path and its parent directory listing
-      FileCache.invalidate(project.id, path)
-      FileCache.invalidate_pattern(project.id, "#{path}/*")
+      FileCacheWrapper.invalidate(project.id, path)
+      FileCacheWrapper.invalidate_pattern(project.id, "#{path}/*")
       
       # Invalidate parent directory listings (with wildcard for options hash)
       parent = Path.dirname(path)
-      FileCache.invalidate_pattern(project.id, "list:#{parent}:*")
+      FileCacheWrapper.invalidate_pattern(project.id, "list:#{parent}:*")
       
       # Also invalidate current directory if we're at root
       if parent == "." do
-        FileCache.invalidate_pattern(project.id, "list:.:*")
+        FileCacheWrapper.invalidate_pattern(project.id, "list:.:*")
       end
     end
   end

@@ -52,6 +52,9 @@ defmodule RubberDuckWeb.Router do
       
       # Project Files Manager
       live "/projects/:project_id/files", Live.ProjectFilesLive, :index
+      
+      # Cache Monitor Dashboard
+      live "/admin/cache-monitor", Live.CacheMonitorLive, :index
     end
   end
 
