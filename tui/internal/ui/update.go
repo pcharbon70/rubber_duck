@@ -456,11 +456,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 		
 	case phoenix.AuthChannelJoinedMsg:
-		m.statusBar = "Auth channel joined - Checking authentication status..."
-		// Check authentication status (API key might auto-authenticate)
-		if authClient, ok := m.authClient.(*phoenix.AuthClient); ok {
-			return m, authClient.GetStatus()
-		}
+		m.statusBar = "Auth channel joined - Waiting for authentication status..."
+		// The server will send auth status through channel events if needed
+		// We don't need to actively request it, avoiding potential timeout errors
 		return m, nil
 		
 	case phoenix.LoginSuccessMsg:
@@ -908,6 +906,7 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 		
 	case "auth_status":
 		m.statusBar = "Checking auth status..."
+		m.statusMessages.AddMessage(StatusCategoryInfo, "Requesting authentication status from server...", nil)
 		if authClient, ok := m.authClient.(*phoenix.AuthClient); ok {
 			return m, authClient.GetStatus()
 		}

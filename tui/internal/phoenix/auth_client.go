@@ -240,12 +240,17 @@ func (a *AuthClient) push(event string, payload map[string]any) tea.Cmd {
 		})
 
 		push.Receive("timeout", func(response any) {
-			if a.program != nil {
-				a.program.Send(ErrorMsg{
-					Err:       fmt.Errorf("auth push timeout"),
-					Component: "Auth Push",
-				})
+			// Only send timeout error for user-initiated actions, not automatic status checks
+			if event == "login" || event == "logout" {
+				if a.program != nil {
+					a.program.Send(ErrorMsg{
+						Err:       fmt.Errorf("request timeout for %s - server may be slow or unreachable", event),
+						Component: "Auth Push",
+					})
+				}
 			}
+			// For get_status and other background operations, silently ignore timeouts
+			// The server will send auth status through channel events when ready
 		})
 
 		return nil
