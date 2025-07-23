@@ -132,11 +132,21 @@ defmodule RubberDuck.Projects.SecurityAudit do
     |> Ash.read!()
   end
 
-  def user_activity_summary(user_id, _hours \\ 24) do
+  def user_activity_summary(user_id, hours \\ 24) do
+    # Since Ash doesn't support group_by in queries, we'll fetch and group in Elixir
+    cutoff_time = DateTime.add(DateTime.utc_now(), -hours * 3600, :second)
+    
     __MODULE__
     |> Ash.Query.filter(user_id: user_id)
-    |> Ash.Query.group_by([:action, :status])
-    |> Ash.Query.aggregate(:count, :count)
+    |> Ash.Query.filter(occurred_at > ^cutoff_time)
     |> Ash.read!()
+    |> Enum.group_by(&{&1.action, &1.status})
+    |> Enum.map(fn {{action, status}, records} ->
+      %{
+        action: action,
+        status: status,
+        count: length(records)
+      }
+    end)
   end
 end
