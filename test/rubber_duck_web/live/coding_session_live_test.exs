@@ -10,7 +10,7 @@ defmodule RubberDuckWeb.CodingSessionLiveTest do
     user = user_fixture()
     # TODO: Create project fixture when Projects domain is implemented
     project = %{id: "test-project-123", name: "Test Project"}
-    
+
     %{user: user, project: project}
   end
 
@@ -25,9 +25,9 @@ defmodule RubberDuckWeb.CodingSessionLiveTest do
 
     test "mounts successfully when authenticated", %{conn: conn, user: user, project: project} do
       conn = log_in_user(conn, user)
-      
+
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/session")
-      
+
       assert has_element?(view, "div.coding-session")
       assert has_element?(view, "header")
       assert has_element?(view, "main")
@@ -35,9 +35,9 @@ defmodule RubberDuckWeb.CodingSessionLiveTest do
 
     test "assigns initial state correctly", %{conn: conn, user: user, project: project} do
       conn = log_in_user(conn, user)
-      
+
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/session")
-      
+
       assert view.assigns.project_id == project.id
       assert view.assigns.user.id == user.id
       assert view.assigns.chat_messages == []
@@ -57,33 +57,33 @@ defmodule RubberDuckWeb.CodingSessionLiveTest do
 
     test "toggles file tree panel", %{view: view} do
       assert has_element?(view, "aside", "Files")
-      
+
       view
       |> element("button[phx-value-panel=\"file_tree\"]")
       |> render_click()
-      
+
       refute has_element?(view, "aside", "Files")
-      
+
       view
       |> element("button[phx-value-panel=\"file_tree\"]")
       |> render_click()
-      
+
       assert has_element?(view, "aside", "Files")
     end
 
     test "toggles editor panel", %{view: view} do
       assert has_element?(view, "aside", "No file selected")
-      
+
       view
       |> element("button[phx-value-panel=\"editor\"]")
       |> render_click()
-      
+
       refute has_element?(view, "aside", "No file selected")
-      
+
       view
       |> element("button[phx-value-panel=\"editor\"]")
       |> render_click()
-      
+
       assert has_element?(view, "aside", "No file selected")
     end
   end
@@ -98,16 +98,16 @@ defmodule RubberDuckWeb.CodingSessionLiveTest do
     test "sends chat message", %{view: view, project: project} do
       # Subscribe to PubSub to verify broadcast
       PubSub.subscribe(RubberDuck.PubSub, "chat:#{project.id}")
-      
+
       view
       |> form("form[phx-submit=\"send_message\"]", %{message: "Hello, world!"})
       |> render_submit()
-      
+
       # Verify PubSub broadcast
       assert_receive {:chat_message, message}
       assert message.content == "Hello, world!"
       assert message.type == :user
-      
+
       # Verify message appears in view
       assert has_element?(view, "div", "Hello, world!")
     end
@@ -116,27 +116,27 @@ defmodule RubberDuckWeb.CodingSessionLiveTest do
       view
       |> form("form[phx-submit=\"send_message\"]", %{message: "Test input"})
       |> render_change()
-      
+
       assert view.assigns.chat_input == "Test input"
     end
 
     test "clears chat input after sending", %{view: view, project: project} do
       PubSub.subscribe(RubberDuck.PubSub, "chat:#{project.id}")
-      
+
       view
       |> form("form[phx-submit=\"send_message\"]", %{message: "Test message"})
       |> render_submit()
-      
+
       assert view.assigns.chat_input == ""
     end
 
     test "identifies command messages", %{view: view, project: project} do
       PubSub.subscribe(RubberDuck.PubSub, "chat:#{project.id}")
-      
+
       view
       |> form("form[phx-submit=\"send_message\"]", %{message: "/help"})
       |> render_submit()
-      
+
       assert_receive {:chat_message, message}
       assert message.type == :command
     end
@@ -151,21 +151,21 @@ defmodule RubberDuckWeb.CodingSessionLiveTest do
 
     test "Ctrl+F toggles file tree", %{view: view} do
       assert view.assigns.layout.show_file_tree == true
-      
+
       view
       |> element("div.coding-session")
       |> render_keydown(%{"key" => "f", "ctrlKey" => true})
-      
+
       assert view.assigns.layout.show_file_tree == false
     end
 
     test "Ctrl+E toggles editor", %{view: view} do
       assert view.assigns.layout.show_editor == true
-      
+
       view
       |> element("div.coding-session")
       |> render_keydown(%{"key" => "e", "ctrlKey" => true})
-      
+
       assert view.assigns.layout.show_editor == false
     end
 
@@ -173,7 +173,7 @@ defmodule RubberDuckWeb.CodingSessionLiveTest do
       view
       |> element("div.coding-session")
       |> render_keydown(%{"key" => "/", "ctrlKey" => true})
-      
+
       # This would push a focus_chat event to the client
       # In a real test, we'd verify the JavaScript hook behavior
     end
@@ -195,12 +195,12 @@ defmodule RubberDuckWeb.CodingSessionLiveTest do
         timestamp: DateTime.utc_now(),
         type: :user
       }
-      
+
       send(view.pid, {:chat_message, other_user_message})
-      
+
       # Give the view time to process the message
       :timer.sleep(50)
-      
+
       assert render(view) =~ "Hello from another user!"
       assert render(view) =~ "other_user"
     end
@@ -214,11 +214,11 @@ defmodule RubberDuckWeb.CodingSessionLiveTest do
         },
         leaves: %{}
       }
-      
+
       send(view.pid, {:presence_diff, presence_diff})
-      
+
       :timer.sleep(50)
-      
+
       assert view.assigns.presence_users["user-123"]
     end
   end
@@ -247,12 +247,12 @@ defmodule RubberDuckWeb.CodingSessionLiveTest do
       streaming_msg = %{
         content: "I'm thinking about your request..."
       }
-      
+
       # Simulate streaming message update
       send(view.pid, {:streaming_update, streaming_msg})
-      
+
       :timer.sleep(50)
-      
+
       # Would verify streaming message display
       # This requires implementing the streaming message handler
     end

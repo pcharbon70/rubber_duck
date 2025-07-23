@@ -1,18 +1,18 @@
 defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
   @moduledoc """
   Manages collaborative editing sessions with operational transformation.
-  
+
   Implements a simplified OT algorithm for real-time collaborative text editing
   with conflict resolution and change attribution.
   """
-  
+
   use GenServer
   alias Phoenix.PubSub
   require Logger
-  
+
   @max_history_size 1000
   @snapshot_interval 100
-  
+
   defmodule Operation do
     @moduledoc """
     Represents a text operation.
@@ -20,15 +20,18 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
     defstruct [
       :id,
       :user_id,
-      :type,      # :insert | :delete
+      # :insert | :delete
+      :type,
       :position,
-      :content,   # For insert
-      :length,    # For delete
+      # For insert
+      :content,
+      # For delete
+      :length,
       :version,
       :timestamp
     ]
   end
-  
+
   defmodule EditorState do
     @moduledoc """
     Represents the state of a collaborative document.
@@ -44,13 +47,13 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       :pending_operations
     ]
   end
-  
+
   # Client API
-  
+
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts)
   end
-  
+
   @doc """
   Start a collaborative editing session for a file.
   """
@@ -62,13 +65,13 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       initial_content: initial_content,
       name: via_tuple(project_id, file_path)
     }
-    
+
     DynamicSupervisor.start_child(
       RubberDuckWeb.Collaboration.EditorSupervisor,
       spec
     )
   end
-  
+
   @doc """
   Apply an operation from a user.
   """
@@ -78,7 +81,7 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       {:apply_operation, operation}
     )
   end
-  
+
   @doc """
   Get the current document state.
   """
@@ -88,7 +91,7 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       :get_document
     )
   end
-  
+
   @doc """
   Join a collaborative session.
   """
@@ -98,7 +101,7 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       {:join_session, user_id}
     )
   end
-  
+
   @doc """
   Leave a collaborative session.
   """
@@ -108,7 +111,7 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       {:leave_session, user_id}
     )
   end
-  
+
   @doc """
   Get operation history.
   """
@@ -118,15 +121,15 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       {:get_history, limit}
     )
   end
-  
+
   # Server Callbacks
-  
+
   @impl true
   def init(opts) do
     project_id = Keyword.fetch!(opts, :project_id)
     file_path = Keyword.fetch!(opts, :file_path)
     initial_content = Keyword.fetch!(opts, :initial_content)
-    
+
     state = %EditorState{
       project_id: project_id,
       file_path: file_path,
@@ -137,47 +140,48 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       active_users: MapSet.new(),
       pending_operations: %{}
     }
-    
+
     # Subscribe to presence updates
     PubSub.subscribe(RubberDuck.PubSub, "project:#{project_id}:presence")
-    
+
     {:ok, state}
   end
-  
+
   @impl true
   def handle_call({:apply_operation, operation}, _from, state) do
     case validate_operation(operation, state) do
       {:ok, validated_op} ->
         # Transform operation against concurrent operations
         transformed_op = transform_operation(validated_op, state)
-        
+
         # Apply the operation
         new_content = apply_to_content(transformed_op, state.content)
         new_version = state.version + 1
-        
+
         # Update operation with version
         final_op = %{transformed_op | version: new_version}
-        
+
         # Update state
-        new_state = %{state |
-          content: new_content,
-          version: new_version,
-          operations: [final_op | state.operations] |> Enum.take(@max_history_size)
+        new_state = %{
+          state
+          | content: new_content,
+            version: new_version,
+            operations: [final_op | state.operations] |> Enum.take(@max_history_size)
         }
-        
+
         # Maybe create snapshot
         new_state = maybe_create_snapshot(new_state)
-        
+
         # Broadcast to other users
         broadcast_operation(state.project_id, state.file_path, final_op)
-        
+
         {:reply, {:ok, final_op}, new_state}
-        
+
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
   end
-  
+
   @impl true
   def handle_call(:get_document, _from, state) do
     document = %{
@@ -185,54 +189,51 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       version: state.version,
       active_users: MapSet.to_list(state.active_users)
     }
-    
+
     {:reply, {:ok, document}, state}
   end
-  
+
   @impl true
   def handle_call({:join_session, user_id}, _from, state) do
-    new_state = %{state |
-      active_users: MapSet.put(state.active_users, user_id)
-    }
-    
+    new_state = %{state | active_users: MapSet.put(state.active_users, user_id)}
+
     # Send current state to joining user
     join_data = %{
       content: state.content,
       version: state.version,
       active_users: MapSet.to_list(new_state.active_users)
     }
-    
+
     broadcast_user_joined(state.project_id, state.file_path, user_id)
-    
+
     {:reply, {:ok, join_data}, new_state}
   end
-  
+
   @impl true
   def handle_call({:get_history, limit}, _from, state) do
-    history = 
+    history =
       state.operations
       |> Enum.take(limit)
       |> Enum.map(&format_operation_for_display/1)
-    
+
     {:reply, {:ok, history}, state}
   end
-  
+
   @impl true
   def handle_cast({:leave_session, user_id}, state) do
-    new_state = %{state |
-      active_users: MapSet.delete(state.active_users, user_id)
-    }
-    
+    new_state = %{state | active_users: MapSet.delete(state.active_users, user_id)}
+
     broadcast_user_left(state.project_id, state.file_path, user_id)
-    
+
     # If no users left, schedule cleanup
     if MapSet.size(new_state.active_users) == 0 do
-      Process.send_after(self(), :maybe_cleanup, 60_000) # 1 minute
+      # 1 minute
+      Process.send_after(self(), :maybe_cleanup, 60_000)
     end
-    
+
     {:noreply, new_state}
   end
-  
+
   @impl true
   def handle_info(:maybe_cleanup, state) do
     if MapSet.size(state.active_users) == 0 do
@@ -243,55 +244,53 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       {:noreply, state}
     end
   end
-  
+
   @impl true
   def handle_info({:user_left, %{user_id: user_id}}, state) do
     # Handle user disconnection
-    new_state = %{state |
-      active_users: MapSet.delete(state.active_users, user_id)
-    }
-    
+    new_state = %{state | active_users: MapSet.delete(state.active_users, user_id)}
+
     {:noreply, new_state}
   end
-  
+
   # Operational Transformation Functions
-  
+
   defp validate_operation(operation, state) do
     cond do
       operation.type not in [:insert, :delete] ->
         {:error, :invalid_operation_type}
-        
+
       operation.position < 0 or operation.position > String.length(state.content) ->
         {:error, :invalid_position}
-        
+
       operation.type == :delete and operation.length <= 0 ->
         {:error, :invalid_delete_length}
-        
+
       operation.type == :insert and (is_nil(operation.content) or operation.content == "") ->
         {:error, :empty_insert}
-        
+
       true ->
         {:ok, operation}
     end
   end
-  
+
   defp transform_operation(operation, state) do
     # Get operations that happened after the client's last known version
-    concurrent_ops = 
+    concurrent_ops =
       state.operations
       |> Enum.take_while(fn op -> op.version > operation.version end)
       |> Enum.reverse()
-    
+
     # Transform the operation against each concurrent operation
     Enum.reduce(concurrent_ops, operation, fn concurrent_op, op ->
       transform_pair(op, concurrent_op)
     end)
   end
-  
+
   defp transform_pair(op1, op2) do
     # Simplified operational transformation
     # In a real implementation, this would be more complex
-    
+
     case {op1.type, op2.type} do
       {:insert, :insert} ->
         if op2.position <= op1.position do
@@ -299,7 +298,7 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
         else
           op1
         end
-        
+
       {:insert, :delete} ->
         if op2.position < op1.position do
           if op2.position + op2.length <= op1.position do
@@ -310,14 +309,14 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
         else
           op1
         end
-        
+
       {:delete, :insert} ->
         if op2.position <= op1.position do
           %{op1 | position: op1.position + String.length(op2.content)}
         else
           op1
         end
-        
+
       {:delete, :delete} ->
         if op2.position <= op1.position do
           %{op1 | position: max(op2.position, op1.position - op2.length)}
@@ -326,20 +325,20 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
         end
     end
   end
-  
+
   defp apply_to_content(operation, content) do
     case operation.type do
       :insert ->
         {before, after_} = String.split_at(content, operation.position)
         before <> operation.content <> after_
-        
+
       :delete ->
         {before, rest} = String.split_at(content, operation.position)
         {_deleted, after_} = String.split_at(rest, operation.length)
         before <> after_
     end
   end
-  
+
   defp maybe_create_snapshot(state) do
     if rem(state.version, @snapshot_interval) == 0 do
       snapshot = %{
@@ -347,13 +346,13 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
         content: state.content,
         timestamp: DateTime.utc_now()
       }
-      
+
       %{state | snapshots: [snapshot | state.snapshots] |> Enum.take(10)}
     else
       state
     end
   end
-  
+
   defp format_operation_for_display(operation) do
     %{
       id: operation.id,
@@ -366,14 +365,14 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       timestamp: operation.timestamp
     }
   end
-  
+
   defp save_document_state(state) do
     # In a real implementation, this would save to database
     Logger.info("Saving document state for #{state.file_path}")
   end
-  
+
   # Broadcasting Functions
-  
+
   defp broadcast_operation(project_id, file_path, operation) do
     PubSub.broadcast(
       RubberDuck.PubSub,
@@ -381,7 +380,7 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       {:operation_applied, operation}
     )
   end
-  
+
   defp broadcast_user_joined(project_id, file_path, user_id) do
     PubSub.broadcast(
       RubberDuck.PubSub,
@@ -389,7 +388,7 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       {:user_joined_editor, user_id}
     )
   end
-  
+
   defp broadcast_user_left(project_id, file_path, user_id) do
     PubSub.broadcast(
       RubberDuck.PubSub,
@@ -397,9 +396,9 @@ defmodule RubberDuckWeb.Collaboration.CollaborativeEditor do
       {:user_left_editor, user_id}
     )
   end
-  
+
   # Registry Functions
-  
+
   defp via_tuple(project_id, file_path) do
     {:via, Registry, {RubberDuckWeb.Collaboration.EditorRegistry, {project_id, file_path}}}
   end

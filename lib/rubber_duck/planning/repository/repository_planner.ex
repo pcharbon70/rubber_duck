@@ -1,48 +1,50 @@
 defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
   @moduledoc """
   Main interface for repository-level planning and multi-file change management.
-  
+
   This module provides the primary API for planning repository-wide changes,
   coordinating between analysis, impact assessment, sequencing, and execution.
   It integrates with the existing planning system and ReAct execution framework.
   """
 
   alias RubberDuck.Planning.Plan
+
   alias RubberDuck.Planning.Repository.{
     RepositoryAnalyzer,
-    ChangeImpactAnalyzer, 
+    ChangeImpactAnalyzer,
     ChangeSequencer
   }
+
   alias RubberDuck.Planning.Execution.PlanExecutor
-  
+
   require Logger
 
   @type repository_plan :: %{
-    id: String.t(),
-    name: String.t(),
-    description: String.t(),
-    repository_path: String.t(),
-    analysis: RepositoryAnalyzer.analysis_result(),
-    changes: [change_request()],
-    impact: ChangeImpactAnalyzer.impact_analysis(),
-    sequence: ChangeSequencer.sequence_plan(),
-    execution_plan: Plan.t() | nil,
-    status: plan_status(),
-    metadata: map()
-  }
+          id: String.t(),
+          name: String.t(),
+          description: String.t(),
+          repository_path: String.t(),
+          analysis: RepositoryAnalyzer.analysis_result(),
+          changes: [change_request()],
+          impact: ChangeImpactAnalyzer.impact_analysis(),
+          sequence: ChangeSequencer.sequence_plan(),
+          execution_plan: Plan.t() | nil,
+          status: plan_status(),
+          metadata: map()
+        }
 
   @type change_request :: %{
-    id: String.t(),
-    name: String.t(),
-    description: String.t(),
-    files: [String.t()],
-    type: change_type(),
-    priority: priority_level(),
-    dependencies: [String.t()],
-    estimated_effort: float(),
-    breaking: boolean(),
-    validation_required: boolean()
-  }
+          id: String.t(),
+          name: String.t(),
+          description: String.t(),
+          files: [String.t()],
+          type: change_type(),
+          priority: priority_level(),
+          dependencies: [String.t()],
+          estimated_effort: float(),
+          breaking: boolean(),
+          validation_required: boolean()
+        }
 
   @type change_type :: :feature | :bugfix | :refactor | :migration | :removal | :architectural
   @type priority_level :: :low | :medium | :high | :critical
@@ -51,18 +53,17 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
   @doc """
   Creates a new repository-level plan for the given changes.
   """
-  @spec create_plan(String.t(), String.t(), [change_request()], keyword()) :: 
-    {:ok, repository_plan()} | {:error, term()}
+  @spec create_plan(String.t(), String.t(), [change_request()], keyword()) ::
+          {:ok, repository_plan()} | {:error, term()}
   def create_plan(repository_path, plan_name, changes, opts \\ []) do
     Logger.info("Creating repository plan '#{plan_name}' for #{length(changes)} changes")
-    
+
     plan_id = generate_plan_id()
     description = Keyword.get(opts, :description, "Repository-level plan: #{plan_name}")
-    
+
     with {:ok, analysis} <- analyze_repository(repository_path, opts),
          {:ok, impact} <- analyze_changes_impact(analysis, changes),
          {:ok, sequence} <- create_change_sequence(analysis, changes, impact, opts) do
-      
       plan = %{
         id: plan_id,
         name: plan_name,
@@ -79,7 +80,7 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
           options: opts
         }
       }
-      
+
       Logger.info("Repository plan '#{plan_name}' created successfully")
       {:ok, plan}
     else
@@ -95,7 +96,7 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
   @spec convert_to_execution_plan(repository_plan()) :: {:ok, Plan.t()} | {:error, term()}
   def convert_to_execution_plan(repo_plan) do
     Logger.info("Converting repository plan to execution plan")
-    
+
     # Create main plan resource
     plan_attrs = %{
       name: repo_plan.name,
@@ -114,22 +115,19 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
         parallel_capable: length(repo_plan.sequence.parallel_groups) > 0
       }
     }
-    
+
     case Ash.create(Plan, plan_attrs) do
       {:ok, plan} ->
         case create_execution_tasks(plan, repo_plan) do
           {:ok, _tasks} ->
-            updated_repo_plan = %{repo_plan | 
-              execution_plan: plan,
-              status: :ready
-            }
+            updated_repo_plan = %{repo_plan | execution_plan: plan, status: :ready}
             {:ok, updated_repo_plan}
-          
+
           error ->
             Ash.destroy!(plan)
             error
         end
-      
+
       error ->
         error
     end
@@ -143,16 +141,20 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
     case repo_plan.execution_plan do
       nil ->
         {:error, :no_execution_plan}
-      
+
       plan ->
         Logger.info("Executing repository plan '#{repo_plan.name}'")
-        
-        execution_opts = Keyword.merge([
-          repository_mode: true,
-          validation_strategy: :conservative,
-          parallel_execution: length(repo_plan.sequence.parallel_groups) > 0
-        ], opts)
-        
+
+        execution_opts =
+          Keyword.merge(
+            [
+              repository_mode: true,
+              validation_strategy: :conservative,
+              parallel_execution: length(repo_plan.sequence.parallel_groups) > 0
+            ],
+            opts
+          )
+
         PlanExecutor.start_link(plan: plan, options: execution_opts)
     end
   end
@@ -163,7 +165,7 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
   @spec preview_changes(repository_plan()) :: {:ok, change_preview()} | {:error, term()}
   def preview_changes(repo_plan) do
     Logger.info("Generating preview for repository plan '#{repo_plan.name}'")
-    
+
     preview = %{
       summary: generate_change_summary(repo_plan),
       phases: preview_execution_phases(repo_plan.sequence),
@@ -173,37 +175,37 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
       validation_points: repo_plan.sequence.validation_points,
       rollback_plan: repo_plan.sequence.rollback_plan
     }
-    
+
     {:ok, preview}
   end
 
   @type change_preview :: %{
-    summary: change_summary(),
-    phases: [phase_preview()],
-    risk_factors: [ChangeImpactAnalyzer.risk_factor()],
-    affected_files: [String.t()],
-    estimated_effort: ChangeImpactAnalyzer.effort_estimate(),
-    validation_points: [ChangeSequencer.validation_point()],
-    rollback_plan: ChangeSequencer.rollback_plan()
-  }
+          summary: change_summary(),
+          phases: [phase_preview()],
+          risk_factors: [ChangeImpactAnalyzer.risk_factor()],
+          affected_files: [String.t()],
+          estimated_effort: ChangeImpactAnalyzer.effort_estimate(),
+          validation_points: [ChangeSequencer.validation_point()],
+          rollback_plan: ChangeSequencer.rollback_plan()
+        }
 
   @type change_summary :: %{
-    total_changes: non_neg_integer(),
-    by_type: map(),
-    by_priority: map(),
-    breaking_changes: non_neg_integer(),
-    files_affected: non_neg_integer()
-  }
+          total_changes: non_neg_integer(),
+          by_type: map(),
+          by_priority: map(),
+          breaking_changes: non_neg_integer(),
+          files_affected: non_neg_integer()
+        }
 
   @type phase_preview :: %{
-    phase: non_neg_integer(),
-    name: String.t(),
-    changes: [String.t()],
-    files: [String.t()],
-    can_parallel: boolean(),
-    estimated_duration: Duration.t(),
-    validation_required: boolean()
-  }
+          phase: non_neg_integer(),
+          name: String.t(),
+          changes: [String.t()],
+          files: [String.t()],
+          can_parallel: boolean(),
+          estimated_duration: Duration.t(),
+          validation_required: boolean()
+        }
 
   @doc """
   Validates a repository plan before execution.
@@ -211,37 +213,41 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
   @spec validate_plan(repository_plan()) :: {:ok, [validation_result()]} | {:error, term()}
   def validate_plan(repo_plan) do
     Logger.info("Validating repository plan '#{repo_plan.name}'")
-    
+
     validations = []
-    
+
     # Validate repository analysis is current
     validations = validations ++ validate_analysis_currency(repo_plan)
-    
+
     # Validate change definitions
     validations = validations ++ validate_change_definitions(repo_plan.changes)
-    
+
     # Validate sequence plan
-    validations = case ChangeSequencer.validate_sequence(repo_plan.sequence, repo_plan.analysis) do
-      {:ok, sequence_validations} ->
-        validations ++ sequence_validations
-        
-      {:error, errors} ->
-        validations ++ [%{
-          type: :sequence_validation,
-          status: :error,
-          message: "Sequence validation failed",
-          details: %{errors: errors}
-        }]
-    end
-    
+    validations =
+      case ChangeSequencer.validate_sequence(repo_plan.sequence, repo_plan.analysis) do
+        {:ok, sequence_validations} ->
+          validations ++ sequence_validations
+
+        {:error, errors} ->
+          validations ++
+            [
+              %{
+                type: :sequence_validation,
+                status: :error,
+                message: "Sequence validation failed",
+                details: %{errors: errors}
+              }
+            ]
+      end
+
     # Validate risk assessment
     validations = validations ++ validate_risk_assessment(repo_plan.impact.risk_assessment)
-    
+
     case Enum.filter(validations, &(&1.status == :error)) do
       [] ->
         Logger.info("Repository plan validation passed")
         {:ok, validations}
-      
+
       errors ->
         Logger.warning("Repository plan validation failed with #{length(errors)} errors")
         {:error, {:validation_failed, errors}}
@@ -249,14 +255,14 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
   end
 
   @type validation_result :: %{
-    type: validation_type(),
-    status: :ok | :warning | :error,
-    message: String.t(),
-    details: map()
-  }
+          type: validation_type(),
+          status: :ok | :warning | :error,
+          message: String.t(),
+          details: map()
+        }
 
-  @type validation_type :: 
-    :analysis_currency | :change_definitions | :sequence_validation | :risk_assessment
+  @type validation_type ::
+          :analysis_currency | :change_definitions | :sequence_validation | :risk_assessment
 
   @doc """
   Suggests optimizations for a repository plan.
@@ -264,30 +270,31 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
   @spec suggest_optimizations(repository_plan()) :: [optimization_suggestion()]
   def suggest_optimizations(repo_plan) do
     suggestions = []
-    
+
     # Get sequencer suggestions
     suggestions = suggestions ++ ChangeSequencer.suggest_improvements(repo_plan.sequence, repo_plan.analysis)
-    
+
     # Add plan-level suggestions
     suggestions = suggestions ++ suggest_plan_optimizations(repo_plan)
-    
+
     # Add risk mitigation suggestions
-    suggestions = suggestions ++ ChangeImpactAnalyzer.suggest_mitigations(repo_plan.impact)
-    |> Enum.map(&convert_mitigation_to_optimization/1)
-    
+    suggestions =
+      (suggestions ++ ChangeImpactAnalyzer.suggest_mitigations(repo_plan.impact))
+      |> Enum.map(&convert_mitigation_to_optimization/1)
+
     Enum.sort_by(suggestions, & &1.impact, :desc)
   end
 
   @type optimization_suggestion :: %{
-    type: optimization_type(),
-    description: String.t(),
-    impact: float(),
-    effort: effort_level(),
-    implementation: [String.t()]
-  }
+          type: optimization_type(),
+          description: String.t(),
+          impact: float(),
+          effort: effort_level(),
+          implementation: [String.t()]
+        }
 
-  @type optimization_type :: 
-    :change_grouping | :parallel_execution | :risk_reduction | :validation_optimization
+  @type optimization_type ::
+          :change_grouping | :parallel_execution | :risk_reduction | :validation_optimization
 
   @type effort_level :: :low | :medium | :high
 
@@ -306,12 +313,12 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
   end
 
   @type plan_status_info :: %{
-    status: plan_status(),
-    progress: float(),
-    current_phase: String.t() | nil,
-    next_actions: [String.t()],
-    issues: [String.t()]
-  }
+          status: plan_status(),
+          progress: float(),
+          current_phase: String.t() | nil,
+          next_actions: [String.t()],
+          issues: [String.t()]
+        }
 
   # Private functions
 
@@ -328,7 +335,7 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
   defp create_change_sequence(analysis, changes, _impact, opts) do
     sequence_requests = Enum.map(changes, &convert_to_sequence_request/1)
     sequence_opts = Keyword.take(opts, [:validation_strategy, :max_parallel])
-    
+
     ChangeSequencer.create_sequence(analysis, sequence_requests, sequence_opts)
   end
 
@@ -345,18 +352,19 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
   end
 
   defp create_execution_tasks(plan, repo_plan) do
-    tasks = repo_plan.sequence.phases
-    |> Enum.with_index(1)
-    |> Enum.map(fn {phase, position} ->
-      create_task_for_phase(plan, phase, position, repo_plan)
-    end)
-    
+    tasks =
+      repo_plan.sequence.phases
+      |> Enum.with_index(1)
+      |> Enum.map(fn {phase, position} ->
+        create_task_for_phase(plan, phase, position, repo_plan)
+      end)
+
     case create_all_tasks(tasks) do
       {:ok, created_tasks} ->
         # Set up task dependencies
         setup_task_dependencies(created_tasks, repo_plan.sequence.phases)
         {:ok, created_tasks}
-      
+
       error ->
         error
     end
@@ -364,11 +372,12 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
 
   defp create_task_for_phase(plan, phase, position, repo_plan) do
     # Find the changes for this phase
-    phase_changes = repo_plan.changes
-    |> Enum.filter(fn change ->
-      Enum.any?(change.files, &(&1 in phase.files))
-    end)
-    
+    phase_changes =
+      repo_plan.changes
+      |> Enum.filter(fn change ->
+        Enum.any?(change.files, &(&1 in phase.files))
+      end)
+
     %{
       name: phase.name,
       description: "Execute #{phase.name}: #{Enum.map(phase_changes, & &1.name) |> Enum.join(", ")}",
@@ -396,27 +405,32 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
         metadata: %{sequence_phases: length(repo_plan.sequence.phases)}
       }
     ]
-    
+
     # Add risk-based constraints
-    risk_constraints = case repo_plan.impact.risk_assessment.overall_risk do
-      :critical ->
-        [%{
-          type: :validation_required,
-          description: "Validation required after each phase due to critical risk",
-          metadata: %{risk_factors: length(repo_plan.impact.risk_assessment.factors)}
-        }]
-      
-      :high ->
-        [%{
-          type: :staged_rollout,
-          description: "Staged rollout required due to high risk",
-          metadata: %{}
-        }]
-      
-      _ ->
-        []
-    end
-    
+    risk_constraints =
+      case repo_plan.impact.risk_assessment.overall_risk do
+        :critical ->
+          [
+            %{
+              type: :validation_required,
+              description: "Validation required after each phase due to critical risk",
+              metadata: %{risk_factors: length(repo_plan.impact.risk_assessment.factors)}
+            }
+          ]
+
+        :high ->
+          [
+            %{
+              type: :staged_rollout,
+              description: "Staged rollout required due to high risk",
+              metadata: %{}
+            }
+          ]
+
+        _ ->
+          []
+      end
+
     base_constraints ++ risk_constraints
   end
 
@@ -424,13 +438,13 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
     changed = Enum.flat_map(repo_plan.changes, & &1.files)
     direct = repo_plan.impact.directly_affected
     transitive = repo_plan.impact.transitively_affected
-    
+
     (changed ++ direct ++ transitive) |> Enum.uniq()
   end
 
   defp generate_change_summary(repo_plan) do
     changes = repo_plan.changes
-    
+
     %{
       total_changes: length(changes),
       by_type: Enum.frequencies_by(changes, & &1.type),
@@ -445,7 +459,8 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
       %{
         phase: phase.phase,
         name: phase.name,
-        changes: [],  # Would be populated with change IDs
+        # Would be populated with change IDs
+        changes: [],
         files: phase.files,
         can_parallel: phase.can_parallel,
         estimated_duration: estimate_phase_duration(phase),
@@ -457,95 +472,116 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
   defp validate_analysis_currency(repo_plan) do
     created_at = repo_plan.metadata.created_at
     age_hours = DateTime.diff(DateTime.utc_now(), created_at, :hour)
-    
+
     if age_hours > 24 do
-      [%{
-        type: :analysis_currency,
-        status: :warning,
-        message: "Repository analysis is #{age_hours} hours old, consider refreshing",
-        details: %{age_hours: age_hours}
-      }]
+      [
+        %{
+          type: :analysis_currency,
+          status: :warning,
+          message: "Repository analysis is #{age_hours} hours old, consider refreshing",
+          details: %{age_hours: age_hours}
+        }
+      ]
     else
-      [%{
-        type: :analysis_currency,
-        status: :ok,
-        message: "Repository analysis is current",
-        details: %{age_hours: age_hours}
-      }]
+      [
+        %{
+          type: :analysis_currency,
+          status: :ok,
+          message: "Repository analysis is current",
+          details: %{age_hours: age_hours}
+        }
+      ]
     end
   end
 
   defp validate_change_definitions(changes) do
-    invalid_changes = Enum.filter(changes, fn change ->
-      is_nil(change.id) or is_nil(change.name) or Enum.empty?(change.files)
-    end)
-    
+    invalid_changes =
+      Enum.filter(changes, fn change ->
+        is_nil(change.id) or is_nil(change.name) or Enum.empty?(change.files)
+      end)
+
     case invalid_changes do
       [] ->
-        [%{
-          type: :change_definitions,
-          status: :ok,
-          message: "All change definitions are valid",
-          details: %{}
-        }]
-      
+        [
+          %{
+            type: :change_definitions,
+            status: :ok,
+            message: "All change definitions are valid",
+            details: %{}
+          }
+        ]
+
       invalid ->
-        [%{
-          type: :change_definitions,
-          status: :error,
-          message: "#{length(invalid)} changes have invalid definitions",
-          details: %{invalid_changes: Enum.map(invalid, & &1.id)}
-        }]
+        [
+          %{
+            type: :change_definitions,
+            status: :error,
+            message: "#{length(invalid)} changes have invalid definitions",
+            details: %{invalid_changes: Enum.map(invalid, & &1.id)}
+          }
+        ]
     end
   end
 
   defp validate_risk_assessment(risk_assessment) do
     if risk_assessment.confidence < 0.5 do
-      [%{
-        type: :risk_assessment,
-        status: :warning,
-        message: "Risk assessment has low confidence (#{Float.round(risk_assessment.confidence * 100, 1)}%)",
-        details: %{confidence: risk_assessment.confidence}
-      }]
+      [
+        %{
+          type: :risk_assessment,
+          status: :warning,
+          message: "Risk assessment has low confidence (#{Float.round(risk_assessment.confidence * 100, 1)}%)",
+          details: %{confidence: risk_assessment.confidence}
+        }
+      ]
     else
-      [%{
-        type: :risk_assessment,
-        status: :ok,
-        message: "Risk assessment confidence is acceptable",
-        details: %{confidence: risk_assessment.confidence}
-      }]
+      [
+        %{
+          type: :risk_assessment,
+          status: :ok,
+          message: "Risk assessment confidence is acceptable",
+          details: %{confidence: risk_assessment.confidence}
+        }
+      ]
     end
   end
 
   defp suggest_plan_optimizations(repo_plan) do
     suggestions = []
-    
+
     # Suggest change grouping if many small changes
-    suggestions = if length(repo_plan.changes) > 10 do
-      suggestions ++ [%{
-        type: :change_grouping,
-        description: "Consider grouping related changes to reduce coordination overhead",
-        impact: 0.4,
-        effort: :medium,
-        implementation: ["Group changes by module or feature area", "Update sequence plan"]
-      }]
-    else
-      suggestions
-    end
-    
+    suggestions =
+      if length(repo_plan.changes) > 10 do
+        suggestions ++
+          [
+            %{
+              type: :change_grouping,
+              description: "Consider grouping related changes to reduce coordination overhead",
+              impact: 0.4,
+              effort: :medium,
+              implementation: ["Group changes by module or feature area", "Update sequence plan"]
+            }
+          ]
+      else
+        suggestions
+      end
+
     # Suggest parallel execution if not already optimized
-    suggestions = if length(repo_plan.sequence.parallel_groups) == 0 and length(repo_plan.changes) > 3 do
-      suggestions ++ [%{
-        type: :parallel_execution,
-        description: "Enable parallel execution for independent changes",
-        impact: 0.6,
-        effort: :low,
-        implementation: ["Re-analyze for parallel opportunities", "Update sequence plan"]
-      }]
-    else
-      suggestions
-    end
-    
+    suggestions =
+      if length(repo_plan.sequence.parallel_groups) == 0 and length(repo_plan.changes) > 3 do
+        suggestions ++
+          [
+            %{
+              type: :parallel_execution,
+              description: "Enable parallel execution for independent changes",
+              impact: 0.6,
+              effort: :low,
+              implementation: ["Re-analyze for parallel opportunities", "Update sequence plan"]
+            }
+          ]
+      else
+        suggestions
+      end
+
     suggestions
   end
 
@@ -618,7 +654,7 @@ defmodule RubberDuck.Planning.Repository.RepositoryPlanner do
     # Base complexity on number of files and breaking changes
     file_count = length(phase.files)
     breaking_count = Enum.count(changes, & &1.breaking)
-    
+
     cond do
       breaking_count > 0 or file_count > 20 -> :very_complex
       file_count > 10 -> :complex

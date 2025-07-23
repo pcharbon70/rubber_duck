@@ -9,9 +9,9 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       plan = build_simple_plan()
       observation = build_normal_observation()
       execution_state = build_normal_state()
-      
+
       result = PlanAdjuster.analyze_and_adjust(plan, observation, execution_state)
-      
+
       assert result == :no_adjustment_needed
     end
 
@@ -19,9 +19,9 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       plan = build_simple_plan()
       observation = build_normal_observation()
       execution_state = build_high_failure_state()
-      
+
       result = PlanAdjuster.analyze_and_adjust(plan, observation, execution_state)
-      
+
       assert {:ok, adjusted_plan} = result
       # Should simplify tasks due to high failure rate
       simplified_task = Enum.find(adjusted_plan.tasks, &(&1.id == "task1"))
@@ -32,9 +32,9 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       plan = build_simple_plan()
       observation = build_slow_observation()
       execution_state = build_normal_state()
-      
+
       result = PlanAdjuster.analyze_and_adjust(plan, observation, execution_state)
-      
+
       assert {:ok, adjusted_plan} = result
       # Should add parallelization due to slow execution
       assert adjusted_plan != plan
@@ -44,16 +44,19 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       plan = build_simple_plan()
       observation = build_high_memory_observation()
       execution_state = build_normal_state()
-      
+
       result = PlanAdjuster.analyze_and_adjust(plan, observation, execution_state)
-      
+
       assert {:ok, adjusted_plan} = result
       # Should reduce batch sizes due to memory constraint
-      batch_task = Enum.find(adjusted_plan.tasks, fn task ->
-        task.metadata[:batch_size] != nil
-      end)
+      batch_task =
+        Enum.find(adjusted_plan.tasks, fn task ->
+          task.metadata[:batch_size] != nil
+        end)
+
       if batch_task do
-        assert batch_task.metadata[:batch_size] <= 50  # Should be reduced
+        # Should be reduced
+        assert batch_task.metadata[:batch_size] <= 50
       end
     end
 
@@ -61,9 +64,9 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       plan = build_simple_plan()
       observation = build_critical_anomaly_observation()
       execution_state = build_normal_state()
-      
+
       result = PlanAdjuster.analyze_and_adjust(plan, observation, execution_state)
-      
+
       assert {:ok, adjusted_plan} = result
       # Should handle failing tasks
       assert adjusted_plan != plan
@@ -73,9 +76,9 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       plan = build_simple_plan()
       observation = build_insight_based_observation()
       execution_state = build_normal_state()
-      
+
       result = PlanAdjuster.analyze_and_adjust(plan, observation, execution_state)
-      
+
       assert {:ok, adjusted_plan} = result
       # Should apply optimization based on insights
       assert adjusted_plan != plan
@@ -87,11 +90,12 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       plan = build_complex_plan()
       observation = build_normal_observation()
       execution_state = build_high_failure_state()
-      
+
       {:ok, adjusted_plan} = PlanAdjuster.analyze_and_adjust(plan, observation, execution_state)
-      
+
       complex_task = Enum.find(adjusted_plan.tasks, &(&1.id == "complex_task"))
-      assert complex_task.complexity == :complex  # Downgraded from :very_complex
+      # Downgraded from :very_complex
+      assert complex_task.complexity == :complex
       assert complex_task.metadata[:simplified] == true
     end
   end
@@ -101,14 +105,15 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       plan = build_parallel_plan()
       observation = build_slow_observation()
       execution_state = build_normal_state()
-      
+
       {:ok, adjusted_plan} = PlanAdjuster.analyze_and_adjust(plan, observation, execution_state)
-      
+
       # Tasks with same dependencies should be grouped for parallel execution
-      parallel_tasks = Enum.filter(adjusted_plan.tasks, fn task ->
-        task.metadata[:parallel_group] != nil
-      end)
-      
+      parallel_tasks =
+        Enum.filter(adjusted_plan.tasks, fn task ->
+          task.metadata[:parallel_group] != nil
+        end)
+
       assert length(parallel_tasks) > 1
     end
   end
@@ -118,12 +123,12 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       plan = build_batch_plan()
       observation = build_high_memory_observation()
       execution_state = build_normal_state()
-      
+
       {:ok, adjusted_plan} = PlanAdjuster.analyze_and_adjust(plan, observation, execution_state)
-      
+
       batch_task = Enum.find(adjusted_plan.tasks, &(&1.metadata[:batch_size] != nil))
       original_task = Enum.find(plan.tasks, &(&1.id == batch_task.id))
-      
+
       assert batch_task.metadata[:batch_size] < original_task.metadata[:batch_size]
     end
   end
@@ -133,9 +138,9 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       plan = build_simple_plan()
       observation = build_high_cpu_observation()
       execution_state = build_normal_state()
-      
+
       {:ok, adjusted_plan} = PlanAdjuster.analyze_and_adjust(plan, observation, execution_state)
-      
+
       assert adjusted_plan.metadata[:rate_limit]
       assert adjusted_plan.metadata[:rate_limit][:max_concurrent_tasks] == 2
       assert adjusted_plan.metadata[:rate_limit][:delay_between_tasks] == 1000
@@ -147,14 +152,15 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       plan = build_plan_with_alternatives()
       observation = build_failing_task_observation()
       execution_state = build_normal_state()
-      
+
       {:ok, adjusted_plan} = PlanAdjuster.analyze_and_adjust(plan, observation, execution_state)
-      
+
       # Should find alternative task
-      alt_task = Enum.find(adjusted_plan.tasks, fn task ->
-        String.ends_with?(task.id, "_alt")
-      end)
-      
+      alt_task =
+        Enum.find(adjusted_plan.tasks, fn task ->
+          String.ends_with?(task.id, "_alt")
+        end)
+
       assert alt_task
       assert alt_task.metadata[:is_alternative] == true
     end
@@ -163,9 +169,9 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       plan = build_simple_plan()
       observation = build_failing_task_observation()
       execution_state = build_normal_state()
-      
+
       {:ok, adjusted_plan} = PlanAdjuster.analyze_and_adjust(plan, observation, execution_state)
-      
+
       # Should mark failing task as optional
       failing_task = Enum.find(adjusted_plan.tasks, &(&1.id == "task1"))
       assert failing_task.metadata[:optional] == true
@@ -177,9 +183,9 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       plan = build_simple_plan()
       observation = build_slow_observation()
       execution_state = build_normal_state()
-      
+
       {:ok, adjusted_plan} = PlanAdjuster.analyze_and_adjust(plan, observation, execution_state)
-      
+
       # Core attributes should be preserved
       assert adjusted_plan.id == plan.id
       assert adjusted_plan.name == plan.name
@@ -190,7 +196,7 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
       # This would test the validation logic
       # In a real scenario, this might happen if the LLM returns invalid suggestions
       # or if the adjustment logic produces an inconsistent plan
-      
+
       # For now, we assume the validation is robust and would catch issues
       assert true
     end
@@ -288,7 +294,8 @@ defmodule RubberDuck.Planning.Execution.PlanAdjusterTest do
     %{
       task_id: "task1",
       status: :success,
-      metrics: %{execution_time: 350_000},  # Very slow
+      # Very slow
+      metrics: %{execution_time: 350_000},
       anomalies: [%{type: :slow_execution}],
       insights: ["Task took longer than expected"]
     }

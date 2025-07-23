@@ -7,9 +7,9 @@ defmodule RubberDuck.Planning.Execution.PlanExecutorTest do
   describe "start_link/1" do
     test "starts executor with valid plan" do
       plan = build_test_plan()
-      
+
       {:ok, pid} = PlanExecutor.start_link(plan: plan)
-      
+
       assert Process.alive?(pid)
       assert {:ok, state} = PlanExecutor.get_state(pid)
       assert state.plan.id == plan.id
@@ -24,12 +24,12 @@ defmodule RubberDuck.Planning.Execution.PlanExecutorTest do
     test "executes plan successfully" do
       plan = build_test_plan()
       {:ok, pid} = PlanExecutor.start_link(plan: plan)
-      
+
       assert :ok = PlanExecutor.execute(pid)
-      
+
       # Wait for execution to start
       :timer.sleep(100)
-      
+
       {:ok, state} = PlanExecutor.get_state(pid)
       assert state.status == :executing
     end
@@ -37,7 +37,7 @@ defmodule RubberDuck.Planning.Execution.PlanExecutorTest do
     test "handles plan already executing" do
       plan = build_test_plan()
       {:ok, pid} = PlanExecutor.start_link(plan: plan)
-      
+
       :ok = PlanExecutor.execute(pid)
       assert {:error, :already_executing} = PlanExecutor.execute(pid)
     end
@@ -47,14 +47,14 @@ defmodule RubberDuck.Planning.Execution.PlanExecutorTest do
     test "pauses and resumes execution" do
       plan = build_test_plan()
       {:ok, pid} = PlanExecutor.start_link(plan: plan)
-      
+
       :ok = PlanExecutor.execute(pid)
       :timer.sleep(50)
-      
+
       :ok = PlanExecutor.pause(pid)
       {:ok, state} = PlanExecutor.get_state(pid)
       assert state.status == :paused
-      
+
       :ok = PlanExecutor.resume(pid)
       {:ok, state} = PlanExecutor.get_state(pid)
       assert state.status == :executing
@@ -65,10 +65,10 @@ defmodule RubberDuck.Planning.Execution.PlanExecutorTest do
     test "stops execution gracefully" do
       plan = build_test_plan()
       {:ok, pid} = PlanExecutor.start_link(plan: plan)
-      
+
       :ok = PlanExecutor.execute(pid)
       :timer.sleep(50)
-      
+
       :ok = PlanExecutor.stop(pid)
       {:ok, state} = PlanExecutor.get_state(pid)
       assert state.status == :stopped
@@ -79,9 +79,9 @@ defmodule RubberDuck.Planning.Execution.PlanExecutorTest do
     test "returns execution progress" do
       plan = build_test_plan()
       {:ok, pid} = PlanExecutor.start_link(plan: plan)
-      
+
       {:ok, progress} = PlanExecutor.get_progress(pid)
-      
+
       assert progress.total_tasks == 3
       assert progress.completed_tasks == 0
       assert progress.failed_tasks == 0
@@ -93,9 +93,9 @@ defmodule RubberDuck.Planning.Execution.PlanExecutorTest do
     test "returns execution history" do
       plan = build_test_plan()
       {:ok, pid} = PlanExecutor.start_link(plan: plan)
-      
+
       {:ok, history} = PlanExecutor.get_history(pid)
-      
+
       assert history.execution_id
       assert history.entries == []
     end
@@ -105,13 +105,13 @@ defmodule RubberDuck.Planning.Execution.PlanExecutorTest do
     test "executes thought-action-observation cycle" do
       plan = build_simple_plan()
       {:ok, pid} = PlanExecutor.start_link(plan: plan)
-      
+
       # Execute and wait for at least one cycle
       :ok = PlanExecutor.execute(pid)
       :timer.sleep(200)
-      
+
       {:ok, history} = PlanExecutor.get_history(pid)
-      
+
       # Should have at least one thought entry
       thoughts = Enum.filter(history.entries, &(&1.type == :thought))
       assert length(thoughts) > 0
@@ -122,12 +122,12 @@ defmodule RubberDuck.Planning.Execution.PlanExecutorTest do
     test "retries failed tasks with exponential backoff" do
       plan = build_failing_plan()
       {:ok, pid} = PlanExecutor.start_link(plan: plan)
-      
+
       :ok = PlanExecutor.execute(pid)
       :timer.sleep(500)
-      
+
       {:ok, history} = PlanExecutor.get_history(pid)
-      
+
       # Should have retry attempts
       retry_count = history.retries["failing_task"] || 0
       assert retry_count > 0
@@ -138,12 +138,12 @@ defmodule RubberDuck.Planning.Execution.PlanExecutorTest do
     test "broadcasts progress updates" do
       plan = build_test_plan()
       {:ok, pid} = PlanExecutor.start_link(plan: plan)
-      
+
       # Subscribe to progress updates
       PlanExecutor.subscribe_to_progress(pid)
-      
+
       :ok = PlanExecutor.execute(pid)
-      
+
       # Should receive progress update
       assert_receive {:progress_update, _progress}, 1000
     end
@@ -165,7 +165,7 @@ defmodule RubberDuck.Planning.Execution.PlanExecutorTest do
           dependencies: []
         },
         %Task{
-          id: "task_2", 
+          id: "task_2",
           name: "Second Task",
           description: "Execute second task",
           complexity: :medium,
@@ -173,7 +173,7 @@ defmodule RubberDuck.Planning.Execution.PlanExecutorTest do
         },
         %Task{
           id: "task_3",
-          name: "Third Task", 
+          name: "Third Task",
           description: "Execute third task",
           complexity: :simple,
           dependencies: ["task_2"]
@@ -205,7 +205,7 @@ defmodule RubberDuck.Planning.Execution.PlanExecutorTest do
   defp build_failing_plan do
     %Plan{
       id: "failing_plan",
-      name: "Failing Plan", 
+      name: "Failing Plan",
       description: "A plan with a failing task",
       tasks: [
         %Task{

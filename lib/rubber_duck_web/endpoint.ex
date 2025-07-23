@@ -20,7 +20,7 @@ defmodule RubberDuckWeb.Endpoint do
     ],
     longpoll: false
   )
-  
+
   # Separate socket for authentication that doesn't require credentials
   socket("/auth_socket", RubberDuckWeb.AuthSocket,
     websocket: [

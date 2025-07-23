@@ -152,7 +152,7 @@ defmodule RubberDuck.Errors do
     # Report to status system if conversation_id is present
     if conversation_id = metadata[:conversation_id] do
       error_details = normalize_error(exception)
-      
+
       RubberDuck.Status.error(
         conversation_id,
         "Exception: #{error_details.message}",
@@ -193,12 +193,13 @@ defmodule RubberDuck.Errors do
 
     # Report to status system if conversation_id is present
     if conversation_id = metadata[:conversation_id] do
-      status_category = case level do
-        :error -> :error
-        :warning -> :warning
-        _ -> :info
-      end
-      
+      status_category =
+        case level do
+          :error -> :error
+          :warning -> :warning
+          _ -> :info
+        end
+
       RubberDuck.Status.update(
         conversation_id,
         status_category,
@@ -281,10 +282,11 @@ defmodule RubberDuck.Errors do
     |> Map.delete(:__exception__)
     |> Map.delete(:message)
   end
-  
+
   defp format_stacktrace(stacktrace) do
     stacktrace
-    |> Enum.take(10)  # Limit stacktrace depth
+    # Limit stacktrace depth
+    |> Enum.take(10)
     |> Enum.map(&Exception.format_stacktrace_entry/1)
     |> Enum.join("\n")
   end

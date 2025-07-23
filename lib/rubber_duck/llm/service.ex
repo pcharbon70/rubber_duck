@@ -51,7 +51,7 @@ defmodule RubberDuck.LLM.Service do
     CostTracker,
     HealthMonitor
   }
-  
+
   alias RubberDuck.Status
 
   @type provider_name :: atom()
@@ -577,7 +577,7 @@ defmodule RubberDuck.LLM.Service do
     try do
       # Execute with retry logic
       result = execute_with_retry(request, adapter, provider_state.config, conversation_id)
-      
+
       # Send completion status
       case result do
         {:ok, response} ->
@@ -592,7 +592,7 @@ defmodule RubberDuck.LLM.Service do
               finish_reason: response[:finish_reason]
             })
           )
-          
+
         {:error, reason} ->
           Status.error(
             conversation_id,
@@ -604,7 +604,7 @@ defmodule RubberDuck.LLM.Service do
             })
           )
       end
-      
+
       Logger.debug("[LLM Service] Request completed with result: #{inspect(result)}")
       result
     rescue
@@ -618,6 +618,7 @@ defmodule RubberDuck.LLM.Service do
             model: request.model
           })
         )
+
         Logger.error("LLM request failed: #{inspect(error)}")
         {:error, error}
     end
@@ -639,7 +640,7 @@ defmodule RubberDuck.LLM.Service do
             error: inspect(reason)
           })
         )
-        
+
         # Exponential backoff
         delay = (:math.pow(2, attempt) * 1000) |> round()
         Process.sleep(delay)
@@ -833,7 +834,7 @@ defmodule RubberDuck.LLM.Service do
 
   defp handle_streaming_request(request, provider_name, provider_state, callback) do
     conversation_id = get_in(request.options, [:user_id])
-    
+
     # Send streaming start status
     Status.engine(
       conversation_id,
@@ -843,10 +844,10 @@ defmodule RubberDuck.LLM.Service do
         streaming: true
       })
     )
-    
+
     start_time = System.monotonic_time(:millisecond)
     token_ref = :counters.new(1, [:atomics])
-    
+
     # Wrap callback to track tokens
     tracking_callback = fn chunk ->
       # Count tokens (approximate)
@@ -854,13 +855,14 @@ defmodule RubberDuck.LLM.Service do
         token_count = String.split(chunk.content) |> length()
         :counters.add(token_ref, 1, token_count)
       end
-      
+
       # Call original callback
       callback.(chunk)
-      
+
       # Send completion status on final chunk
       if chunk.finish_reason do
         total_tokens = :counters.get(token_ref, 1)
+
         Status.with_timing(
           conversation_id,
           :engine,
@@ -875,7 +877,7 @@ defmodule RubberDuck.LLM.Service do
         )
       end
     end
-    
+
     # For mock provider, simulate streaming
     if provider_name == :mock do
       simulate_mock_streaming(request, tracking_callback)
@@ -894,6 +896,7 @@ defmodule RubberDuck.LLM.Service do
             model: request.model
           })
         )
+
         {:error, :streaming_not_supported}
       end
     end

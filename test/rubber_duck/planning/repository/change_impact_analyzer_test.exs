@@ -1,15 +1,15 @@
 defmodule RubberDuck.Planning.Repository.ChangeImpactAnalyzerTest do
   use ExUnit.Case, async: true
-  
+
   alias RubberDuck.Planning.Repository.{ChangeImpactAnalyzer, RepositoryAnalyzer, DependencyGraph}
-  
+
   describe "analyze_impact/3" do
     test "analyzes impact of file changes" do
       repo_analysis = create_mock_repo_analysis()
       changed_files = ["lib/module_a.ex"]
-      
+
       assert {:ok, impact} = ChangeImpactAnalyzer.analyze_impact(repo_analysis, changed_files)
-      
+
       assert impact.changed_files == changed_files
       assert is_list(impact.directly_affected)
       assert is_list(impact.transitively_affected)
@@ -20,13 +20,14 @@ defmodule RubberDuck.Planning.Repository.ChangeImpactAnalyzerTest do
       assert is_list(impact.parallel_groups)
       assert is_map(impact.estimated_effort)
     end
-    
+
     test "calculates risk assessment correctly" do
       repo_analysis = create_complex_repo_analysis()
-      changed_files = ["lib/core_module.ex"]  # High complexity file
-      
+      # High complexity file
+      changed_files = ["lib/core_module.ex"]
+
       assert {:ok, impact} = ChangeImpactAnalyzer.analyze_impact(repo_analysis, changed_files)
-      
+
       risk = impact.risk_assessment
       assert risk.overall_risk in [:low, :medium, :high, :critical]
       assert is_list(risk.factors)
@@ -34,27 +35,30 @@ defmodule RubberDuck.Planning.Repository.ChangeImpactAnalyzerTest do
       assert risk.confidence >= 0.0 and risk.confidence <= 1.0
       assert is_list(risk.recommendations)
     end
-    
+
     test "identifies test coverage gaps" do
       repo_analysis = create_repo_with_poor_test_coverage()
       changed_files = ["lib/untested_module.ex"]
-      
+
       assert {:ok, impact} = ChangeImpactAnalyzer.analyze_impact(repo_analysis, changed_files)
-      
+
       # Should identify test coverage as a risk factor
-      coverage_risk = Enum.find(impact.risk_assessment.factors, 
-        &(&1.type == :test_coverage_gaps))
-      
+      coverage_risk =
+        Enum.find(
+          impact.risk_assessment.factors,
+          &(&1.type == :test_coverage_gaps)
+        )
+
       assert coverage_risk
       assert coverage_risk.severity in [:medium, :high]
     end
-    
+
     test "estimates effort based on complexity" do
       repo_analysis = create_complex_repo_analysis()
       changed_files = ["lib/core_module.ex", "lib/simple_module.ex"]
-      
+
       assert {:ok, impact} = ChangeImpactAnalyzer.analyze_impact(repo_analysis, changed_files)
-      
+
       effort = impact.estimated_effort
       assert effort.total_files > 0
       assert effort.complexity_score > 0.0
@@ -62,26 +66,30 @@ defmodule RubberDuck.Planning.Repository.ChangeImpactAnalyzerTest do
       assert effort.confidence >= 0.0 and effort.confidence <= 1.0
     end
   end
-  
+
   describe "analyze_breaking_change/3" do
     test "analyzes breaking change impact" do
       repo_analysis = create_mock_repo_analysis()
-      
-      assert {:ok, impact} = ChangeImpactAnalyzer.analyze_breaking_change(
-        repo_analysis, 
-        "ModuleA", 
-        ["function1", "function2"]
-      )
-      
+
+      assert {:ok, impact} =
+               ChangeImpactAnalyzer.analyze_breaking_change(
+                 repo_analysis,
+                 "ModuleA",
+                 ["function1", "function2"]
+               )
+
       # Should have breaking change risk factor
-      breaking_risk = Enum.find(impact.risk_assessment.factors,
-        &(&1.type == :breaking_changes))
-      
+      breaking_risk =
+        Enum.find(
+          impact.risk_assessment.factors,
+          &(&1.type == :breaking_changes)
+        )
+
       assert breaking_risk
       assert breaking_risk.severity == :high
     end
   end
-  
+
   describe "suggest_mitigations/1" do
     test "suggests mitigations for high complexity files" do
       impact_with_complexity_risk = %{
@@ -97,16 +105,16 @@ defmodule RubberDuck.Planning.Repository.ChangeImpactAnalyzerTest do
           ]
         }
       }
-      
+
       mitigations = ChangeImpactAnalyzer.suggest_mitigations(impact_with_complexity_risk)
-      
+
       assert length(mitigations) > 0
-      
+
       extensive_testing = Enum.find(mitigations, &(&1.type == :extensive_testing))
       assert extensive_testing
       assert extensive_testing.effectiveness > 0.0
     end
-    
+
     test "suggests mitigations for breaking changes" do
       impact_with_breaking_changes = %{
         risk_assessment: %{
@@ -121,14 +129,14 @@ defmodule RubberDuck.Planning.Repository.ChangeImpactAnalyzerTest do
           ]
         }
       }
-      
+
       mitigations = ChangeImpactAnalyzer.suggest_mitigations(impact_with_breaking_changes)
-      
+
       backward_compat = Enum.find(mitigations, &(&1.type == :backward_compatibility))
       assert backward_compat
       assert backward_compat.effort in [:low, :medium, :high]
     end
-    
+
     test "suggests mitigations for many dependents" do
       impact_with_many_deps = %{
         risk_assessment: %{
@@ -143,19 +151,19 @@ defmodule RubberDuck.Planning.Repository.ChangeImpactAnalyzerTest do
           ]
         }
       }
-      
+
       mitigations = ChangeImpactAnalyzer.suggest_mitigations(impact_with_many_deps)
-      
+
       staged_deployment = Enum.find(mitigations, &(&1.type == :staged_deployment))
       assert staged_deployment
     end
   end
-  
+
   # Helper functions to create mock data
-  
+
   defp create_mock_repo_analysis do
     {:ok, dependency_graph} = create_mock_dependency_graph()
-    
+
     %{
       files: [
         %{
@@ -165,7 +173,7 @@ defmodule RubberDuck.Planning.Repository.ChangeImpactAnalyzerTest do
           modules: [%{name: "ModuleA"}]
         },
         %{
-          path: "lib/module_b.ex", 
+          path: "lib/module_b.ex",
           type: :lib,
           complexity: :simple,
           modules: [%{name: "ModuleB"}]
@@ -195,10 +203,10 @@ defmodule RubberDuck.Planning.Repository.ChangeImpactAnalyzerTest do
       }
     }
   end
-  
+
   defp create_complex_repo_analysis do
     {:ok, dependency_graph} = create_mock_dependency_graph()
-    
+
     %{
       files: [
         %{
@@ -209,7 +217,7 @@ defmodule RubberDuck.Planning.Repository.ChangeImpactAnalyzerTest do
         },
         %{
           path: "lib/simple_module.ex",
-          type: :lib, 
+          type: :lib,
           complexity: :simple,
           modules: [%{name: "SimpleModule"}]
         }
@@ -232,10 +240,10 @@ defmodule RubberDuck.Planning.Repository.ChangeImpactAnalyzerTest do
       }
     }
   end
-  
+
   defp create_repo_with_poor_test_coverage do
     {:ok, dependency_graph} = create_mock_dependency_graph()
-    
+
     %{
       files: [
         %{
@@ -247,7 +255,7 @@ defmodule RubberDuck.Planning.Repository.ChangeImpactAnalyzerTest do
         %{
           path: "lib/another_module.ex",
           type: :lib,
-          complexity: :medium, 
+          complexity: :medium,
           modules: [%{name: "AnotherModule"}]
         }
         # Notice: no test files for coverage
@@ -263,29 +271,33 @@ defmodule RubberDuck.Planning.Repository.ChangeImpactAnalyzerTest do
       }
     }
   end
-  
+
   defp create_mock_dependency_graph do
     file_analyses = [
       %{
         path: "lib/module_a.ex",
-        modules: [%{
-          name: "ModuleA",
-          imports: ["ModuleB"],
-          aliases: [],
-          uses: []
-        }]
+        modules: [
+          %{
+            name: "ModuleA",
+            imports: ["ModuleB"],
+            aliases: [],
+            uses: []
+          }
+        ]
       },
       %{
         path: "lib/module_b.ex",
-        modules: [%{
-          name: "ModuleB", 
-          imports: [],
-          aliases: [],
-          uses: []
-        }]
+        modules: [
+          %{
+            name: "ModuleB",
+            imports: [],
+            aliases: [],
+            uses: []
+          }
+        ]
       }
     ]
-    
+
     DependencyGraph.build(file_analyses)
   end
 end

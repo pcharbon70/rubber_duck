@@ -11,12 +11,13 @@ defmodule RubberDuck.AccountsFixtures do
 
   def user_fixture(attrs \\ %{}) do
     # Create the user bypassing policies for test fixtures
-    attrs = Enum.into(attrs, %{
-      email: unique_user_email(),
-      username: unique_username(),
-      hashed_password: Bcrypt.hash_pwd_salt("password123!")
-    })
-    
+    attrs =
+      Enum.into(attrs, %{
+        email: unique_user_email(),
+        username: unique_username(),
+        hashed_password: Bcrypt.hash_pwd_salt("password123!")
+      })
+
     User
     |> Ash.Changeset.for_create(:register_with_password, %{
       username: attrs.username,

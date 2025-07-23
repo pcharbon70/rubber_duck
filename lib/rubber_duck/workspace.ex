@@ -1,7 +1,7 @@
 defmodule RubberDuck.Workspace do
   use Ash.Domain,
     otp_app: :rubber_duck
-  
+
   require Ash.Query
 
   resources do
@@ -46,7 +46,7 @@ defmodule RubberDuck.Workspace do
   # Custom functions for collaborator management
   def add_project_collaborator(project, user, permission, opts \\ []) do
     actor = Keyword.get(opts, :actor)
-    
+
     # Check if actor is the project owner
     if actor && actor.id == project.owner_id do
       Ash.create(RubberDuck.Workspace.ProjectCollaborator, %{

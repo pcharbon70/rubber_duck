@@ -1,7 +1,7 @@
 defmodule RubberDuckWeb.StatusDashboardLive do
   @moduledoc """
   Live dashboard for monitoring the Status Broadcasting System.
-  
+
   Provides real-time visualization of:
   - System health metrics
   - Message throughput
@@ -9,33 +9,34 @@ defmodule RubberDuckWeb.StatusDashboardLive do
   - Performance optimization status
   - Alert monitoring
   """
-  
+
   use RubberDuckWeb, :live_view
-  
+
   on_mount {RubberDuckWeb.LiveUserAuth, :live_user_required}
-  
+
   alias RubberDuck.Status.{Monitor, Optimizer, Debug}
-  
-  @refresh_interval 1000  # Update every second
-  
+
+  # Update every second
+  @refresh_interval 1000
+
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
       :timer.send_interval(@refresh_interval, self(), :refresh)
-      
+
       # Subscribe to telemetry events
       subscribe_to_telemetry()
     end
-    
+
     socket =
       socket
       |> assign(:page_title, "Status System Dashboard")
       |> assign_initial_state()
       |> fetch_metrics()
-    
+
     {:ok, socket}
   end
-  
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -80,20 +81,20 @@ defmodule RubberDuckWeb.StatusDashboardLive do
     </div>
     """
   end
-  
+
   @impl true
   def handle_info(:refresh, socket) do
     {:noreply, fetch_metrics(socket)}
   end
-  
+
   @impl true
   def handle_info({:telemetry_event, event, measurements, metadata}, socket) do
     socket = update_from_telemetry(socket, event, measurements, metadata)
     {:noreply, socket}
   end
-  
+
   # Private Functions
-  
+
   defp assign_initial_state(socket) do
     socket
     |> assign(:health_status, :unknown)
@@ -106,45 +107,45 @@ defmodule RubberDuckWeb.StatusDashboardLive do
     |> assign(:top_channels, [])
     |> assign(:health_check, %{})
   end
-  
+
   defp fetch_metrics(socket) do
     # Fetch health status
-    health_status = 
+    health_status =
       case Monitor.health_status() do
         {:ok, status} -> status.status
         _ -> :unknown
       end
-    
+
     # Fetch queue stats
     queue_stats = Debug.dump_queue()
-    
+
     # Fetch metrics summary
-    metrics_summary = 
+    metrics_summary =
       case Monitor.metrics_summary() do
         {:ok, summary} -> summary
         _ -> %{}
       end
-    
+
     # Fetch recent alerts
-    alerts = 
+    alerts =
       case Monitor.recent_alerts(5) do
         {:ok, alerts} -> alerts
         _ -> []
       end
-    
+
     # Fetch optimization settings
-    optimizations = 
+    optimizations =
       case Optimizer.get_optimizations() do
         {:ok, opts} -> opts
         _ -> %{}
       end
-    
+
     # Fetch top channels
     top_channels = Debug.list_channels(limit: 5)
-    
+
     # Perform health check
     health_check = Debug.health_check()
-    
+
     socket
     |> assign(:health_status, health_status)
     |> assign(:queue_depth, queue_stats.queue_size)
@@ -156,12 +157,12 @@ defmodule RubberDuckWeb.StatusDashboardLive do
     |> assign(:top_channels, top_channels)
     |> assign(:health_check, health_check)
   end
-  
+
   defp calculate_throughput(metrics_summary) do
     throughput_stats = Map.get(metrics_summary, :throughput, %{})
     Map.get(throughput_stats, :current, 0) |> Float.round(2)
   end
-  
+
   defp format_metrics(metrics_summary) do
     Enum.map(metrics_summary, fn {metric_type, stats} ->
       %{
@@ -173,35 +174,39 @@ defmodule RubberDuckWeb.StatusDashboardLive do
       }
     end)
   end
-  
+
   defp format_metric_name(metric_type) do
     metric_type
     |> to_string()
     |> String.replace("_", " ")
     |> String.capitalize()
   end
-  
+
   defp format_metric_value(:error_rate, value) when is_number(value) do
     "#{Float.round(value * 100, 2)}%"
   end
+
   defp format_metric_value(:latency, value) when is_number(value) do
     "#{round(value)}ms"
   end
+
   defp format_metric_value(:throughput, value) when is_number(value) do
     "#{Float.round(value, 2)} msg/s"
   end
+
   defp format_metric_value(_, value) when is_number(value) do
     if is_float(value), do: Float.round(value, 2), else: value
   end
+
   defp format_metric_value(_, value), do: value || "-"
-  
+
   defp subscribe_to_telemetry do
     events = [
       [:rubber_duck, :status, :monitor, :health],
       [:rubber_duck, :status, :monitor, :alert],
       [:rubber_duck, :status, :optimizer, :adjusted]
     ]
-    
+
     Enum.each(events, fn event ->
       :telemetry.attach(
         "dashboard-#{Enum.join(event, "-")}",
@@ -211,32 +216,32 @@ defmodule RubberDuckWeb.StatusDashboardLive do
       )
     end)
   end
-  
+
   def handle_telemetry_event(event, measurements, metadata, pid) do
     send(pid, {:telemetry_event, event, measurements, metadata})
   end
-  
+
   defp update_from_telemetry(socket, event, _measurements, _metadata) do
     case event do
       [:rubber_duck, :status, :monitor, :health] ->
         # Trigger immediate refresh on health change
         fetch_metrics(socket)
-        
+
       [:rubber_duck, :status, :monitor, :alert] ->
         # Refresh alerts
         fetch_metrics(socket)
-        
+
       [:rubber_duck, :status, :optimizer, :adjusted] ->
         # Refresh optimization settings
         fetch_metrics(socket)
-        
+
       _ ->
         socket
     end
   end
-  
+
   # Component Functions
-  
+
   defp metric_card(assigns) do
     ~H"""
     <div class="bg-white overflow-hidden shadow rounded-lg">
@@ -255,7 +260,7 @@ defmodule RubberDuckWeb.StatusDashboardLive do
     </div>
     """
   end
-  
+
   defp panel(assigns) do
     ~H"""
     <div class="bg-white shadow rounded-lg">
@@ -268,7 +273,7 @@ defmodule RubberDuckWeb.StatusDashboardLive do
     </div>
     """
   end
-  
+
   defp metrics_table(assigns) do
     ~H"""
     <div class="overflow-x-auto">
@@ -293,7 +298,7 @@ defmodule RubberDuckWeb.StatusDashboardLive do
     </div>
     """
   end
-  
+
   defp alerts_list(assigns) do
     ~H"""
     <div class="space-y-2">
@@ -316,7 +321,7 @@ defmodule RubberDuckWeb.StatusDashboardLive do
     </div>
     """
   end
-  
+
   defp optimization_status(assigns) do
     ~H"""
     <dl class="space-y-2">
@@ -343,7 +348,7 @@ defmodule RubberDuckWeb.StatusDashboardLive do
     </dl>
     """
   end
-  
+
   defp channel_list(assigns) do
     ~H"""
     <div class="space-y-2">
@@ -367,7 +372,7 @@ defmodule RubberDuckWeb.StatusDashboardLive do
     </div>
     """
   end
-  
+
   defp health_check_results(assigns) do
     ~H"""
     <div class="space-y-4">
@@ -398,33 +403,33 @@ defmodule RubberDuckWeb.StatusDashboardLive do
     </div>
     """
   end
-  
+
   # Helper Functions
-  
+
   defp status_color("status", :healthy), do: "text-green-600"
   defp status_color("status", :degraded), do: "text-yellow-600"
   defp status_color("status", :unhealthy), do: "text-red-600"
   defp status_color("status", _), do: "text-gray-600"
   defp status_color(_, _), do: ""
-  
+
   defp alert_bg_color(:critical), do: "bg-red-50"
   defp alert_bg_color(:warning), do: "bg-yellow-50"
   defp alert_bg_color(_), do: "bg-blue-50"
-  
+
   defp alert_text_color(:critical), do: "text-red-800"
   defp alert_text_color(:warning), do: "text-yellow-800"
   defp alert_text_color(_), do: "text-blue-800"
-  
+
   defp health_badge_class(true), do: "bg-green-100 text-green-800"
   defp health_badge_class(false), do: "bg-red-100 text-red-800"
-  
+
   defp format_timestamp(timestamp) do
     timestamp
     |> DateTime.to_string()
     |> String.split(".")
     |> List.first()
   end
-  
+
   defp format_component_name(component) do
     component
     |> to_string()

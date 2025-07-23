@@ -9,15 +9,15 @@ defmodule RubberDuck.Repo.Migrations.ConversationAuthUpdate do
 
   def up do
     # First, delete any conversations with null user_id or invalid user_id
-    execute "DELETE FROM conversations WHERE user_id IS NULL OR user_id NOT IN (SELECT id FROM users)"
-    
+    execute("DELETE FROM conversations WHERE user_id IS NULL OR user_id NOT IN (SELECT id FROM users)")
+
     # Then add the foreign key constraint
     alter table(:conversations) do
       modify :user_id,
              references(:users, column: :id, name: "conversations_user_id_fkey", type: :uuid, prefix: "public")
     end
 
-    create_if_not_exists index(:conversations, [:user_id])
+    create_if_not_exists(index(:conversations, [:user_id]))
   end
 
   def down do

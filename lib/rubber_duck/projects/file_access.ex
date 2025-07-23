@@ -1,7 +1,7 @@
 defmodule RubberDuck.Projects.FileAccess do
   @moduledoc """
   Secure file access management for project sandboxes.
-  
+
   Provides path validation, normalization, and access control to ensure
   all file operations remain within project boundaries.
   """
@@ -10,7 +10,7 @@ defmodule RubberDuck.Projects.FileAccess do
 
   @doc """
   Validates that a path is safe and within the project's root directory.
-  
+
   Returns {:ok, normalized_path} or {:error, reason}
   """
   @spec validate_path(String.t(), String.t()) :: {:ok, String.t()} | {:error, atom()}
@@ -74,7 +74,8 @@ defmodule RubberDuck.Projects.FileAccess do
         {:error, :file_too_large}
       end
     else
-      {:error, :enoent} -> :ok  # File doesn't exist yet, size check passes
+      # File doesn't exist yet, size check passes
+      {:error, :enoent} -> :ok
       error -> error
     end
   end
@@ -85,10 +86,10 @@ defmodule RubberDuck.Projects.FileAccess do
   """
   @spec check_extension(String.t(), [String.t()]) :: :ok | {:error, :invalid_extension}
   def check_extension(_path, []), do: :ok
-  
+
   def check_extension(path, allowed_extensions) do
     ext = Path.extname(path)
-    
+
     if ext in allowed_extensions do
       :ok
     else
@@ -104,14 +105,15 @@ defmodule RubberDuck.Projects.FileAccess do
     with {:ok, safe_path} <- validate_path(path, project_root),
          {:ok, stat} <- File.stat(safe_path),
          {:ok, lstat} <- File.lstat(safe_path) do
-      {:ok, %{
-        path: safe_path,
-        size: stat.size,
-        type: stat.type,
-        modified: stat.mtime,
-        is_symlink: lstat.type == :symlink,
-        permissions: stat.mode
-      }}
+      {:ok,
+       %{
+         path: safe_path,
+         size: stat.size,
+         type: stat.type,
+         modified: stat.mtime,
+         is_symlink: lstat.type == :symlink,
+         permissions: stat.mode
+       }}
     end
   end
 
@@ -123,11 +125,11 @@ defmodule RubberDuck.Projects.FileAccess do
       String.starts_with?(path, project_root) ->
         relative = Path.relative_to(path, project_root)
         {:ok, relative}
-      
+
       # Absolute path outside project
       Path.absname(path) == path ->
         {:error, :outside_project_root}
-      
+
       # Relative path
       true ->
         {:ok, path}
@@ -136,13 +138,18 @@ defmodule RubberDuck.Projects.FileAccess do
 
   defp check_path_traversal(path) do
     dangerous_patterns = [
-      ~r/\.\./,           # Parent directory traversal
-      ~r/^\//,            # Absolute paths
-      ~r/^~/,             # Home directory expansion
-      ~r/\0/,             # Null bytes
-      ~r/[<>:"|?*]/       # Invalid path characters
+      # Parent directory traversal
+      ~r/\.\./,
+      # Absolute paths
+      ~r/^\//,
+      # Home directory expansion
+      ~r/^~/,
+      # Null bytes
+      ~r/\0/,
+      # Invalid path characters
+      ~r/[<>:"|?*]/
     ]
-    
+
     if Enum.any?(dangerous_patterns, &Regex.match?(&1, path)) do
       {:error, :path_traversal_attempt}
     else
@@ -153,18 +160,18 @@ defmodule RubberDuck.Projects.FileAccess do
   defp normalize_path(relative_path, project_root) do
     # Use Path.safe_relative/1 if available (OTP 26+)
     # Otherwise fall back to manual normalization
-    normalized = 
+    normalized =
       Path.join(project_root, relative_path)
       |> Path.expand()
-    
+
     {:ok, normalized}
   end
 
   defp verify_within_root(normalized_path, project_root) do
     normalized_root = Path.expand(project_root)
-    
-    if String.starts_with?(normalized_path, normalized_root <> "/") or 
-       normalized_path == normalized_root do
+
+    if String.starts_with?(normalized_path, normalized_root <> "/") or
+         normalized_path == normalized_root do
       :ok
     else
       Logger.warning("Path escape attempt detected: #{normalized_path} not within #{normalized_root}")

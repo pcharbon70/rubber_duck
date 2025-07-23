@@ -95,6 +95,8 @@ defmodule RubberDuck.Application do
       RubberDuckWeb.Collaboration.Communication,
       # Project file watcher system
       RubberDuck.Projects.FileWatcher.Supervisor,
+      # Multi-project watcher manager
+      RubberDuck.Projects.WatcherManager,
       # Web endpoint - start last
       RubberDuckWeb.Endpoint,
       {AshAuthentication.Supervisor, [otp_app: :rubber_duck]}

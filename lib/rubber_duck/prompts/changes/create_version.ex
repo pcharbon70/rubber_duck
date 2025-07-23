@@ -7,7 +7,7 @@ defmodule RubberDuck.Prompts.Changes.CreateVersion do
       case changeset.data do
         %{id: id, content: old_content} when not is_nil(id) ->
           # Get the current highest version number
-          version_number = 
+          version_number =
             case get_latest_version_number(id) do
               nil -> 1
               num -> num + 1
@@ -24,8 +24,10 @@ defmodule RubberDuck.Prompts.Changes.CreateVersion do
           }
 
           case Ash.create(PromptVersion, version_attrs, authorize?: false) do
-            {:ok, _version} -> changeset
-            {:error, error} -> 
+            {:ok, _version} ->
+              changeset
+
+            {:error, error} ->
               Ash.Changeset.add_error(changeset, field: :base, message: "Failed to create version: #{inspect(error)}")
           end
 

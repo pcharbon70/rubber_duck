@@ -12,12 +12,21 @@ defmodule RubberDuck.Workspace.Project do
 
   actions do
     defaults [:read, :destroy]
-    
+
     create :create do
-      accept [:name, :description, :configuration, :root_path, :file_access_enabled, 
-              :max_file_size, :allowed_extensions, :sandbox_config]
+      accept [
+        :name,
+        :description,
+        :configuration,
+        :root_path,
+        :file_access_enabled,
+        :max_file_size,
+        :allowed_extensions,
+        :sandbox_config
+      ]
+
       primary? true
-      
+
       # Automatically set the owner to the current actor
       change fn changeset, context ->
         case context.actor do
@@ -26,10 +35,19 @@ defmodule RubberDuck.Workspace.Project do
         end
       end
     end
-    
+
     update :update do
-      accept [:name, :description, :configuration, :root_path, :file_access_enabled, 
-              :max_file_size, :allowed_extensions, :sandbox_config]
+      accept [
+        :name,
+        :description,
+        :configuration,
+        :root_path,
+        :file_access_enabled,
+        :max_file_size,
+        :allowed_extensions,
+        :sandbox_config
+      ]
+
       require_atomic? false
     end
   end
@@ -58,7 +76,7 @@ defmodule RubberDuck.Workspace.Project do
         case Ash.Changeset.get_attribute(changeset, :root_path) do
           nil ->
             {:error, field: :root_path, message: "is required when file access is enabled"}
-          
+
           path ->
             if String.trim(path) == "" do
               {:error, field: :root_path, message: "cannot be empty when file access is enabled"}
@@ -107,7 +125,8 @@ defmodule RubberDuck.Workspace.Project do
 
     attribute :max_file_size, :integer do
       allow_nil? true
-      default 10_485_760  # 10MB
+      # 10MB
+      default 10_485_760
       public? true
       description "Maximum file size in bytes allowed for this project"
     end
@@ -132,7 +151,7 @@ defmodule RubberDuck.Workspace.Project do
 
   relationships do
     has_many :code_files, RubberDuck.Workspace.CodeFile
-    
+
     belongs_to :owner, RubberDuck.Accounts.User do
       allow_nil? false
       attribute_writable? true

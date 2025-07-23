@@ -202,7 +202,7 @@ defmodule RubberDuck.ErrorBoundary do
       })
 
     message = "Caught #{kind}: #{inspect(reason)}"
-    
+
     # Report to status system if conversation_id is present
     if conversation_id = metadata[:conversation_id] do
       Status.error(
@@ -220,7 +220,7 @@ defmodule RubberDuck.ErrorBoundary do
         )
       )
     end
-    
+
     # Convert to keyword list for Tower
     Tower.report_message(:error, message, Map.to_list(enhanced_metadata))
   end
