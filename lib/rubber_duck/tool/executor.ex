@@ -56,11 +56,11 @@ defmodule RubberDuck.Tool.Executor do
   def execute(tool_module, params, user, context \\ %{}) do
     execution_id = generate_execution_id()
     full_context = build_execution_context(user, execution_id, context)
-    
+
     # Get tool metadata for status updates
     tool_metadata = RubberDuck.Tool.metadata(tool_module)
     conversation_id = context[:conversation_id]
-    
+
     # Send initial status
     Status.tool(
       conversation_id,
@@ -88,6 +88,7 @@ defmodule RubberDuck.Tool.Executor do
             execution_id: execution_id
           })
         )
+
         {:error, :validation_failed, errors}
 
       {:error, :authorization_failed, reason} ->
@@ -99,6 +100,7 @@ defmodule RubberDuck.Tool.Executor do
             execution_id: execution_id
           })
         )
+
         {:error, :authorization_failed, reason}
 
       {:error, reason} ->
@@ -110,6 +112,7 @@ defmodule RubberDuck.Tool.Executor do
             execution_id: execution_id
           })
         )
+
         emit_execution_event(:failed, tool_module, user, reason)
         {:error, reason}
 
@@ -123,6 +126,7 @@ defmodule RubberDuck.Tool.Executor do
             details: details
           })
         )
+
         emit_execution_event(:failed, tool_module, user, reason)
         {:error, reason, details}
     end
@@ -542,6 +546,7 @@ defmodule RubberDuck.Tool.Executor do
     |> Enum.map(&to_string/1)
     |> Enum.join(", ")
   end
+
   defp format_validation_errors(error), do: inspect(error)
 
   defp emit_execution_event(event, tool_module, user, data) do

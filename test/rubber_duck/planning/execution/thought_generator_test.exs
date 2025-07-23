@@ -8,9 +8,9 @@ defmodule RubberDuck.Planning.Execution.ThoughtGeneratorTest do
     test "generates thought for simple task" do
       task = build_simple_task()
       state = build_execution_state()
-      
+
       thought = ThoughtGenerator.generate_thought(task, state)
-      
+
       assert thought.task_id == task.id
       assert thought.reasoning
       assert thought.approach in [:direct_execution, :careful_execution]
@@ -20,9 +20,9 @@ defmodule RubberDuck.Planning.Execution.ThoughtGeneratorTest do
     test "generates careful approach for complex task" do
       task = build_complex_task()
       state = build_execution_state()
-      
+
       thought = ThoughtGenerator.generate_thought(task, state)
-      
+
       assert thought.approach in [:careful_execution, :validate_then_execute]
       assert thought.confidence <= 0.8
     end
@@ -30,9 +30,9 @@ defmodule RubberDuck.Planning.Execution.ThoughtGeneratorTest do
     test "suggests retry with fixes for previously failed task" do
       task = build_simple_task()
       state = build_state_with_failures(task.id)
-      
+
       thought = ThoughtGenerator.generate_thought(task, state)
-      
+
       assert thought.approach in [:fix_and_retry, :retry_with_modifications]
       assert String.contains?(thought.reasoning, "previous failure")
     end
@@ -40,9 +40,9 @@ defmodule RubberDuck.Planning.Execution.ThoughtGeneratorTest do
     test "generates extended timeout approach for slow tasks" do
       task = build_slow_task()
       state = build_execution_state()
-      
+
       thought = ThoughtGenerator.generate_thought(task, state)
-      
+
       assert thought.approach in [:execute_with_extended_timeout, :careful_execution]
       assert String.contains?(thought.reasoning, "timeout")
     end
@@ -55,10 +55,11 @@ defmodule RubberDuck.Planning.Execution.ThoughtGeneratorTest do
         complexity: :simple,
         dependencies: []
       }
+
       state = build_execution_state()
-      
+
       thought = ThoughtGenerator.generate_thought(task, state)
-      
+
       assert thought.confidence > 0.8
     end
 
@@ -68,19 +69,20 @@ defmodule RubberDuck.Planning.Execution.ThoughtGeneratorTest do
         complexity: :very_complex,
         dependencies: ["dep1", "dep2", "dep3"]
       }
+
       state = build_execution_state()
-      
+
       thought = ThoughtGenerator.generate_thought(task, state)
-      
+
       assert thought.confidence < 0.7
     end
 
     test "very low confidence for tasks with multiple failures" do
       task = build_simple_task()
       state = build_state_with_multiple_failures(task.id, 3)
-      
+
       thought = ThoughtGenerator.generate_thought(task, state)
-      
+
       assert thought.confidence < 0.5
     end
   end
@@ -89,9 +91,9 @@ defmodule RubberDuck.Planning.Execution.ThoughtGeneratorTest do
     test "includes task complexity in reasoning" do
       task = build_complex_task()
       state = build_execution_state()
-      
+
       thought = ThoughtGenerator.generate_thought(task, state)
-      
+
       assert String.contains?(thought.reasoning, "complex")
     end
 
@@ -100,21 +102,22 @@ defmodule RubberDuck.Planning.Execution.ThoughtGeneratorTest do
         id: "dependent",
         dependencies: ["task1", "task2"]
       }
+
       state = build_execution_state()
-      
+
       thought = ThoughtGenerator.generate_thought(task, state)
-      
+
       assert String.contains?(thought.reasoning, "dependencies")
     end
 
     test "references failure history in reasoning" do
       task = build_simple_task()
       state = build_state_with_failures(task.id)
-      
+
       thought = ThoughtGenerator.generate_thought(task, state)
-      
+
       assert String.contains?(thought.reasoning, "failed") or
-             String.contains?(thought.reasoning, "previous")
+               String.contains?(thought.reasoning, "previous")
     end
   end
 
@@ -125,14 +128,15 @@ defmodule RubberDuck.Planning.Execution.ThoughtGeneratorTest do
         complexity: :simple,
         dependencies: []
       }
+
       state = %{
         completed_tasks: MapSet.new(),
         failed_tasks: MapSet.new(),
         history: %{failures: %{}, retries: %{}}
       }
-      
+
       thought = ThoughtGenerator.generate_thought(task, state)
-      
+
       assert thought.approach == :direct_execution
     end
 
@@ -141,10 +145,11 @@ defmodule RubberDuck.Planning.Execution.ThoughtGeneratorTest do
         id: "many_deps",
         dependencies: ["a", "b", "c", "d", "e"]
       }
+
       state = build_execution_state()
-      
+
       thought = ThoughtGenerator.generate_thought(task, state)
-      
+
       assert thought.approach in [:validate_then_execute, :careful_execution]
     end
   end
@@ -164,7 +169,7 @@ defmodule RubberDuck.Planning.Execution.ThoughtGeneratorTest do
   defp build_complex_task do
     %Task{
       id: "complex_task",
-      name: "Complex Task", 
+      name: "Complex Task",
       description: "A very complex task requiring careful execution",
       complexity: :very_complex,
       dependencies: ["dep1", "dep2"]
@@ -210,12 +215,13 @@ defmodule RubberDuck.Planning.Execution.ThoughtGeneratorTest do
   end
 
   defp build_state_with_multiple_failures(task_id, count) do
-    failures = Enum.map(1..count, fn i ->
-      %{
-        error: {:error, "failure_#{i}"},
-        timestamp: DateTime.utc_now()
-      }
-    end)
+    failures =
+      Enum.map(1..count, fn i ->
+        %{
+          error: {:error, "failure_#{i}"},
+          timestamp: DateTime.utc_now()
+        }
+      end)
 
     %{
       completed_tasks: MapSet.new(),

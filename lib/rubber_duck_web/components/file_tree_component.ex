@@ -1,7 +1,7 @@
 defmodule RubberDuckWeb.Components.FileTreeComponent do
   @moduledoc """
   An interactive file tree component for project navigation.
-  
+
   Features:
   - Recursive folder structure display with expand/collapse
   - File type icons and visual indicators
@@ -12,9 +12,9 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
   - Git status integration
   """
   use RubberDuckWeb, :live_component
-  
+
   alias Phoenix.PubSub
-  
+
   @impl true
   def mount(socket) do
     {:ok,
@@ -35,18 +35,18 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
      |> assign_new(:project_id, fn -> nil end)
      |> assign_new(:current_file, fn -> nil end)}
   end
-  
+
   @impl true
   def update(assigns, socket) do
-    socket = 
+    socket =
       socket
       |> assign(assigns)
       |> maybe_load_tree()
       |> maybe_subscribe()
-    
+
     {:ok, socket}
   end
-  
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -168,81 +168,81 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
     </div>
     """
   end
-  
+
   # Event Handlers
-  
+
   @impl true
   def handle_event("toggle_search", _params, socket) do
-    socket = 
+    socket =
       socket
       |> update(:show_search, &(!&1))
       |> assign(:search_query, "")
-    
+
     if socket.assigns.show_search do
       {:noreply, push_event(socket, "focus", %{id: "#{socket.assigns.id}-search"})}
     else
       {:noreply, socket}
     end
   end
-  
+
   @impl true
   def handle_event("search_files", %{"search" => query}, socket) do
     {:noreply, assign(socket, :search_query, query)}
   end
-  
+
   @impl true
   def handle_event("clear_search", _params, socket) do
     {:noreply, assign(socket, :search_query, "")}
   end
-  
+
   @impl true
   def handle_event("toggle_hidden", _params, socket) do
     {:noreply, update(socket, :show_hidden, &(!&1))}
   end
-  
+
   @impl true
   def handle_event("refresh_tree", _params, socket) do
     {:noreply, load_file_tree(socket)}
   end
-  
+
   @impl true
   def handle_event("toggle_node", %{"path" => path}, socket) do
-    expanded_paths = 
+    expanded_paths =
       if MapSet.member?(socket.assigns.expanded_paths, path) do
         MapSet.delete(socket.assigns.expanded_paths, path)
       else
         MapSet.put(socket.assigns.expanded_paths, path)
       end
-    
+
     {:noreply, assign(socket, :expanded_paths, expanded_paths)}
   end
-  
+
   @impl true
   def handle_event("select_file", %{"path" => path} = params, socket) do
     shift_key = params["shiftKey"] == "true"
     ctrl_key = params["ctrlKey"] == "true" || params["metaKey"] == "true"
-    
+
     socket = handle_file_selection(socket, path, shift_key, ctrl_key)
-    
+
     # Notify parent about file selection
     send(self(), {:file_selected, path})
-    
+
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("tree_keydown", %{"key" => key} = params, socket) do
     socket = handle_keyboard_navigation(socket, key, params)
     {:noreply, socket}
   end
-  
+
   # Public Functions
-  
+
   @doc """
   Updates the file tree data from the parent LiveView.
   """
   def update_tree_data(component_id, tree_nodes, git_status) do
-    send_update(__MODULE__, 
+    send_update(__MODULE__,
       id: component_id,
       tree_nodes: tree_nodes,
       git_status: git_status,
@@ -250,20 +250,20 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
       error: nil
     )
   end
-  
+
   @doc """
   Updates the file tree with an error from the parent LiveView.
   """
   def update_tree_error(component_id, error) do
-    send_update(__MODULE__, 
+    send_update(__MODULE__,
       id: component_id,
       error: error,
       loading: false
     )
   end
-  
+
   # Private Functions
-  
+
   defp maybe_load_tree(socket) do
     if socket.assigns.project_id && socket.assigns.tree_nodes == [] do
       load_file_tree(socket)
@@ -271,21 +271,22 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
       socket
     end
   end
-  
+
   defp maybe_subscribe(socket) do
     if connected?(socket) && socket.assigns.project_id do
       PubSub.subscribe(RubberDuck.PubSub, "project:#{socket.assigns.project_id}:files")
     end
+
     socket
   end
-  
+
   defp load_file_tree(socket) do
     project_id = socket.assigns.project_id
-    
+
     if project_id do
       # Request the parent LiveView to load the file tree
       send(self(), {:load_file_tree, socket.assigns.id, socket.assigns.show_hidden})
-      
+
       socket
       |> assign(:loading, true)
       |> assign(:error, nil)
@@ -296,28 +297,28 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
       |> assign(:error, "No project selected")
     end
   end
-  
+
   defp handle_file_selection(socket, path, shift_key, ctrl_key) do
     cond do
       ctrl_key ->
         # Toggle selection
-        selected_paths = 
+        selected_paths =
           if MapSet.member?(socket.assigns.selected_paths, path) do
             MapSet.delete(socket.assigns.selected_paths, path)
           else
             MapSet.put(socket.assigns.selected_paths, path)
           end
-        
+
         socket
         |> assign(:selected_paths, selected_paths)
         |> assign(:active_path, path)
-        
+
       shift_key && socket.assigns.active_path ->
         # Range selection
         # TODO: Implement range selection logic
         socket
         |> assign(:active_path, path)
-        
+
       true ->
         # Single selection
         socket
@@ -325,23 +326,24 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
         |> assign(:active_path, path)
     end
   end
-  
+
   defp handle_keyboard_navigation(socket, "ArrowDown", _params) do
     # TODO: Implement down navigation
     socket
   end
-  
+
   defp handle_keyboard_navigation(socket, "ArrowUp", _params) do
     # TODO: Implement up navigation
     socket
   end
-  
+
   defp handle_keyboard_navigation(socket, "ArrowRight", _params) do
     # Expand directory or move to first child
     if socket.assigns.active_path do
       case find_node_by_path(socket.assigns.tree_nodes, socket.assigns.active_path) do
         %{type: :directory} = node ->
           update(socket, :expanded_paths, &MapSet.put(&1, node.path))
+
         _ ->
           socket
       end
@@ -349,7 +351,7 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
       socket
     end
   end
-  
+
   defp handle_keyboard_navigation(socket, "ArrowLeft", _params) do
     # Collapse directory or move to parent
     if socket.assigns.active_path do
@@ -361,6 +363,7 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
             # Move to parent
             socket
           end
+
         _ ->
           # Move to parent
           socket
@@ -369,16 +372,17 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
       socket
     end
   end
-  
+
   defp handle_keyboard_navigation(socket, "Enter", _params) do
     if socket.assigns.active_path do
       send(self(), {:file_selected, socket.assigns.active_path})
     end
+
     socket
   end
-  
+
   defp handle_keyboard_navigation(socket, _key, _params), do: socket
-  
+
   defp filter_nodes(nodes, search_query, filter_extensions, show_hidden) do
     nodes
     |> Enum.filter(&should_show_node(&1, search_query, filter_extensions, show_hidden))
@@ -390,33 +394,33 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
       end
     end)
   end
-  
+
   defp should_show_node(node, search_query, filter_extensions, show_hidden) do
     # Hidden file check
     if !show_hidden && String.starts_with?(node.name, ".") do
       false
     else
       # Search query check
-      search_match = 
+      search_match =
         if search_query == "" do
           true
         else
           String.contains?(String.downcase(node.name), String.downcase(search_query))
         end
-      
+
       # Extension filter check
-      extension_match = 
+      extension_match =
         if filter_extensions == [] || node.type == :directory do
           true
         else
           extension = Path.extname(node.name)
           Enum.member?(filter_extensions, extension)
         end
-      
+
       search_match && extension_match
     end
   end
-  
+
   defp find_node_by_path(nodes, path) do
     Enum.find_value(nodes, fn node ->
       if node.path == path do
@@ -428,13 +432,13 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
       end
     end)
   end
-  
+
   defp count_visible_files(nodes, search_query, filter_extensions, show_hidden) do
     nodes
     |> filter_nodes(search_query, filter_extensions, show_hidden)
     |> count_files_recursive()
   end
-  
+
   defp count_files_recursive(nodes) do
     Enum.reduce(nodes, 0, fn node, acc ->
       if node.type == :file do
@@ -444,9 +448,9 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
       end
     end)
   end
-  
+
   # Components
-  
+
   defp tree_node(assigns) do
     ~H"""
     <div class="tree-node">
@@ -528,10 +532,11 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
     </div>
     """
   end
-  
+
   # Helper Functions
-  
+
   defp file_icon(%{type: :directory}), do: "📁"
+
   defp file_icon(%{name: name}) do
     case Path.extname(name) do
       ".ex" -> "💧"
@@ -553,39 +558,40 @@ defmodule RubberDuckWeb.Components.FileTreeComponent do
       _ -> "📄"
     end
   end
-  
+
   defp git_status_icon(:modified), do: "●"
   defp git_status_icon(:added), do: "+"
   defp git_status_icon(:deleted), do: "✕"
   defp git_status_icon(:renamed), do: "➜"
   defp git_status_icon(:untracked), do: "?"
   defp git_status_icon(_), do: nil
-  
+
   defp git_status_title(:modified), do: "Modified"
   defp git_status_title(:added), do: "Added"
   defp git_status_title(:deleted), do: "Deleted"
   defp git_status_title(:renamed), do: "Renamed"
   defp git_status_title(:untracked), do: "Untracked"
   defp git_status_title(_), do: ""
-  
+
   defp format_file_size(size) when size < 1024, do: "#{size} B"
   defp format_file_size(size) when size < 1024 * 1024, do: "#{Float.round(size / 1024, 1)} KB"
   defp format_file_size(size), do: "#{Float.round(size / 1024 / 1024, 1)} MB"
-  
+
   defp highlight_search(text, ""), do: text
+
   defp highlight_search(text, query) do
     case :binary.match(String.downcase(text), String.downcase(query)) do
       {start, length} ->
         prefix = String.slice(text, 0, start)
         match = String.slice(text, start, length)
         suffix = String.slice(text, (start + length)..-1//1)
-        
+
         assigns = %{prefix: prefix, match: match, suffix: suffix}
-        
+
         ~H"""
         <%= @prefix %><span class="bg-yellow-200 dark:bg-yellow-700"><%= @match %></span><%= @suffix %>
         """
-        
+
       :nomatch ->
         text
     end

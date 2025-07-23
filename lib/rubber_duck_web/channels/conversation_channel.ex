@@ -639,7 +639,10 @@ defmodule RubberDuckWeb.ConversationChannel do
             if conversation.user_id == user_id do
               {:ok, conversation}
             else
-              Logger.warning("User #{user_id} tried to access conversation #{conversation_id} owned by #{conversation.user_id}")
+              Logger.warning(
+                "User #{user_id} tried to access conversation #{conversation_id} owned by #{conversation.user_id}"
+              )
+
               {:error, :unauthorized}
             end
 
@@ -662,7 +665,7 @@ defmodule RubberDuckWeb.ConversationChannel do
                 {:error, reason}
             end
         end
-      
+
       {:error, _} ->
         Logger.error("Could not find user #{user_id} for conversation creation")
         {:error, :user_not_found}

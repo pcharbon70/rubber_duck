@@ -261,7 +261,6 @@ defmodule RubberDuck.Tool.Monitoring do
     :ok
   end
 
-
   defp store_execution_record(record) do
     key = {record.timestamp, record.tool_name, :rand.uniform(1000)}
     :ets.insert(:tool_execution_history, {key, record})
@@ -774,7 +773,6 @@ defmodule RubberDuck.Tool.Monitoring do
 
     "{#{label_pairs}}"
   end
-
 
   defp aggregate_metrics do
     # Perform periodic aggregation of metrics

@@ -1,7 +1,7 @@
 defmodule RubberDuck.Planning.Repository.DependencyGraph do
   @moduledoc """
   Builds and manages dependency graphs for repository-level analysis.
-  
+
   This module creates directed graphs representing file dependencies based on
   module imports, aliases, and usage patterns. It provides operations for
   dependency analysis, topological sorting, and impact assessment.
@@ -10,23 +10,23 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
   defstruct [:graph, :nodes, :edges]
 
   @type t :: %__MODULE__{
-    graph: :digraph.graph(),
-    nodes: MapSet.t(String.t()),
-    edges: [{String.t(), String.t()}]
-  }
+          graph: :digraph.graph(),
+          nodes: MapSet.t(String.t()),
+          edges: [{String.t(), String.t()}]
+        }
 
   @type file_analysis :: %{
-    path: String.t(),
-    modules: [module_info()],
-    dependencies: [String.t()]
-  }
+          path: String.t(),
+          modules: [module_info()],
+          dependencies: [String.t()]
+        }
 
   @type module_info :: %{
-    name: String.t(),
-    imports: [String.t()],
-    aliases: [String.t()],
-    uses: [String.t()]
-  }
+          name: String.t(),
+          imports: [String.t()],
+          aliases: [String.t()],
+          uses: [String.t()]
+        }
 
   require Logger
 
@@ -36,29 +36,30 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
   @spec build([file_analysis()]) :: {:ok, t()} | {:error, term()}
   def build(file_analyses) do
     Logger.debug("Building dependency graph from #{length(file_analyses)} files")
-    
+
     try do
       graph = :digraph.new([:acyclic])
-      
+
       # Create a mapping from module names to file paths
       module_to_file = build_module_mapping(file_analyses)
-      
+
       # Add all files as vertices
       files = Enum.map(file_analyses, & &1.path)
       Enum.each(files, &:digraph.add_vertex(graph, &1))
-      
+
       # Add edges based on dependencies
       edges = build_edges(file_analyses, module_to_file)
+
       Enum.each(edges, fn {from, to} ->
         :digraph.add_edge(graph, from, to)
       end)
-      
+
       result = %__MODULE__{
         graph: graph,
         nodes: MapSet.new(files),
         edges: edges
       }
-      
+
       Logger.debug("Dependency graph built with #{length(files)} nodes and #{length(edges)} edges")
       {:ok, result}
     rescue
@@ -81,7 +82,8 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
       end
     end)
     |> Enum.uniq()
-    |> Enum.reject(&(&1 in files))  # Remove the original files
+    # Remove the original files
+    |> Enum.reject(&(&1 in files))
   end
 
   @doc """
@@ -97,7 +99,8 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
       end
     end)
     |> Enum.uniq()
-    |> Enum.reject(&(&1 in files))  # Remove the original files
+    # Remove the original files
+    |> Enum.reject(&(&1 in files))
   end
 
   @doc """
@@ -108,7 +111,7 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
     case :digraph_utils.topsort(graph) do
       false ->
         {:error, :cyclic_dependency}
-      
+
       sorted_files ->
         {:ok, sorted_files}
     end
@@ -120,7 +123,9 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
   @spec detect_cycles(t()) :: [cycle()]
   def detect_cycles(%__MODULE__{graph: graph}) do
     case :digraph_utils.cyclic_strong_components(graph) do
-      [] -> []
+      [] ->
+        []
+
       components ->
         components
         |> Enum.filter(&(length(&1) > 1))
@@ -129,9 +134,9 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
   end
 
   @type cycle :: %{
-    files: [String.t()],
-    type: :cyclic_dependency
-  }
+          files: [String.t()],
+          type: :cyclic_dependency
+        }
 
   @doc """
   Gets direct dependencies for a file.
@@ -141,7 +146,7 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
     case :digraph.vertices(graph) |> Enum.member?(file) do
       true ->
         :digraph.out_neighbours(graph, file)
-      
+
       false ->
         []
     end
@@ -155,7 +160,7 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
     case :digraph.vertices(graph) |> Enum.member?(file) do
       true ->
         :digraph.in_neighbours(graph, file)
-      
+
       false ->
         []
     end
@@ -168,16 +173,18 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
   def calculate_metrics(%__MODULE__{graph: graph, nodes: nodes, edges: edges}) do
     vertex_count = MapSet.size(nodes)
     edge_count = length(edges)
-    
+
     # Calculate in-degree and out-degree statistics
-    in_degrees = Enum.map(MapSet.to_list(nodes), fn node ->
-      length(:digraph.in_neighbours(graph, node))
-    end)
-    
-    out_degrees = Enum.map(MapSet.to_list(nodes), fn node ->
-      length(:digraph.out_neighbours(graph, node))
-    end)
-    
+    in_degrees =
+      Enum.map(MapSet.to_list(nodes), fn node ->
+        length(:digraph.in_neighbours(graph, node))
+      end)
+
+    out_degrees =
+      Enum.map(MapSet.to_list(nodes), fn node ->
+        length(:digraph.out_neighbours(graph, node))
+      end)
+
     %{
       vertex_count: vertex_count,
       edge_count: edge_count,
@@ -191,15 +198,15 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
   end
 
   @type graph_metrics :: %{
-    vertex_count: non_neg_integer(),
-    edge_count: non_neg_integer(),
-    density: float(),
-    max_in_degree: non_neg_integer(),
-    max_out_degree: non_neg_integer(),
-    avg_in_degree: float(),
-    avg_out_degree: float(),
-    strongly_connected_components: non_neg_integer()
-  }
+          vertex_count: non_neg_integer(),
+          edge_count: non_neg_integer(),
+          density: float(),
+          max_in_degree: non_neg_integer(),
+          max_out_degree: non_neg_integer(),
+          avg_in_degree: float(),
+          avg_out_degree: float(),
+          strongly_connected_components: non_neg_integer()
+        }
 
   @doc """
   Finds the shortest path between two files.
@@ -220,29 +227,31 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
     graph_name = Keyword.get(opts, :name, "dependency_graph")
     node_attrs = Keyword.get(opts, :node_attrs, "shape=box")
     edge_attrs = Keyword.get(opts, :edge_attrs, "")
-    
+
     header = "digraph #{graph_name} {\n"
     footer = "}\n"
-    
+
     # Add node declarations
-    node_declarations = nodes
-    |> MapSet.to_list()
-    |> Enum.map(fn node ->
-      safe_name = sanitize_node_name(node)
-      label = Path.basename(node)
-      "  \"#{safe_name}\" [label=\"#{label}\" #{node_attrs}];"
-    end)
-    |> Enum.join("\n")
-    
+    node_declarations =
+      nodes
+      |> MapSet.to_list()
+      |> Enum.map(fn node ->
+        safe_name = sanitize_node_name(node)
+        label = Path.basename(node)
+        "  \"#{safe_name}\" [label=\"#{label}\" #{node_attrs}];"
+      end)
+      |> Enum.join("\n")
+
     # Add edge declarations
-    edge_declarations = edges
-    |> Enum.map(fn {from, to} ->
-      safe_from = sanitize_node_name(from)
-      safe_to = sanitize_node_name(to)
-      "  \"#{safe_from}\" -> \"#{safe_to}\" [#{edge_attrs}];"
-    end)
-    |> Enum.join("\n")
-    
+    edge_declarations =
+      edges
+      |> Enum.map(fn {from, to} ->
+        safe_from = sanitize_node_name(from)
+        safe_to = sanitize_node_name(to)
+        "  \"#{safe_from}\" -> \"#{safe_to}\" [#{edge_attrs}];"
+      end)
+      |> Enum.join("\n")
+
     header <> node_declarations <> "\n" <> edge_declarations <> "\n" <> footer
   end
 
@@ -274,18 +283,20 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
       Enum.map(dependencies, &{file.path, &1})
     end)
     |> Enum.uniq()
-    |> Enum.reject(fn {from, to} -> from == to end)  # Remove self-dependencies
+    # Remove self-dependencies
+    |> Enum.reject(fn {from, to} -> from == to end)
   end
 
   defp get_file_dependencies(file, module_to_file) do
     file.modules
     |> Enum.flat_map(fn module ->
       all_deps = module.imports ++ module.aliases ++ module.uses
-      
+
       all_deps
       |> Enum.map(&resolve_module_to_file(&1, module_to_file))
       |> Enum.reject(&is_nil/1)
-      |> Enum.reject(&(&1 == file.path))  # Remove self-references
+      # Remove self-references
+      |> Enum.reject(&(&1 == file.path))
     end)
     |> Enum.uniq()
   end
@@ -296,7 +307,7 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
       nil ->
         # Try to find partial matches for nested modules
         find_parent_module(module_name, module_to_file)
-      
+
       file_path ->
         file_path
     end
@@ -304,13 +315,14 @@ defmodule RubberDuck.Planning.Repository.DependencyGraph do
 
   defp find_parent_module(module_name, module_to_file) do
     parts = String.split(module_name, ".")
-    
+
     # Try progressively shorter module paths
     1..(length(parts) - 1)
     |> Enum.map(fn take_count ->
       parts |> Enum.take(take_count) |> Enum.join(".")
     end)
-    |> Enum.reverse()  # Try longer matches first
+    # Try longer matches first
+    |> Enum.reverse()
     |> Enum.find_value(fn parent_module ->
       Map.get(module_to_file, parent_module)
     end)

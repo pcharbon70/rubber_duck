@@ -2,7 +2,7 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
   @moduledoc """
   An intelligent context panel that displays relevant project information,
   analysis results, and system status.
-  
+
   Features:
   - Current file analysis with symbol outline
   - Code metrics and complexity indicators
@@ -12,9 +12,9 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
   - Real-time updates via PubSub
   """
   use RubberDuckWeb, :live_component
-  
+
   alias Phoenix.PubSub
-  
+
   @impl true
   def mount(socket) do
     {:ok,
@@ -26,7 +26,7 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
        symbol_outline: [],
        related_files: [],
        documentation: nil,
-       
+
        # Metrics
        code_metrics: %{
          complexity: nil,
@@ -34,7 +34,7 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
          performance: nil,
          security_score: nil
        },
-       
+
        # Status monitoring
        llm_status: %{
          provider: nil,
@@ -56,7 +56,7 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
        },
        error_count: 0,
        warning_count: 0,
-       
+
        # UI state
        active_tab: :context,
        search_query: "",
@@ -67,18 +67,18 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
      )
      |> assign_new(:project_id, fn -> nil end)}
   end
-  
+
   @impl true
   def update(assigns, socket) do
-    socket = 
+    socket =
       socket
       |> assign(assigns)
       |> maybe_load_file_analysis()
       |> maybe_subscribe()
-    
+
     {:ok, socket}
   end
-  
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -193,9 +193,9 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
     </div>
     """
   end
-  
+
   # Tab Components
-  
+
   defp context_tab(assigns) do
     ~H"""
     <div class="context-content h-full overflow-y-auto">
@@ -286,7 +286,7 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
     </div>
     """
   end
-  
+
   defp metrics_tab(assigns) do
     ~H"""
     <div class="metrics-content h-full overflow-y-auto p-4 space-y-4">
@@ -409,7 +409,7 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
     </div>
     """
   end
-  
+
   defp status_tab(assigns) do
     ~H"""
     <div class="status-content h-full overflow-y-auto p-4 space-y-4">
@@ -544,7 +544,7 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
     </div>
     """
   end
-  
+
   defp actions_tab(assigns) do
     ~H"""
     <div class="actions-content h-full overflow-y-auto p-4 space-y-4">
@@ -653,106 +653,106 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
     </div>
     """
   end
-  
+
   # Event Handlers
-  
+
   @impl true
   def handle_event("switch_tab", %{"tab" => tab}, socket) do
     {:noreply, assign(socket, :active_tab, String.to_atom(tab))}
   end
-  
+
   @impl true
   def handle_event("toggle_search", _params, socket) do
-    socket = 
+    socket =
       socket
       |> update(:show_search, &(!&1))
       |> assign(:search_query, "")
       |> assign(:search_results, [])
-    
+
     if socket.assigns.show_search do
       {:noreply, push_event(socket, "focus", %{id: "#{socket.assigns.id}-search"})}
     else
       {:noreply, socket}
     end
   end
-  
+
   @impl true
   def handle_event("search", %{"search" => query}, socket) do
-    socket = 
+    socket =
       socket
       |> assign(:search_query, query)
       |> perform_search(query)
-    
+
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("clear_search", _params, socket) do
     {:noreply, assign(socket, search_query: "", search_results: [])}
   end
-  
+
   @impl true
   def handle_event("goto_symbol", %{"line" => line}, socket) do
     line_number = String.to_integer(line)
     send(self(), {:goto_line, socket.assigns.current_file, line_number})
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("open_file", %{"path" => path}, socket) do
     send(self(), {:open_file, path})
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("run_analysis", _params, socket) do
     socket = run_action(socket, :analysis, "Running full analysis...")
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("generate_tests", _params, socket) do
     socket = run_action(socket, :generate_tests, "Generating test cases...")
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("suggest_refactoring", _params, socket) do
     socket = run_action(socket, :refactoring, "Analyzing for refactoring opportunities...")
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("generate_docs", _params, socket) do
     socket = run_action(socket, :generate_docs, "Generating documentation...")
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("security_scan", _params, socket) do
     socket = run_action(socket, :security_scan, "Running security scan...")
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("optimize_performance", _params, socket) do
     socket = run_action(socket, :performance, "Analyzing performance...")
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("dismiss_notification", %{"id" => id}, socket) do
     notifications = Enum.reject(socket.assigns.notifications, &(&1.id == id))
     {:noreply, assign(socket, :notifications, notifications)}
   end
-  
+
   # Public Functions
-  
+
   @doc """
   Updates the current file and triggers analysis.
   """
   def update_current_file(component_id, file_path) do
-    send_update(__MODULE__, 
+    send_update(__MODULE__,
       id: component_id,
       current_file: file_path,
       file_analysis: nil,
@@ -760,27 +760,27 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
       related_files: []
     )
   end
-  
+
   @doc """
   Updates metrics data.
   """
   def update_metrics(component_id, metrics) do
-    send_update(__MODULE__, 
+    send_update(__MODULE__,
       id: component_id,
       code_metrics: metrics
     )
   end
-  
+
   @doc """
   Updates LLM status.
   """
   def update_llm_status(component_id, status) do
-    send_update(__MODULE__, 
+    send_update(__MODULE__,
       id: component_id,
       llm_status: status
     )
   end
-  
+
   @doc """
   Adds a notification.
   """
@@ -791,17 +791,17 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
       message: message,
       timestamp: DateTime.utc_now()
     }
-    
-    send_update(__MODULE__, 
+
+    send_update(__MODULE__,
       id: component_id,
-      notifications: fn notifications -> 
+      notifications: fn notifications ->
         [notification | notifications] |> Enum.take(5)
       end
     )
   end
-  
+
   # Private Functions
-  
+
   defp maybe_load_file_analysis(socket) do
     if socket.assigns.current_file && !socket.assigns.file_analysis do
       send(self(), {:analyze_file, socket.assigns.id, socket.assigns.current_file})
@@ -810,19 +810,20 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
       socket
     end
   end
-  
+
   defp maybe_subscribe(socket) do
     if connected?(socket) && socket.assigns.project_id do
       PubSub.subscribe(RubberDuck.PubSub, "project:#{socket.assigns.project_id}:metrics")
       PubSub.subscribe(RubberDuck.PubSub, "system:status")
     end
+
     socket
   end
-  
+
   defp perform_search(socket, "") do
     assign(socket, :search_results, [])
   end
-  
+
   defp perform_search(socket, _query) do
     # TODO: Implement actual search
     # For now, return mock results
@@ -830,35 +831,35 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
       %{type: :symbol, name: "search_result", file: "lib/example.ex", line: 42},
       %{type: :file, name: "search_file.ex", path: "lib/search_file.ex"}
     ]
-    
+
     assign(socket, :search_results, results)
   end
-  
+
   defp run_action(socket, action, message) do
     # Send action request to parent
     send(self(), {:run_action, action, socket.assigns.current_file})
-    
+
     # Add notification
     add_notification(socket.assigns.id, :info, message)
-    
+
     socket
   end
-  
+
   # UI Helpers
-  
+
   defp tab_class(active) do
     base = "px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-    
+
     if active do
       base <> " bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
     else
       base <> " text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
     end
   end
-  
+
   defp notification_class(type) do
     base = "px-4 py-3 rounded-lg shadow-lg flex items-center justify-between"
-    
+
     case type do
       :info -> base <> " bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
       :success -> base <> " bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
@@ -867,7 +868,7 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
       _ -> base <> " bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
     end
   end
-  
+
   defp symbol_icon(:function), do: "ƒ"
   defp symbol_icon(:module), do: "M"
   defp symbol_icon(:struct), do: "S"
@@ -875,62 +876,67 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
   defp symbol_icon(:callback), do: "@"
   defp symbol_icon(:type), do: "T"
   defp symbol_icon(_), do: "•"
-  
+
   defp complexity_color(value) when value < 10, do: "text-green-600"
   defp complexity_color(value) when value < 20, do: "text-yellow-600"
   defp complexity_color(_), do: "text-red-600"
-  
+
   defp coverage_color(value) when value >= 80, do: "text-green-600"
   defp coverage_color(value) when value >= 60, do: "text-yellow-600"
   defp coverage_color(_), do: "text-red-600"
-  
+
   defp security_color(score) when score >= 90, do: "text-green-600"
   defp security_color(score) when score >= 70, do: "text-yellow-600"
   defp security_color(_), do: "text-red-600"
-  
+
   defp security_grade(score) when score >= 90, do: "A"
   defp security_grade(score) when score >= 80, do: "B"
   defp security_grade(score) when score >= 70, do: "C"
   defp security_grade(score) when score >= 60, do: "D"
   defp security_grade(_), do: "F"
-  
+
   defp resource_color(value) when value < 50, do: "bg-green-500"
   defp resource_color(value) when value < 80, do: "bg-yellow-500"
   defp resource_color(_), do: "bg-red-500"
-  
+
   defp complexity_advice(%{cyclomatic: c, cognitive: cog}) when c < 10 and cog < 15 do
     "Good complexity levels. Code is easy to understand and maintain."
   end
+
   defp complexity_advice(%{cyclomatic: c, cognitive: cog}) when c < 20 and cog < 30 do
     "Moderate complexity. Consider refactoring complex methods."
   end
+
   defp complexity_advice(_) do
     "High complexity detected. Refactoring recommended to improve maintainability."
   end
-  
+
   defp format_number(n) when n >= 1_000_000, do: "#{Float.round(n / 1_000_000, 1)}M"
   defp format_number(n) when n >= 1_000, do: "#{Float.round(n / 1_000, 1)}K"
   defp format_number(n), do: to_string(n)
-  
+
   defp format_bytes(bytes) when bytes >= 1_073_741_824 do
     "#{Float.round(bytes / 1_073_741_824, 2)} GB"
   end
+
   defp format_bytes(bytes) when bytes >= 1_048_576 do
     "#{Float.round(bytes / 1_048_576, 2)} MB"
   end
+
   defp format_bytes(bytes) when bytes >= 1024 do
     "#{Float.round(bytes / 1024, 2)} KB"
   end
+
   defp format_bytes(bytes), do: "#{bytes} B"
-  
+
   # Component Functions
-  
+
   defp metric_bar(assigns) do
-    assigns = 
+    assigns =
       assigns
       |> assign_new(:suffix, fn -> "" end)
       |> assign_new(:color, fn -> "text-gray-600" end)
-    
+
     ~H"""
     <div>
       <div class="flex justify-between text-sm mb-1">
@@ -946,10 +952,10 @@ defmodule RubberDuckWeb.Components.ContextPanelComponent do
     </div>
     """
   end
-  
+
   defp progress_bar(assigns) do
     assigns = assign_new(assigns, :color, fn -> "bg-blue-500" end)
-    
+
     ~H"""
     <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
       <div 

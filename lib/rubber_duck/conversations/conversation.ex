@@ -17,6 +17,40 @@ defmodule RubberDuck.Conversations.Conversation do
     repo RubberDuck.Repo
   end
 
+  actions do
+    defaults [:read, :destroy, update: :*]
+
+    create :create do
+      accept [:title, :user_id, :project_id, :metadata, :status]
+      primary? true
+
+      # Allow setting the ID during creation
+      argument :id, :uuid do
+        allow_nil? true
+      end
+
+      change fn changeset, _ ->
+        case Ash.Changeset.get_argument(changeset, :id) do
+          nil -> changeset
+          id -> Ash.Changeset.force_change_attribute(changeset, :id, id)
+        end
+      end
+
+      # Ensure users can only create conversations for themselves
+      change fn changeset, context ->
+        case context.actor do
+          nil -> changeset
+          actor -> Ash.Changeset.force_change_attribute(changeset, :user_id, actor.id)
+        end
+      end
+    end
+
+    read :list_by_user do
+      argument :user_id, :uuid, allow_nil?: false
+      filter expr(user_id == ^arg(:user_id))
+    end
+  end
+
   policies do
     # Allow system operations to bypass authorization
     bypass actor_attribute_equals(:system, true) do
@@ -46,40 +80,6 @@ defmodule RubberDuck.Conversations.Conversation do
     policy action_type(:destroy) do
       description "Users can delete their own conversations"
       authorize_if relates_to_actor_via(:user)
-    end
-  end
-
-  actions do
-    defaults [:read, :destroy, update: :*]
-    
-    create :create do
-      accept [:title, :user_id, :project_id, :metadata, :status]
-      primary? true
-      
-      # Allow setting the ID during creation
-      argument :id, :uuid do
-        allow_nil? true
-      end
-      
-      change fn changeset, _ ->
-        case Ash.Changeset.get_argument(changeset, :id) do
-          nil -> changeset
-          id -> Ash.Changeset.force_change_attribute(changeset, :id, id)
-        end
-      end
-      
-      # Ensure users can only create conversations for themselves
-      change fn changeset, context ->
-        case context.actor do
-          nil -> changeset
-          actor -> Ash.Changeset.force_change_attribute(changeset, :user_id, actor.id)
-        end
-      end
-    end
-
-    read :list_by_user do
-      argument :user_id, :uuid, allow_nil?: false
-      filter expr(user_id == ^arg(:user_id))
     end
   end
 

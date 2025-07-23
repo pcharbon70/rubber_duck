@@ -391,7 +391,6 @@ defmodule RubberDuck.Enhancement.Coordinator do
     "enh_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}"
   end
 
-
   # Simplified CoT application for now
   defp apply_cot_reasoning(content, config) do
     # Use the actual CoT system based on chain type

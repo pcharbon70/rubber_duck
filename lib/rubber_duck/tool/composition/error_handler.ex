@@ -324,7 +324,7 @@ defmodule RubberDuck.Tool.Composition.ErrorHandler do
             Logger.warning(
               "Tool #{tool_module} failed on attempt #{attempt}, retrying in #{delay}ms: #{inspect(error)}"
             )
-            
+
             # Report retry attempt
             if conversation_id = context[:conversation_id] do
               Status.progress(

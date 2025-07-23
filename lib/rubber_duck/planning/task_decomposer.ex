@@ -460,8 +460,10 @@ defmodule RubberDuck.Planning.TaskDecomposer do
       ]
 
       case Enum.find(validations, &match?({:error, _}, &1)) do
-        {:error, _} = error -> error
-        nil -> 
+        {:error, _} = error ->
+          error
+
+        nil ->
           # If basic validations pass, run critics
           case run_critic_validation(tasks, dependencies, state) do
             :ok -> {:ok, %{tasks: tasks, valid: true}}
@@ -474,11 +476,12 @@ defmodule RubberDuck.Planning.TaskDecomposer do
   end
 
   defp run_critic_validation(tasks, dependencies, state) do
-    orchestrator = Orchestrator.new(
-      cache_enabled: true,
-      parallel_execution: true,
-      config: state.llm_config
-    )
+    orchestrator =
+      Orchestrator.new(
+        cache_enabled: true,
+        parallel_execution: true,
+        config: state.llm_config
+      )
 
     # Create a mock plan structure for validation
     plan = %{
@@ -493,24 +496,24 @@ defmodule RubberDuck.Planning.TaskDecomposer do
     case Orchestrator.validate(orchestrator, plan) do
       {:ok, results} ->
         aggregated = Orchestrator.aggregate_results(results)
-        
+
         if aggregated.summary == :failed do
           {:error, format_critic_errors(aggregated)}
         else
           :ok
         end
-        
-      # Orchestrator.validate always returns {:ok, results}
-      # So we don't need this error case
+
+        # Orchestrator.validate always returns {:ok, results}
+        # So we don't need this error case
     end
   end
 
   defp format_critic_errors(aggregated) do
-    blocking_messages = 
+    blocking_messages =
       aggregated.blocking_issues
       |> Enum.map(& &1.message)
       |> Enum.join("; ")
-    
+
     "Validation failed: #{blocking_messages}"
   end
 

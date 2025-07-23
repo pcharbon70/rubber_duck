@@ -287,7 +287,6 @@ defmodule RubberDuck.MCP.WorkflowAdapter.StreamingHandler do
     Logger.debug("Cleaned up progress monitoring for workflow: #{workflow_id}")
   end
 
-
   defp emit_workflow_event(stream_id, event_type, event_data) do
     event = %{
       type: event_type,

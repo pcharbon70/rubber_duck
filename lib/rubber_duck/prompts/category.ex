@@ -16,7 +16,7 @@ defmodule RubberDuck.Prompts.Category do
     create :create do
       primary? true
       accept [:name, :description, :parent_id]
-      
+
       change set_attribute(:user_id, actor(:id))
     end
   end
@@ -26,7 +26,7 @@ defmodule RubberDuck.Prompts.Category do
     policy action_type(:create) do
       authorize_if actor_present()
     end
-    
+
     # For reads, updates, and destroys, users can only access their own categories
     policy action_type([:read, :update, :destroy]) do
       authorize_if expr(user_id == ^actor(:id))

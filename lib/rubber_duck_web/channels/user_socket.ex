@@ -96,7 +96,7 @@ defmodule RubberDuckWeb.UserSocket do
       {:ok, user} ->
         # Convert UUID to string
         {:ok, to_string(user.id)}
-      
+
       {:error, _reason} ->
         {:error, "Invalid API key"}
     end
@@ -108,9 +108,10 @@ defmodule RubberDuckWeb.UserSocket do
 
   defp authenticate_api_key(api_key) do
     # Use the sign_in_with_api_key action to authenticate
-    case Ash.read_one(RubberDuck.Accounts.User, 
-                      action: :sign_in_with_api_key, 
-                      input: %{api_key: api_key}) do
+    case Ash.read_one(RubberDuck.Accounts.User,
+           action: :sign_in_with_api_key,
+           input: %{api_key: api_key}
+         ) do
       {:ok, user} -> {:ok, user}
       {:error, _} -> {:error, :invalid_api_key}
     end
@@ -127,5 +128,4 @@ defmodule RubberDuckWeb.UserSocket do
   end
 
   defp get_api_key_from_uri(_), do: :error
-
 end

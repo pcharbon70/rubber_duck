@@ -1,7 +1,7 @@
 defmodule RubberDuckWeb.Components.ChatPanelComponent do
   @moduledoc """
   A comprehensive chat panel component for AI-powered coding assistance.
-  
+
   Features:
   - Rich message rendering with markdown and syntax highlighting
   - Real-time streaming support
@@ -10,7 +10,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
   - LLM integration controls
   """
   use RubberDuckWeb, :live_component
-  
+
   @impl true
   def mount(socket) do
     {:ok,
@@ -31,7 +31,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
      )
      |> assign_new(:current_user, fn -> nil end)}
   end
-  
+
   @impl true
   def update(assigns, socket) do
     {:ok,
@@ -40,7 +40,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
      |> assign_new(:conversation_connected, fn -> false end)
      |> maybe_subscribe_to_chat()}
   end
-  
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -133,21 +133,21 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     </div>
     """
   end
-  
+
   # Event Handlers
-  
+
   @impl true
   def handle_event("send_message", %{"message" => content}, socket) do
     content = String.trim(content)
-    
+
     if content != "" do
       message = create_message(content, :user, socket.assigns.current_user)
-      
+
       socket =
         socket
         |> add_message(message)
         |> assign(input_value: "")
-      
+
       # Check if it's a command or regular message
       if String.starts_with?(content, "/") do
         socket = handle_command(socket, message)
@@ -161,79 +161,79 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
       {:noreply, socket}
     end
   end
-  
+
   @impl true
   def handle_event("update_input", %{"message" => value}, socket) do
     socket =
       socket
       |> assign(input_value: value)
       |> maybe_show_commands(value)
-    
+
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("keydown", %{"key" => "Enter", "shiftKey" => false}, socket) do
     if socket.assigns.input_value != "" && socket.assigns.streaming_message == nil do
       send(self(), {:submit_message})
     end
-    
+
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("keydown", %{"key" => "Escape"}, socket) do
     {:noreply, assign(socket, show_commands: false, search_results: [])}
   end
-  
+
   @impl true
   def handle_event("keydown", _params, socket) do
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("select_command", %{"command" => command}, socket) do
     socket =
       socket
       |> assign(input_value: command <> " ", show_commands: false)
       |> push_event("focus_input", %{id: "#{socket.assigns.id}-input"})
-    
+
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("cancel_streaming", _params, socket) do
     # TODO: Implement streaming cancellation
     {:noreply, assign(socket, streaming_message: nil)}
   end
-  
+
   @impl true
   def handle_event("retry_message", %{"message_id" => _message_id}, socket) do
     # TODO: Implement message retry
     {:noreply, socket}
   end
-  
+
   @impl true
   def handle_event("copy_message", %{"message_id" => message_id}, socket) do
     message = Enum.find(socket.assigns.messages, fn {_id, msg} -> msg.id == message_id end)
-    
+
     if message do
       {:noreply, push_event(socket, "copy_to_clipboard", %{text: elem(message, 1).content})}
     else
       {:noreply, socket}
     end
   end
-  
+
   @impl true
   def handle_event("toggle_model_settings", _params, socket) do
     {:noreply, update(socket, :show_model_settings, &(!&1))}
   end
-  
+
   @impl true
   def handle_event("update_model", %{"provider" => provider, "model" => model}, socket) do
     # Notify parent to update conversation channel preferences
     send(self(), {:update_llm_preferences, %{provider: provider, model: model}})
-    
+
     {:noreply,
      assign(socket,
        selected_provider: provider,
@@ -241,21 +241,21 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
        show_model_settings: false
      )}
   end
-  
+
   # PubSub Handlers
-  
+
   # Note: LiveComponents don't support handle_info
   # These would need to be handled by the parent LiveView
   # The parent LiveView should handle PubSub messages and update the component's assigns
-  
+
   # Helper Functions
-  
+
   defp maybe_subscribe_to_chat(socket) do
     # Subscription should be handled by the parent LiveView
     # since LiveComponents can't receive handle_info messages
     socket
   end
-  
+
   defp create_message(content, type, user) do
     %{
       id: Ecto.UUID.generate(),
@@ -269,63 +269,62 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
       }
     }
   end
-  
+
   defp add_message(socket, message) do
     update(socket, :messages, fn messages ->
       messages ++ [{"message-#{message.id}", message}]
     end)
   end
-  
-  
+
   defp handle_command(socket, message) do
     parts = String.split(message.content, " ", trim: true)
     [command | args] = parts
-    
+
     case command do
       "/help" ->
         help_message = create_help_message()
         add_message(socket, help_message)
-        
+
       "/login" ->
         handle_login_command(socket, args)
-        
+
       "/logout" ->
         handle_logout_command(socket)
-        
+
       "/api-key" ->
         handle_api_key_command(socket, args)
-        
+
       "/clear" ->
         assign(socket, messages: [])
-        
+
       "/export" ->
         # TODO: Implement export
         error_message = create_message("Export functionality coming soon!", :system, nil)
         add_message(socket, error_message)
-        
+
       "/model" ->
         assign(socket, show_model_settings: true)
-        
+
       "/retry" ->
         # TODO: Implement retry
         error_message = create_message("Retry functionality coming soon!", :system, nil)
         add_message(socket, error_message)
-        
+
       "/status" ->
         handle_status_command(socket)
-        
+
       _ ->
-        error_message = create_message(
-          "Unknown command: #{command}. Type /help for available commands.",
-          :system,
-          nil
-        )
+        error_message =
+          create_message(
+            "Unknown command: #{command}. Type /help for available commands.",
+            :system,
+            nil
+          )
+
         add_message(socket, error_message)
     end
   end
-  
-  
-  
+
   defp maybe_show_commands(socket, value) do
     if String.starts_with?(value, "/") && String.length(value) > 1 do
       query = String.slice(value, 1..-1//1) |> String.downcase()
@@ -335,7 +334,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
       assign(socket, show_commands: false, command_suggestions: [])
     end
   end
-  
+
   defp filter_commands(query) do
     commands = [
       %{command: "/help", description: "Show available commands"},
@@ -348,17 +347,17 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
       %{command: "/retry", description: "Retry last message"},
       %{command: "/status", description: "Show connection status"}
     ]
-    
+
     Enum.filter(commands, fn cmd ->
       String.contains?(String.downcase(cmd.command), query)
     end)
   end
-  
+
   defp calculate_rows(value) do
     lines = String.split(value, "\n") |> length()
     min(max(lines, 1), 10)
   end
-  
+
   defp handle_login_command(socket, args) do
     case args do
       [username, password] ->
@@ -366,23 +365,25 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
         send(self(), {:auth_login, %{username: username, password: password}})
         message = create_message("Attempting to login as #{username}...", :system, nil)
         add_message(socket, message)
-        
+
       _ ->
-        message = create_message(
-          "Usage: /login <username> <password>\nExample: /login myuser mypassword",
-          :system,
-          nil
-        )
+        message =
+          create_message(
+            "Usage: /login <username> <password>\nExample: /login myuser mypassword",
+            :system,
+            nil
+          )
+
         add_message(socket, message)
     end
   end
-  
+
   defp handle_logout_command(socket) do
     send(self(), {:auth_logout})
     message = create_message("Logging out...", :system, nil)
     add_message(socket, message)
   end
-  
+
   defp handle_api_key_command(socket, args) do
     case args do
       ["generate" | rest] ->
@@ -390,32 +391,34 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
         send(self(), {:api_key_generate, %{name: name}})
         message = create_message("Generating new API key#{if name != "", do: ": #{name}", else: ""}...", :system, nil)
         add_message(socket, message)
-        
+
       ["list"] ->
         send(self(), {:api_key_list})
         message = create_message("Fetching API keys...", :system, nil)
         add_message(socket, message)
-        
+
       ["revoke", key_id] ->
         send(self(), {:api_key_revoke, key_id})
         message = create_message("Revoking API key #{key_id}...", :system, nil)
         add_message(socket, message)
-        
+
       _ ->
-        message = create_message(
-          """
-          API Key Commands:
-          - `/api-key generate [name]` - Generate a new API key
-          - `/api-key list` - List all your API keys
-          - `/api-key revoke <key_id>` - Revoke an API key
-          """,
-          :system,
-          nil
-        )
+        message =
+          create_message(
+            """
+            API Key Commands:
+            - `/api-key generate [name]` - Generate a new API key
+            - `/api-key list` - List all your API keys
+            - `/api-key revoke <key_id>` - Revoke an API key
+            """,
+            :system,
+            nil
+          )
+
         add_message(socket, message)
     end
   end
-  
+
   defp handle_status_command(socket) do
     status_content = """
     Connection Status:
@@ -423,11 +426,11 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     - Model: #{socket.assigns.selected_provider}/#{socket.assigns.selected_model}
     - Messages: #{length(socket.assigns.messages)}
     """
-    
+
     message = create_message(status_content, :system, nil)
     add_message(socket, message)
   end
-  
+
   defp create_help_message do
     content = """
     Available commands:
@@ -440,15 +443,15 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     - `/model` - Open model settings
     - `/retry` - Retry the last message (coming soon)
     - `/status` - Show connection status
-    
+
     You can also use @ to mention files or # to reference code blocks.
     """
-    
+
     create_message(content, :system, nil)
   end
-  
+
   # Components
-  
+
   defp message(assigns) do
     ~H"""
     <div class={"message flex gap-3 #{message_classes(@message.type)}"}>
@@ -502,7 +505,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     </div>
     """
   end
-  
+
   defp streaming_message(assigns) do
     ~H"""
     <div class="message flex gap-3 assistant-message">
@@ -540,7 +543,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     </div>
     """
   end
-  
+
   defp model_selector(assigns) do
     ~H"""
     <button
@@ -554,17 +557,17 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     </button>
     """
   end
-  
+
   defp token_usage(assigns) do
     assigns = assign(assigns, :total_tokens, calculate_total_tokens(assigns.messages))
-    
+
     ~H"""
     <div class="text-xs text-gray-500 dark:text-gray-400">
       <%= format_number(@total_tokens) %> tokens
     </div>
     """
   end
-  
+
   defp chat_actions(assigns) do
     ~H"""
     <div class="flex items-center gap-1">
@@ -586,7 +589,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     </div>
     """
   end
-  
+
   defp typing_indicator(assigns) do
     ~H"""
     <div :if={@typing_users != []} class="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -594,7 +597,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     </div>
     """
   end
-  
+
   defp connection_indicator(assigns) do
     ~H"""
     <div class="flex items-center gap-1.5">
@@ -609,7 +612,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     </div>
     """
   end
-  
+
   defp command_palette(assigns) do
     ~H"""
     <div class="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 max-h-48 overflow-y-auto">
@@ -630,7 +633,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     </div>
     """
   end
-  
+
   defp user_avatar(assigns) do
     ~H"""
     <div class={"w-8 h-8 rounded-full flex items-center justify-center #{avatar_bg_class(@type)}"}>
@@ -644,43 +647,44 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     </div>
     """
   end
-  
+
   # Helper functions for components
-  
+
   defp message_classes(:user), do: "user-message"
   defp message_classes(:assistant), do: "assistant-message"
   defp message_classes(:system), do: "system-message"
   defp message_classes(:error), do: "error-message"
-  
+
   defp avatar_bg_class(:user), do: "bg-blue-500"
   defp avatar_bg_class(:assistant), do: "bg-green-500"
   defp avatar_bg_class(:system), do: "bg-gray-500"
   defp avatar_bg_class(:error), do: "bg-red-500"
-  
+
   defp avatar_emoji(:assistant), do: "✨"
   defp avatar_emoji(:system), do: "ℹ️"
   defp avatar_emoji(:error), do: "⚠️"
   defp avatar_emoji(_), do: "👤"
-  
+
   defp display_name(%{type: :user, username: username}), do: username || "User"
   defp display_name(%{type: :assistant}), do: "AI Assistant"
   defp display_name(%{type: :system}), do: "System"
   defp display_name(%{type: :error}), do: "Error"
-  
+
   defp format_timestamp(_timestamp) do
     # TODO: Implement proper timestamp formatting
     "just now"
   end
-  
+
   defp render_content(content) do
     # TODO: Implement markdown rendering with syntax highlighting
     # For now, just return the raw content
     raw(content)
   end
-  
+
   defp calculate_total_tokens(messages) do
     Enum.reduce(messages, 0, fn {_id, msg}, acc ->
       tokens = get_in(msg, [:metadata, :tokens])
+
       if tokens do
         acc + Map.get(tokens, :prompt, 0) + Map.get(tokens, :completion, 0)
       else
@@ -688,16 +692,16 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
       end
     end)
   end
-  
+
   defp format_number(n) when n >= 1000, do: "#{Float.round(n / 1000, 1)}k"
   defp format_number(n), do: to_string(n)
-  
+
   defp format_typing_users([user]), do: user
   defp format_typing_users([u1, u2]), do: "#{u1} and #{u2} are"
   defp format_typing_users([u | _rest]), do: "#{u} and others are"
-  
+
   # Placeholder components
-  
+
   defp file_upload_area(assigns) do
     ~H"""
     <div :if={@uploading_files != []} class="mb-2">
@@ -705,7 +709,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     </div>
     """
   end
-  
+
   defp search_overlay(assigns) do
     ~H"""
     <div class="absolute inset-0 bg-white dark:bg-gray-900 z-10">
@@ -713,7 +717,7 @@ defmodule RubberDuckWeb.Components.ChatPanelComponent do
     </div>
     """
   end
-  
+
   defp model_settings_modal(assigns) do
     ~H"""
     <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

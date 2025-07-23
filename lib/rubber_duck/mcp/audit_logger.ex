@@ -715,7 +715,6 @@ defmodule RubberDuck.MCP.AuditLogger do
     # Telemetry is handled elsewhere
   end
 
-
   defp generate_log_id do
     Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)
   end
