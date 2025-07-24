@@ -222,26 +222,32 @@ defmodule RubberDuckWeb.StatusChannel do
 
   @impl true
   def terminate(reason, socket) do
+    # Handle cases where join failed and assigns aren't set
+    conversation_id = Map.get(socket.assigns, :conversation_id, "unknown")
+    
     Logger.info(
-      "Status channel terminating for conversation #{socket.assigns.conversation_id}, reason: #{inspect(reason)}"
+      "Status channel terminating for conversation #{conversation_id}, reason: #{inspect(reason)}"
     )
 
-    # Unsubscribe from all PubSub topics
-    Enum.each(socket.assigns.subscribed_categories, fn category ->
-      topic = build_topic(socket.assigns.conversation_id, category)
-      PubSub.unsubscribe(RubberDuck.PubSub, topic)
-    end)
-
-    # Emit telemetry for monitoring
-    :telemetry.execute(
-      [:rubber_duck, :status_channel, :disconnected],
-      %{duration_ms: DateTime.diff(DateTime.utc_now(), socket.assigns.joined_at, :millisecond)},
-      %{
-        conversation_id: socket.assigns.conversation_id,
-        user_id: socket.assigns.user_id,
-        subscribed_categories: MapSet.to_list(socket.assigns.subscribed_categories)
-      }
-    )
+    # Only unsubscribe if we have the required assigns
+    if Map.has_key?(socket.assigns, :subscribed_categories) && Map.has_key?(socket.assigns, :conversation_id) do
+      # Unsubscribe from all PubSub topics
+      Enum.each(socket.assigns.subscribed_categories, fn category ->
+        topic = build_topic(socket.assigns.conversation_id, category)
+        PubSub.unsubscribe(RubberDuck.PubSub, topic)
+      end)
+      
+      # Emit telemetry for monitoring
+      :telemetry.execute(
+        [:rubber_duck, :status_channel, :disconnected],
+        %{duration_ms: DateTime.diff(DateTime.utc_now(), socket.assigns.joined_at, :millisecond)},
+        %{
+          conversation_id: socket.assigns.conversation_id,
+          user_id: socket.assigns.user_id,
+          subscribed_categories: MapSet.to_list(socket.assigns.subscribed_categories)
+        }
+      )
+    end
 
     :ok
   end
