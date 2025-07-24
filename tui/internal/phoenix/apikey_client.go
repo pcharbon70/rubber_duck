@@ -53,8 +53,8 @@ func (a *ApiKeyClient) JoinApiKeyChannel() tea.Cmd {
 			}
 		}
 		
-		// Join api_keys:user_id channel
-		channelName := fmt.Sprintf("api_keys:%s", a.userID)
+		// Join api_keys:manage channel
+		channelName := "api_keys:manage"
 		channel := a.socket.Channel(channelName, nil)
 		
 		// Set up event handlers
