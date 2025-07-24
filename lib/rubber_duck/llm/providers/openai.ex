@@ -205,6 +205,7 @@ defmodule RubberDuck.LLM.Providers.OpenAI do
   end
 
   defp build_url(endpoint, config) do
+    # Use base_url from config (which includes runtime overrides)
     base = config.base_url || @base_url
     base <> endpoint
   end
