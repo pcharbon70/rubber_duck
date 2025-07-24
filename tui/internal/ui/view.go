@@ -73,7 +73,8 @@ func (m Model) renderBase() string {
 	// Build chat content with header, status messages at top, conversation at bottom
 	// Calculate heights for chat and status sections
 	headerHeight := 3 // chat header takes 3 lines
-	availableHeight := contentHeight - headerHeight - 2 // -2 for main borders
+	statusBarHeight := 1 // status bar takes 1 line
+	availableHeight := contentHeight - headerHeight - statusBarHeight - 2 // -2 for main borders
 	
 	// Status messages take 30% of available conversation area
 	statusHeight := int(float64(availableHeight) * 0.3)
@@ -82,8 +83,8 @@ func (m Model) renderBase() string {
 	}
 	chatHeight := availableHeight - statusHeight
 	
-	// Update component sizes - reduce status messages height to account for status bar
-	m.statusMessages.SetSize(chatWidth-4, statusHeight-3) // -4 for borders, -3 for height borders and status bar
+	// Update component sizes
+	m.statusMessages.SetSize(chatWidth-4, statusHeight-2) // -4 for borders, -2 for height borders
 	// Update chat size to account for borders
 	m.chat.SetSize(chatWidth-4, chatHeight-2) // -4 for borders, -2 for height borders
 	
@@ -102,15 +103,11 @@ func (m Model) renderBase() string {
 		Height(chatHeight).
 		Padding(0, 1)
 	
-	// Create mini status bar for status messages area
+	// Create mini status bar as separate component
 	statusBar := m.renderMiniStatusBar(chatWidth - 2)
 	
-	// Combine status bar with status messages
-	statusContent := lipgloss.JoinVertical(
-		lipgloss.Left,
-		statusBar,
-		m.statusMessages.View(),
-	)
+	// Status messages content (without status bar)
+	statusContent := m.statusMessages.View()
 	
 	// Apply borders to sections
 	statusSection := statusBorderStyle.Render(statusContent)
@@ -119,6 +116,7 @@ func (m Model) renderBase() string {
 	chatContent := lipgloss.JoinVertical(
 		lipgloss.Left,
 		m.chatHeader.View(),
+		statusBar,        // Status bar now between header and status messages
 		statusSection,
 		chatSection,
 	)
