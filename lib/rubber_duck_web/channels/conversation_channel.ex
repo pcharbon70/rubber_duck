@@ -655,7 +655,10 @@ defmodule RubberDuckWeb.ConversationChannel do
               status: :active
             }
 
-            case Conversations.create_conversation(attrs, actor: user, input: %{id: conversation_id}) do
+            # Set the ID in the attributes directly
+            attrs = Map.put(attrs, :id, conversation_id)
+            
+            case Conversations.create_conversation(attrs, actor: user) do
               {:ok, conversation} ->
                 Logger.info("Created conversation #{conversation_id} for user #{user_id}")
                 {:ok, conversation}

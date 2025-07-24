@@ -92,7 +92,9 @@ defmodule RubberDuckWeb.UserSocket do
     case AshAuthentication.Jwt.verify(token, RubberDuck.Accounts.User) do
       {:ok, claims, _resource} ->
         # Extract user_id from the subject claim
-        user_id = claims["sub"]
+        # The subject is in format "user?id=UUID", so we need to extract the UUID
+        subject = claims["sub"]
+        user_id = extract_user_id_from_subject(subject)
         {:ok, user_id}
 
       {:error, :token_expired} ->
@@ -114,4 +116,14 @@ defmodule RubberDuckWeb.UserSocket do
   defp authenticate(_params) do
     {:error, "No authentication credentials provided. Please use a JWT token."}
   end
+  
+  defp extract_user_id_from_subject(subject) when is_binary(subject) do
+    # Handle subject format "user?id=UUID"
+    case String.split(subject, "id=") do
+      [_, user_id] -> user_id
+      _ -> subject  # Fallback to original subject if format is different
+    end
+  end
+  
+  defp extract_user_id_from_subject(subject), do: subject
 end

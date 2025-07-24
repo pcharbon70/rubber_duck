@@ -40,6 +40,8 @@ defmodule RubberDuck.Application do
       RubberDuck.Context.Cache,
       RubberDuck.Context.AdaptiveSelector,
       RubberDuck.Embeddings.Service,
+      # Session context manager
+      RubberDuck.SessionContext,
       # Chain-of-Thought system
       RubberDuck.CoT.ConversationManager,
       RubberDuck.CoT.ChainRegistry,

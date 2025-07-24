@@ -49,7 +49,8 @@ defmodule RubberDuck.LLM.Service do
     ProviderConfig,
     ProviderState,
     CostTracker,
-    HealthMonitor
+    HealthMonitor,
+    ConfigLoader
   }
 
   alias RubberDuck.Status
@@ -155,6 +156,34 @@ defmodule RubberDuck.LLM.Service do
   def cost_summary(opts \\ []) do
     GenServer.call(__MODULE__, {:cost_summary, opts})
   end
+  
+  @doc """
+  Updates configuration for a specific provider at runtime.
+  
+  The configuration is merged with existing settings and persisted to config.json.
+  """
+  @spec update_provider_config(atom(), map()) :: :ok | {:error, term()}
+  def update_provider_config(provider_name, config) do
+    GenServer.call(__MODULE__, {:update_provider_config, provider_name, config})
+  end
+  
+  @doc """
+  Reloads configuration from config.json file.
+  
+  This will reload all provider configurations from the file and apply them.
+  """
+  @spec reload_config() :: :ok | {:error, term()}
+  def reload_config do
+    GenServer.call(__MODULE__, :reload_config)
+  end
+  
+  @doc """
+  Gets the current configuration for a provider.
+  """
+  @spec get_provider_config(atom()) :: {:ok, map()} | {:error, :not_found}
+  def get_provider_config(provider_name) do
+    GenServer.call(__MODULE__, {:get_provider_config, provider_name})
+  end
 
   # Server Callbacks
 
@@ -162,13 +191,19 @@ defmodule RubberDuck.LLM.Service do
   def init(opts) do
     config = load_config(opts)
 
+    # Load providers from ConfigLoader
+    runtime_overrides = Keyword.get(opts, :runtime_overrides, %{})
+    provider_configs = ConfigLoader.load_all_providers(runtime_overrides)
+    
     state = %{
-      providers: initialize_providers(config.providers),
-      model_mapping: build_model_mapping(config.providers),
+      providers: initialize_providers(provider_configs),
+      model_mapping: build_model_mapping(provider_configs),
       request_queue: :queue.new(),
       active_requests: %{},
       cost_tracker: CostTracker.new(),
-      health_monitor: HealthMonitor.new()
+      health_monitor: HealthMonitor.new(),
+      runtime_overrides: runtime_overrides,
+      config: config
     }
 
     # Start health monitoring
@@ -292,6 +327,63 @@ defmodule RubberDuck.LLM.Service do
     summary = CostTracker.get_summary(state.cost_tracker, opts)
     {:reply, {:ok, summary}, state}
   end
+  
+  @impl true
+  def handle_call({:update_provider_config, provider_name, config}, _from, state) do
+    # Update runtime overrides
+    new_overrides = Map.put(state.runtime_overrides, provider_name, config)
+    
+    # Save to config file
+    case save_provider_config_to_file(provider_name, config) do
+      :ok ->
+        # Reload provider with new config
+        new_state = reload_provider(provider_name, new_overrides, state)
+        {:reply, :ok, %{new_state | runtime_overrides: new_overrides}}
+        
+      {:error, reason} = error ->
+        Logger.error("Failed to save provider config: #{inspect(reason)}")
+        {:reply, error, state}
+    end
+  end
+  
+  @impl true
+  def handle_call(:reload_config, _from, state) do
+    # Reload all providers from config file
+    provider_configs = ConfigLoader.load_all_providers(state.runtime_overrides)
+    
+    new_state = %{state |
+      providers: initialize_providers(provider_configs),
+      model_mapping: build_model_mapping(provider_configs)
+    }
+    
+    {:reply, :ok, new_state}
+  end
+  
+  @impl true
+  def handle_call({:get_provider_config, provider_name}, _from, state) do
+    case Map.get(state.providers, provider_name) do
+      nil ->
+        {:reply, {:error, :not_found}, state}
+        
+      %{config: config} ->
+        # Return config as a map for easier consumption
+        config_map = %{
+          name: config.name,
+          adapter: config.adapter,
+          api_key: config.api_key,
+          base_url: config.base_url,
+          models: config.models,
+          priority: config.priority,
+          rate_limit: config.rate_limit,
+          max_retries: config.max_retries,
+          timeout: config.timeout,
+          headers: config.headers,
+          options: config.options,
+          runtime_overrides: config.runtime_overrides
+        }
+        {:reply, {:ok, config_map}, state}
+    end
+  end
 
   @impl true
   def handle_info(:process_queue, state) do
@@ -323,13 +415,12 @@ defmodule RubberDuck.LLM.Service do
   # Private Functions
 
   defp load_config(opts) do
-    # Get config from :rubber_duck, :llm to match ConnectionManager
+    # Get config from :rubber_duck, :llm
     app_config = Application.get_env(:rubber_duck, :llm, [])
 
     config = Keyword.merge(app_config, opts)
 
     %{
-      providers: Keyword.get(config, :providers, []),
       queue_check_interval: Keyword.get(config, :queue_check_interval, 100),
       health_check_interval: Keyword.get(config, :health_check_interval, 30_000),
       default_timeout: Keyword.get(config, :default_timeout, 30_000)
@@ -1023,6 +1114,75 @@ defmodule RubberDuck.LLM.Service do
 
       :not_found ->
         :not_found
+    end
+  end
+  
+  defp save_provider_config_to_file(provider_name, config) do
+    # Load current config file
+    current_config = ConfigLoader.load_config_file()
+    
+    # Update provider configuration
+    provider_str = to_string(provider_name)
+    updated_config = 
+      current_config
+      |> Map.put("providers", Map.get(current_config, "providers", %{}))
+      |> put_in(["providers", provider_str], config_to_map(config))
+    
+    # Save back to file
+    try do
+      ConfigLoader.save_config_file(updated_config)
+      :ok
+    rescue
+      error ->
+        {:error, error}
+    end
+  end
+  
+  defp config_to_map(config) when is_map(config) do
+    # Convert config to JSON-compatible map
+    config
+    |> Enum.map(fn {k, v} -> {to_string(k), v} end)
+    |> Enum.into(%{})
+    |> Map.drop(["name", "adapter"]) # Don't save these to config file
+  end
+  
+  defp reload_provider(provider_name, new_overrides, state) do
+    # Reload specific provider with new configuration
+    provider_configs = ConfigLoader.load_all_providers(new_overrides)
+    
+    # Find the updated provider config
+    updated_provider_config = 
+      Enum.find(provider_configs, fn config -> 
+        config.name == provider_name 
+      end)
+    
+    if updated_provider_config do
+      # Initialize the provider state
+      new_provider_state = %ProviderState{
+        config: struct(ProviderConfig, updated_provider_config),
+        circuit_state: :closed,
+        circuit_failures: 0,
+        rate_limiter: initialize_rate_limiter(updated_provider_config),
+        last_health_check: DateTime.utc_now(),
+        health_status: :unknown,
+        active_requests: 0
+      }
+      
+      # Update providers map
+      new_providers = Map.put(state.providers, provider_name, new_provider_state)
+      
+      # Update model mapping if models changed
+      new_model_mapping = 
+        if updated_provider_config.models != get_in(state.providers, [provider_name, :config, :models]) do
+          build_model_mapping(provider_configs)
+        else
+          state.model_mapping
+        end
+      
+      %{state | providers: new_providers, model_mapping: new_model_mapping}
+    else
+      # Provider not found, return state unchanged
+      state
     end
   end
 end
