@@ -215,6 +215,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case phoenix.ChannelJoinedMsg:
 		m.channel = msg.Channel
+		
+		// Check if this is the conversation channel join response
+		if msg.Channel != nil && msg.Response != nil {
+			// Extract conversation_id from the response
+			if respMap, ok := msg.Response.(map[string]any); ok {
+				if convID, ok := respMap["conversation_id"].(string); ok {
+					m.conversationID = convID
+					m.chatHeader.SetConversationID(convID)
+					m.statusBar = fmt.Sprintf("Joined conversation %s - Joining status channel...", convID)
+					
+					// Now join the status channel with the actual conversation ID
+					if statusClient, ok := m.statusClient.(*phoenix.StatusClient); ok {
+						statusClient.SetSocket(m.socket)
+						statusClient.SetProgram(m.ProgramHolder())
+						return m, statusClient.JoinStatusChannel(m.conversationID)
+					}
+				}
+			}
+		}
+		
 		m.statusBar = m.buildStatusBar()
 		return m, nil
 		
@@ -402,11 +422,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.authenticated {
 			m.statusBar = "Joining conversation channel..."
 			if client, ok := m.phoenixClient.(*phoenix.Client); ok {
-				// Join conversation channel and then status channel
-				return m, tea.Batch(
-					client.JoinChannel("conversation:lobby"),
-					func() tea.Msg { return JoinStatusChannelMsg{} },
-				)
+				// Join conversation channel first
+				// Status channel will be joined after we get the conversation ID
+				return m, client.JoinChannel("conversation:lobby")
 			}
 		} else {
 			m.statusBar = "Cannot join conversation - not authenticated"

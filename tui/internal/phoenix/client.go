@@ -133,7 +133,10 @@ func (c *Client) JoinChannel(topic string) tea.Cmd {
 		
 		// Handle join response
 		join.Receive("ok", func(response any) {
-			c.program.Send(ChannelJoinedMsg{Channel: channel})
+			c.program.Send(ChannelJoinedMsg{
+				Channel:  channel,
+				Response: response,
+			})
 		})
 		
 		join.Receive("error", func(response any) {

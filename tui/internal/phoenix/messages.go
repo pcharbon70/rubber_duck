@@ -22,7 +22,10 @@ type (
 		SocketType SocketType
 	}
 	SocketCreatedMsg  struct{ Socket *phx.Socket }
-	ChannelJoinedMsg  struct{ Channel *phx.Channel }
+	ChannelJoinedMsg  struct{ 
+		Channel  *phx.Channel
+		Response any // Join response data from server
+	}
 	ChannelJoiningMsg struct{}
 	
 	ErrorMsg struct {
