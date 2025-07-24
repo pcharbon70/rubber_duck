@@ -22,12 +22,16 @@ defmodule RubberDuckWeb.StatusChannel do
   - `:progress` - General progress indicators
   - `:error` - Error messages
   - `:info` - Informational messages
+  - `:planning` - Planning and decision-making updates
 
   ## Subscription Management
 
   After joining, clients can subscribe/unsubscribe to specific categories:
 
   ```javascript
+  // Get available categories
+  channel.push("get_available_categories", {})
+  
   // Subscribe to categories
   channel.push("subscribe_categories", {categories: ["engine", "tool"]})
 
@@ -57,7 +61,7 @@ defmodule RubberDuckWeb.StatusChannel do
   alias RubberDuck.Conversations
   alias Phoenix.PubSub
 
-  @allowed_categories ~w(engine tool workflow progress error info)a
+  @allowed_categories ~w(engine tool workflow progress error info planning)a
   @max_categories_per_client 10
   # 1 minute
   @rate_limit_window_ms 60_000
@@ -217,6 +221,24 @@ defmodule RubberDuckWeb.StatusChannel do
       %{
         subscribed_categories: MapSet.to_list(socket.assigns.subscribed_categories),
         available_categories: @allowed_categories
+      }}, socket}
+  end
+  
+  @impl true
+  def handle_in("get_available_categories", _params, socket) do
+    {:reply,
+     {:ok,
+      %{
+        available_categories: @allowed_categories,
+        descriptions: %{
+          engine: "Engine execution updates",
+          tool: "Tool execution status",
+          workflow: "Workflow progress updates",
+          progress: "General progress indicators",
+          error: "Error messages",
+          info: "Informational messages",
+          planning: "Planning and decision-making updates"
+        }
       }}, socket}
   end
 
