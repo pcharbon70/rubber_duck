@@ -31,12 +31,13 @@ type StatusMessage struct {
 
 // StatusMessages represents the status messages component
 type StatusMessages struct {
-	messages      []StatusMessage
-	viewport      viewport.Model
-	width         int
-	height        int
-	maxMessages   int
-	showTimestamp bool
+	messages        []StatusMessage
+	viewport        viewport.Model
+	width           int
+	height          int
+	maxMessages     int
+	showTimestamp   bool
+	categoryColors  map[string]string // Category name to color code mapping
 }
 
 // NewStatusMessages creates a new status messages component
@@ -44,12 +45,13 @@ func NewStatusMessages() *StatusMessages {
 	vp := viewport.New(0, 0)
 	
 	return &StatusMessages{
-		messages:      []StatusMessage{},
-		viewport:      vp,
-		width:         80,
-		height:        10,
-		maxMessages:   100, // Keep last 100 messages
-		showTimestamp: true,
+		messages:       []StatusMessage{},
+		viewport:       vp,
+		width:          80,
+		height:         10,
+		maxMessages:    100, // Keep last 100 messages
+		showTimestamp:  true,
+		categoryColors: make(map[string]string),
 	}
 }
 
@@ -61,6 +63,13 @@ func (s *StatusMessages) SetSize(width, height int) {
 	s.viewport.Height = height - 2 // Account for title and margin
 	
 	// Update viewport content when size changes
+	s.viewport.SetContent(s.buildContent())
+}
+
+// SetCategoryColors sets the color mapping for categories
+func (s *StatusMessages) SetCategoryColors(colors map[string]string) {
+	s.categoryColors = colors
+	// Re-render content with new colors
 	s.viewport.SetContent(s.buildContent())
 }
 
@@ -129,14 +138,14 @@ func (s StatusMessages) buildContent() string {
 	
 	var content strings.Builder
 	
-	// Define category styles
-	categoryStyles := map[StatusCategory]lipgloss.Style{
-		StatusCategoryEngine:   lipgloss.NewStyle().Foreground(lipgloss.Color("33")),    // Blue
-		StatusCategoryTool:     lipgloss.NewStyle().Foreground(lipgloss.Color("213")),   // Purple
-		StatusCategoryWorkflow: lipgloss.NewStyle().Foreground(lipgloss.Color("226")),   // Yellow
-		StatusCategoryProgress: lipgloss.NewStyle().Foreground(lipgloss.Color("46")),    // Green
-		StatusCategoryError:    lipgloss.NewStyle().Foreground(lipgloss.Color("196")),   // Red
-		StatusCategoryInfo:     lipgloss.NewStyle().Foreground(lipgloss.Color("240")),   // Gray
+	// Define default category styles
+	defaultCategoryStyles := map[StatusCategory]string{
+		StatusCategoryEngine:   "33",    // Blue
+		StatusCategoryTool:     "213",   // Purple
+		StatusCategoryWorkflow: "226",   // Yellow
+		StatusCategoryProgress: "46",    // Green
+		StatusCategoryError:    "196",   // Red
+		StatusCategoryInfo:     "240",   // Gray
 	}
 	
 	timeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
@@ -146,11 +155,18 @@ func (s StatusMessages) buildContent() string {
 			content.WriteString("\n")
 		}
 		
-		// Get style for category
-		style, ok := categoryStyles[msg.Category]
-		if !ok {
-			style = categoryStyles[StatusCategoryInfo]
+		// Get color for category
+		color := "240" // Default gray
+		
+		// First check if we have a configured color for this category
+		if configuredColor, exists := s.categoryColors[string(msg.Category)]; exists {
+			color = configuredColor
+		} else if defaultColor, exists := defaultCategoryStyles[msg.Category]; exists {
+			// Fall back to default color
+			color = defaultColor
 		}
+		
+		style := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
 		
 		// Format line
 		categoryText := style.Bold(true).Render(fmt.Sprintf("[%s]", strings.ToUpper(string(msg.Category))))

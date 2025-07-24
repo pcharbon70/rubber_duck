@@ -94,6 +94,9 @@ type Model struct {
 	
 	// Status category metadata
 	categoryMetadata map[string]CategoryInfo
+	
+	// Configuration
+	config *Config
 }
 
 // CategoryInfo stores metadata about a status category
@@ -131,6 +134,18 @@ func NewModel() *Model {
 	// Create error handler
 	errorHandler := NewErrorHandler()
 	
+	// Load configuration
+	config, err := LoadConfig()
+	if err != nil {
+		// If config fails to load, use empty config with defaults
+		config = &Config{
+			Providers: make(map[string]ProviderConfig),
+			TUI: TUIConfig{
+				StatusCategoryColors: make(map[string]string),
+			},
+		}
+	}
+	
 	model := &Model{
 		activePane:   ChatPane, // Chat is primary
 		width:        80,       // Default width
@@ -166,6 +181,7 @@ func NewModel() *Model {
 		tokenUsage:    0,
 		tokenLimit:    4096,
 		categoryMetadata: make(map[string]CategoryInfo),
+		config:        config,
 	}
 	
 	// Initialize component sizes with defaults

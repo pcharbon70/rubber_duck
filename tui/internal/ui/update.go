@@ -634,13 +634,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case phoenix.StatusChannelJoinedMsg:
 		m.statusBar = fmt.Sprintf("Status channel joined for conversation %s", msg.ConversationID)
 		
-		// Store category metadata with default colors
+		// Store category metadata with colors from config
 		if msg.CategoryDescriptions != nil {
 			for category, description := range msg.CategoryDescriptions {
+				// Get color from config, fallback to white
+				color := m.config.GetCategoryColor(category, "white")
 				m.categoryMetadata[category] = CategoryInfo{
 					Name:        category,
 					Description: description,
-					Color:       "white", // Default color for all categories
+					Color:       color,
 				}
 			}
 		}
@@ -650,10 +652,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Also ensure metadata exists for categories without descriptions
 			for _, category := range msg.AvailableCategories {
 				if _, exists := m.categoryMetadata[category]; !exists {
+					color := m.config.GetCategoryColor(category, "white")
 					m.categoryMetadata[category] = CategoryInfo{
 						Name:        category,
 						Description: "", // No description provided
-						Color:       "white", // Default color
+						Color:       color,
 					}
 				}
 			}
@@ -670,10 +673,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Create default metadata for fallback categories
 				for _, category := range categories {
 					if _, exists := m.categoryMetadata[category]; !exists {
+						color := m.config.GetCategoryColor(category, "white")
 						m.categoryMetadata[category] = CategoryInfo{
 							Name:        category,
 							Description: "", // No description for defaults
-							Color:       "white", // Default color
+							Color:       color,
 						}
 					}
 				}
@@ -681,6 +685,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, statusClient.SubscribeCategories(categories)
 			}
 		}
+		
+		// Update status messages component with category colors
+		colors := make(map[string]string)
+		for category, info := range m.categoryMetadata {
+			colors[category] = info.Color
+		}
+		m.statusMessages.SetCategoryColors(colors)
+		
 		return m, nil
 		
 	case phoenix.StatusCategoriesSubscribedMsg:
