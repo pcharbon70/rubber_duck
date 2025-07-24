@@ -632,11 +632,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	// Status channel messages
 	case phoenix.StatusChannelJoinedMsg:
-		m.statusBar = "Status channel joined - Subscribing to all categories..."
-		// Subscribe to all categories by default
-		if statusClient, ok := m.statusClient.(*phoenix.StatusClient); ok {
-			categories := []string{"engine", "tool", "workflow", "progress", "error", "info"}
-			return m, statusClient.SubscribeCategories(categories)
+		m.statusBar = fmt.Sprintf("Status channel joined for conversation %s", msg.ConversationID)
+		
+		// Subscribe to all available categories
+		if len(msg.AvailableCategories) > 0 {
+			m.statusMessages.AddMessage(StatusCategoryInfo, fmt.Sprintf("Available status categories: %v", msg.AvailableCategories), nil)
+			
+			if statusClient, ok := m.statusClient.(*phoenix.StatusClient); ok {
+				m.statusBar = "Subscribing to all available status categories..."
+				return m, statusClient.SubscribeCategories(msg.AvailableCategories)
+			}
+		} else {
+			// Fallback to default categories if none provided
+			m.statusMessages.AddMessage(StatusCategoryInfo, "No available categories returned, using defaults", nil)
+			if statusClient, ok := m.statusClient.(*phoenix.StatusClient); ok {
+				categories := []string{"engine", "tool", "workflow", "progress", "error", "info"}
+				return m, statusClient.SubscribeCategories(categories)
+			}
 		}
 		return m, nil
 		
