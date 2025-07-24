@@ -496,6 +496,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 		
 	case phoenix.AuthChannelJoinedMsg:
+		// Check if already authenticated
+		if m.authenticated && m.jwtToken != "" {
+			// Already authenticated, proceed directly to user socket
+			m.statusBar = fmt.Sprintf("Already authenticated as %s - Switching to user socket...", m.username)
+			m.statusMessages.AddMessage(StatusCategoryInfo, fmt.Sprintf("Using existing authentication for user %s", m.username), nil)
+			
+			// Trigger switch to user socket
+			return m, func() tea.Msg { return SwitchToUserSocketMsg{} }
+		}
+		
 		// Check if we have an API key to authenticate with
 		if m.apiKey != "" {
 			// Mask the API key for display (show only last 4 characters)
