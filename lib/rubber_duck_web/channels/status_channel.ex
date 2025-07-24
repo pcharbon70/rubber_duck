@@ -22,12 +22,16 @@ defmodule RubberDuckWeb.StatusChannel do
   - `:progress` - General progress indicators
   - `:error` - Error messages
   - `:info` - Informational messages
+  - `:planning` - Planning and decision-making updates
 
   ## Subscription Management
 
   After joining, clients can subscribe/unsubscribe to specific categories:
 
   ```javascript
+  // Get available categories
+  channel.push("get_available_categories", {})
+  
   // Subscribe to categories
   channel.push("subscribe_categories", {categories: ["engine", "tool"]})
 
@@ -57,7 +61,7 @@ defmodule RubberDuckWeb.StatusChannel do
   alias RubberDuck.Conversations
   alias Phoenix.PubSub
 
-  @allowed_categories ~w(engine tool workflow progress error info)a
+  @allowed_categories ~w(engine tool workflow progress error info planning)a
   @max_categories_per_client 10
   # 1 minute
   @rate_limit_window_ms 60_000
@@ -219,29 +223,53 @@ defmodule RubberDuckWeb.StatusChannel do
         available_categories: @allowed_categories
       }}, socket}
   end
+  
+  @impl true
+  def handle_in("get_available_categories", _params, socket) do
+    {:reply,
+     {:ok,
+      %{
+        available_categories: @allowed_categories,
+        descriptions: %{
+          engine: "Engine execution updates",
+          tool: "Tool execution status",
+          workflow: "Workflow progress updates",
+          progress: "General progress indicators",
+          error: "Error messages",
+          info: "Informational messages",
+          planning: "Planning and decision-making updates"
+        }
+      }}, socket}
+  end
 
   @impl true
   def terminate(reason, socket) do
+    # Handle cases where join failed and assigns aren't set
+    conversation_id = Map.get(socket.assigns, :conversation_id, "unknown")
+    
     Logger.info(
-      "Status channel terminating for conversation #{socket.assigns.conversation_id}, reason: #{inspect(reason)}"
+      "Status channel terminating for conversation #{conversation_id}, reason: #{inspect(reason)}"
     )
 
-    # Unsubscribe from all PubSub topics
-    Enum.each(socket.assigns.subscribed_categories, fn category ->
-      topic = build_topic(socket.assigns.conversation_id, category)
-      PubSub.unsubscribe(RubberDuck.PubSub, topic)
-    end)
-
-    # Emit telemetry for monitoring
-    :telemetry.execute(
-      [:rubber_duck, :status_channel, :disconnected],
-      %{duration_ms: DateTime.diff(DateTime.utc_now(), socket.assigns.joined_at, :millisecond)},
-      %{
-        conversation_id: socket.assigns.conversation_id,
-        user_id: socket.assigns.user_id,
-        subscribed_categories: MapSet.to_list(socket.assigns.subscribed_categories)
-      }
-    )
+    # Only unsubscribe if we have the required assigns
+    if Map.has_key?(socket.assigns, :subscribed_categories) && Map.has_key?(socket.assigns, :conversation_id) do
+      # Unsubscribe from all PubSub topics
+      Enum.each(socket.assigns.subscribed_categories, fn category ->
+        topic = build_topic(socket.assigns.conversation_id, category)
+        PubSub.unsubscribe(RubberDuck.PubSub, topic)
+      end)
+      
+      # Emit telemetry for monitoring
+      :telemetry.execute(
+        [:rubber_duck, :status_channel, :disconnected],
+        %{duration_ms: DateTime.diff(DateTime.utc_now(), socket.assigns.joined_at, :millisecond)},
+        %{
+          conversation_id: socket.assigns.conversation_id,
+          user_id: socket.assigns.user_id,
+          subscribed_categories: MapSet.to_list(socket.assigns.subscribed_categories)
+        }
+      )
+    end
 
     :ok
   end
