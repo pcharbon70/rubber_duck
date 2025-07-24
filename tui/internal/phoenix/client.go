@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"strings"
 	"time"
 	
 	tea "github.com/charmbracelet/bubbletea"
@@ -121,12 +120,6 @@ func (c *Client) JoinChannel(topic string) tea.Cmd {
 		// Create channel with proper params
 		// Note: nshafer/phx expects map[string]string, so we need to serialize complex data
 		params := map[string]string{}
-		
-		// Special handling for conversation channel - needs conversation_id parameter
-		if strings.HasPrefix(topic, "conversation:") {
-			params["conversation_id"] = "" // Empty string to represent null
-		}
-		
 		channel := c.socket.Channel(topic, params)
 		
 		// Join the channel
