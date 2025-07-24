@@ -18,6 +18,7 @@ defmodule RubberDuck.Conversations do
       define :update_conversation, action: :update
       define :delete_conversation, action: :destroy
       define :list_user_conversations, action: :list_by_user
+      define :get_latest_conversation_by_user, action: :get_latest_by_user
     end
 
     resource RubberDuck.Conversations.Message do

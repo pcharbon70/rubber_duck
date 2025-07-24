@@ -120,15 +120,30 @@ defmodule RubberDuckWeb.ConversationChannel do
     session_id = generate_session_id()
     preferences = Map.get(params, "preferences", %{})
 
-    # For authenticated users, ensure conversation exists in database
-    if socket.assigns[:user_id] do
-      ensure_conversation_exists(conversation_id, user_id, params)
+    # Handle lobby specially - load or create user's latest conversation
+    actual_conversation_id = if conversation_id == "lobby" && socket.assigns[:user_id] do
+      case load_or_create_user_conversation(user_id, params) do
+        {:ok, conversation} ->
+          Logger.info("Loaded/created conversation #{conversation.id} for user #{user_id} from lobby")
+          conversation.id
+          
+        {:error, reason} ->
+          Logger.error("Failed to load/create conversation for lobby: #{inspect(reason)}")
+          # Fall back to using lobby as conversation_id (will likely fail downstream)
+          conversation_id
+      end
+    else
+      # For non-lobby conversations, ensure it exists
+      if socket.assigns[:user_id] do
+        ensure_conversation_exists(conversation_id, user_id, params)
+      end
+      conversation_id
     end
 
     # Initialize conversation state
     socket =
       socket
-      |> assign(:conversation_id, conversation_id)
+      |> assign(:conversation_id, actual_conversation_id)
       |> assign(:messages, [])
       |> assign(:context, %{})
       |> assign(:user_id, user_id)
@@ -144,7 +159,7 @@ defmodule RubberDuckWeb.ConversationChannel do
         Logger.warning("Failed to create session context: #{inspect(reason)}")
     end
 
-    {:ok, %{conversation_id: conversation_id, session_id: session_id}, socket}
+    {:ok, %{conversation_id: actual_conversation_id, session_id: session_id}, socket}
   end
 
   @impl true
@@ -677,5 +692,41 @@ defmodule RubberDuckWeb.ConversationChannel do
 
   defp get_user_for_actor(user_id) do
     RubberDuck.Accounts.get_user(user_id, authorize?: false)
+  end
+  
+  defp load_or_create_user_conversation(user_id, params) do
+    case get_user_for_actor(user_id) do
+      {:ok, user} ->
+        # Try to get the user's latest conversation
+        case Conversations.get_latest_conversation_by_user(%{user_id: user_id}, actor: user) do
+          {:ok, conversation} ->
+            Logger.info("Found existing conversation #{conversation.id} for user #{user_id}")
+            {:ok, conversation}
+            
+          {:error, _} ->
+            # No existing conversation, create a new one
+            attrs = %{
+              id: Ecto.UUID.generate(),
+              user_id: user_id,
+              title: Map.get(params, "title", "New Conversation"),
+              metadata: Map.get(params, "metadata", %{}),
+              status: :active
+            }
+            
+            case Conversations.create_conversation(attrs, actor: user) do
+              {:ok, conversation} ->
+                Logger.info("Created new conversation #{conversation.id} for user #{user_id}")
+                {:ok, conversation}
+                
+              {:error, reason} = error ->
+                Logger.error("Failed to create conversation: #{inspect(reason)}")
+                error
+            end
+        end
+        
+      {:error, reason} = error ->
+        Logger.error("Failed to get user for conversation: #{inspect(reason)}")
+        error
+    end
   end
 end
