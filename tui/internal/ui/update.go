@@ -634,19 +634,50 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case phoenix.StatusChannelJoinedMsg:
 		m.statusBar = fmt.Sprintf("Status channel joined for conversation %s", msg.ConversationID)
 		
+		// Store category metadata with default colors
+		if msg.CategoryDescriptions != nil {
+			for category, description := range msg.CategoryDescriptions {
+				m.categoryMetadata[category] = CategoryInfo{
+					Name:        category,
+					Description: description,
+					Color:       "white", // Default color for all categories
+				}
+			}
+		}
+		
 		// Subscribe to all available categories
 		if len(msg.AvailableCategories) > 0 {
-			m.statusMessages.AddMessage(StatusCategoryInfo, fmt.Sprintf("Available status categories: %v", msg.AvailableCategories), nil)
+			// Also ensure metadata exists for categories without descriptions
+			for _, category := range msg.AvailableCategories {
+				if _, exists := m.categoryMetadata[category]; !exists {
+					m.categoryMetadata[category] = CategoryInfo{
+						Name:        category,
+						Description: "", // No description provided
+						Color:       "white", // Default color
+					}
+				}
+			}
 			
 			if statusClient, ok := m.statusClient.(*phoenix.StatusClient); ok {
-				m.statusBar = "Subscribing to all available status categories..."
+				m.statusBar = "Subscribing to status categories..."
 				return m, statusClient.SubscribeCategories(msg.AvailableCategories)
 			}
 		} else {
 			// Fallback to default categories if none provided
-			m.statusMessages.AddMessage(StatusCategoryInfo, "No available categories returned, using defaults", nil)
 			if statusClient, ok := m.statusClient.(*phoenix.StatusClient); ok {
 				categories := []string{"engine", "tool", "workflow", "progress", "error", "info"}
+				
+				// Create default metadata for fallback categories
+				for _, category := range categories {
+					if _, exists := m.categoryMetadata[category]; !exists {
+						m.categoryMetadata[category] = CategoryInfo{
+							Name:        category,
+							Description: "", // No description for defaults
+							Color:       "white", // Default color
+						}
+					}
+				}
+				
 				return m, statusClient.SubscribeCategories(categories)
 			}
 		}

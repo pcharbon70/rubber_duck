@@ -66,9 +66,10 @@ func (s *StatusClient) JoinStatusChannel(conversationID string) tea.Cmd {
 		join.Receive("ok", func(response any) {
 			// Parse response
 			var resp struct {
-				ConversationID       string   `json:"conversation_id"`
-				AvailableCategories []string `json:"available_categories"`
-				SubscribedCategories []string `json:"subscribed_categories"`
+				ConversationID       string              `json:"conversation_id"`
+				AvailableCategories []string            `json:"available_categories"`
+				SubscribedCategories []string           `json:"subscribed_categories"`
+				CategoryDescriptions map[string]string  `json:"category_descriptions"`
 			}
 			
 			if data, ok := response.(map[string]any); ok {
@@ -82,11 +83,20 @@ func (s *StatusClient) JoinStatusChannel(conversationID string) tea.Cmd {
 						}
 					}
 				}
+				if descs, ok := data["category_descriptions"].(map[string]any); ok {
+					resp.CategoryDescriptions = make(map[string]string)
+					for cat, desc := range descs {
+						if descStr, ok := desc.(string); ok {
+							resp.CategoryDescriptions[cat] = descStr
+						}
+					}
+				}
 			}
 			
 			s.program.Send(StatusChannelJoinedMsg{
-				ConversationID:      resp.ConversationID,
-				AvailableCategories: resp.AvailableCategories,
+				ConversationID:       resp.ConversationID,
+				AvailableCategories:  resp.AvailableCategories,
+				CategoryDescriptions: resp.CategoryDescriptions,
 			})
 		})
 		
@@ -335,8 +345,9 @@ func (s *StatusClient) handleStatusUpdate(_ *phx.Channel, payload any) {
 // Status channel message types
 
 type StatusChannelJoinedMsg struct {
-	ConversationID      string
-	AvailableCategories []string
+	ConversationID       string
+	AvailableCategories  []string
+	CategoryDescriptions map[string]string
 }
 
 type StatusCategoriesSubscribedMsg struct {

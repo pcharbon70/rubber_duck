@@ -91,6 +91,16 @@ type Model struct {
 	messageCount   int
 	tokenUsage     int
 	tokenLimit     int
+	
+	// Status category metadata
+	categoryMetadata map[string]CategoryInfo
+}
+
+// CategoryInfo stores metadata about a status category
+type CategoryInfo struct {
+	Name        string
+	Description string
+	Color       string // Terminal color code/name
 }
 
 // NewModel creates a new TUI model with default state
@@ -155,6 +165,7 @@ func NewModel() *Model {
 		messageCount:  0,
 		tokenUsage:    0,
 		tokenLimit:    4096,
+		categoryMetadata: make(map[string]CategoryInfo),
 	}
 	
 	// Initialize component sizes with defaults
