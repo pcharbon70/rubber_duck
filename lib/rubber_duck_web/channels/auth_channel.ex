@@ -8,10 +8,23 @@ defmodule RubberDuckWeb.AuthChannel do
   ## Supported Operations
 
   - Login with username/password
+  - Login with API key (returns JWT token)
   - Logout with token invalidation  
   - User registration (optional)
   - Token refresh
   - Get authentication status
+  
+  ## Authentication Methods
+  
+  ### Password Authentication
+  Send: `{"username": "user", "password": "pass"}`
+  Event: `login`
+  
+  ### API Key Authentication  
+  Send: `{"api_key": "rubberduck_..."}`
+  Event: `authenticate_with_api_key`
+  
+  Both methods return the same response format with user info and JWT token.
   """
 
   use RubberDuckWeb, :channel
@@ -75,6 +88,62 @@ defmodule RubberDuckWeb.AuthChannel do
 
       Logger.warning("Rate limit exceeded for login attempts from socket")
     end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_in("authenticate_with_api_key", %{"api_key" => api_key}, socket) do
+    Logger.info("API key authentication attempt")
+    
+    # Basic rate limiting check (same as password login)
+    if check_login_rate_limit(socket) do
+      case authenticate_with_api_key(api_key) do
+        {:ok, user, token} ->
+          # Update socket with authenticated user
+          socket =
+            socket
+            |> assign(:user_id, user.id)
+            |> assign(:authenticated_at, DateTime.utc_now())
+
+          push(socket, "login_success", %{
+            user: %{
+              id: user.id,
+              username: user.username,
+              email: user.email
+            },
+            token: token
+          })
+
+          Logger.info("User #{user.id} authenticated via API key")
+
+        {:error, reason} ->
+          push(socket, "login_error", %{
+            message: "Authentication failed",
+            details: format_auth_error(reason)
+          })
+
+          Logger.warning("API key authentication failed, reason: #{inspect(reason)}")
+      end
+    else
+      push(socket, "login_error", %{
+        message: "Rate limit exceeded",
+        details: "Too many authentication attempts. Please try again later."
+      })
+
+      Logger.warning("Rate limit exceeded for API key authentication from socket")
+    end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_in("authenticate_with_api_key", _params, socket) do
+    # Handle missing API key
+    push(socket, "login_error", %{
+      message: "Authentication failed",
+      details: "API key is required"
+    })
 
     {:noreply, socket}
   end
@@ -197,6 +266,34 @@ defmodule RubberDuckWeb.AuthChannel do
           {:ok, token} -> {:ok, user, token}
           error -> error
         end
+
+      error ->
+        error
+    end
+  end
+
+  defp authenticate_with_api_key(api_key) do
+    require Ash.Query
+
+    # Build a query with the sign_in_with_api_key action
+    query =
+      RubberDuck.Accounts.User
+      |> Ash.Query.for_read(:sign_in_with_api_key, %{
+        api_key: api_key
+      })
+
+    # Execute the query with authorization bypassed
+    case Ash.read_one(query, authorize?: false) do
+      {:ok, user} when not is_nil(user) ->
+        case AshAuthentication.Jwt.token_for_user(user) do
+          {:ok, token, _claims} -> {:ok, user, token}
+          # Handle both return formats
+          {:ok, token} -> {:ok, user, token}
+          error -> error
+        end
+
+      {:ok, nil} ->
+        {:error, %Ash.Error.Query.NotFound{}}
 
       error ->
         error

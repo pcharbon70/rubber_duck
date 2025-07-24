@@ -99,6 +99,9 @@ defmodule RubberDuck.Application do
       RubberDuck.Projects.WatcherManager,
       # File cache system
       RubberDuck.Projects.FileCache,
+      # Enhanced cache system with statistics
+      RubberDuck.Projects.CacheStats,
+      RubberDuck.Projects.FileCacheEnhanced,
       # Registry for FileManagerWatcher
       {Registry, keys: :unique, name: RubberDuck.Projects.FileManagerWatcher.Registry},
       # FileManagerWatcher supervisor

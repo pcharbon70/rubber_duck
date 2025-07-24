@@ -1,4 +1,28 @@
 defmodule RubberDuckWeb.UserSocket do
+  @moduledoc """
+  Authenticated user socket for RubberDuck application.
+  
+  This socket requires JWT authentication. API key authentication has been moved
+  to the AuthChannel on AuthSocket, which returns a JWT token.
+  
+  ## Authentication Flow
+  
+  1. Connect to AuthSocket and authenticate with username/password or API key
+  2. Receive JWT token from AuthChannel
+  3. Connect to UserSocket with the JWT token
+  
+  ## Connection Parameters
+  
+  - `token` (required): JWT token obtained from AuthChannel
+  
+  ## Example
+  
+      # JavaScript client
+      const socket = new Socket("/socket", {
+        params: {token: jwtToken}
+      })
+  """
+  
   use Phoenix.Socket
 
   require Logger
@@ -27,19 +51,12 @@ defmodule RubberDuckWeb.UserSocket do
   # See `Phoenix.Token` documentation for examples in
   # performing token verification on connect.
   @impl true
-  def connect(params, socket, connect_info) do
+  def connect(params, socket, _connect_info) do
     # Log connection without sensitive data
-    safe_params = Map.drop(params, ["api_key", "token"])
+    safe_params = Map.drop(params, ["token"])
     Logger.info("WebSocket connection attempt with params: #{inspect(safe_params)}")
 
-    # Try to get API key from query params if not in params
-    auth_params =
-      case get_api_key_from_uri(connect_info) do
-        {:ok, api_key} -> Map.put(params, "api_key", api_key)
-        _ -> params
-      end
-
-    case authenticate(auth_params) do
+    case authenticate(params) do
       {:ok, user_id} ->
         socket =
           socket
@@ -70,7 +87,7 @@ defmodule RubberDuckWeb.UserSocket do
 
   # Private functions
 
-  defp authenticate(%{"token" => token}) when is_binary(token) do
+  defp authenticate(%{"token" => token}) when is_binary(token) and byte_size(token) > 0 do
     # Verify JWT token using Ash Authentication
     case AshAuthentication.Jwt.verify(token, RubberDuck.Accounts.User) do
       {:ok, claims, _resource} ->
@@ -87,45 +104,14 @@ defmodule RubberDuckWeb.UserSocket do
       {:error, reason} ->
         Logger.debug("Token verification failed: #{inspect(reason)}")
         {:error, "Invalid token"}
-    end
-  end
-
-  defp authenticate(%{"api_key" => api_key}) when is_binary(api_key) do
-    # Authenticate using Ash Authentication API key strategy
-    case authenticate_api_key(api_key) do
-      {:ok, user} ->
-        # Convert UUID to string
-        {:ok, to_string(user.id)}
-
-      {:error, _reason} ->
-        {:error, "Invalid API key"}
+        
+      :error ->
+        # Handle malformed tokens
+        {:error, "Invalid token format"}
     end
   end
 
   defp authenticate(_params) do
-    {:error, "No authentication credentials provided"}
+    {:error, "No authentication credentials provided. Please use a JWT token."}
   end
-
-  defp authenticate_api_key(api_key) do
-    # Use the sign_in_with_api_key action to authenticate
-    case Ash.read_one(RubberDuck.Accounts.User,
-           action: :sign_in_with_api_key,
-           input: %{api_key: api_key}
-         ) do
-      {:ok, user} -> {:ok, user}
-      {:error, _} -> {:error, :invalid_api_key}
-    end
-  end
-
-  defp get_api_key_from_uri(%{uri: %{query: query}}) when is_binary(query) do
-    case URI.decode_query(query) do
-      %{"api_key" => api_key} when is_binary(api_key) and api_key != "" ->
-        {:ok, api_key}
-
-      _ ->
-        :error
-    end
-  end
-
-  defp get_api_key_from_uri(_), do: :error
 end
