@@ -73,15 +73,14 @@ func (m Model) renderBase() string {
 	// Build chat content with header, status messages at top, conversation at bottom
 	// Calculate heights for chat and status sections
 	headerHeight := 3 // chat header takes 3 lines
-	statusBarHeight := 1 // new status bar takes 1 line
-	availableHeight := contentHeight - headerHeight - statusBarHeight - 2 // -2 for main borders
+	availableHeight := contentHeight - headerHeight - 2 // -2 for main borders
 	
 	// Status messages take 30% of available conversation area
 	statusHeight := int(float64(availableHeight) * 0.3)
 	if statusHeight < 5 {
 		statusHeight = 5 // Minimum height
 	}
-	chatHeight := availableHeight - statusHeight - 2 // -2 for spacing between sections
+	chatHeight := availableHeight - statusHeight
 	
 	// Update component sizes - reduce status messages height to account for status bar
 	m.statusMessages.SetSize(chatWidth-4, statusHeight-3) // -4 for borders, -3 for height borders and status bar
