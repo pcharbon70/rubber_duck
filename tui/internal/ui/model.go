@@ -121,7 +121,7 @@ func NewModel() *Model {
 	// Create error handler
 	errorHandler := NewErrorHandler()
 	
-	return &Model{
+	model := &Model{
 		activePane:   ChatPane, // Chat is primary
 		width:        80,       // Default width
 		height:       24,       // Default height
@@ -156,6 +156,11 @@ func NewModel() *Model {
 		tokenUsage:    0,
 		tokenLimit:    4096,
 	}
+	
+	// Initialize component sizes with defaults
+	model.updateComponentSizes()
+	
+	return model
 }
 
 // Init implements tea.Model
