@@ -300,14 +300,16 @@ defmodule RubberDuck.SessionContext do
     # Remove stale contexts (older than 1 hour)
     one_hour_ago = DateTime.add(DateTime.utc_now(), -3600, :second)
 
-    stale_contexts =
-      :ets.select(:session_contexts, [
-        {
-          {:"$1", %{last_activity: :"$2"}},
-          [{:<, :"$2", one_hour_ago}],
-          [:"$1"]
-        }
-      ])
+    # Get all contexts and filter stale ones
+    # ETS match specifications don't work well with map field access
+    all_contexts = :ets.tab2list(:session_contexts)
+    
+    stale_contexts = 
+      all_contexts
+      |> Enum.filter(fn {_session_id, context} ->
+        DateTime.compare(context.last_activity, one_hour_ago) == :lt
+      end)
+      |> Enum.map(fn {session_id, _context} -> session_id end)
 
     removed_count =
       Enum.reduce(stale_contexts, 0, fn session_id, count ->
