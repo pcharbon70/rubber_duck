@@ -49,6 +49,13 @@ defmodule RubberDuck.Conversations.Conversation do
       argument :user_id, :uuid, allow_nil?: false
       filter expr(user_id == ^arg(:user_id))
     end
+    
+    read :get_latest_by_user do
+      argument :user_id, :uuid, allow_nil?: false
+      filter expr(user_id == ^arg(:user_id))
+      prepare build(sort: [updated_at: :desc], limit: 1)
+      get? true
+    end
   end
 
   policies do
