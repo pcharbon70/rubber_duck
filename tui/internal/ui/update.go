@@ -449,19 +449,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.authSocket.Disconnect()
 			m.authSocket = nil
 		}
-		// Now connect to user socket with credentials
+		// Now connect to user socket with JWT token only
 		client := m.phoenixClient.(*phoenix.Client)
 		config := phoenix.Config{
 			URL:      m.phoenixURL,
 			IsAuth:   false,
 		}
-		// Prefer API key over JWT token if we have one, as it's more reliable
-		if m.apiKey != "" {
-			config.APIKey = m.apiKey
-		} else if m.jwtToken != "" {
+		// Always use JWT token for user socket authentication
+		if m.jwtToken != "" {
 			config.JWTToken = m.jwtToken
+			m.statusBar = "Connecting to authenticated socket with JWT token..."
+		} else {
+			// This shouldn't happen - we should always have a JWT token after authentication
+			m.statusBar = "Error: No JWT token available for authenticated connection"
+			m.statusMessages.AddMessage(StatusCategoryError, "Cannot connect to user socket: No JWT token available", nil)
+			return m, nil
 		}
-		m.statusBar = "Connecting to authenticated socket..."
 		return m, client.Connect(config)
 		
 	// Authentication messages
@@ -475,9 +478,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 		
 	case phoenix.AuthChannelJoinedMsg:
-		m.statusBar = "Auth channel joined - Waiting for authentication status..."
-		// The server will send auth status through channel events if needed
-		// We don't need to actively request it, avoiding potential timeout errors
+		// Check if we have an API key to authenticate with
+		if m.apiKey != "" {
+			// Mask the API key for display (show only last 4 characters)
+			maskedKey := "****"
+			if len(m.apiKey) > 4 {
+				maskedKey = "****" + m.apiKey[len(m.apiKey)-4:]
+			}
+			m.statusBar = fmt.Sprintf("Authenticating with API key: %s", maskedKey)
+			m.statusMessages.AddMessage(StatusCategoryInfo, fmt.Sprintf("Attempting authentication with API key: %s", maskedKey), nil)
+			
+			// Attempt API key authentication
+			if authClient, ok := m.authClient.(*phoenix.AuthClient); ok {
+				return m, authClient.AuthenticateWithAPIKey(m.apiKey)
+			}
+		}
+		
+		// No API key, wait for manual authentication
+		m.statusBar = "Auth channel joined - Waiting for authentication..."
 		return m, nil
 		
 	case phoenix.LoginSuccessMsg:
@@ -486,7 +504,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.userID = msg.User.ID // Store user ID for api_keys channel
 		m.jwtToken = msg.Token // Store the JWT token
 		m.statusBar = fmt.Sprintf("Logged in as %s - Switching to authenticated connection...", msg.User.Username)
-		m.chat.AddMessage(SystemMessage, fmt.Sprintf("Successfully logged in as %s", msg.User.Username), "system")
+		
+		// Show appropriate message based on whether API key was used
+		if m.apiKey != "" {
+			m.chat.AddMessage(SystemMessage, fmt.Sprintf("Successfully authenticated as %s via API key", msg.User.Username), "system")
+			m.statusMessages.AddMessage(StatusCategoryInfo, fmt.Sprintf("API key authentication successful - logged in as %s", msg.User.Username), nil)
+		} else {
+			m.chat.AddMessage(SystemMessage, fmt.Sprintf("Successfully logged in as %s", msg.User.Username), "system")
+		}
+		
 		m.updateHeaderState()
 		// Now switch to the authenticated socket
 		return m, func() tea.Msg { return SwitchToUserSocketMsg{} }

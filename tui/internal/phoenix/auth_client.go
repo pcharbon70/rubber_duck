@@ -128,6 +128,42 @@ func (a *AuthClient) setupAuthHandlers(channel *phx.Channel) {
 		}
 	})
 
+	// API key authentication success - returns same format as login_success
+	channel.On("authenticate_with_api_key_success", func(payload any) {
+		var msg struct {
+			User  AuthUser `json:"user"`
+			Token string   `json:"token"`
+		}
+		if data, err := json.Marshal(payload); err == nil {
+			if err := json.Unmarshal(data, &msg); err == nil {
+				if a.program != nil {
+					a.program.Send(LoginSuccessMsg{
+						User:  msg.User,
+						Token: msg.Token,
+					})
+				}
+			}
+		}
+	})
+
+	// API key authentication error
+	channel.On("authenticate_with_api_key_error", func(payload any) {
+		var msg struct {
+			Message string `json:"message"`
+			Details string `json:"details"`
+		}
+		if data, err := json.Marshal(payload); err == nil {
+			if err := json.Unmarshal(data, &msg); err == nil {
+				if a.program != nil {
+					a.program.Send(LoginErrorMsg{
+						Message: msg.Message,
+						Details: msg.Details,
+					})
+				}
+			}
+		}
+	})
+
 	// Logout success
 	channel.On("logout_success", func(payload any) {
 		var msg struct {
@@ -205,6 +241,13 @@ func (a *AuthClient) GetStatus() tea.Cmd {
 // RefreshToken refreshes the authentication token
 func (a *AuthClient) RefreshToken() tea.Cmd {
 	return a.push("refresh_token", map[string]any{})
+}
+
+// AuthenticateWithAPIKey authenticates using an API key
+func (a *AuthClient) AuthenticateWithAPIKey(apiKey string) tea.Cmd {
+	return a.push("authenticate_with_api_key", map[string]any{
+		"api_key": apiKey,
+	})
 }
 
 // push sends a message to the auth channel
