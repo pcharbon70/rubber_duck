@@ -147,11 +147,18 @@ defmodule RubberDuck.Telemetry.StatusHandler do
   end
 
   def handle_event([:rubber_duck, :status_channel, :disconnected], measurements, metadata, _config) do
-    Logger.info("Status channel disconnected",
-      channel: metadata.channel,
-      reason: metadata[:reason],
-      duration_seconds: div(measurements[:session_duration] || 0, 1_000_000)
-    )
+    # Handle metadata safely - channel key might not be present
+    log_metadata = [
+      conversation_id: metadata[:conversation_id],
+      user_id: metadata[:user_id],
+      subscribed_categories: metadata[:subscribed_categories],
+      duration_ms: measurements[:duration_ms]
+    ]
+    
+    # Only add non-nil values
+    log_metadata = Enum.filter(log_metadata, fn {_k, v} -> v != nil end)
+    
+    Logger.info("Status channel disconnected", log_metadata)
 
     :ok
   end
