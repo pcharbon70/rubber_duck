@@ -50,14 +50,12 @@ defmodule RubberDuckWeb.ApiKeyChannel do
     if check_generation_rate_limit(socket) do
       # Parse expiration time
       expires_at = parse_expiration(params["expires_at"])
-      name = params["name"] || "Generated via WebSocket"
 
-      case generate_api_key_for_user(user_id, expires_at, name) do
+      case generate_api_key_for_user(user_id, expires_at) do
         {:ok, api_key, key_value} ->
           push(socket, "key_generated", %{
             api_key: %{
               id: api_key.id,
-              name: api_key.name,
               key: key_value,
               expires_at: DateTime.to_iso8601(api_key.expires_at),
               created_at: DateTime.to_iso8601(api_key.inserted_at)
@@ -115,7 +113,6 @@ defmodule RubberDuckWeb.ApiKeyChannel do
           Enum.map(api_keys, fn key ->
             %{
               id: key.id,
-              name: key.name,
               expires_at: DateTime.to_iso8601(key.expires_at),
               valid: key.valid,
               last_used_at: key.last_used_at && DateTime.to_iso8601(key.last_used_at),
@@ -184,11 +181,10 @@ defmodule RubberDuckWeb.ApiKeyChannel do
 
   # Private helper functions
 
-  defp generate_api_key_for_user(user_id, expires_at, name) do
+  defp generate_api_key_for_user(user_id, expires_at) do
     case Ash.create(ApiKey, %{
            user_id: user_id,
-           expires_at: expires_at,
-           name: name
+           expires_at: expires_at
          }) do
       {:ok, api_key} ->
         # The actual API key value should be in the metadata or context
@@ -263,7 +259,14 @@ defmodule RubberDuckWeb.ApiKeyChannel do
     case reason do
       %Ash.Error.Invalid{errors: errors} ->
         errors
-        |> Enum.map(& &1.message)
+        |> Enum.map(fn error ->
+          case error do
+            %{message: message} -> message
+            %Ash.Error.Invalid.NoSuchInput{input: input, resource: resource} ->
+              "Invalid input '#{input}' for #{inspect(resource)}"
+            _ -> inspect(error)
+          end
+        end)
         |> Enum.join(", ")
 
       %Ash.Error.Query.NotFound{} ->
