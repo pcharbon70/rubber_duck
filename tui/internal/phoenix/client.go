@@ -254,6 +254,12 @@ func (c *Client) Push(event string, payload map[string]any) tea.Cmd {
 		})
 		
 		push.Receive("timeout", func(response any) {
+			// For get_history, we handle the response through channel events
+			if event == "get_history" {
+				// History is handled by the "history" channel event, ignore push timeout
+				return
+			}
+			
 			c.program.Send(ErrorMsg{
 				Err:       fmt.Errorf("Connection timeout for event: %s", event),
 				Component: "Phoenix Push",

@@ -283,7 +283,13 @@ func (a *AuthClient) push(event string, payload map[string]any) tea.Cmd {
 		})
 
 		push.Receive("timeout", func(response any) {
-			// Always report timeouts with the specific event name so we can debug
+			// Don't report timeout for login/logout if we're already authenticated
+			// These events use channel events for success, not push replies
+			if event == "login" || event == "logout" || event == "authenticate_with_api_key" {
+				// These are handled by channel events, ignore push timeout
+				return
+			}
+			
 			if a.program != nil {
 				a.program.Send(ErrorMsg{
 					Err:       fmt.Errorf("Connection timeout for event: %s", event),
