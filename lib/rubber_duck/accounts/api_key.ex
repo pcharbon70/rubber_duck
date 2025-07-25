@@ -25,6 +25,21 @@ defmodule RubberDuck.Accounts.ApiKey do
     bypass AshAuthentication.Checks.AshAuthenticationInteraction do
       authorize_if always()
     end
+
+    policy action_type(:create) do
+      description "Users can create their own API keys"
+      authorize_if expr(user_id == ^actor(:id))
+    end
+
+    policy action_type(:read) do
+      description "Users can only read their own API keys"
+      authorize_if expr(user_id == ^actor(:id))
+    end
+
+    policy action_type(:destroy) do
+      description "Users can only destroy their own API keys"
+      authorize_if expr(user_id == ^actor(:id))
+    end
   end
 
   attributes do

@@ -50,10 +50,13 @@ defmodule RubberDuckWeb.ApiKeyChannel do
     if check_generation_rate_limit(socket) do
       # Parse expiration time
       expires_at = parse_expiration(params["expires_at"])
+      
+      Logger.info("About to generate API key for user #{user_id}, expires_at: #{inspect(expires_at)}")
 
       case generate_api_key_for_user(user_id, expires_at) do
         {:ok, api_key, key_value} ->
-          push(socket, "api_key_generated", %{
+          Logger.info("Successfully generated API key: #{api_key.id}, key_value present: #{not is_nil(key_value)}")
+          payload = %{
             api_key: %{
               id: api_key.id,
               key: key_value,
@@ -61,7 +64,13 @@ defmodule RubberDuckWeb.ApiKeyChannel do
               created_at: DateTime.to_iso8601(api_key.inserted_at)
             },
             warning: "Store this key securely - it won't be shown again"
-          })
+          }
+          
+          Logger.debug("Pushing api_key_generated event to client with payload: #{inspect(payload)}")
+          Logger.info("Pushing api_key_generated event for key #{api_key.id}")
+          
+          result = push(socket, "api_key_generated", payload)
+          Logger.info("Push result: #{inspect(result)}")
 
           Logger.info("API key generated for user #{user_id}: #{api_key.id}")
 
@@ -170,11 +179,26 @@ defmodule RubberDuckWeb.ApiKeyChannel do
   # Private helper functions
 
   defp generate_api_key_for_user(user_id, expires_at) do
-    case Ash.create(ApiKey, %{
-           user_id: user_id,
-           expires_at: expires_at
-         }) do
+    Logger.info("generate_api_key_for_user called with user_id: #{user_id}, expires_at: #{inspect(expires_at)}")
+    
+    # Get the user to use as actor
+    actor = case RubberDuck.Accounts.get_user(user_id, authorize?: false) do
+      {:ok, user} -> user
+      _ -> nil
+    end
+    
+    result = Ash.create(ApiKey, %{
+      user_id: user_id,
+      expires_at: expires_at
+    }, actor: actor)
+    
+    Logger.info("Ash.create result: #{inspect(result)}")
+    
+    case result do
       {:ok, api_key} ->
+        Logger.info("API key created successfully with id: #{api_key.id}")
+        Logger.info("API key metadata: #{inspect(api_key.__metadata__)}")
+        
         # The actual API key value should be in the metadata or context
         # For now, let's generate a placeholder and note that the actual implementation
         # will depend on how AshAuthentication.Strategy.ApiKey.GenerateApiKey works
@@ -183,9 +207,11 @@ defmodule RubberDuckWeb.ApiKeyChannel do
             Map.get(api_key.__metadata__, :generated_api_key) ||
             "rubberduck_" <> Base.encode64(:crypto.strong_rand_bytes(32), padding: false)
 
+        Logger.info("Key value determined: #{String.slice(key_value, 0, 20)}...")
         {:ok, api_key, key_value}
 
       error ->
+        Logger.error("Failed to create API key: #{inspect(error)}")
         error
     end
   end
@@ -194,18 +220,31 @@ defmodule RubberDuckWeb.ApiKeyChannel do
     page = Keyword.get(opts, :page, 1)
     per_page = Keyword.get(opts, :per_page, 20)
 
+    # Get the user to use as actor
+    actor = case RubberDuck.Accounts.get_user(user_id, authorize?: false) do
+      {:ok, user} -> user
+      _ -> nil
+    end
+
     Ash.read(ApiKey,
       filter: [user_id: user_id],
       sort: [inserted_at: :desc],
       load: [:valid],
-      page: [limit: per_page, offset: (page - 1) * per_page]
+      page: [limit: per_page, offset: (page - 1) * per_page],
+      actor: actor
     )
   end
 
   defp revoke_user_api_key(user_id, api_key_id) do
-    case Ash.get(ApiKey, api_key_id, filter: [user_id: user_id]) do
+    # Get the user to use as actor
+    actor = case RubberDuck.Accounts.get_user(user_id, authorize?: false) do
+      {:ok, user} -> user
+      _ -> nil
+    end
+
+    case Ash.get(ApiKey, api_key_id, filter: [user_id: user_id], actor: actor) do
       {:ok, api_key} ->
-        Ash.destroy(api_key)
+        Ash.destroy(api_key, actor: actor)
 
       {:error, %Ash.Error.Query.NotFound{}} ->
         {:error, "API key not found or unauthorized"}
