@@ -273,18 +273,10 @@ defmodule RubberDuckWeb.AuthChannel do
   end
 
   defp authenticate_with_api_key(api_key) do
-    require Ash.Query
-
-    # Build a query with the sign_in_with_api_key action
-    query =
-      RubberDuck.Accounts.User
-      |> Ash.Query.for_read(:sign_in_with_api_key, %{
-        api_key: api_key
-      })
-
-    # Execute the query with authorization bypassed
-    case Ash.read_one(query, authorize?: false) do
-      {:ok, user} when not is_nil(user) ->
+    # Use our custom validate_api_key function that works with our plaintext keys
+    case RubberDuck.Accounts.validate_api_key(api_key) do
+      {:ok, user} ->
+        # Generate JWT token for the user
         case AshAuthentication.Jwt.token_for_user(user) do
           {:ok, token, _claims} -> {:ok, user, token}
           # Handle both return formats
@@ -292,8 +284,13 @@ defmodule RubberDuckWeb.AuthChannel do
           error -> error
         end
 
-      {:ok, nil} ->
+      {:error, :invalid_api_key} ->
         {:error, %Ash.Error.Query.NotFound{}}
+
+      {:error, :expired_api_key} ->
+        {:error, %Ash.Error.Invalid{
+          errors: [%{message: "API key has expired"}]
+        }}
 
       error ->
         error

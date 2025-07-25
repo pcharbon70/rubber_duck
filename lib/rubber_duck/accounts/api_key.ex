@@ -19,6 +19,10 @@ defmodule RubberDuck.Accounts.ApiKey do
 
       change {AshAuthentication.Strategy.ApiKey.GenerateApiKey, prefix: :rubberduck, hash: :api_key_hash}
     end
+
+    create :create_with_hash do
+      accept [:user_id, :expires_at, :api_key_hash]
+    end
   end
 
   policies do

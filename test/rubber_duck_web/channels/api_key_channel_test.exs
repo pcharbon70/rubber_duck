@@ -9,7 +9,7 @@ defmodule RubberDuckWeb.ApiKeyChannelTest do
     user = user_fixture()
 
     # Generate a token for the user
-    {:ok, token} = AshAuthentication.Jwt.token_for_user(user)
+    {:ok, token, _claims} = AshAuthentication.Jwt.token_for_user(user)
 
     # Connect to socket with token
     {:ok, socket} = connect(UserSocket, %{"token" => token})
@@ -50,10 +50,9 @@ defmodule RubberDuckWeb.ApiKeyChannelTest do
     test "generates API key with default expiration", %{channel: socket} do
       ref = push(socket, "generate", %{})
 
-      assert_push("key_generated", %{
+      assert_push("api_key_generated", %{
         api_key: %{
           id: _id,
-          name: "Generated via WebSocket",
           key: key,
           expires_at: expires_at,
           created_at: _created_at
@@ -69,26 +68,20 @@ defmodule RubberDuckWeb.ApiKeyChannelTest do
       diff = DateTime.diff(exp_dt, DateTime.utc_now(), :day)
       assert diff >= 364 and diff <= 366
 
-      # Other clients should receive update
-      assert_broadcast("key_list_updated", %{
-        action: "generated",
-        api_key_id: _
-      })
+      # Broadcast removed for security - no broadcasting of API key generation
     end
 
-    test "generates API key with custom expiration and name", %{channel: socket} do
+    test "generates API key with custom expiration", %{channel: socket} do
       custom_expires = DateTime.utc_now() |> DateTime.add(30, :day)
 
       ref =
         push(socket, "generate", %{
-          "expires_at" => DateTime.to_iso8601(custom_expires),
-          "name" => "Custom API Key"
+          "expires_at" => DateTime.to_iso8601(custom_expires)
         })
 
-      assert_push("key_generated", %{
+      assert_push("api_key_generated", %{
         api_key: %{
           id: _id,
-          name: "Custom API Key",
           key: _key,
           expires_at: expires_at,
           created_at: _created_at
@@ -118,16 +111,14 @@ defmodule RubberDuckWeb.ApiKeyChannelTest do
       {:ok, key1} =
         Ash.create(ApiKey, %{
           user_id: user.id,
-          name: "Test Key 1",
           expires_at: DateTime.utc_now() |> DateTime.add(30, :day)
-        })
+        }, actor: user)
 
       {:ok, key2} =
         Ash.create(ApiKey, %{
           user_id: user.id,
-          name: "Test Key 2",
           expires_at: DateTime.utc_now() |> DateTime.add(60, :day)
-        })
+        }, actor: user)
 
       %{channel: socket, keys: [key1, key2]}
     end
@@ -135,7 +126,7 @@ defmodule RubberDuckWeb.ApiKeyChannelTest do
     test "lists user's API keys", %{channel: socket, keys: keys} do
       ref = push(socket, "list", %{})
 
-      assert_push("key_list", %{
+      assert_push("api_key_list", %{
         api_keys: api_keys,
         page: 1,
         per_page: 20,
@@ -147,16 +138,12 @@ defmodule RubberDuckWeb.ApiKeyChannelTest do
 
       # Verify keys are returned in descending order by created_at
       [first_key, second_key] = api_keys
-      assert first_key.name == "Test Key 2"
-      assert second_key.name == "Test Key 1"
 
       # Verify key structure
       assert %{
                id: _,
-               name: _,
                expires_at: _,
                valid: _,
-               last_used_at: _,
                created_at: _
              } = first_key
     end
@@ -164,7 +151,7 @@ defmodule RubberDuckWeb.ApiKeyChannelTest do
     test "supports pagination", %{channel: socket, keys: _keys} do
       ref = push(socket, "list", %{"page" => 2, "per_page" => 1})
 
-      assert_push("key_list", %{
+      assert_push("api_key_list", %{
         api_keys: api_keys,
         page: 2,
         per_page: 1,
@@ -188,9 +175,8 @@ defmodule RubberDuckWeb.ApiKeyChannelTest do
       {:ok, api_key} =
         Ash.create(ApiKey, %{
           user_id: user.id,
-          name: "Key to Revoke",
           expires_at: DateTime.utc_now() |> DateTime.add(30, :day)
-        })
+        }, actor: user)
 
       %{channel: socket, api_key: api_key}
     end
@@ -198,21 +184,17 @@ defmodule RubberDuckWeb.ApiKeyChannelTest do
     test "revokes an API key", %{channel: socket, api_key: api_key} do
       ref = push(socket, "revoke", %{"api_key_id" => api_key.id})
 
-      assert_push("key_revoked", %{
+      assert_push("api_key_revoked", %{
         api_key_id: api_key_id,
         message: "API key revoked successfully"
       })
 
       assert api_key_id == api_key.id
 
-      # Other clients should receive update
-      assert_broadcast("key_list_updated", %{
-        action: "revoked",
-        api_key_id: ^api_key_id
-      })
+      # Broadcast removed for security
 
       # Verify key is actually deleted
-      assert {:error, %Ash.Error.Query.NotFound{}} = Ash.get(ApiKey, api_key.id)
+      assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{}]}} = Ash.get(ApiKey, api_key.id)
     end
 
     test "fails to revoke non-existent key", %{channel: socket} do
@@ -233,9 +215,8 @@ defmodule RubberDuckWeb.ApiKeyChannelTest do
       {:ok, other_key} =
         Ash.create(ApiKey, %{
           user_id: other_user.id,
-          name: "Other User's Key",
           expires_at: DateTime.utc_now() |> DateTime.add(30, :day)
-        })
+        }, actor: other_user)
 
       ref = push(socket, "revoke", %{"api_key_id" => other_key.id})
 
@@ -288,15 +269,11 @@ defmodule RubberDuckWeb.ApiKeyChannelTest do
       # Simulate another client on the same channel
       # In a real test, you'd connect another socket
 
-      ref = push(socket, "generate", %{"name" => "Broadcast Test"})
+      ref = push(socket, "generate", %{})
 
-      assert_push("key_generated", %{api_key: %{id: key_id}})
+      assert_push("api_key_generated", %{api_key: %{id: _key_id}})
 
-      # Should broadcast to other clients (not self)
-      assert_broadcast("key_list_updated", %{
-        action: "generated",
-        api_key_id: ^key_id
-      })
+      # Broadcast removed for security - no broadcasting of API key generation
     end
   end
 end

@@ -77,7 +77,7 @@ defmodule RubberDuckWeb.AuthChannelApiKeyTest do
         details: details
       }
       
-      assert details == "Invalid credentials"
+      assert details == "API key has expired"
     end
 
     test "applies rate limiting to API key authentication" do
