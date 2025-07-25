@@ -16,6 +16,7 @@ defmodule RubberDuck.Engines.Conversation.ConversationRouter do
 
   alias RubberDuck.CoT.QuestionClassifier
   alias RubberDuck.Engine.Manager, as: EngineManager
+  alias RubberDuck.Engine.InputValidator
 
   @simple_types [:factual, :basic_code, :straightforward]
   @complex_types [:complex_problem, :multi_step]
@@ -66,14 +67,18 @@ defmodule RubberDuck.Engines.Conversation.ConversationRouter do
   # Private functions
 
   defp validate_input(%{query: query} = input) when is_binary(query) do
-    validated = %{
-      query: String.trim(query),
-      context: Map.get(input, :context, %{}),
-      options: Map.get(input, :options, %{}),
-      llm_config: Map.get(input, :llm_config, %{})
-    }
-
-    {:ok, validated}
+    # Validate required LLM fields
+    case InputValidator.validate_llm_input(input, [:query]) do
+      {:ok, validated} ->
+        # Add router-specific fields
+        validated = Map.merge(validated, %{
+          query: String.trim(query),
+          llm_config: Map.get(input, :llm_config, %{})
+        })
+        {:ok, validated}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp validate_input(_), do: {:error, :invalid_input}
@@ -131,12 +136,18 @@ defmodule RubberDuck.Engines.Conversation.ConversationRouter do
   end
 
   defp route_to_engine(engine_name, validated, state) do
-    # Prepare input for the target engine
+    # Prepare input for the target engine, ensuring provider/model are passed
     engine_input = %{
       query: validated.query,
       context: validated.context,
       options: validated.options,
-      llm_config: validated.llm_config
+      llm_config: validated.llm_config,
+      # Pass through required LLM fields
+      provider: validated.provider,
+      model: validated.model,
+      user_id: validated.user_id,
+      temperature: validated.temperature,
+      max_tokens: validated.max_tokens
     }
 
     # Execute on the selected engine

@@ -18,9 +18,9 @@ defmodule RubberDuck.Engines.Analysis do
   require Logger
 
   alias RubberDuck.LLM
-  alias RubberDuck.LLM.Config
   alias RubberDuck.CoT.Manager, as: ConversationManager
   alias RubberDuck.CoT.Chains.AnalysisChain
+  alias RubberDuck.Engine.InputValidator
 
   @impl true
   def init(config) do
@@ -37,6 +37,11 @@ defmodule RubberDuck.Engines.Analysis do
     with {:ok, validated} <- validate_input(input) do
       # Build CoT context
       cot_context = %{
+        # Required LLM parameters
+        provider: validated.provider,
+        model: validated.model,
+        user_id: validated.user_id,
+        # Context
         code: validated.content,
         context: %{
           file_path: validated.file_path,
@@ -105,16 +110,17 @@ defmodule RubberDuck.Engines.Analysis do
   end
 
   defp validate_input(%{file_path: path} = input) when is_binary(path) do
-    language = detect_language(path)
-
-    validated = %{
-      file_path: path,
-      language: language,
-      content: read_file_content(path),
-      options: Map.get(input, :options, %{})
-    }
-
-    {:ok, validated}
+    case InputValidator.validate_llm_input(input, [:file_path]) do
+      {:ok, validated} ->
+        language = detect_language(path)
+        validated = Map.merge(validated, %{
+          language: language,
+          content: read_file_content(path)
+        })
+        {:ok, validated}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp validate_input(_), do: {:error, :invalid_input}
@@ -343,18 +349,16 @@ defmodule RubberDuck.Engines.Analysis do
   defp enhance_issue_group(category, issues, input, state) do
     prompt = build_analysis_prompt(category, issues, input)
 
-    # Get current provider and model from configuration
-    {provider, model} = Config.get_current_provider_and_model()
-
     opts = [
-      provider: provider,
-      model: model,
+      provider: input.provider,  # Required from input
+      model: input.model,        # Required from input
       messages: [
         %{"role" => "system", "content" => get_analysis_system_prompt()},
         %{"role" => "user", "content" => prompt}
       ],
-      temperature: 0.3,
-      max_tokens: state.config[:max_tokens] || 1024
+      temperature: input.temperature || 0.3,
+      max_tokens: input.max_tokens || state.config[:max_tokens] || 1024,
+      user_id: input.user_id
     ]
 
     case LLM.Service.completion(opts) do

@@ -18,6 +18,7 @@ defmodule RubberDuck.Engines.Conversation.MultiStepConversation do
 
   alias RubberDuck.CoT.Manager, as: ConversationManager
   alias RubberDuck.CoT.Chains.LightweightConversationChain
+  alias RubberDuck.Engine.InputValidator
 
   @impl true
   def init(config) do
@@ -25,7 +26,7 @@ defmodule RubberDuck.Engines.Conversation.MultiStepConversation do
       config: config,
       max_tokens: config[:max_tokens] || 1500,
       temperature: config[:temperature] || 0.5,
-      model: config[:model] || "codellama",
+      # Remove hardcoded model - will come from input
       timeout: config[:timeout] || 30_000,
       chain_module: config[:chain_module] || LightweightConversationChain,
       max_context_messages: config[:max_context_messages] || 10
@@ -45,9 +46,10 @@ defmodule RubberDuck.Engines.Conversation.MultiStepConversation do
         step_number: calculate_step_number(validated.context),
         processing_time: extract_duration(response),
         metadata: %{
-          model: state.model,
-          temperature: state.temperature,
-          max_tokens: state.max_tokens,
+          provider: validated.provider,
+          model: validated.model,
+          temperature: validated.temperature || state.temperature,
+          max_tokens: validated.max_tokens || state.max_tokens,
           context_messages: length(validated.context[:messages] || [])
         }
       }
@@ -64,14 +66,12 @@ defmodule RubberDuck.Engines.Conversation.MultiStepConversation do
   # Private functions
 
   defp validate_input(%{query: query} = input) when is_binary(query) do
-    validated = %{
-      query: String.trim(query),
-      context: Map.get(input, :context, %{}),
-      options: Map.get(input, :options, %{}),
-      llm_config: Map.get(input, :llm_config, %{})
-    }
-
-    {:ok, validated}
+    case InputValidator.validate_llm_input(input, [:query]) do
+      {:ok, validated} ->
+        {:ok, Map.merge(validated, %{query: String.trim(query), llm_config: Map.get(input, :llm_config, %{})})}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp validate_input(_), do: {:error, :invalid_input}
@@ -107,6 +107,11 @@ defmodule RubberDuck.Engines.Conversation.MultiStepConversation do
       end
 
     %{
+      # Required LLM parameters
+      provider: validated.provider,
+      model: validated.model,
+      user_id: validated.user_id,
+      # Context
       context:
         Map.merge(validated.context, %{
           conversation_type: :multi_step,
@@ -115,14 +120,14 @@ defmodule RubberDuck.Engines.Conversation.MultiStepConversation do
       llm_config:
         Map.merge(
           %{
-            model: state.model,
-            temperature: state.temperature,
-            max_tokens: state.max_tokens,
+            provider: validated.provider,
+            model: validated.model,
+            temperature: validated.temperature || state.temperature,
+            max_tokens: validated.max_tokens || state.max_tokens,
             timeout: state.timeout
           },
           validated.llm_config
         ),
-      user_id: validated.context[:user_id],
       session_id: validated.context[:session_id] || generate_session_id()
     }
   end

@@ -18,6 +18,7 @@ defmodule RubberDuck.Engines.Conversation.AnalysisConversation do
 
   alias RubberDuck.CoT.Manager, as: ConversationManager
   alias RubberDuck.CoT.Chains.AnalysisChain
+  alias RubberDuck.Engine.InputValidator
 
   @impl true
   def init(config) do
@@ -25,7 +26,7 @@ defmodule RubberDuck.Engines.Conversation.AnalysisConversation do
       config: config,
       max_tokens: config[:max_tokens] || 2000,
       temperature: config[:temperature] || 0.3,
-      model: config[:model] || "codellama",
+      # Remove hardcoded model - will come from input
       timeout: config[:timeout] || 45_000,
       chain_module: config[:chain_module] || AnalysisChain
     }
@@ -45,9 +46,10 @@ defmodule RubberDuck.Engines.Conversation.AnalysisConversation do
         recommendations: extract_recommendations(response),
         processing_time: response.duration_ms,
         metadata: %{
-          model: state.model,
-          temperature: state.temperature,
-          max_tokens: state.max_tokens,
+          provider: validated.provider,
+          model: validated.model,
+          temperature: validated.temperature || state.temperature,
+          max_tokens: validated.max_tokens || state.max_tokens,
           analysis_type: validated.analysis_type
         }
       }
@@ -64,16 +66,18 @@ defmodule RubberDuck.Engines.Conversation.AnalysisConversation do
   # Private functions
 
   defp validate_input(%{query: query} = input) when is_binary(query) do
-    validated = %{
-      query: String.trim(query),
-      context: Map.get(input, :context, %{}),
-      options: Map.get(input, :options, %{}),
-      llm_config: Map.get(input, :llm_config, %{}),
-      code: Map.get(input, :code),
-      analysis_type: detect_analysis_type(query)
-    }
-
-    {:ok, validated}
+    case InputValidator.validate_llm_input(input, [:query]) do
+      {:ok, validated} ->
+        validated = Map.merge(validated, %{
+          query: String.trim(query),
+          llm_config: Map.get(input, :llm_config, %{}),
+          code: Map.get(input, :code),
+          analysis_type: detect_analysis_type(query)
+        })
+        {:ok, validated}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp validate_input(_), do: {:error, :invalid_input}
@@ -97,6 +101,11 @@ defmodule RubberDuck.Engines.Conversation.AnalysisConversation do
 
   defp build_cot_context(validated, state) do
     %{
+      # Required LLM parameters
+      provider: validated.provider,
+      model: validated.model,
+      user_id: validated.user_id,
+      # Context
       code: validated.code || extract_code_from_context(validated.context),
       context:
         Map.merge(validated.context, %{
@@ -108,14 +117,14 @@ defmodule RubberDuck.Engines.Conversation.AnalysisConversation do
       llm_config:
         Map.merge(
           %{
-            model: state.model,
-            temperature: state.temperature,
-            max_tokens: state.max_tokens,
+            provider: validated.provider,
+            model: validated.model,
+            temperature: validated.temperature || state.temperature,
+            max_tokens: validated.max_tokens || state.max_tokens,
             timeout: state.timeout
           },
           validated.llm_config
         ),
-      user_id: validated.context[:user_id],
       session_id: validated.context[:session_id] || generate_session_id()
     }
   end

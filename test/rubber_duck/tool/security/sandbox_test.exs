@@ -211,7 +211,7 @@ defmodule RubberDuck.Tool.Security.SandboxTest do
         end)
 
       # Should either succeed or timeout, depending on system load
-      assert {:ok, :ok} = result2 or {:error, :timeout} = result2
+      assert result2 == {:ok, :ok} or result2 == {:error, :timeout}
     end
   end
 

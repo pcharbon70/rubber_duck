@@ -39,9 +39,9 @@ defmodule RubberDuck.Engines.Generation do
 
   require Logger
 
-  alias RubberDuck.LLM.Config
   alias RubberDuck.CoT.Manager, as: ConversationManager
   alias RubberDuck.CoT.Chains.GenerationChain
+  alias RubberDuck.Engine.InputValidator
 
   # Default configuration
   @default_max_context_items 10
@@ -108,8 +108,13 @@ defmodule RubberDuck.Engines.Generation do
     Logger.debug("Generation engine execute called with input: #{inspect(input)}")
 
     with {:ok, validated_input} <- validate_input(input) do
-      # Build CoT context
+      # Build CoT context with provider/model
       cot_context = %{
+        # Required LLM parameters
+        provider: validated_input.provider,
+        model: validated_input.model,
+        user_id: validated_input.user_id,
+        # Generation context
         query: validated_input.prompt,
         language: to_string(validated_input.language),
         context: %{
@@ -213,16 +218,19 @@ defmodule RubberDuck.Engines.Generation do
 
   defp validate_input(%{prompt: prompt, language: language} = input)
        when is_binary(prompt) and is_atom(language) do
-    validated = %{
-      prompt: prompt,
-      language: language,
-      context: Map.get(input, :context, %{}),
-      partial_code: Map.get(input, :partial_code),
-      style: Map.get(input, :style, :default),
-      constraints: Map.get(input, :constraints, %{})
-    }
-
-    {:ok, validated}
+    # Validate required LLM fields
+    case InputValidator.validate_llm_input(input, [:prompt, :language]) do
+      {:ok, validated} ->
+        # Add generation-specific fields
+        validated = Map.merge(validated, %{
+          partial_code: Map.get(input, :partial_code),
+          style: Map.get(input, :style, :default),
+          constraints: Map.get(input, :constraints, %{})
+        })
+        {:ok, validated}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp validate_input(_) do
@@ -582,20 +590,18 @@ defmodule RubberDuck.Engines.Generation do
     # Call LLM service to generate code
     Logger.debug("Calling LLM service for code generation")
 
-    # Get current provider and model from config
-    {provider, model} = get_provider_and_model_for_language(input.language)
-
     opts = [
-      provider: provider,
-      model: model,
+      provider: input.provider,  # Required from input
+      model: input.model,        # Required from input
       messages: [
         %{"role" => "system", "content" => get_system_prompt(input.language)},
         %{"role" => "user", "content" => prompt}
       ],
-      temperature: state.config[:temperature] || 0.7,
-      max_tokens: state.config[:max_tokens] || 4096,
+      temperature: input.temperature || state.config[:temperature] || 0.7,
+      max_tokens: input.max_tokens || state.config[:max_tokens] || 4096,
       # 4.5 minutes, slightly less than the 5 minute engine timeout
-      timeout: 280_000
+      timeout: 280_000,
+      user_id: input.user_id
     ]
 
     Logger.debug("LLM request options: #{inspect(opts)}")
@@ -657,17 +663,6 @@ defmodule RubberDuck.Engines.Generation do
     {:ok, result}
   end
 
-  defp get_provider_and_model_for_language(_language) do
-    # Get the current provider and model from configuration
-    case Config.get_current_provider_and_model() do
-      {provider, model} when not is_nil(provider) and not is_nil(model) ->
-        {provider, model}
-
-      _ ->
-        # Fallback to defaults if not configured
-        {:ollama, "codellama"}
-    end
-  end
 
   defp get_system_prompt(language) do
     """
