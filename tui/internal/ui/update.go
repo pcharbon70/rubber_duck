@@ -218,12 +218,54 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 		// Check if this is the conversation channel join response
 		if msg.Channel != nil && msg.Response != nil {
-			// Extract conversation_id from the response
+			// Extract conversation_id and history from the response
 			if respMap, ok := msg.Response.(map[string]any); ok {
 				if convID, ok := respMap["conversation_id"].(string); ok {
 					m.conversationID = convID
 					m.chatHeader.SetConversationID(convID)
-					m.statusBar = fmt.Sprintf("Joined conversation %s - Joining status channel...", convID)
+					m.statusBar = fmt.Sprintf("Joined conversation %s", convID)
+					
+					// Load conversation history if provided
+					if messages, ok := respMap["messages"].([]any); ok && len(messages) > 0 {
+						m.statusBar = fmt.Sprintf("Loading %d messages from conversation history...", len(messages))
+						
+						// Clear existing messages first
+						m.chat.ClearMessages()
+						
+						// Add each historical message
+						for _, msgData := range messages {
+							if msg, ok := msgData.(map[string]any); ok {
+								// Extract message fields
+								content, _ := msg["content"].(string)
+								role, _ := msg["role"].(string)
+								
+								// Map role to message type
+								var msgType MessageType
+								switch role {
+								case "user":
+									msgType = UserMessage
+								case "assistant":
+									msgType = AssistantMessage
+								case "system":
+									msgType = SystemMessage
+								default:
+									msgType = SystemMessage
+								}
+								
+								// Add message to chat
+								m.chat.AddMessage(msgType, content, role)
+							}
+						}
+						
+						// Update message count and token usage based on loaded messages
+						m.messageCount = m.chat.GetMessageCount()
+						m.tokenUsage = EstimateConversationTokens(m.chat.GetMessages())
+						m.chatHeader.SetMessageCount(m.messageCount)
+						m.chatHeader.SetTokenUsage(m.tokenUsage, m.tokenLimit)
+						m.statusBar = fmt.Sprintf("Loaded %d messages from history - Joining status channel...", len(messages))
+					} else {
+						m.statusBar = fmt.Sprintf("Joined conversation %s - Joining status channel...", convID)
+					}
 					
 					// Now join the status channel with the actual conversation ID
 					if statusClient, ok := m.statusClient.(*phoenix.StatusClient); ok {

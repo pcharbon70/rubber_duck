@@ -206,6 +206,13 @@ func (c *Chat) GetMessages() []ChatMessage {
 	return c.messages
 }
 
+// ClearMessages clears all messages from the chat
+func (c *Chat) ClearMessages() {
+	c.messages = []ChatMessage{}
+	c.viewport.SetContent(c.buildViewportContent())
+	c.viewport.GotoTop()
+}
+
 // GetMessageCount returns the number of messages
 func (c *Chat) GetMessageCount() int {
 	return len(c.messages)
