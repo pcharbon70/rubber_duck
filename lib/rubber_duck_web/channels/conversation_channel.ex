@@ -1,10 +1,9 @@
 defmodule RubberDuckWeb.ConversationChannel do
   @moduledoc """
-  Channel for handling AI conversations and LLM preference management.
+  Channel for handling AI conversations.
 
   This channel manages conversational interactions with the AI system,
-  maintaining context across messages, routing to appropriate engines,
-  and providing real-time management of user LLM preferences.
+  maintaining context across messages and routing to appropriate engines.
 
   ## Core Features
 
@@ -14,37 +13,18 @@ defmodule RubberDuckWeb.ConversationChannel do
   - Multi-turn conversation support
   - Engine routing based on message type
 
-  ### LLM Preference Management
-  - Per-user LLM provider/model configuration
-  - Real-time preference updates
-  - Usage statistics tracking
-  - Session-aware configuration resolution
-
   ## Message Types
 
-  ### Incoming - Conversation
+  ### Incoming
   - `"message"` - Send a message in the conversation
+    - Params: `%{"content" => "...", "llm_config" => %{"provider" => "openai", "model" => "gpt-4"}}`
   - `"new_conversation"` - Start a new conversation (clears context)
   - `"set_context"` - Update conversation context
   - `"typing"` - User typing indicator
   - `"get_history"` - Get conversation message history
     - Params: `%{"limit" => 100}` (optional, defaults to 100)
 
-  ### Incoming - LLM Preferences
-  - `"set_llm_preference"` - Set user's LLM provider/model preference
-    - Params: `%{"provider" => "openai", "model" => "gpt-4", "is_default" => true}`
-  - `"add_llm_model"` - Add a new LLM model to user's configuration
-    - Params: `%{"provider" => "anthropic", "model" => "claude-3-sonnet"}`
-  - `"get_llm_preferences"` - Get user's LLM preferences
-    - Params: `%{}`
-  - `"get_llm_default"` - Get user's default LLM configuration
-    - Params: `%{}`
-  - `"remove_llm_provider"` - Remove a provider from user's configuration
-    - Params: `%{"provider" => "openai"}`
-  - `"get_llm_usage_stats"` - Get usage statistics for user's LLM configurations
-    - Params: `%{}`
-
-  ### Outgoing - Conversation
+  ### Outgoing
   - `"response"` - AI response to a message
   - `"thinking"` - AI is processing indicator
   - `"error"` - Error occurred during processing
@@ -53,52 +33,25 @@ defmodule RubberDuckWeb.ConversationChannel do
   - `"history"` - Conversation history response
     - Payload: `%{conversation_id: "uuid", messages: [...], count: 50}`
 
-  ### Outgoing - LLM Preferences
-  - `"llm_preference_set"` - LLM preference was set successfully
-    - Data: `%{"provider" => "openai", "model" => "gpt-4", "is_default" => true, "config" => %{...}}`
-  - `"llm_preferences"` - User's LLM preferences
-    - Data: `%{"configs" => [...], "count" => 2}`
-  - `"llm_default"` - User's default LLM configuration
-    - Data: `%{"provider" => "openai", "model" => "gpt-4", "user_id" => "user_123"}`
-  - `"llm_provider_removed"` - Provider was removed from configuration
-    - Data: `%{"provider" => "openai", "removed_count" => 1}`
-  - `"llm_usage_stats"` - Usage statistics for user's LLM configurations
-    - Data: `%{"stats" => %{...}, "user_id" => "user_123"}`
-  - `"llm_error"` - Error occurred during LLM preference operation
-    - Data: `%{"operation" => "set_preference", "message" => "...", "details" => "..."}`
-
-  ## Session Integration
-
-  The channel automatically integrates with SessionContext to:
-  - Cache user LLM preferences for performance
-  - Track LLM usage statistics
-  - Update session-specific configurations
-  - Maintain preference consistency across WebSocket connections
-
   ## Error Handling
 
-  All LLM preference operations include comprehensive error handling:
-  - Invalid provider/model validation
-  - Database constraint violations
-  - User authorization checks
-  - Graceful degradation for missing configurations
+  The channel includes comprehensive error handling for:
+  - Missing provider/model configuration
+  - Invalid message formats
+  - Engine processing failures
+  - Timeout errors
 
   ## Usage Example
 
   ```javascript
-  // Set user's default LLM preference
-  channel.push("set_llm_preference", {
-    provider: "openai",
-    model: "gpt-4",
-    is_default: true
-  })
-
-  // Get current preferences
-  channel.push("get_llm_preferences", {})
-
-  // Remove a provider
-  channel.push("remove_llm_provider", {
-    provider: "anthropic"
+  // Send a message with LLM configuration
+  channel.push("message", {
+    content: "Hello, how are you?",
+    llm_config: {
+      provider: "openai",
+      model: "gpt-4",
+      temperature: 0.7
+    }
   })
   ```
   """
@@ -107,8 +60,6 @@ defmodule RubberDuckWeb.ConversationChannel do
   require Logger
 
   alias RubberDuck.Engine.Manager, as: EngineManager
-  alias RubberDuck.SessionContext
-  alias RubberDuck.UserConfig
   alias RubberDuck.Conversations
   alias RubberDuck.Status
   alias RubberDuck.LLM.ErrorHandler
@@ -124,7 +75,6 @@ defmodule RubberDuckWeb.ConversationChannel do
     # Use authenticated user_id from socket, fall back to generated ID for anonymous users
     user_id = socket.assigns[:user_id] || generate_user_id()
     session_id = generate_session_id()
-    preferences = Map.get(params, "preferences", %{})
 
     # Handle lobby specially - load or create user's latest conversation
     actual_conversation_id = if conversation_id == "lobby" && socket.assigns[:user_id] do
@@ -154,16 +104,9 @@ defmodule RubberDuckWeb.ConversationChannel do
       |> assign(:context, %{})
       |> assign(:user_id, user_id)
       |> assign(:session_id, session_id)
-      |> assign(:preferences, preferences)
 
-    # Create session context with user LLM preferences
-    case SessionContext.ensure_context(session_id, user_id, %{preferences: preferences}) do
-      {:ok, _context} ->
-        Logger.debug("Session context created for user #{user_id}")
-
-      {:error, reason} ->
-        Logger.warning("Failed to create session context: #{inspect(reason)}")
-    end
+    # Log session creation
+    Logger.debug("Session created for user #{user_id}")
 
     {:ok, %{conversation_id: actual_conversation_id, session_id: session_id}, socket}
   end
@@ -247,14 +190,8 @@ defmodule RubberDuckWeb.ConversationChannel do
         messages = add_message(messages, assistant_message)
         socket = assign(socket, :messages, messages)
 
-        # Record LLM usage for this session
-        if Map.has_key?(input.llm_config, :provider) and Map.has_key?(input.llm_config, :model) do
-          SessionContext.record_llm_usage(
-            socket.assigns.session_id,
-            input.llm_config.provider,
-            input.llm_config.model
-          )
-        end
+        # Log successful completion
+        Logger.debug("Message processed successfully")
 
         # Send completion status
         Status.with_timing(
@@ -301,6 +238,16 @@ defmodule RubberDuckWeb.ConversationChannel do
         {:noreply, socket}
     end
     end  # Close the if/else for provider/model check
+  end
+
+  @impl true
+  def handle_in("message", _params, socket) do
+    # Handle messages without content
+    push(socket, "error", %{
+      message: "Message content is required",
+      type: "invalid_message"
+    })
+    {:noreply, socket}
   end
 
   @impl true
@@ -354,159 +301,10 @@ defmodule RubberDuckWeb.ConversationChannel do
     {:noreply, socket}
   end
 
-  @impl true
-  def handle_in("set_llm_preference", %{"provider" => provider, "model" => model} = params, socket) do
-    user_id = socket.assigns.user_id
-    is_default = Map.get(params, "is_default", true)
 
-    case UserConfig.set_default(user_id, String.to_atom(provider), model) do
-      {:ok, config} ->
-        # Update session context if this is the default
-        if is_default do
-          SessionContext.update_preferences(socket.assigns.session_id, %{
-            llm_provider: String.to_atom(provider),
-            llm_model: model
-          })
-        end
 
-        push(socket, "llm_preference_set", %{
-          provider: provider,
-          model: model,
-          is_default: is_default,
-          config: %{
-            id: config.id,
-            usage_count: config.usage_count,
-            created_at: config.created_at
-          }
-        })
 
-      {:error, reason} ->
-        push(socket, "llm_error", %{
-          operation: "set_preference",
-          message: "Failed to set LLM preference",
-          details: format_llm_error(reason)
-        })
-    end
 
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_in("add_llm_model", %{"provider" => provider, "model" => model}, socket) do
-    user_id = socket.assigns.user_id
-
-    case UserConfig.add_model(user_id, String.to_atom(provider), model) do
-      {:ok, config} ->
-        push(socket, "llm_preference_set", %{
-          provider: provider,
-          model: model,
-          is_default: false,
-          config: %{
-            id: config.id,
-            usage_count: config.usage_count,
-            created_at: config.created_at
-          }
-        })
-
-      {:error, reason} ->
-        push(socket, "llm_error", %{
-          operation: "add_model",
-          message: "Failed to add LLM model",
-          details: format_llm_error(reason)
-        })
-    end
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_in("get_llm_preferences", _params, socket) do
-    user_id = socket.assigns.user_id
-
-    case UserConfig.get_all_configs(user_id) do
-      {:ok, configs} ->
-        formatted_configs =
-          Enum.map(configs, fn config ->
-            %{
-              id: config.id,
-              provider: to_string(config.provider),
-              model: config.model,
-              is_default: config.is_default,
-              usage_count: config.usage_count,
-              created_at: config.created_at,
-              updated_at: config.updated_at,
-              metadata: config.metadata
-            }
-          end)
-
-        push(socket, "llm_preferences", %{
-          configs: formatted_configs,
-          count: length(formatted_configs)
-        })
-
-      {:error, reason} ->
-        push(socket, "llm_error", %{
-          operation: "get_preferences",
-          message: "Failed to get LLM preferences",
-          details: format_llm_error(reason)
-        })
-    end
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_in("get_llm_default", _params, socket) do
-    user_id = socket.assigns.user_id
-
-    case UserConfig.get_default(user_id) do
-      {:ok, %{provider: provider, model: model}} ->
-        push(socket, "llm_default", %{
-          provider: to_string(provider),
-          model: model,
-          user_id: user_id
-        })
-
-      {:error, :not_found} ->
-        push(socket, "llm_default", %{
-          provider: nil,
-          model: nil,
-          user_id: user_id,
-          message: "No default LLM configuration found"
-        })
-
-      {:error, reason} ->
-        push(socket, "llm_error", %{
-          operation: "get_default",
-          message: "Failed to get default LLM configuration",
-          details: format_llm_error(reason)
-        })
-    end
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_in("remove_llm_provider", %{"provider" => provider}, socket) do
-    user_id = socket.assigns.user_id
-
-    case UserConfig.remove_provider(user_id, String.to_atom(provider)) do
-      {:ok, removed_count} ->
-        push(socket, "llm_provider_removed", %{
-          provider: provider,
-          removed_count: removed_count
-        })
-
-      {:error, reason} ->
-        push(socket, "llm_error", %{
-          operation: "remove_provider",
-          message: "Failed to remove LLM provider",
-          details: format_llm_error(reason)
-        })
-    end
-
-    {:noreply, socket}
-  end
   
   @impl true
   def handle_in("get_history", params, socket) do
@@ -545,37 +343,7 @@ defmodule RubberDuckWeb.ConversationChannel do
     {:noreply, socket}
   end
 
-  @impl true
-  def handle_in("get_llm_usage_stats", _params, socket) do
-    user_id = socket.assigns.user_id
 
-    case UserConfig.get_usage_stats(user_id) do
-      {:ok, stats} ->
-        push(socket, "llm_usage_stats", %{
-          stats: stats,
-          user_id: user_id
-        })
-
-      {:error, reason} ->
-        push(socket, "llm_error", %{
-          operation: "get_usage_stats",
-          message: "Failed to get usage statistics",
-          details: format_llm_error(reason)
-        })
-    end
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def terminate(_reason, socket) do
-    # Clean up session context when channel terminates
-    if Map.has_key?(socket.assigns, :session_id) do
-      SessionContext.remove_context(socket.assigns.session_id)
-    end
-
-    :ok
-  end
 
   # Private functions
 
@@ -587,7 +355,6 @@ defmodule RubberDuckWeb.ConversationChannel do
       messages: format_messages_for_context(socket.assigns.messages),
       custom_context: socket.assigns.context,
       message_count: length(socket.assigns.messages),
-      preferences: socket.assigns.preferences,
       timestamp: DateTime.utc_now()
     }
     |> Map.merge(Map.get(params, "context", %{}))
@@ -596,30 +363,33 @@ defmodule RubberDuckWeb.ConversationChannel do
   defp build_llm_config(socket, params) do
     defaults = %{
       temperature: 0.7,
-      max_tokens: 2000,
-      # Let engine decide
-      model: nil
+      max_tokens: 2000
     }
 
-    # Start with defaults and preferences
+    # Get llm_config from params and convert string keys to atoms
+    llm_params = Map.get(params, "llm_config", %{})
+    
+    # Convert string keys to atoms for provider and model
+    llm_config = if llm_params["provider"] && llm_params["model"] do
+      %{
+        provider: String.to_atom(llm_params["provider"]),
+        model: llm_params["model"]
+      }
+    else
+      %{}
+    end
+
+    # Merge with defaults and other parameters
     config =
       defaults
-      |> Map.merge(socket.assigns.preferences)
-      |> Map.merge(Map.get(params, "llm_config", %{}))
+      |> Map.merge(llm_config)
+      |> Map.merge(%{
+        temperature: llm_params["temperature"] || defaults.temperature,
+        max_tokens: llm_params["max_tokens"] || defaults.max_tokens
+      })
+      |> Map.put(:user_id, socket.assigns.user_id)
 
-    # Enhance with user's session context LLM config
-    case SessionContext.get_llm_config(socket.assigns.session_id) do
-      {:ok, %{provider: provider, model: model}} ->
-        config
-        |> Map.put(:provider, provider)
-        |> Map.put(:model, model)
-        |> Map.put(:user_id, socket.assigns.user_id)
-
-      {:error, _} ->
-        # Fall back to original config
-        config
-        |> Map.put(:user_id, socket.assigns.user_id)
-    end
+    config
   end
 
   defp format_messages_for_context(messages) do
@@ -686,27 +456,6 @@ defmodule RubberDuckWeb.ConversationChannel do
     "session_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}"
   end
 
-  defp format_llm_error(reason) do
-    case reason do
-      {:validation_error, field, message} ->
-        "Validation error on #{field}: #{message}"
-
-      {:invalid_provider, provider} ->
-        "Invalid provider: #{provider}"
-
-      {:invalid_model, model} ->
-        "Invalid model: #{model}"
-
-      {:user_not_found, user_id} ->
-        "User not found: #{user_id}"
-
-      {:database_error, details} ->
-        "Database error: #{inspect(details)}"
-
-      _ ->
-        "Unknown error: #{inspect(reason)}"
-    end
-  end
 
   defp ensure_conversation_exists(conversation_id, user_id, params) do
     # First get the user to use as actor

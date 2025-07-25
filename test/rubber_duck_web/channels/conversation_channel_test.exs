@@ -1,25 +1,38 @@
 defmodule RubberDuckWeb.ConversationChannelTest do
   use RubberDuckWeb.ChannelCase
+  import RubberDuck.AccountsFixtures
 
   alias RubberDuckWeb.ConversationChannel
 
   setup do
-    # Create a socket with authentication
-    {:ok, socket} = connect(RubberDuckWeb.UserSocket, %{"api_key" => "test_key"})
+    # Create a user for authentication
+    user = user_fixture()
+    
+    # Generate JWT token
+    {:ok, token, _claims} = AshAuthentication.Jwt.token_for_user(user)
+    
+    # Create a socket with JWT authentication
+    {:ok, socket} = connect(RubberDuckWeb.UserSocket, %{"token" => token})
 
+    # Generate a valid UUID for the conversation
+    conversation_id = Ecto.UUID.generate()
+    
     # Join the conversation channel
-    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:test_123")
+    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation_id}")
 
-    %{socket: socket}
+    %{socket: socket, user: user, conversation_id: conversation_id}
   end
 
   describe "message handling" do
     test "simple message receives response", %{socket: socket} do
       # Send a simple message
-      ref =
-        push(socket, "message", %{
-          "content" => "What is Elixir?"
-        })
+      push(socket, "message", %{
+        "content" => "What is Elixir?",
+        "llm_config" => %{
+          "provider" => "mock",
+          "model" => "test-model"
+        }
+      })
 
       # Should receive thinking indicator
       assert_push("thinking", %{})
@@ -35,17 +48,20 @@ defmodule RubberDuckWeb.ConversationChannelTest do
 
     test "message with context", %{socket: socket} do
       # Send message with additional context
-      ref =
-        push(socket, "message", %{
-          "content" => "Can you explain pattern matching in Elixir?",
-          "context" => %{
-            "skill_level" => "beginner",
-            "preferred_language" => "en"
-          },
-          "options" => %{
-            "include_examples" => true
-          }
-        })
+      push(socket, "message", %{
+        "content" => "Can you explain pattern matching in Elixir?",
+        "context" => %{
+          "skill_level" => "beginner",
+          "preferred_language" => "en"
+        },
+        "options" => %{
+          "include_examples" => true
+        },
+        "llm_config" => %{
+          "provider" => "mock",
+          "model" => "test-model"
+        }
+      })
 
       assert_push("thinking", %{})
 
@@ -56,12 +72,18 @@ defmodule RubberDuckWeb.ConversationChannelTest do
 
     test "multi-turn conversation maintains context", %{socket: socket} do
       # First message
-      push(socket, "message", %{"content" => "What is pattern matching?"})
+      push(socket, "message", %{
+        "content" => "What is pattern matching?",
+        "llm_config" => %{"provider" => "mock", "model" => "test-model"}
+      })
       assert_push("thinking", %{})
       assert_push("response", _, 10_000)
 
       # Follow-up message - should have context
-      push(socket, "message", %{"content" => "Can you show me an example?"})
+      push(socket, "message", %{
+        "content" => "Can you show me an example?",
+        "llm_config" => %{"provider" => "mock", "model" => "test-model"}
+      })
       assert_push("thinking", %{})
       assert_push("response", response, 10_000)
 
@@ -122,15 +144,13 @@ defmodule RubberDuckWeb.ConversationChannelTest do
       assert message
     end
 
-    test "handles engine errors", %{socket: socket} do
+    test "handles missing llm config", %{socket: socket} do
       # This will trigger an error due to missing LLM config
       push(socket, "message", %{"content" => "Test message"})
 
-      assert_push("thinking", %{})
-
-      # Expect error response
-      assert_push("error", %{message: message, details: _}, 10_000)
-      assert message =~ "error"
+      # Should receive error about missing configuration
+      assert_push("error", %{message: message, type: "llm_not_configured"})
+      assert message =~ "configure your LLM provider"
     end
   end
 end
