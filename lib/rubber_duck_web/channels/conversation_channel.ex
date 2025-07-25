@@ -27,6 +27,8 @@ defmodule RubberDuckWeb.ConversationChannel do
   - `"new_conversation"` - Start a new conversation (clears context)
   - `"set_context"` - Update conversation context
   - `"typing"` - User typing indicator
+  - `"get_history"` - Get conversation message history
+    - Params: `%{"limit" => 100}` (optional, defaults to 100)
 
   ### Incoming - LLM Preferences
   - `"set_llm_preference"` - Set user's LLM provider/model preference
@@ -48,6 +50,8 @@ defmodule RubberDuckWeb.ConversationChannel do
   - `"error"` - Error occurred during processing
   - `"context_updated"` - Context was updated
   - `"conversation_reset"` - Conversation was reset
+  - `"history"` - Conversation history response
+    - Payload: `%{conversation_id: "uuid", messages: [...], count: 50}`
 
   ### Outgoing - LLM Preferences
   - `"llm_preference_set"` - LLM preference was set successfully
@@ -479,6 +483,40 @@ defmodule RubberDuckWeb.ConversationChannel do
 
     {:noreply, socket}
   end
+  
+  @impl true
+  def handle_in("get_history", params, socket) do
+    conversation_id = socket.assigns.conversation_id
+    limit = Map.get(params, "limit", 100)
+    
+    case get_conversation_messages(conversation_id, limit) do
+      {:ok, messages} ->
+        # Format messages for client
+        formatted_messages = Enum.map(messages, fn msg ->
+          %{
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            metadata: msg.metadata || %{},
+            created_at: msg.inserted_at
+          }
+        end)
+        
+        push(socket, "history", %{
+          conversation_id: conversation_id,
+          messages: formatted_messages,
+          count: length(formatted_messages)
+        })
+        
+      {:error, reason} ->
+        push(socket, "error", %{
+          message: "Failed to load conversation history",
+          details: format_error(reason)
+        })
+    end
+    
+    {:noreply, socket}
+  end
 
   @impl true
   def handle_in("get_llm_usage_stats", _params, socket) do
@@ -692,6 +730,15 @@ defmodule RubberDuckWeb.ConversationChannel do
 
   defp get_user_for_actor(user_id) do
     RubberDuck.Accounts.get_user(user_id, authorize?: false)
+  end
+  
+  defp get_conversation_messages(conversation_id, limit) do
+    # Get the user_id from the socket assigns through the calling function
+    # For now, we'll use authorize?: false to allow access
+    Conversations.get_conversation_history(
+      %{conversation_id: conversation_id, limit: limit},
+      authorize?: false
+    )
   end
   
   defp load_or_create_user_conversation(user_id, params) do
