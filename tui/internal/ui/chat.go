@@ -60,8 +60,7 @@ func NewChat() *Chat {
 		focused:  true,
 	}
 	
-	// Add welcome message
-	chat.AddMessage(SystemMessage, "Welcome to RubberDuck TUI!\n\nConnecting to auth server...\nAuthentication is required to use the chat.\n\nIf you provided an API key, authentication will happen automatically.\nOtherwise, use /login <username> <password> to authenticate.", "system")
+	// No welcome message - keep chat clean on startup
 	
 	// Set initial viewport content
 	chat.viewport.SetContent(chat.buildViewportContent())
