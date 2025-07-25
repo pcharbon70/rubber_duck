@@ -53,7 +53,7 @@ defmodule RubberDuckWeb.ApiKeyChannel do
 
       case generate_api_key_for_user(user_id, expires_at) do
         {:ok, api_key, key_value} ->
-          push(socket, "key_generated", %{
+          push(socket, "api_key_generated", %{
             api_key: %{
               id: api_key.id,
               key: key_value,
@@ -61,12 +61,6 @@ defmodule RubberDuckWeb.ApiKeyChannel do
               created_at: DateTime.to_iso8601(api_key.inserted_at)
             },
             warning: "Store this key securely - it won't be shown again"
-          })
-
-          # Broadcast to other connected clients
-          broadcast_from(socket, "key_list_updated", %{
-            action: "generated",
-            api_key_id: api_key.id
           })
 
           Logger.info("API key generated for user #{user_id}: #{api_key.id}")
@@ -120,7 +114,7 @@ defmodule RubberDuckWeb.ApiKeyChannel do
             }
           end)
 
-        push(socket, "key_list", %{
+        push(socket, "api_key_list", %{
           api_keys: formatted_keys,
           page: page,
           per_page: per_page,
@@ -145,15 +139,9 @@ defmodule RubberDuckWeb.ApiKeyChannel do
 
     case revoke_user_api_key(user_id, api_key_id) do
       {:ok, _} ->
-        push(socket, "key_revoked", %{
+        push(socket, "api_key_revoked", %{
           api_key_id: api_key_id,
           message: "API key revoked successfully"
-        })
-
-        # Broadcast to other connected clients
-        broadcast_from(socket, "key_list_updated", %{
-          action: "revoked",
-          api_key_id: api_key_id
         })
 
         Logger.info("API key #{api_key_id} revoked by user #{user_id}")
