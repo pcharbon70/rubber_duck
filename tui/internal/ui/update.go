@@ -225,53 +225,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.chatHeader.SetConversationID(convID)
 					m.statusBar = fmt.Sprintf("Joined conversation %s", convID)
 					
-					// Load conversation history if provided
-					if messages, ok := respMap["messages"].([]any); ok && len(messages) > 0 {
-						m.statusBar = fmt.Sprintf("Loading %d messages from conversation history...", len(messages))
-						
-						// Clear existing messages first
-						m.chat.ClearMessages()
-						
-						// Add each historical message
-						for _, msgData := range messages {
-							if msg, ok := msgData.(map[string]any); ok {
-								// Extract message fields
-								content, _ := msg["content"].(string)
-								role, _ := msg["role"].(string)
-								
-								// Map role to message type
-								var msgType MessageType
-								switch role {
-								case "user":
-									msgType = UserMessage
-								case "assistant":
-									msgType = AssistantMessage
-								case "system":
-									msgType = SystemMessage
-								default:
-									msgType = SystemMessage
-								}
-								
-								// Add message to chat
-								m.chat.AddMessage(msgType, content, role)
-							}
-						}
-						
-						// Update message count and token usage based on loaded messages
-						m.messageCount = m.chat.GetMessageCount()
-						m.tokenUsage = EstimateConversationTokens(m.chat.GetMessages())
-						m.chatHeader.SetMessageCount(m.messageCount)
-						m.chatHeader.SetTokenUsage(m.tokenUsage, m.tokenLimit)
-						m.statusBar = fmt.Sprintf("Loaded %d messages from history - Joining status channel...", len(messages))
-					} else {
-						m.statusBar = fmt.Sprintf("Joined conversation %s - Joining status channel...", convID)
-					}
+					// Set system message to indicate we're loading history
+					m.systemMessage = "Loading conversation history..."
 					
-					// Now join the status channel with the actual conversation ID
-					if statusClient, ok := m.statusClient.(*phoenix.StatusClient); ok {
-						statusClient.SetSocket(m.socket)
-						statusClient.SetProgram(m.ProgramHolder())
-						return m, statusClient.JoinStatusChannel(m.conversationID)
+					// Request conversation history after joining
+					if client, ok := m.phoenixClient.(*phoenix.Client); ok {
+						// Request up to 100 messages from history
+						return m, tea.Batch(
+							client.GetConversationHistory(100),
+							// Join status channel after requesting history
+							func() tea.Msg {
+								if statusClient, ok := m.statusClient.(*phoenix.StatusClient); ok {
+									statusClient.SetSocket(m.socket)
+									statusClient.SetProgram(m.ProgramHolder())
+									return statusClient.JoinStatusChannel(m.conversationID)()
+								}
+								return nil
+							},
+						)
 					}
 				}
 			}
@@ -422,6 +393,55 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tokenUsage = 0
 		m.updateHeaderState()
 		m.statusBar = "Conversation reset"
+		return m, nil
+		
+	case phoenix.ConversationHistoryMsg:
+		// Clear system message
+		m.systemMessage = ""
+		
+		// Clear existing messages first
+		m.chat.ClearMessages()
+		
+		// Process history messages
+		if messages, ok := msg.Messages.([]any); ok && len(messages) > 0 {
+			m.statusBar = fmt.Sprintf("Loading %d messages from history...", len(messages))
+			
+			// Add each historical message
+			for _, msgData := range messages {
+				if msgMap, ok := msgData.(map[string]any); ok {
+					// Extract message fields
+					content, _ := msgMap["content"].(string)
+					role, _ := msgMap["role"].(string)
+					
+					// Map role to message type
+					var msgType MessageType
+					switch role {
+					case "user":
+						msgType = UserMessage
+					case "assistant":
+						msgType = AssistantMessage
+					case "system":
+						msgType = SystemMessage
+					default:
+						msgType = SystemMessage
+					}
+					
+					// Add message to chat
+					m.chat.AddMessage(msgType, content, role)
+				}
+			}
+			
+			// Update message count and token usage
+			m.messageCount = m.chat.GetMessageCount()
+			m.tokenUsage = EstimateConversationTokens(m.chat.GetMessages())
+			m.chatHeader.SetMessageCount(m.messageCount)
+			m.chatHeader.SetTokenUsage(m.tokenUsage, m.tokenLimit)
+			
+			m.statusBar = fmt.Sprintf("Loaded %d messages from history", len(messages))
+		} else {
+			m.statusBar = "No conversation history found"
+		}
+		
 		return m, nil
 		
 	// Phoenix streaming messages

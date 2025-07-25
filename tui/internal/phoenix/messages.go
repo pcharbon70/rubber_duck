@@ -53,6 +53,12 @@ type (
 		SessionInfo json.RawMessage
 	}
 	
+	ConversationHistoryMsg struct {
+		ConversationID any
+		Messages       any
+		Count          any
+	}
+	
 	// Streaming message types
 	StreamStartMsg struct{ ID string }
 	StreamDataMsg  struct {

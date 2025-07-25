@@ -185,6 +185,17 @@ func (c *Client) setupChannelHandlers(channel *phx.Channel) {
 		})
 	})
 	
+	// Handle conversation history
+	channel.On("history", func(payload any) {
+		if data, ok := payload.(map[string]any); ok {
+			c.program.Send(ConversationHistoryMsg{
+				ConversationID: data["conversation_id"],
+				Messages:       data["messages"],
+				Count:          data["count"],
+			})
+		}
+	})
+	
 	// Handle streaming responses
 	channel.On("stream:start", func(payload any) {
 		data := payload.(map[string]any)
@@ -282,6 +293,13 @@ func (c *Client) SendMessageWithConfig(content string, model string, temperature
 // StartNewConversation starts a new conversation
 func (c *Client) StartNewConversation() tea.Cmd {
 	return c.Push("new_conversation", map[string]any{})
+}
+
+// GetConversationHistory requests the conversation history
+func (c *Client) GetConversationHistory(limit int) tea.Cmd {
+	return c.Push("get_history", map[string]any{
+		"limit": limit,
+	})
 }
 
 // SetConversationContext updates the conversation context
