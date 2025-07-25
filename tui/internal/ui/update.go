@@ -37,7 +37,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 		// Global hotkeys
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c", "ctrl+q":
 			return m, tea.Quit
 		case "tab":
 			m.activePane = m.nextPane()
@@ -254,6 +254,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statusMessages.AddMessage(StatusCategoryError, "Not connected to conversation channel", nil)
 			return m, nil
 		}
+		// Check if provider and model are set
+		if m.currentProvider == "" || m.currentModel == "" {
+			m.statusMessages.AddMessage(StatusCategoryError, "Please set both provider and model before sending messages. Use /provider <name> and /model <name>", nil)
+			m.chat.AddMessage(SystemMessage, "Please configure your LLM:\n• Use /provider <name> to set the provider\n• Use /model <name> to set the model\n\nExample:\n/provider openai\n/model gpt-4", "system")
+			return m, nil
+		}
 		// Send message through Phoenix channel
 		m.chat.AddMessage(UserMessage, msg.Content, "user")
 		m.messageCount = m.chat.GetMessageCount()
@@ -263,11 +269,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateHeaderState()
 		m.statusBar = "Sending message..."
 		if client, ok := m.phoenixClient.(*phoenix.Client); ok && m.connected {
-			// Use the configured model if set
-			if m.currentModel != "" {
-				return m, client.SendMessageWithConfig(msg.Content, m.currentModel, m.temperature)
-			}
-			return m, client.SendMessage(msg.Content)
+			// Always send with provider and model configuration
+			return m, client.SendMessageWithConfig(msg.Content, m.currentModel, m.currentProvider, m.temperature)
 		}
 		// If not connected, show error
 		m.statusMessages.AddMessage(StatusCategoryError, "Not connected to server", nil)
@@ -845,7 +848,7 @@ func (m Model) buildHelpContent() string {
 	help += "Ctrl+H    - This help\n"
 	help += "Ctrl+R    - Reconnect to server\n"
 	help += "Tab       - Switch panes\n"
-	help += "Ctrl+C/q  - Quit\n\n"
+	help += "Ctrl+C/Ctrl+Q - Quit\n\n"
 	
 	help += "NAVIGATION:\n"
 	help += "━━━━━━━━━━━━━━━━━━━━━\n"
@@ -1001,71 +1004,27 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 		}
 		m.statusBar = "Not connected to server"
 	
-	// Model selection commands
-	case "model_default":
-		m.currentModel = ""
-		m.currentProvider = ""
-		m.updateHeaderState()
-		m.statusBar = m.buildStatusBar()
-		// Clear conversation context preference
-		if client, ok := m.phoenixClient.(*phoenix.Client); ok && m.connected {
-			return m, client.SetConversationModel("", "")
-		}
-	case "model_gpt4":
-		m.currentModel = "gpt-4"
-		m.currentProvider = "openai"
-		m.updateHeaderState()
-		m.statusBar = m.buildStatusBar()
-		if client, ok := m.phoenixClient.(*phoenix.Client); ok && m.connected {
-			return m, client.SetConversationModel("gpt-4", "openai")
-		}
-	case "model_gpt35":
-		m.currentModel = "gpt-3.5-turbo"
-		m.currentProvider = "openai"
-		m.updateHeaderState()
-		m.statusBar = m.buildStatusBar()
-		if client, ok := m.phoenixClient.(*phoenix.Client); ok && m.connected {
-			return m, client.SetConversationModel("gpt-3.5-turbo", "openai")
-		}
-	case "model_claude_opus":
-		m.currentModel = "claude-3-opus"
-		m.currentProvider = "anthropic"
-		m.updateHeaderState()
-		m.statusBar = m.buildStatusBar()
-		if client, ok := m.phoenixClient.(*phoenix.Client); ok && m.connected {
-			return m, client.SetConversationModel("claude-3-opus", "anthropic")
-		}
-	case "model_claude_sonnet":
-		m.currentModel = "claude-3-sonnet"
-		m.currentProvider = "anthropic"
-		m.updateHeaderState()
-		m.statusBar = m.buildStatusBar()
-		if client, ok := m.phoenixClient.(*phoenix.Client); ok && m.connected {
-			return m, client.SetConversationModel("claude-3-sonnet", "anthropic")
-		}
-	case "model_llama2":
-		m.currentModel = "llama2"
-		m.currentProvider = "ollama"
-		m.updateHeaderState()
-		m.statusBar = m.buildStatusBar()
-		if client, ok := m.phoenixClient.(*phoenix.Client); ok && m.connected {
-			return m, client.SetConversationModel("llama2", "ollama")
-		}
-	case "model_mistral":
-		m.currentModel = "mistral"
-		m.currentProvider = "ollama"
-		m.updateHeaderState()
-		m.statusBar = m.buildStatusBar()
-		if client, ok := m.phoenixClient.(*phoenix.Client); ok && m.connected {
-			return m, client.SetConversationModel("mistral", "ollama")
-		}
-	case "model_codellama":
-		m.currentModel = "codellama"
-		m.currentProvider = "ollama"
-		m.updateHeaderState()
-		m.statusBar = m.buildStatusBar()
-		if client, ok := m.phoenixClient.(*phoenix.Client); ok && m.connected {
-			return m, client.SetConversationModel("codellama", "ollama")
+	// Model command
+	case "set_model":
+		if args := msg.Args; args != nil {
+			model := args["model"]
+			if model != "" {
+				// If model is "default" or "none", clear the model
+				if model == "default" || model == "none" {
+					m.currentModel = ""
+					m.currentProvider = ""
+					m.updateHeaderState()
+					m.statusBar = "Model cleared - using server default"
+					m.chat.AddMessage(SystemMessage, "Model preference cleared - using server default", "system")
+				} else {
+					m.currentModel = model
+					// Don't change provider if already set
+					m.tokenLimit = GetModelTokenLimit(model)
+					m.updateHeaderState()
+					m.statusBar = fmt.Sprintf("Model set to: %s", model)
+					m.chat.AddMessage(SystemMessage, fmt.Sprintf("Model set to: %s", model), "system")
+				}
+			}
 		}
 		
 	// Authentication commands
@@ -1136,11 +1095,6 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 				m.updateHeaderState()
 				m.statusBar = fmt.Sprintf("Provider set to: %s", provider)
 				m.chat.AddMessage(SystemMessage, fmt.Sprintf("Provider set to: %s", provider), "system")
-				
-				// Update conversation context with new provider
-				if client, ok := m.phoenixClient.(*phoenix.Client); ok && m.connected && m.channel != nil {
-					return m, client.SetConversationModel(m.currentModel, provider)
-				}
 			}
 		}
 		
@@ -1155,11 +1109,6 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 				m.updateHeaderState()
 				m.statusBar = fmt.Sprintf("Model set to: %s (%s)", model, provider)
 				m.chat.AddMessage(SystemMessage, fmt.Sprintf("Model set to: %s\nProvider set to: %s", model, provider), "system")
-				
-				// Update conversation context
-				if client, ok := m.phoenixClient.(*phoenix.Client); ok && m.connected && m.channel != nil {
-					return m, client.SetConversationModel(model, provider)
-				}
 			}
 		}
 	}

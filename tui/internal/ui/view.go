@@ -36,7 +36,7 @@ func (m Model) renderBase() string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("62"))
 	
-	// Use full height (no status bar)
+	// Use full height
 	contentHeight := m.height
 	
 	// Build the layout based on visible components
@@ -70,37 +70,35 @@ func (m Model) renderBase() string {
 		chatWidth -= 42 // 40 + 2 for borders
 	}
 	
-	// Build chat content with header, status messages at top, conversation at bottom
+	// Build chat content with status messages at top, conversation at bottom
 	// Calculate heights for chat and status sections
-	headerHeight := 3 // chat header takes 3 lines
 	statusBarHeight := 1 // status bar takes 1 line
-	availableHeight := contentHeight - headerHeight - statusBarHeight - 2 // -2 for main borders
+	// Account for outer container border (2 lines) and reduce by 2 more for visibility
+	availableHeight := contentHeight - statusBarHeight - 5
 	
-	// Status messages take 30% of available conversation area
-	statusHeight := int(float64(availableHeight) * 0.3)
+	// Status messages take 35% of available conversation area
+	statusHeight := int(float64(availableHeight) * 0.35)
 	if statusHeight < 5 {
 		statusHeight = 5 // Minimum height
 	}
 	chatHeight := availableHeight - statusHeight
 	
 	// Update component sizes
-	m.statusMessages.SetSize(chatWidth-4, statusHeight-2) // -4 for borders, -2 for height borders
-	// Update chat size to account for borders
-	m.chat.SetSize(chatWidth-4, chatHeight-2) // -4 for borders, -2 for height borders
+	m.statusMessages.SetSize(chatWidth-4, statusHeight) // -4 for horizontal padding
+	// Update chat size
+	m.chat.SetSize(chatWidth-4, chatHeight) // -4 for horizontal padding
 	
 	// Create styles for rounded borders
 	statusBorderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
 		Width(chatWidth - 2).
-		Height(statusHeight).
 		Padding(0, 1)
 		
 	chatBorderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("62")).
 		Width(chatWidth - 2).
-		Height(chatHeight).
 		Padding(0, 1)
 	
 	// Create mini status bar as separate component
@@ -115,15 +113,14 @@ func (m Model) renderBase() string {
 	
 	chatContent := lipgloss.JoinVertical(
 		lipgloss.Left,
-		m.chatHeader.View(),
-		statusBar,        // Status bar now between header and status messages
+		statusBar,        // Status bar at the top
 		statusSection,
 		chatSection,
 	)
 	
 	chat := chatStyle.
 		Width(chatWidth).
-		Height(contentHeight).
+		Height(contentHeight - 2).
 		Render(chatContent)
 	components = append(components, chat)
 	
@@ -140,8 +137,10 @@ func (m Model) renderBase() string {
 		components = append(components, editor)
 	}
 	
-	// Join components horizontally and return (no status bar)
-	return lipgloss.JoinHorizontal(lipgloss.Top, components...)
+	// Join components horizontally with top margin to ensure visibility
+	content := lipgloss.JoinHorizontal(lipgloss.Top, components...)
+	// Add top margin of 2 to push content down and make status bar visible
+	return lipgloss.NewStyle().MarginTop(2).Render(content)
 }
 
 // renderMiniStatusBar renders a compact status bar for the status messages area

@@ -279,14 +279,15 @@ func (c *Client) SendMessage(content string) tea.Cmd {
 }
 
 // SendMessageWithConfig sends a message with LLM configuration
-func (c *Client) SendMessageWithConfig(content string, model string, temperature float64) tea.Cmd {
+func (c *Client) SendMessageWithConfig(content string, model string, provider string, temperature float64) tea.Cmd {
 	payload := map[string]any{
 		"content": content,
 	}
 	
-	// Add llm_config if model is specified
-	if model != "" {
+	// Add llm_config with both provider and model
+	if model != "" && provider != "" {
 		llmConfig := map[string]any{
+			"provider":    provider,
 			"model":       model,
 			"temperature": temperature,
 		}

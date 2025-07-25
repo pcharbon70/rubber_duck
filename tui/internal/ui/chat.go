@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -37,6 +38,7 @@ type Chat struct {
 	width    int
 	height   int
 	focused  bool
+	renderer *glamour.TermRenderer
 }
 
 // NewChat creates a new chat component
@@ -58,6 +60,7 @@ func NewChat() *Chat {
 		width:    80,
 		height:   24,
 		focused:  true,
+		renderer: nil, // Defer renderer creation
 	}
 	
 	// No welcome message - keep chat clean on startup
@@ -170,6 +173,11 @@ func (c *Chat) SetSize(width, height int) {
 	c.viewport.Width = width
 	c.viewport.Height = height - 7 // Leave room for input area and title
 	c.input.SetWidth(width)
+	
+	// Clear renderer to force recreation with new width
+	if c.renderer != nil && c.width != width {
+		c.renderer = nil
+	}
 }
 
 // Focus sets the focus state
@@ -218,8 +226,20 @@ func (c *Chat) GetMessageCount() int {
 	return len(c.messages)
 }
 
+// ensureRenderer lazily initializes the glamour renderer
+func (c *Chat) ensureRenderer() {
+	if c.renderer == nil && c.width > 4 {
+		// Use "dark" style as default for faster initialization
+		// This avoids the slow auto-detection on startup
+		c.renderer, _ = glamour.NewTermRenderer(
+			glamour.WithStylePath("dark"),
+			glamour.WithWordWrap(c.width - 4),
+		)
+	}
+}
+
 // buildViewportContent builds the formatted message history
-func (c Chat) buildViewportContent() string {
+func (c *Chat) buildViewportContent() string {
 	if len(c.messages) == 0 {
 		return lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240")).
@@ -248,6 +268,19 @@ func (c Chat) buildViewportContent() string {
 		
 	timeStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240"))
+	
+	// Message content style with word wrapping
+	// Account for viewport width minus some padding
+	wrapWidth := c.viewport.Width
+	if wrapWidth <= 0 {
+		wrapWidth = c.width
+	}
+	if wrapWidth > 4 {
+		wrapWidth -= 4 // Leave some padding
+	}
+	
+	messageStyle := lipgloss.NewStyle().
+		Width(wrapWidth)
 
 	for i, msg := range c.messages {
 		if i > 0 {
@@ -283,7 +316,34 @@ func (c Chat) buildViewportContent() string {
 		
 		content.WriteString(header)
 		content.WriteString("\n")
-		content.WriteString(msg.Content)
+		
+		// Render message content
+		var renderedContent string
+		
+		// Use markdown rendering for assistant messages
+		if msg.Type == AssistantMessage {
+			// Ensure renderer is initialized
+			c.ensureRenderer()
+			if c.renderer != nil {
+				// Try to render as markdown
+				markdownContent, err := c.renderer.Render(msg.Content)
+				if err == nil {
+					// Remove trailing newlines from glamour output
+					renderedContent = strings.TrimRight(markdownContent, "\n")
+				} else {
+					// Fallback to plain text with wrapping
+					renderedContent = messageStyle.Render(msg.Content)
+				}
+			} else {
+				// No renderer available, use plain text
+				renderedContent = messageStyle.Render(msg.Content)
+			}
+		} else {
+			// For user, system, and error messages, use plain text with wrapping
+			renderedContent = messageStyle.Render(msg.Content)
+		}
+		
+		content.WriteString(renderedContent)
 	}
 	
 	return content.String()
@@ -309,67 +369,37 @@ func (c Chat) handleSlashCommand(command string) tea.Cmd {
 	case "model", "m":
 		if len(parts) > 1 {
 			// Handle model selection with optional provider
-			modelName := strings.ToLower(parts[1])
-			var provider string
-			if len(parts) > 2 {
-				provider = strings.Join(parts[2:], " ")
-			}
+			modelName := strings.Join(parts[1:], " ")
 			
-			// Check if we have a provider specified
-			if provider != "" {
-				// Use custom model with provider
+			// Check if provider is included (format: "model provider")
+			modelParts := strings.Fields(modelName)
+			if len(modelParts) > 1 {
+				// Model and provider specified
+				model := modelParts[0]
+				provider := strings.Join(modelParts[1:], " ")
 				return func() tea.Msg {
 					return ExecuteCommandMsg{
 						Command: "set_model_with_provider",
 						Args: map[string]string{
-							"model":    modelName,
+							"model":    model,
 							"provider": provider,
 						},
 					}
 				}
-			}
-			
-			// Otherwise use predefined model commands
-			switch modelName {
-			case "default", "none":
+			} else {
+				// Just model specified
 				return func() tea.Msg {
-					return ExecuteCommandMsg{Command: "model_default"}
+					return ExecuteCommandMsg{
+						Command: "set_model",
+						Args: map[string]string{
+							"model": modelName,
+						},
+					}
 				}
-			case "gpt4", "gpt-4":
-				return func() tea.Msg {
-					return ExecuteCommandMsg{Command: "model_gpt4"}
-				}
-			case "gpt3", "gpt-3", "gpt3.5", "gpt-3.5", "gpt35":
-				return func() tea.Msg {
-					return ExecuteCommandMsg{Command: "model_gpt35"}
-				}
-			case "claude", "opus", "claude-opus", "claude3-opus":
-				return func() tea.Msg {
-					return ExecuteCommandMsg{Command: "model_claude_opus"}
-				}
-			case "sonnet", "claude-sonnet", "claude3-sonnet":
-				return func() tea.Msg {
-					return ExecuteCommandMsg{Command: "model_claude_sonnet"}
-				}
-			case "llama", "llama2":
-				return func() tea.Msg {
-					return ExecuteCommandMsg{Command: "model_llama2"}
-				}
-			case "mistral":
-				return func() tea.Msg {
-					return ExecuteCommandMsg{Command: "model_mistral"}
-				}
-			case "codellama", "code-llama":
-				return func() tea.Msg {
-					return ExecuteCommandMsg{Command: "model_codellama"}
-				}
-			default:
-				// Show error message - add to chat
-				c.AddMessage(SystemMessage, fmt.Sprintf("Unknown model: %s\nAvailable: default, gpt4, gpt3.5, claude-opus, claude-sonnet, llama2, mistral, codellama", modelName), "system")
 			}
 		} else {
-			// Show current model - add to chat
-			c.AddMessage(SystemMessage, "Usage: /model <name> [provider]\nExample: /model gpt4\nExample: /model gpt4 azure\nAvailable: default, gpt4, gpt3.5, claude-opus, claude-sonnet, llama2, mistral, codellama", "system")
+			// Show usage - add to chat
+			c.AddMessage(SystemMessage, "Usage: /model <name> [provider]\nExample: /model gpt-4\nExample: /model claude-3-opus anthropic", "system")
 		}
 		
 	case "provider", "p":
