@@ -215,6 +215,15 @@ func (m Model) renderMiniStatusBar(width int) string {
 		components = append(components, modelStatus)
 	}
 	
+	// Add system message if present
+	if m.systemMessage != "" {
+		sysMsg := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("220")). // Yellow for visibility
+			Bold(true).
+			Render(m.systemMessage)
+		components = append(components, sysMsg)
+	}
+	
 	// Join components with separator
 	content := strings.Join(components, "  |  ")
 	

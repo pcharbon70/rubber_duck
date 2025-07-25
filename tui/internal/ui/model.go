@@ -69,6 +69,7 @@ type Model struct {
 	
 	// Status bar
 	statusBar    string
+	systemMessage string // System message to display in status bar
 	
 	// Error handling
 	errorHandler *ErrorHandler
@@ -159,6 +160,7 @@ func NewModel() *Model {
 		showFileTree: false,    // Hidden by default
 		showEditor:   false,    // Hidden by default
 		statusBar:    "Welcome to RubberDuck TUI | Connecting to auth server...",
+		systemMessage: "", // Start with empty system message
 		errorHandler: errorHandler,
 		modal:        NewModal(),
 		commandPalette: NewCommandPalette(),
@@ -283,4 +285,14 @@ func (m *Model) GetStatusClient() interface{} {
 // GetApiKeyClient returns the ApiKey client interface
 func (m *Model) GetApiKeyClient() interface{} {
 	return m.apiKeyClient
+}
+
+// SetSystemMessage sets the system message to display in the status bar
+func (m *Model) SetSystemMessage(message string) {
+	m.systemMessage = message
+}
+
+// ClearSystemMessage clears the system message from the status bar
+func (m *Model) ClearSystemMessage() {
+	m.systemMessage = ""
 }
