@@ -96,6 +96,12 @@ defmodule RubberDuckWeb.ApiKeyChannel do
   end
 
   @impl true
+  def handle_in("generate_api_key", params, socket) do
+    # Delegate to the existing generate handler
+    handle_in("generate", params, socket)
+  end
+
+  @impl true
   def handle_in("list", params, socket) do
     user_id = socket.assigns.user_id
 
