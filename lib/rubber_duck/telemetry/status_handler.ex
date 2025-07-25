@@ -91,14 +91,17 @@ defmodule RubberDuck.Telemetry.StatusHandler do
   end
 
   def handle_event([:rubber_duck, :status, :broadcaster, :queue_depth], measurements, _metadata, _config) do
-    if measurements.depth > 1000 do
+    # The broadcaster sends 'size' not 'depth'
+    queue_size = measurements[:size] || 0
+    
+    if queue_size > 1000 do
       Logger.warning("Status broadcaster queue depth high",
-        depth: measurements.depth,
+        depth: queue_size,
         processing_rate: measurements[:processing_rate]
       )
     else
       Logger.debug("Status broadcaster queue depth",
-        depth: measurements.depth
+        depth: queue_size
       )
     end
 
