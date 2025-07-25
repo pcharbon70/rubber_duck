@@ -50,13 +50,10 @@ defmodule RubberDuckWeb.ApiKeyChannel do
     if check_generation_rate_limit(socket) do
       # Parse expiration time
       expires_at = parse_expiration(params["expires_at"])
-      
-      Logger.info("About to generate API key for user #{user_id}, expires_at: #{inspect(expires_at)}")
 
       case generate_api_key_for_user(user_id, expires_at) do
         {:ok, api_key, key_value} ->
-          Logger.info("Successfully generated API key: #{api_key.id}, key_value present: #{not is_nil(key_value)}")
-          payload = %{
+          push(socket, "api_key_generated", %{
             api_key: %{
               id: api_key.id,
               key: key_value,
@@ -64,13 +61,7 @@ defmodule RubberDuckWeb.ApiKeyChannel do
               created_at: DateTime.to_iso8601(api_key.inserted_at)
             },
             warning: "Store this key securely - it won't be shown again"
-          }
-          
-          Logger.debug("Pushing api_key_generated event to client with payload: #{inspect(payload)}")
-          Logger.info("Pushing api_key_generated event for key #{api_key.id}")
-          
-          result = push(socket, "api_key_generated", payload)
-          Logger.info("Push result: #{inspect(result)}")
+          })
 
           Logger.info("API key generated for user #{user_id}: #{api_key.id}")
 
@@ -111,14 +102,13 @@ defmodule RubberDuckWeb.ApiKeyChannel do
     per_page = params["per_page"] || 20
 
     case list_user_api_keys(user_id, page: page, per_page: per_page) do
-      {:ok, api_keys} ->
+      {:ok, %{results: api_keys} = page_info} ->
         formatted_keys =
           Enum.map(api_keys, fn key ->
             %{
               id: key.id,
               expires_at: DateTime.to_iso8601(key.expires_at),
               valid: key.valid,
-              last_used_at: key.last_used_at && DateTime.to_iso8601(key.last_used_at),
               created_at: DateTime.to_iso8601(key.inserted_at)
             }
           end)
@@ -127,8 +117,8 @@ defmodule RubberDuckWeb.ApiKeyChannel do
           api_keys: formatted_keys,
           page: page,
           per_page: per_page,
-          # TODO: Get actual total from pagination
-          total_count: length(formatted_keys)
+          # Get actual count if available
+          total_count: page_info.count || length(formatted_keys)
         })
 
       {:error, reason} ->
@@ -147,7 +137,7 @@ defmodule RubberDuckWeb.ApiKeyChannel do
     user_id = socket.assigns.user_id
 
     case revoke_user_api_key(user_id, api_key_id) do
-      {:ok, _} ->
+      :ok ->
         push(socket, "api_key_revoked", %{
           api_key_id: api_key_id,
           message: "API key revoked successfully"
@@ -176,10 +166,46 @@ defmodule RubberDuckWeb.ApiKeyChannel do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_in("validate", %{"api_key" => api_key}, socket) do
+    case RubberDuck.Accounts.validate_api_key(api_key) do
+      {:ok, user} ->
+        push(socket, "api_key_valid", %{
+          valid: true,
+          user_id: user.id,
+          username: user.username
+        })
+
+      {:error, :invalid_api_key} ->
+        push(socket, "api_key_valid", %{
+          valid: false,
+          reason: "Invalid API key"
+        })
+
+      {:error, :expired_api_key} ->
+        push(socket, "api_key_valid", %{
+          valid: false,
+          reason: "API key has expired"
+        })
+
+      {:error, _} ->
+        push(socket, "error", %{
+          operation: "validate",
+          message: "Failed to validate API key"
+        })
+    end
+
+    {:noreply, socket}
+  end
+
   # Private helper functions
 
   defp generate_api_key_for_user(user_id, expires_at) do
-    Logger.info("generate_api_key_for_user called with user_id: #{user_id}, expires_at: #{inspect(expires_at)}")
+    # Generate the plaintext API key first
+    plaintext_key = "rubberduck_" <> Base.encode64(:crypto.strong_rand_bytes(32), padding: false)
+    
+    # Hash it the same way AshAuthentication does
+    api_key_hash = :crypto.hash(:sha256, plaintext_key)
     
     # Get the user to use as actor
     actor = case RubberDuck.Accounts.get_user(user_id, authorize?: false) do
@@ -187,36 +213,24 @@ defmodule RubberDuckWeb.ApiKeyChannel do
       _ -> nil
     end
     
-    result = Ash.create(ApiKey, %{
+    # Create the API key directly with the hash
+    # Note: We're bypassing the GenerateApiKey change because it doesn't expose the plaintext
+    case Ash.create(ApiKey, %{
       user_id: user_id,
-      expires_at: expires_at
-    }, actor: actor)
-    
-    Logger.info("Ash.create result: #{inspect(result)}")
-    
-    case result do
+      expires_at: expires_at,
+      api_key_hash: api_key_hash
+    }, action: :create_with_hash, actor: actor) do
       {:ok, api_key} ->
-        Logger.info("API key created successfully with id: #{api_key.id}")
-        Logger.info("API key metadata: #{inspect(api_key.__metadata__)}")
-        
-        # The actual API key value should be in the metadata or context
-        # For now, let's generate a placeholder and note that the actual implementation
-        # will depend on how AshAuthentication.Strategy.ApiKey.GenerateApiKey works
-        key_value =
-          Map.get(api_key.__metadata__, :api_key) ||
-            Map.get(api_key.__metadata__, :generated_api_key) ||
-            "rubberduck_" <> Base.encode64(:crypto.strong_rand_bytes(32), padding: false)
-
-        Logger.info("Key value determined: #{String.slice(key_value, 0, 20)}...")
-        {:ok, api_key, key_value}
+        {:ok, api_key, plaintext_key}
 
       error ->
-        Logger.error("Failed to create API key: #{inspect(error)}")
         error
     end
   end
 
   defp list_user_api_keys(user_id, opts) do
+    require Ash.Query
+    
     page = Keyword.get(opts, :page, 1)
     per_page = Keyword.get(opts, :per_page, 20)
 
@@ -226,28 +240,34 @@ defmodule RubberDuckWeb.ApiKeyChannel do
       _ -> nil
     end
 
-    Ash.read(ApiKey,
-      filter: [user_id: user_id],
-      sort: [inserted_at: :desc],
-      load: [:valid],
-      page: [limit: per_page, offset: (page - 1) * per_page],
-      actor: actor
-    )
+    ApiKey
+    |> Ash.Query.filter(user_id == ^user_id)
+    |> Ash.Query.sort(inserted_at: :desc)
+    |> Ash.Query.load([:valid])
+    |> Ash.Query.page(limit: per_page, offset: (page - 1) * per_page)
+    |> Ash.read(actor: actor)
   end
 
   defp revoke_user_api_key(user_id, api_key_id) do
+    require Ash.Query
+    
     # Get the user to use as actor
     actor = case RubberDuck.Accounts.get_user(user_id, authorize?: false) do
       {:ok, user} -> user
       _ -> nil
     end
 
-    case Ash.get(ApiKey, api_key_id, filter: [user_id: user_id], actor: actor) do
+    # Build query to find the API key
+    query = 
+      ApiKey
+      |> Ash.Query.filter(id == ^api_key_id and user_id == ^user_id)
+      
+    case Ash.read_one(query, actor: actor) do
+      {:ok, nil} ->
+        {:error, "API key not found or unauthorized"}
+        
       {:ok, api_key} ->
         Ash.destroy(api_key, actor: actor)
-
-      {:error, %Ash.Error.Query.NotFound{}} ->
-        {:error, "API key not found or unauthorized"}
 
       error ->
         error
