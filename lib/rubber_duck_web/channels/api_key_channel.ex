@@ -179,11 +179,20 @@ defmodule RubberDuckWeb.ApiKeyChannel do
   # Private helper functions
 
   defp generate_api_key_for_user(user_id, expires_at) do
-    case Ash.create(ApiKey, %{
-           user_id: user_id,
-           expires_at: expires_at
-         }) do
+    Logger.info("generate_api_key_for_user called with user_id: #{user_id}, expires_at: #{inspect(expires_at)}")
+    
+    result = Ash.create(ApiKey, %{
+      user_id: user_id,
+      expires_at: expires_at
+    })
+    
+    Logger.info("Ash.create result: #{inspect(result)}")
+    
+    case result do
       {:ok, api_key} ->
+        Logger.info("API key created successfully with id: #{api_key.id}")
+        Logger.info("API key metadata: #{inspect(api_key.__metadata__)}")
+        
         # The actual API key value should be in the metadata or context
         # For now, let's generate a placeholder and note that the actual implementation
         # will depend on how AshAuthentication.Strategy.ApiKey.GenerateApiKey works
@@ -192,9 +201,11 @@ defmodule RubberDuckWeb.ApiKeyChannel do
             Map.get(api_key.__metadata__, :generated_api_key) ||
             "rubberduck_" <> Base.encode64(:crypto.strong_rand_bytes(32), padding: false)
 
+        Logger.info("Key value determined: #{String.slice(key_value, 0, 20)}...")
         {:ok, api_key, key_value}
 
       error ->
+        Logger.error("Failed to create API key: #{inspect(error)}")
         error
     end
   end
