@@ -257,7 +257,7 @@ func (a *ApiKeyClient) GenerateAPIKey(params map[string]any) tea.Cmd {
 			if a.program != nil {
 				a.program.Send(APIKeyErrorMsg{
 					Operation: "generate",
-					Message:   "Generate API key timeout",
+					Message:   "Connection timeout for event: generate_api_key",
 					Details:   "",
 				})
 			}
@@ -304,7 +304,7 @@ func (a *ApiKeyClient) ListAPIKeys() tea.Cmd {
 			if a.program != nil {
 				a.program.Send(APIKeyErrorMsg{
 					Operation: "list",
-					Message:   "List API keys timeout",
+					Message:   "Connection timeout for event: list_api_keys",
 					Details:   "",
 				})
 			}
@@ -355,7 +355,7 @@ func (a *ApiKeyClient) RevokeAPIKey(keyID string) tea.Cmd {
 			if a.program != nil {
 				a.program.Send(APIKeyErrorMsg{
 					Operation: "revoke",
-					Message:   "Revoke API key timeout",
+					Message:   "Connection timeout for event: revoke_api_key",
 					Details:   "",
 				})
 			}

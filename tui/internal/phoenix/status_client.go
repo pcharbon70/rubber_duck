@@ -175,7 +175,7 @@ func (s *StatusClient) SubscribeCategories(categories []string) tea.Cmd {
 		push.Receive("timeout", func(response any) {
 			s.program.Send(ErrorMsg{
 				Component: "StatusClient",
-				Err:       fmt.Errorf("subscribe timeout"),
+				Err:       fmt.Errorf("Connection timeout for event: subscribe_categories"),
 			})
 		})
 		
@@ -230,7 +230,7 @@ func (s *StatusClient) UnsubscribeCategories(categories []string) tea.Cmd {
 		push.Receive("timeout", func(response any) {
 			s.program.Send(ErrorMsg{
 				Component: "StatusClient",
-				Err:       fmt.Errorf("unsubscribe timeout"),
+				Err:       fmt.Errorf("Connection timeout for event: unsubscribe_categories"),
 			})
 		})
 		
@@ -292,7 +292,7 @@ func (s *StatusClient) GetSubscriptions() tea.Cmd {
 		push.Receive("timeout", func(response any) {
 			s.program.Send(ErrorMsg{
 				Component: "StatusClient",
-				Err:       fmt.Errorf("get subscriptions timeout"),
+				Err:       fmt.Errorf("Connection timeout for event: get_subscriptions"),
 			})
 		})
 		
