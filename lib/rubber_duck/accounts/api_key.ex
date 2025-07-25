@@ -27,17 +27,12 @@ defmodule RubberDuck.Accounts.ApiKey do
     end
 
     policy action_type(:create) do
-      description "Users can create their own API keys"
-      authorize_if expr(user_id == ^actor(:id))
+      description "Users can create API keys when user_id matches actor id"
+      authorize_if changing_attributes(user_id: [to: actor(:id)])
     end
 
-    policy action_type(:read) do
-      description "Users can only read their own API keys"
-      authorize_if expr(user_id == ^actor(:id))
-    end
-
-    policy action_type(:destroy) do
-      description "Users can only destroy their own API keys"
+    policy action_type([:read, :update, :destroy]) do
+      description "Users can only read/update/destroy their own API keys"
       authorize_if expr(user_id == ^actor(:id))
     end
   end
