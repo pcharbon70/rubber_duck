@@ -255,7 +255,7 @@ func (c *Client) Push(event string, payload map[string]any) tea.Cmd {
 		
 		push.Receive("timeout", func(response any) {
 			c.program.Send(ErrorMsg{
-				Err:       fmt.Errorf("push timeout"),
+				Err:       fmt.Errorf("Connection timeout for event: %s", event),
 				Component: "Phoenix Push",
 			})
 		})

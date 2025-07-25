@@ -225,24 +225,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.chatHeader.SetConversationID(convID)
 					m.statusBar = fmt.Sprintf("Joined conversation %s", convID)
 					
-					// Set system message to indicate we're loading history
-					m.systemMessage = "Loading conversation history..."
-					
-					// Request conversation history after joining
-					if client, ok := m.phoenixClient.(*phoenix.Client); ok {
-						// Request up to 100 messages from history
-						return m, tea.Batch(
-							client.GetConversationHistory(100),
-							// Join status channel after requesting history
-							func() tea.Msg {
-								if statusClient, ok := m.statusClient.(*phoenix.StatusClient); ok {
-									statusClient.SetSocket(m.socket)
-									statusClient.SetProgram(m.ProgramHolder())
-									return statusClient.JoinStatusChannel(m.conversationID)()
-								}
-								return nil
-							},
-						)
+					// Don't request history immediately - wait for channel to be fully ready
+					// Just join the status channel
+					if statusClient, ok := m.statusClient.(*phoenix.StatusClient); ok {
+						statusClient.SetSocket(m.socket)
+						statusClient.SetProgram(m.ProgramHolder())
+						return m, statusClient.JoinStatusChannel(m.conversationID)
 					}
 				}
 			}
@@ -766,6 +754,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case phoenix.StatusCategoriesSubscribedMsg:
 		m.statusBar = fmt.Sprintf("Subscribed to status categories: %v", msg.Categories)
+		
+		// Now that all channels are ready, request conversation history
+		m.systemMessage = "Loading conversation history..."
+		if client, ok := m.phoenixClient.(*phoenix.Client); ok {
+			return m, client.GetConversationHistory(100)
+		}
+		
 		return m, nil
 		
 	case phoenix.StatusUpdateMsg:
