@@ -53,7 +53,7 @@ defmodule RubberDuckWeb.ApiKeyChannel do
 
       case generate_api_key_for_user(user_id, expires_at) do
         {:ok, api_key, key_value} ->
-          push(socket, "api_key_generated", %{
+          payload = %{
             api_key: %{
               id: api_key.id,
               key: key_value,
@@ -61,7 +61,10 @@ defmodule RubberDuckWeb.ApiKeyChannel do
               created_at: DateTime.to_iso8601(api_key.inserted_at)
             },
             warning: "Store this key securely - it won't be shown again"
-          })
+          }
+          
+          Logger.debug("Pushing api_key_generated event to client with payload: #{inspect(payload)}")
+          push(socket, "api_key_generated", payload)
 
           Logger.info("API key generated for user #{user_id}: #{api_key.id}")
 
