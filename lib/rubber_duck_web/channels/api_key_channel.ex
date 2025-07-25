@@ -181,10 +181,16 @@ defmodule RubberDuckWeb.ApiKeyChannel do
   defp generate_api_key_for_user(user_id, expires_at) do
     Logger.info("generate_api_key_for_user called with user_id: #{user_id}, expires_at: #{inspect(expires_at)}")
     
+    # Get the user to use as actor
+    actor = case RubberDuck.Accounts.get_user(user_id, authorize?: false) do
+      {:ok, user} -> user
+      _ -> nil
+    end
+    
     result = Ash.create(ApiKey, %{
       user_id: user_id,
       expires_at: expires_at
-    })
+    }, actor: actor)
     
     Logger.info("Ash.create result: #{inspect(result)}")
     
@@ -214,18 +220,31 @@ defmodule RubberDuckWeb.ApiKeyChannel do
     page = Keyword.get(opts, :page, 1)
     per_page = Keyword.get(opts, :per_page, 20)
 
+    # Get the user to use as actor
+    actor = case RubberDuck.Accounts.get_user(user_id, authorize?: false) do
+      {:ok, user} -> user
+      _ -> nil
+    end
+
     Ash.read(ApiKey,
       filter: [user_id: user_id],
       sort: [inserted_at: :desc],
       load: [:valid],
-      page: [limit: per_page, offset: (page - 1) * per_page]
+      page: [limit: per_page, offset: (page - 1) * per_page],
+      actor: actor
     )
   end
 
   defp revoke_user_api_key(user_id, api_key_id) do
-    case Ash.get(ApiKey, api_key_id, filter: [user_id: user_id]) do
+    # Get the user to use as actor
+    actor = case RubberDuck.Accounts.get_user(user_id, authorize?: false) do
+      {:ok, user} -> user
+      _ -> nil
+    end
+
+    case Ash.get(ApiKey, api_key_id, filter: [user_id: user_id], actor: actor) do
       {:ok, api_key} ->
-        Ash.destroy(api_key)
+        Ash.destroy(api_key, actor: actor)
 
       {:error, %Ash.Error.Query.NotFound{}} ->
         {:error, "API key not found or unauthorized"}
