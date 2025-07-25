@@ -462,17 +462,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SwitchToUserSocketMsg:
 		m.statusBar = "Switching to authenticated connection..."
 		m.switchingSocket = true // Set flag to indicate we're switching
-		
-		// First disconnect auth client to clean up auth channel
-		if authClient, ok := m.authClient.(*phoenix.AuthClient); ok {
-			authClient.Disconnect()() // Execute the disconnect command immediately
-		}
-		
-		// Then disconnect from auth socket
-		if m.authSocket != nil {
-			m.authSocket.Disconnect()
-			m.authSocket = nil
-		}
+		// Don't disconnect from auth socket - we need to stay connected to AuthChannel
+		// Just connect to user socket with JWT token
 		// Now connect to user socket with JWT token only
 		client := m.phoenixClient.(*phoenix.Client)
 		config := phoenix.Config{
@@ -1158,7 +1149,8 @@ func (m *Model) handleReconnect() (Model, tea.Cmd) {
 	m.errorHandler.Reset()
 	
 	// Disconnect existing connections
-	if m.authSocket != nil {
+	// Keep auth socket connected if we're already authenticated
+	if m.authSocket != nil && !m.authenticated {
 		m.authSocket.Disconnect()
 		m.authSocket = nil
 	}
@@ -1169,7 +1161,8 @@ func (m *Model) handleReconnect() (Model, tea.Cmd) {
 	
 	// Reset connection state
 	m.connected = false
-	m.authenticated = false
+	// Don't reset authenticated state if we're already authenticated
+	// m.authenticated = false  // Keep existing auth state
 	m.channel = nil
 	
 	// Update reconnect tracking
