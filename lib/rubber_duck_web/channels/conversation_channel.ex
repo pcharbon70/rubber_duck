@@ -490,7 +490,10 @@ defmodule RubberDuckWeb.ConversationChannel do
     limit = Map.get(params, "limit", 100)
     
     case get_conversation_messages(conversation_id, limit) do
-      {:ok, messages} ->
+      {:ok, page} ->
+        # Extract messages from the Ash.Page.Keyset struct
+        messages = page.results
+        
         # Format messages for client
         formatted_messages = Enum.map(messages, fn msg ->
           %{
