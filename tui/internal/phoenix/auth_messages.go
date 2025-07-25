@@ -93,7 +93,6 @@ type AuthUser struct {
 type APIKey struct {
 	ID        string    `json:"id"`
 	Key       string    `json:"key,omitempty"` // Only present when generated
-	Name      string    `json:"name,omitempty"` // Optional name for the key
 	ExpiresAt time.Time `json:"expires_at"`
 	Valid     bool      `json:"valid"`
 	CreatedAt time.Time `json:"created_at"`

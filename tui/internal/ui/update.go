@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 	
+	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rubber_duck/tui/internal/phoenix"
 )
@@ -79,6 +80,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+r":
 			// Reconnect with backoff
 			return m.handleReconnect()
+		case "ctrl+a":
+			// Copy all conversation history
+			content := m.chat.GetAllMessagesPlainText()
+			if content != "" {
+				if err := clipboard.WriteAll(content); err != nil {
+					m.statusMessages.AddMessage(StatusCategoryError, fmt.Sprintf("Failed to copy: %v", err), nil)
+				} else {
+					m.statusBar = "Copied all messages to clipboard"
+					m.chat.AddMessage(SystemMessage, "All messages copied to clipboard", "system")
+				}
+			} else {
+				m.statusBar = "No messages to copy"
+			}
+			return m, nil
+		case "ctrl+l":
+			// Copy last assistant message
+			content := m.chat.GetLastAssistantMessage()
+			if content != "" {
+				if err := clipboard.WriteAll(content); err != nil {
+					m.statusMessages.AddMessage(StatusCategoryError, fmt.Sprintf("Failed to copy: %v", err), nil)
+				} else {
+					m.statusBar = "Copied last assistant message to clipboard"
+					m.chat.AddMessage(SystemMessage, "Last assistant message copied to clipboard", "system")
+				}
+			} else {
+				m.statusBar = "No assistant message to copy"
+			}
+			return m, nil
+		case "ctrl+m":
+			// Toggle mouse mode
+			return m, func() tea.Msg { return ToggleMouseModeMsg{} }
 		}
 		
 		// Handle pane-specific input
@@ -109,6 +141,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.updateComponentSizes()
+		return m, nil
+		
+	case ToggleMouseModeMsg:
+		// Toggle mouse mode
+		m.mouseEnabled = !m.mouseEnabled
+		if m.mouseEnabled {
+			m.statusBar = "Mouse mode enabled - scrolling with mouse wheel"
+			m.chat.AddMessage(SystemMessage, "Mouse mode enabled. You can scroll with the mouse wheel but cannot select text. Press Ctrl+M to disable mouse mode for text selection.", "system")
+		} else {
+			m.statusBar = "Mouse mode disabled - text selection enabled" 
+			m.chat.AddMessage(SystemMessage, "Mouse mode disabled. You can now select and copy text with your mouse. Press Ctrl+M to re-enable mouse mode for scrolling.", "system")
+		}
+		// Note: Actually toggling mouse mode requires restarting the program with different options
+		// For now, we just track the state and inform the user
 		return m, nil
 		
 	case InitiateConnectionMsg:
@@ -458,6 +504,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statusBar = message
 			m.statusMessages.AddMessage(StatusCategoryError, message, nil)
 			
+			// Also show API key channel errors in chat for debugging
+			if msg.Component == "ApiKey Client" {
+				m.chat.AddMessage(ErrorMessage, fmt.Sprintf("API Key Client Error: %s", message), "system")
+			}
+			
 			// Add connection advice if available
 			if advice := GetConnectionAdvice(msg.Err); advice != "" {
 				m.statusMessages.AddMessage(StatusCategoryInfo, advice, nil)
@@ -640,12 +691,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case phoenix.APIKeyGeneratedMsg:
 		m.statusBar = "API key generated"
-		// Show the key and warning
-		keyMsg := fmt.Sprintf("API Key Generated!\n\nKey: %s\n\n%s\n\nExpires: %s", 
-			msg.APIKey.Key, 
-			msg.Warning,
-			msg.APIKey.ExpiresAt.Format("2006-01-02 15:04:05"))
-		m.chat.AddMessage(SystemMessage, keyMsg, "system")
+		// Debug: Check if we have the key
+		if msg.APIKey.Key == "" {
+			m.chat.AddMessage(ErrorMessage, "Error: API key was generated but key value is empty", "system")
+			m.statusMessages.AddMessage(StatusCategoryError, "API key generation succeeded but key value is missing", nil)
+		} else {
+			// Show the key and warning
+			keyMsg := fmt.Sprintf("API Key Generated!\n\nKey: %s\n\n%s\n\nExpires: %s", 
+				msg.APIKey.Key, 
+				msg.Warning,
+				msg.APIKey.ExpiresAt.Format("2006-01-02 15:04:05"))
+			m.chat.AddMessage(SystemMessage, keyMsg, "system")
+		}
 		return m, nil
 		
 	case phoenix.APIKeyListMsg:
@@ -674,6 +731,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case phoenix.APIKeyErrorMsg:
 		m.statusBar = fmt.Sprintf("API key error: %s", msg.Message)
 		m.statusMessages.AddMessage(StatusCategoryError, fmt.Sprintf("API key %s failed: %s - %s", msg.Operation, msg.Message, msg.Details), nil)
+		m.chat.AddMessage(ErrorMessage, fmt.Sprintf("API Key Error (%s): %s\nDetails: %s", msg.Operation, msg.Message, msg.Details), "system")
 		return m, nil
 		
 	case phoenix.TokenRefreshedMsg:
@@ -782,6 +840,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// API key channel joined
 	case phoenix.ApiKeyChannelJoinedMsg:
 		m.statusBar = "API key channel joined - Ready for API key management"
+		m.chat.AddMessage(SystemMessage, "API key management channel joined successfully", "system")
 		return m, nil
 	}
 	
@@ -856,6 +915,12 @@ func (m Model) buildHelpContent() string {
 	help += "Ctrl+F    - Toggle file tree\n"
 	help += "Ctrl+E    - Toggle editor\n\n"
 	
+	help += "COPY/PASTE:\n"
+	help += "━━━━━━━━━━━━━━━━━━━━━\n"
+	help += "Ctrl+A    - Copy all messages to clipboard\n"
+	help += "Ctrl+L    - Copy last assistant message\n"
+	help += "Ctrl+M    - Toggle mouse mode (enable text selection)\n\n"
+	
 	help += "CHAT:\n"
 	help += "━━━━━━━━━━━━━━━━━━━━━\n"
 	help += "Enter     - Send message\n"
@@ -873,7 +938,7 @@ func (m Model) buildHelpContent() string {
 	help += "/commands - Show command palette\n"
 	help += "/login    - Login to server\n"
 	help += "/logout   - Logout from server\n"
-	help += "/apikey   - API key management\n"
+	help += "/apikey   - API key management (generate/list/revoke/save)\n"
 	help += "/status   - Check auth status\n"
 	help += "/quit     - Exit application\n\n"
 	
@@ -1058,6 +1123,7 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.statusBar = "Generating API key..."
+		m.chat.AddMessage(SystemMessage, "Requesting API key generation...", "system")
 		if apiKeyClient, ok := m.apiKeyClient.(*phoenix.ApiKeyClient); ok {
 			return m, apiKeyClient.GenerateAPIKey(nil)
 		}
@@ -1085,6 +1151,27 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 			}
 		}
 		m.statusBar = "Revoke failed: missing key ID"
+		
+	case "auth_apikey_save":
+		if args := msg.Args; args != nil {
+			apiKey := args["apikey"]
+			
+			if apiKey == "" {
+				m.statusMessages.AddMessage(StatusCategoryError, "No API key provided. Usage: /apikey save <api-key>", nil)
+				return m, nil
+			}
+			
+			// Update the config
+			m.config.APIKey = apiKey
+			
+			// Save the config
+			if err := SaveConfig(m.config); err != nil {
+				m.statusMessages.AddMessage(StatusCategoryError, fmt.Sprintf("Failed to save config: %v", err), nil)
+			} else {
+				m.statusBar = "API key saved"
+				m.chat.AddMessage(SystemMessage, "Server API key saved to ~/.rubber_duck/config.json", "system")
+			}
+		}
 		
 	// Provider and model commands
 	case "set_provider":

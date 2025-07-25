@@ -8,6 +8,7 @@ import (
 
 // Config represents the TUI configuration
 type Config struct {
+	APIKey    string                    `json:"api_key,omitempty"`
 	Providers map[string]ProviderConfig `json:"providers"`
 	TUI       TUIConfig                 `json:"tui"`
 }
@@ -72,3 +73,29 @@ func (c *Config) GetCategoryColor(category string, defaultColor string) string {
 	}
 	return defaultColor
 }
+
+// SaveConfig saves the configuration to the user's config file
+func SaveConfig(config *Config) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	
+	configDir := filepath.Join(homeDir, ".rubber_duck")
+	configPath := filepath.Join(configDir, "config.json")
+	
+	// Ensure config directory exists
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return err
+	}
+	
+	// Marshal config to JSON with indentation
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+	
+	// Write to file
+	return os.WriteFile(configPath, data, 0644)
+}
+

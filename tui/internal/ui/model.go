@@ -98,6 +98,9 @@ type Model struct {
 	
 	// Configuration
 	config *Config
+	
+	// Mouse mode toggle
+	mouseEnabled bool
 }
 
 // CategoryInfo stores metadata about a status category
@@ -166,7 +169,7 @@ func NewModel() *Model {
 		commandPalette: NewCommandPalette(),
 		phoenixURL:   "ws://localhost:5555/socket",
 		authSocketURL: "ws://localhost:5555/auth_socket",
-		apiKey:       "",
+		apiKey:       config.APIKey, // Load API key from config
 		jwtToken:     "",
 		phoenixClient: phoenixClient,
 		authClient:   authClient,
@@ -184,6 +187,7 @@ func NewModel() *Model {
 		tokenLimit:    4096,
 		categoryMetadata: make(map[string]CategoryInfo),
 		config:        config,
+		mouseEnabled:  true, // Mouse enabled by default
 	}
 	
 	// Initialize component sizes with defaults

@@ -38,6 +38,15 @@ type ShowModalMsg struct {
 	Content string
 }
 
+// Copy operation messages
+type CopyToClipboardMsg struct {
+	Content string
+	Type    string // "all" or "last_assistant"
+}
+
+// Mouse mode toggle message
+type ToggleMouseModeMsg struct{}
+
 // Connection messages
 type InitiateConnectionMsg struct{}
 type JoinConversationChannelMsg struct{}

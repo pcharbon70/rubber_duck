@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 	
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -224,6 +225,52 @@ func (c *Chat) ClearMessages() {
 // GetMessageCount returns the number of messages
 func (c *Chat) GetMessageCount() int {
 	return len(c.messages)
+}
+
+// GetAllMessagesPlainText returns all messages as plain text for copying
+func (c *Chat) GetAllMessagesPlainText() string {
+	if len(c.messages) == 0 {
+		return ""
+	}
+	
+	var content strings.Builder
+	for i, msg := range c.messages {
+		if i > 0 {
+			content.WriteString("\n\n")
+		}
+		
+		// Format timestamp
+		timestamp := msg.Timestamp.Format("15:04:05")
+		
+		// Format author
+		var prefix string
+		switch msg.Type {
+		case UserMessage:
+			prefix = "You"
+		case AssistantMessage:
+			prefix = "Assistant"
+		case SystemMessage:
+			prefix = "System"
+		case ErrorMessage:
+			prefix = "Error"
+		}
+		
+		// Write header and content
+		content.WriteString(fmt.Sprintf("%s [%s]\n%s", prefix, timestamp, msg.Content))
+	}
+	
+	return content.String()
+}
+
+// GetLastAssistantMessage returns the last assistant message as plain text
+func (c *Chat) GetLastAssistantMessage() string {
+	// Iterate backwards to find the last assistant message
+	for i := len(c.messages) - 1; i >= 0; i-- {
+		if c.messages[i].Type == AssistantMessage {
+			return c.messages[i].Content
+		}
+	}
+	return ""
 }
 
 // ensureRenderer lazily initializes the glamour renderer
@@ -482,11 +529,26 @@ func (c Chat) handleSlashCommand(command string) tea.Cmd {
 				} else {
 					c.AddMessage(SystemMessage, "Usage: /apikey revoke <key-id>", "system")
 				}
+			case "save":
+				if len(parts) > 2 {
+					// Get the API key
+					apiKey := strings.Join(parts[2:], " ")
+					return func() tea.Msg {
+						return ExecuteCommandMsg{
+							Command: "auth_apikey_save",
+							Args:    map[string]string{
+								"apikey": apiKey,
+							},
+						}
+					}
+				} else {
+					c.AddMessage(SystemMessage, "Usage: /apikey save <api-key>\nSaves the server API key to ~/.rubber_duck/config.json", "system")
+				}
 			default:
-				c.AddMessage(SystemMessage, "Usage: /apikey <generate|list|revoke>", "system")
+				c.AddMessage(SystemMessage, "Usage: /apikey <generate|list|revoke|save>", "system")
 			}
 		} else {
-			c.AddMessage(SystemMessage, "Usage: /apikey <generate|list|revoke>", "system")
+			c.AddMessage(SystemMessage, "Usage: /apikey <generate|list|revoke|save>", "system")
 		}
 		
 	case "status", "auth":

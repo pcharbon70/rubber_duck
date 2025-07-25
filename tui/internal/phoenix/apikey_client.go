@@ -107,7 +107,7 @@ func (a *ApiKeyClient) setupApiKeyHandlers(channel *phx.Channel) {
 			APIKey struct {
 				ID        string `json:"id"`
 				Key       string `json:"key"`
-				Name      string `json:"name"`
+				CreatedAt string `json:"created_at"`
 				ExpiresAt string `json:"expires_at"`
 			} `json:"api_key"`
 			Warning string `json:"warning"`
@@ -118,14 +118,17 @@ func (a *ApiKeyClient) setupApiKeyHandlers(channel *phx.Channel) {
 			if apiKeyData, ok := data["api_key"].(map[string]any); ok {
 				msg.APIKey.ID = getString(apiKeyData, "id")
 				msg.APIKey.Key = getString(apiKeyData, "key")
-				msg.APIKey.Name = getString(apiKeyData, "name")
+				msg.APIKey.CreatedAt = getString(apiKeyData, "created_at")
 				msg.APIKey.ExpiresAt = getString(apiKeyData, "expires_at")
 			}
 			msg.Warning = getString(data, "warning")
 		}
 		
-		// Parse expiration time
-		var expiresAt time.Time
+		// Parse timestamps
+		var createdAt, expiresAt time.Time
+		if msg.APIKey.CreatedAt != "" {
+			createdAt, _ = time.Parse(time.RFC3339, msg.APIKey.CreatedAt)
+		}
 		if msg.APIKey.ExpiresAt != "" {
 			expiresAt, _ = time.Parse(time.RFC3339, msg.APIKey.ExpiresAt)
 		}
@@ -135,7 +138,7 @@ func (a *ApiKeyClient) setupApiKeyHandlers(channel *phx.Channel) {
 				APIKey: APIKey{
 					ID:        msg.APIKey.ID,
 					Key:       msg.APIKey.Key,
-					Name:      msg.APIKey.Name,
+					CreatedAt: createdAt,
 					ExpiresAt: expiresAt,
 				},
 				Warning: msg.Warning,
@@ -144,7 +147,7 @@ func (a *ApiKeyClient) setupApiKeyHandlers(channel *phx.Channel) {
 	})
 	
 	// API keys listed
-	channel.On("api_keys_listed", func(payload any) {
+	channel.On("api_key_list", func(payload any) {
 		var apiKeys []APIKey
 		
 		if data, ok := payload.(map[string]any); ok {
@@ -153,7 +156,6 @@ func (a *ApiKeyClient) setupApiKeyHandlers(channel *phx.Channel) {
 					if key, ok := keyData.(map[string]any); ok {
 						var apiKey APIKey
 						apiKey.ID = getString(key, "id")
-						apiKey.Name = getString(key, "name")
 						apiKey.Valid = getBool(key, "valid")
 						
 						if createdStr := getString(key, "created_at"); createdStr != "" {
@@ -223,14 +225,7 @@ func (a *ApiKeyClient) GenerateAPIKey(params map[string]any) tea.Cmd {
 			}
 		}
 		
-		// Default params if not provided
-		if params == nil {
-			params = map[string]any{
-				"name": fmt.Sprintf("TUI Key %s", time.Now().Format("2006-01-02")),
-			}
-		}
-		
-		push, err := a.channel.Push("generate_api_key", params)
+		push, err := a.channel.Push("generate_api_key", nil)
 		if err != nil {
 			return ErrorMsg{
 				Err:       fmt.Errorf("failed to generate API key: %w", err),
@@ -254,13 +249,7 @@ func (a *ApiKeyClient) GenerateAPIKey(params map[string]any) tea.Cmd {
 		})
 		
 		push.Receive("timeout", func(response any) {
-			if a.program != nil {
-				a.program.Send(APIKeyErrorMsg{
-					Operation: "generate",
-					Message:   "Connection timeout for event: generate_api_key",
-					Details:   "",
-				})
-			}
+			// API key generation uses channel events for success, ignore push timeout
 		})
 		
 		return nil
@@ -301,13 +290,7 @@ func (a *ApiKeyClient) ListAPIKeys() tea.Cmd {
 		})
 		
 		push.Receive("timeout", func(response any) {
-			if a.program != nil {
-				a.program.Send(APIKeyErrorMsg{
-					Operation: "list",
-					Message:   "Connection timeout for event: list_api_keys",
-					Details:   "",
-				})
-			}
+			// API key list uses channel events for success, ignore push timeout
 		})
 		
 		return nil
@@ -352,13 +335,7 @@ func (a *ApiKeyClient) RevokeAPIKey(keyID string) tea.Cmd {
 		})
 		
 		push.Receive("timeout", func(response any) {
-			if a.program != nil {
-				a.program.Send(APIKeyErrorMsg{
-					Operation: "revoke",
-					Message:   "Connection timeout for event: revoke_api_key",
-					Details:   "",
-				})
-			}
+			// API key revoke uses channel events for success, ignore push timeout
 		})
 		
 		return nil
