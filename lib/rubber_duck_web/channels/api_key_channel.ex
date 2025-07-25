@@ -50,9 +50,12 @@ defmodule RubberDuckWeb.ApiKeyChannel do
     if check_generation_rate_limit(socket) do
       # Parse expiration time
       expires_at = parse_expiration(params["expires_at"])
+      
+      Logger.info("About to generate API key for user #{user_id}, expires_at: #{inspect(expires_at)}")
 
       case generate_api_key_for_user(user_id, expires_at) do
         {:ok, api_key, key_value} ->
+          Logger.info("Successfully generated API key: #{api_key.id}, key_value present: #{not is_nil(key_value)}")
           payload = %{
             api_key: %{
               id: api_key.id,
@@ -64,7 +67,10 @@ defmodule RubberDuckWeb.ApiKeyChannel do
           }
           
           Logger.debug("Pushing api_key_generated event to client with payload: #{inspect(payload)}")
-          push(socket, "api_key_generated", payload)
+          Logger.info("Pushing api_key_generated event for key #{api_key.id}")
+          
+          result = push(socket, "api_key_generated", payload)
+          Logger.info("Push result: #{inspect(result)}")
 
           Logger.info("API key generated for user #{user_id}: #{api_key.id}")
 
