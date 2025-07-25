@@ -102,6 +102,10 @@ func formatErrorMessage(err error, component string) string {
 	}
 	
 	if strings.Contains(errStr, "timeout") {
+		// Preserve the original error message if it contains event information
+		if strings.Contains(errStr, "event:") {
+			return fmt.Sprintf("%s: %v", component, err)
+		}
 		return fmt.Sprintf("%s: Connection timeout. The server might be slow or unreachable.", component)
 	}
 	
