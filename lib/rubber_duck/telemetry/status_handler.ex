@@ -111,8 +111,7 @@ defmodule RubberDuck.Telemetry.StatusHandler do
   def handle_event([:rubber_duck, :status, :broadcaster, :batch_processed], measurements, _metadata, _config) do
     Logger.debug("Status broadcaster processed batch",
       batch_size: measurements.batch_size,
-      duration_ms: div(measurements.duration, 1_000),
-      messages_per_second: measurements[:messages_per_second]
+      remaining: measurements[:remaining]
     )
 
     :ok
