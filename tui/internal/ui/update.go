@@ -462,7 +462,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SwitchToUserSocketMsg:
 		m.statusBar = "Switching to authenticated connection..."
 		m.switchingSocket = true // Set flag to indicate we're switching
-		// First disconnect from auth socket
+		
+		// First disconnect auth client to clean up auth channel
+		if authClient, ok := m.authClient.(*phoenix.AuthClient); ok {
+			authClient.Disconnect()() // Execute the disconnect command immediately
+		}
+		
+		// Then disconnect from auth socket
 		if m.authSocket != nil {
 			m.authSocket.Disconnect()
 			m.authSocket = nil
