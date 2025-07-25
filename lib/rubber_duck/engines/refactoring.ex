@@ -15,7 +15,7 @@ defmodule RubberDuck.Engines.Refactoring do
   require Logger
 
   alias RubberDuck.LLM
-  alias RubberDuck.LLM.Config
+  alias RubberDuck.Engine.InputValidator
 
   @impl true
   def init(config) do
@@ -44,19 +44,22 @@ defmodule RubberDuck.Engines.Refactoring do
 
   defp validate_input(%{file_path: path, instruction: instruction} = input)
        when is_binary(path) and is_binary(instruction) do
-    content = read_file_content(path)
-    language = detect_language(path)
-
-    validated = %{
-      file_path: path,
-      content: content,
-      instruction: instruction,
-      language: language,
-      apply_changes: Map.get(input, :apply_changes, false),
-      diff_only: Map.get(input, :diff_only, false)
-    }
-
-    {:ok, validated}
+    case InputValidator.validate_llm_input(input, [:file_path, :instruction]) do
+      {:ok, validated} ->
+        content = read_file_content(path)
+        language = detect_language(path)
+        
+        validated = Map.merge(validated, %{
+          content: content,
+          language: language,
+          apply_changes: Map.get(input, :apply_changes, false),
+          diff_only: Map.get(input, :diff_only, false)
+        })
+        
+        {:ok, validated}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp validate_input(_), do: {:error, :invalid_input}
@@ -166,18 +169,16 @@ defmodule RubberDuck.Engines.Refactoring do
     # Use LLM to generate refactoring suggestions
     prompt = build_refactoring_prompt(analysis, input)
 
-    # Get current provider and model from configuration
-    {provider, model} = Config.get_current_provider_and_model()
-
     opts = [
-      provider: provider,
-      model: model,
+      provider: input.provider,  # Required from input
+      model: input.model,        # Required from input
       messages: [
         %{"role" => "system", "content" => get_refactoring_system_prompt(input.language)},
         %{"role" => "user", "content" => prompt}
       ],
-      temperature: 0.4,
-      max_tokens: state.config[:max_tokens] || 4096
+      temperature: input.temperature || 0.4,
+      max_tokens: input.max_tokens || state.config[:max_tokens] || 4096,
+      user_id: input.user_id
     ]
 
     case LLM.Service.completion(opts) do

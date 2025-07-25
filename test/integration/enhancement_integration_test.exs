@@ -240,7 +240,7 @@ defmodule RubberDuck.Integration.EnhancementIntegrationTest do
 
       # Should not crash
       result = Coordinator.enhance(task, timeout: 5000)
-      assert match?({:ok, _} | {:error, _}, result)
+      assert match?({:ok, _}, result) or match?({:error, _}, result)
     end
 
     test "respects timeouts" do

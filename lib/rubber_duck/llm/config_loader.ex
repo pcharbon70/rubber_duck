@@ -143,12 +143,12 @@ defmodule RubberDuck.LLM.ConfigLoader do
     |> Enum.uniq()
   end
   
-  defp get_adapter_module(:openai), do: RubberDuck.LLM.Providers.OpenAI
-  defp get_adapter_module(:anthropic), do: RubberDuck.LLM.Providers.Anthropic
-  defp get_adapter_module(:ollama), do: RubberDuck.LLM.Providers.Ollama
-  defp get_adapter_module(:tgi), do: RubberDuck.LLM.Providers.TGI
-  defp get_adapter_module(:mock), do: RubberDuck.LLM.Providers.Mock
-  defp get_adapter_module(_), do: nil
+  defp get_adapter_module(provider_name) do
+    case RubberDuck.LLM.AdapterRegistry.get_adapter(provider_name) do
+      {:ok, adapter} -> adapter
+      {:error, _} -> nil
+    end
+  end
   
   defp default_api_key_env(:openai), do: "OPENAI_API_KEY"
   defp default_api_key_env(:anthropic), do: "ANTHROPIC_API_KEY"

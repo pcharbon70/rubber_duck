@@ -82,6 +82,7 @@ defmodule RubberDuck.LLM.Service do
 
   ## Options
 
+  - `:provider` - Provider to use (required if not using model resolution)
   - `:model` - Specific model to use (required)
   - `:messages` - List of messages (required)
   - `:user_id` - User ID for personalized configuration (optional)
@@ -90,10 +91,18 @@ defmodule RubberDuck.LLM.Service do
   - `:stream` - Whether to stream the response
   - `:timeout` - Request timeout in milliseconds
   - `:priority` - Request priority (:high, :normal, :low)
+  
+  Note: This function now delegates to ServiceV2 if provider is specified.
   """
   @spec completion(keyword()) :: {:ok, Response.t()} | {:error, term()}
   def completion(opts) do
-    GenServer.call(__MODULE__, {:completion, opts}, timeout(opts))
+    # If provider is explicitly provided, use the new stateless service
+    if Keyword.has_key?(opts, :provider) do
+      RubberDuck.LLM.ServiceV2.completion(opts)
+    else
+      # Otherwise fall back to the old stateful behavior for backward compatibility
+      GenServer.call(__MODULE__, {:completion, opts}, timeout(opts))
+    end
   end
 
   @doc """
@@ -130,7 +139,13 @@ defmodule RubberDuck.LLM.Service do
   """
   @spec completion_stream(keyword(), function()) :: {:ok, reference()} | {:error, term()}
   def completion_stream(opts, callback) when is_function(callback, 1) do
-    GenServer.call(__MODULE__, {:completion_stream, opts, callback})
+    # If provider is explicitly provided, use the new stateless service
+    if Keyword.has_key?(opts, :provider) do
+      RubberDuck.LLM.ServiceV2.completion_stream(opts, callback)
+    else
+      # Otherwise fall back to the old stateful behavior
+      GenServer.call(__MODULE__, {:completion_stream, opts, callback})
+    end
   end
 
   @doc """

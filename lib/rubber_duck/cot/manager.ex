@@ -205,50 +205,46 @@ defmodule RubberDuck.CoT.Manager do
   end
 
   defp call_llm(prompt, step, session) do
-    # Get LLM config from context, with fallbacks
+    # Get LLM config from context
     llm_config = get_in(session, [:context, :llm_config]) || %{}
+    
+    # Require provider and model from context
+    provider = Map.get(session.context, :provider) || Map.get(llm_config, :provider)
+    model = Map.get(session.context, :model) || Map.get(llm_config, :model)
+    
+    if is_nil(provider) or is_nil(model) do
+      {:error, {:missing_llm_config, "Provider and model must be specified in context"}}
+    else
+      options = %{
+        provider: provider,  # Required
+        model: model,        # Required
+        max_tokens: Map.get(step, :max_tokens, Map.get(llm_config, :max_tokens, 2000)),
+        temperature: Map.get(step, :temperature, Map.get(llm_config, :temperature, 0.7)),
+        timeout: Map.get(step, :timeout, Map.get(llm_config, :timeout, 30_000)),
+        user_id: Map.get(session.context, :user_id),
+        from_cot: true
+      }
 
-    # Get default model from ModelConfig if available
-    default_model =
-      case Process.whereis(RubberDuck.LLM.ModelConfig) do
-        nil ->
-          "codellama"
+      messages = [
+        %{role: "system", content: get_system_prompt(session)},
+        %{role: "user", content: prompt}
+      ]
 
-        _pid ->
-          try do
-            RubberDuck.LLM.ModelConfig.get_default_model()
-          catch
-            _, _ -> "codellama"
-          end
+      Logger.debug("Executing step #{step.name} with provider #{provider}, model #{model}, prompt: #{String.slice(prompt, 0, 100)}...")
+
+      # Convert map to keyword list for Service.completion/1
+      opts = %{messages: messages} |> Map.merge(options) |> Map.to_list()
+
+      case Service.completion(opts) do
+        {:ok, response} ->
+          content = extract_content(response)
+          Logger.debug("Step #{step.name} LLM response content: #{inspect(content)}")
+          {:ok, content}
+
+        {:error, reason} = error ->
+          Logger.error("LLM call failed for step #{step.name}: #{inspect(reason)}")
+          error
       end
-
-    options = %{
-      model: Map.get(llm_config, :model) || default_model,
-      max_tokens: Map.get(step, :max_tokens, Map.get(llm_config, :max_tokens, 2000)),
-      temperature: Map.get(step, :temperature, Map.get(llm_config, :temperature, 0.7)),
-      timeout: Map.get(step, :timeout, Map.get(llm_config, :timeout, 30_000)),
-      from_cot: true
-    }
-
-    messages = [
-      %{role: "system", content: get_system_prompt(session)},
-      %{role: "user", content: prompt}
-    ]
-
-    Logger.debug("Executing step #{step.name} with model #{options.model}, prompt: #{String.slice(prompt, 0, 100)}...")
-
-    # Convert map to keyword list for Service.completion/1
-    opts = %{messages: messages} |> Map.merge(options) |> Map.to_list()
-
-    case Service.completion(opts) do
-      {:ok, response} ->
-        content = extract_content(response)
-        Logger.debug("Step #{step.name} LLM response content: #{inspect(content)}")
-        {:ok, content}
-
-      {:error, reason} = error ->
-        Logger.error("LLM call failed for step #{step.name}: #{inspect(reason)}")
-        error
     end
   end
 

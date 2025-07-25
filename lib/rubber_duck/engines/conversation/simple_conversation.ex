@@ -18,6 +18,7 @@ defmodule RubberDuck.Engines.Conversation.SimpleConversation do
   require Logger
 
   alias RubberDuck.LLM.Service, as: LLMService
+  alias RubberDuck.Engine.InputValidator
 
   @impl true
   def init(config) do
@@ -25,7 +26,7 @@ defmodule RubberDuck.Engines.Conversation.SimpleConversation do
       config: config,
       max_tokens: config[:max_tokens] || 500,
       temperature: config[:temperature] || 0.3,
-      model: config[:model] || "codellama",
+      # Remove hardcoded model - will come from input
       timeout: config[:timeout] || 10_000
     }
 
@@ -42,9 +43,10 @@ defmodule RubberDuck.Engines.Conversation.SimpleConversation do
         conversation_type: :simple,
         processing_time: validated.start_time |> DateTime.diff(DateTime.utc_now(), :millisecond),
         metadata: %{
-          model: state.model,
-          temperature: state.temperature,
-          max_tokens: state.max_tokens
+          provider: validated.provider,
+          model: validated.model,
+          temperature: validated.temperature || state.temperature,
+          max_tokens: validated.max_tokens || state.max_tokens
         }
       }
 
@@ -60,14 +62,12 @@ defmodule RubberDuck.Engines.Conversation.SimpleConversation do
   # Private functions
 
   defp validate_input(%{query: query} = input) when is_binary(query) do
-    validated = %{
-      query: String.trim(query),
-      context: Map.get(input, :context, %{}),
-      options: Map.get(input, :options, %{}),
-      start_time: DateTime.utc_now()
-    }
-
-    {:ok, validated}
+    case InputValidator.validate_llm_input(input, [:query]) do
+      {:ok, validated} ->
+        {:ok, Map.put(validated, :query, String.trim(query))}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp validate_input(_), do: {:error, :invalid_input}
@@ -76,14 +76,8 @@ defmodule RubberDuck.Engines.Conversation.SimpleConversation do
     # Build messages for LLM
     messages = build_messages(validated)
 
-    # Prepare LLM request
-    llm_opts = [
-      model: state.model,
-      messages: messages,
-      temperature: state.temperature,
-      max_tokens: state.max_tokens,
-      timeout: state.timeout
-    ]
+    # Prepare LLM request with provider and model from input
+    llm_opts = InputValidator.build_llm_opts(validated, messages, state)
 
     Logger.debug("Processing simple conversation query: #{String.slice(validated.query, 0, 50)}...")
 

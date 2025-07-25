@@ -36,9 +36,9 @@ defmodule RubberDuck.Engines.Completion do
   require Logger
 
   alias RubberDuck.LLM
-  alias RubberDuck.LLM.Config
   alias RubberDuck.CoT.Manager, as: ConversationManager
   alias RubberDuck.CoT.Chains.CompletionChain
+  alias RubberDuck.Engine.InputValidator
 
   # Default configuration
   @default_max_suggestions 5
@@ -186,16 +186,19 @@ defmodule RubberDuck.Engines.Completion do
 
   defp validate_input(%{prefix: prefix, suffix: suffix, language: language} = input)
        when is_binary(prefix) and is_binary(suffix) and is_atom(language) do
-    validated = %{
-      prefix: prefix,
-      suffix: suffix,
-      language: language,
-      cursor_position: Map.get(input, :cursor_position, {0, 0}),
-      file_path: Map.get(input, :file_path),
-      project_context: Map.get(input, :project_context, %{})
-    }
-
-    {:ok, validated}
+    # Validate required LLM fields
+    case InputValidator.validate_llm_input(input, [:prefix, :suffix, :language]) do
+      {:ok, validated} ->
+        # Add completion-specific fields
+        validated = Map.merge(validated, %{
+          cursor_position: Map.get(input, :cursor_position, {0, 0}),
+          file_path: Map.get(input, :file_path),
+          project_context: Map.get(input, :project_context, %{})
+        })
+        {:ok, validated}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp validate_input(_) do
@@ -357,18 +360,17 @@ defmodule RubberDuck.Engines.Completion do
     # Build FIM prompt for the LLM
     prompt = build_fim_prompt(fim_context, input)
 
-    # Get current provider and model from configuration
-    {provider, model} = Config.get_current_provider_and_model()
-
+    # Use provider and model from input (validated to be present)
     opts = [
-      provider: provider,
-      model: model,
+      provider: input.provider,  # Required from input
+      model: input.model,        # Required from input
       messages: [
         %{"role" => "system", "content" => get_completion_system_prompt(input.language)},
         %{"role" => "user", "content" => prompt}
       ],
-      temperature: 0.2,
-      max_tokens: state.config[:max_tokens] || 256,
+      temperature: input.temperature || 0.2,
+      max_tokens: input.max_tokens || state.config[:max_tokens] || 256,
+      user_id: input.user_id,
       # Stop sequences
       stop: ["\n\n", "def ", "class ", "function "]
     ]

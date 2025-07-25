@@ -17,7 +17,7 @@ defmodule RubberDuck.Engines.TestGeneration do
   require Logger
 
   alias RubberDuck.LLM
-  alias RubberDuck.LLM.Config
+  alias RubberDuck.Engine.InputValidator
 
   @impl true
   def init(config) do
@@ -53,20 +53,24 @@ defmodule RubberDuck.Engines.TestGeneration do
   end
 
   defp validate_input(%{file_path: path} = input) when is_binary(path) do
-    content = read_file_content(path)
-    language = detect_language(path)
-
-    validated = %{
-      file_path: path,
-      content: content,
-      language: language,
-      framework: Map.get(input, :framework) || default_framework(language),
-      include_edge_cases: Map.get(input, :include_edge_cases, true),
-      include_property_tests: Map.get(input, :include_property_tests, false),
-      output_file: Map.get(input, :output_file)
-    }
-
-    {:ok, validated}
+    case InputValidator.validate_llm_input(input, [:file_path]) do
+      {:ok, validated} ->
+        content = read_file_content(path)
+        language = detect_language(path)
+        
+        validated = Map.merge(validated, %{
+          content: content,
+          language: language,
+          framework: Map.get(input, :framework) || default_framework(language),
+          include_edge_cases: Map.get(input, :include_edge_cases, true),
+          include_property_tests: Map.get(input, :include_property_tests, false),
+          output_file: Map.get(input, :output_file)
+        })
+        
+        {:ok, validated}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp validate_input(_), do: {:error, :invalid_input}
@@ -257,18 +261,16 @@ defmodule RubberDuck.Engines.TestGeneration do
   defp generate_tests(test_plan, input, state) do
     prompt = build_test_generation_prompt(test_plan, input)
 
-    # Get current provider and model from configuration
-    {provider, model} = Config.get_current_provider_and_model()
-
     opts = [
-      provider: provider,
-      model: model,
+      provider: input.provider,  # Required from input
+      model: input.model,        # Required from input
       messages: [
         %{"role" => "system", "content" => get_test_system_prompt(input.language, input.framework)},
         %{"role" => "user", "content" => prompt}
       ],
-      temperature: 0.3,
-      max_tokens: state.config[:max_tokens] || 4096
+      temperature: input.temperature || 0.3,
+      max_tokens: input.max_tokens || state.config[:max_tokens] || 4096,
+      user_id: input.user_id
     ]
 
     case LLM.Service.completion(opts) do
