@@ -111,6 +111,8 @@ defmodule RubberDuckWeb.ConversationChannel do
   alias RubberDuck.UserConfig
   alias RubberDuck.Conversations
   alias RubberDuck.Status
+  alias RubberDuck.LLM.ErrorHandler
+  alias RubberDuck.Engine.InputValidator
 
   @default_timeout 60_000
   @max_context_messages 20
@@ -206,12 +208,28 @@ defmodule RubberDuckWeb.ConversationChannel do
     )
 
     # Build input for conversation router
-    input = %{
-      query: content,
-      context: build_context(socket, params),
-      options: Map.get(params, "options", %{}),
-      llm_config: build_llm_config(socket, params)
-    }
+    llm_config = build_llm_config(socket, params)
+    
+    # Ensure provider and model are available
+    if not Map.has_key?(llm_config, :provider) or not Map.has_key?(llm_config, :model) do
+      push(socket, "error", %{
+        message: "Please configure your LLM provider and model in settings.",
+        type: "llm_not_configured"
+      })
+      {:noreply, socket}
+    else
+      input = %{
+        query: content,
+        context: build_context(socket, params),
+        options: Map.get(params, "options", %{}),
+        llm_config: llm_config,
+        # Pass provider and model at top level for engines
+        provider: llm_config.provider,
+        model: llm_config.model,
+        user_id: socket.assigns.user_id,
+        temperature: llm_config[:temperature],
+        max_tokens: llm_config[:max_tokens]
+      }
 
     start_time = System.monotonic_time(:millisecond)
 
@@ -270,13 +288,19 @@ defmodule RubberDuckWeb.ConversationChannel do
           })
         )
 
+        # Try error recovery
+        error_message = format_user_error(reason)
+        
         push(socket, "error", %{
-          message: "I encountered an error processing your message.",
+          message: error_message,
+          type: extract_error_type(reason),
+          recoverable: is_recoverable_error?(reason),
           details: format_error(reason)
         })
 
         {:noreply, socket}
     end
+    end  # Close the if/else for provider/model check
   end
 
   @impl true
@@ -777,6 +801,57 @@ defmodule RubberDuckWeb.ConversationChannel do
       {:error, reason} = error ->
         Logger.error("Failed to get user for conversation: #{inspect(reason)}")
         error
+    end
+  end
+  
+  defp format_user_error(reason) do
+    case reason do
+      {:missing_required_field, _field, message} ->
+        message
+        
+      {:missing_required_field, :provider} ->
+        "Please configure your LLM provider in settings."
+        
+      {:missing_required_field, :model} ->
+        "Please select a model for your LLM provider."
+        
+      {:engine_error, _engine, {:cot_error, _details}} ->
+        "I'm having trouble processing your request. Please try rephrasing or simplifying your question."
+        
+      {:timeout, _} ->
+        "The request took too long to process. Please try again with a shorter message."
+        
+      {error_type, %{details: details}} when is_map(details) ->
+        ErrorHandler.format_user_error({error_type, details})
+        
+      error ->
+        # Check if it's a validation error
+        case error do
+          {:error, validation_error} -> 
+            InputValidator.format_validation_error(validation_error)
+          _ ->
+            "I encountered an issue processing your request. Please try again or contact support if the problem persists."
+        end
+    end
+  end
+  
+  defp extract_error_type(reason) do
+    case reason do
+      {:missing_required_field, _} -> "configuration_error"
+      {:missing_required_field, _, _} -> "configuration_error"
+      {:timeout, _} -> "timeout_error"
+      {:engine_error, _, _} -> "processing_error"
+      {error_type, _} when is_atom(error_type) -> to_string(error_type)
+      _ -> "unknown_error"
+    end
+  end
+  
+  defp is_recoverable_error?(reason) do
+    case reason do
+      {:timeout, _} -> true
+      {:rate_limit_exceeded, _} -> true
+      {:service_unavailable, _} -> true
+      _ -> false
     end
   end
 end
