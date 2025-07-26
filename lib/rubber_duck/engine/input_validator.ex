@@ -48,6 +48,9 @@ defmodule RubberDuck.Engine.InputValidator do
         context: Map.get(input, :context, %{}),
         options: Map.get(input, :options, %{}),
         
+        # Cancellation support
+        cancellation_token: Map.get(input, :cancellation_token),
+        
         # Timestamp
         start_time: DateTime.utc_now()
       }

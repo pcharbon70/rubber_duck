@@ -139,6 +139,27 @@ defmodule RubberDuck.Conversations.Conversation do
       description "Timestamp of the last message or activity in this conversation"
     end
 
+    attribute :processing_status, :atom do
+      allow_nil? false
+      default :idle
+      public? true
+      constraints one_of: [:idle, :processing, :cancelling, :cancelled, :completed, :failed]
+      description "Current processing status of the conversation"
+    end
+
+    attribute :processing_started_at, :utc_datetime_usec do
+      allow_nil? true
+      public? true
+      description "When the current processing started"
+    end
+
+    attribute :processing_metadata, :map do
+      allow_nil? true
+      default %{}
+      public? true
+      description "Metadata about the current processing (task_id, engine, etc.)"
+    end
+
     create_timestamp :inserted_at
     update_timestamp :updated_at
   end

@@ -7,6 +7,8 @@ defmodule RubberDuck.CoT.Manager do
   """
 
   alias RubberDuck.LLM.Service
+  alias RubberDuck.Engine.CancellationToken
+  alias RubberDuck.Status
   require Logger
 
   @doc """
@@ -26,34 +28,47 @@ defmodule RubberDuck.CoT.Manager do
   def execute_chain(chain_module, query, context \\ %{}) do
     with {:ok, config} <- get_chain_config(chain_module),
          {:ok, steps} <- get_chain_steps(chain_module) do
-      # Initialize session
-      session = %{
-        chain: chain_module,
-        config: config,
-        query: query,
-        context: context,
-        steps: %{},
-        started_at: DateTime.utc_now(),
-        status: :running
-      }
+      # Extract cancellation token from context
+      cancellation_token = CancellationToken.from_input(context)
+      
+      # Check if already cancelled before starting
+      if cancellation_token && CancellationToken.cancelled?(cancellation_token) do
+        {:error, :cancelled}
+      else
+        # Initialize session
+        session = %{
+          chain: chain_module,
+          config: config,
+          query: query,
+          context: context,
+          steps: %{},
+          started_at: DateTime.utc_now(),
+          status: :running,
+          cancellation_token: cancellation_token
+        }
 
-      # Execute steps
-      case execute_steps(steps, session) do
-        {:ok, completed_session} ->
-          final_session =
-            completed_session
-            |> Map.put(:status, :completed)
-            |> Map.put(:completed_at, DateTime.utc_now())
+        # Execute steps
+        case execute_steps(steps, session) do
+          {:ok, completed_session} ->
+            final_session =
+              completed_session
+              |> Map.put(:status, :completed)
+              |> Map.put(:completed_at, DateTime.utc_now())
 
-          {:ok, final_session}
+            {:ok, final_session}
 
-        {:error, reason, _partial_session} ->
-          # Return simple error without trying to modify session
-          {:error, reason}
+          {:error, :cancelled, _partial_session} ->
+            # Clean cancellation error
+            {:error, :cancelled}
 
-        {:error, reason} ->
-          # Handle case where execute_steps returns 2-tuple error
-          {:error, reason}
+          {:error, reason, _partial_session} ->
+            # Return simple error without trying to modify session
+            {:error, reason}
+
+          {:error, reason} ->
+            # Handle case where execute_steps returns 2-tuple error
+            {:error, reason}
+        end
       end
     end
   end
@@ -88,14 +103,39 @@ defmodule RubberDuck.CoT.Manager do
 
   defp execute_steps(steps, session) do
     Enum.reduce_while(steps, {:ok, session}, fn step, {:ok, current_session} ->
-      case execute_single_step(step, current_session) do
-        {:ok, result} ->
-          updated_session = update_session_with_result(current_session, step, result)
-          {:cont, {:ok, updated_session}}
+      # Check cancellation before each step
+      if current_session.cancellation_token && CancellationToken.cancelled?(current_session.cancellation_token) do
+        Logger.info("Chain execution cancelled before step #{step.name}")
+        
+        # Broadcast cancellation if we have a conversation_id
+        conversation_id = get_in(current_session, [:context, :conversation_id])
+        if conversation_id do
+          Status.workflow(
+            conversation_id,
+            "Chain execution cancelled at step #{step.name}",
+            %{
+              chain: inspect(current_session.chain),
+              step: step.name,
+              cancelled_at: DateTime.utc_now()
+            }
+          )
+        end
+        
+        {:halt, {:error, :cancelled, current_session}}
+      else
+        case execute_single_step(step, current_session) do
+          {:ok, result} ->
+            updated_session = update_session_with_result(current_session, step, result)
+            {:cont, {:ok, updated_session}}
 
-        {:error, reason} ->
-          Logger.error("Step #{step.name} failed: #{inspect(reason)}")
-          {:halt, {:error, reason, current_session}}
+          {:error, :cancelled} ->
+            Logger.info("Step #{step.name} was cancelled")
+            {:halt, {:error, :cancelled, current_session}}
+
+          {:error, reason} ->
+            Logger.error("Step #{step.name} failed: #{inspect(reason)}")
+            {:halt, {:error, reason, current_session}}
+        end
       end
     end)
   end
@@ -205,45 +245,62 @@ defmodule RubberDuck.CoT.Manager do
   end
 
   defp call_llm(prompt, step, session) do
-    # Get LLM config from context
-    llm_config = get_in(session, [:context, :llm_config]) || %{}
-    
-    # Require provider and model from context
-    provider = Map.get(session.context, :provider) || Map.get(llm_config, :provider)
-    model = Map.get(session.context, :model) || Map.get(llm_config, :model)
-    
-    if is_nil(provider) or is_nil(model) do
-      {:error, {:missing_llm_config, "Provider and model must be specified in context"}}
+    # Check cancellation before making LLM call
+    if session.cancellation_token && CancellationToken.cancelled?(session.cancellation_token) do
+      {:error, :cancelled}
     else
-      options = %{
-        provider: provider,  # Required
-        model: model,        # Required
-        max_tokens: Map.get(step, :max_tokens, Map.get(llm_config, :max_tokens, 2000)),
-        temperature: Map.get(step, :temperature, Map.get(llm_config, :temperature, 0.7)),
-        timeout: Map.get(step, :timeout, Map.get(llm_config, :timeout, 30_000)),
-        user_id: Map.get(session.context, :user_id),
-        from_cot: true
-      }
+      # Get LLM config from context
+      llm_config = get_in(session, [:context, :llm_config]) || %{}
+      
+      # Require provider and model from context
+      provider = Map.get(session.context, :provider) || Map.get(llm_config, :provider)
+      model = Map.get(session.context, :model) || Map.get(llm_config, :model)
+      
+      if is_nil(provider) or is_nil(model) do
+        {:error, {:missing_llm_config, "Provider and model must be specified in context"}}
+      else
+        options = %{
+          provider: provider,  # Required
+          model: model,        # Required
+          max_tokens: Map.get(step, :max_tokens, Map.get(llm_config, :max_tokens, 2000)),
+          temperature: Map.get(step, :temperature, Map.get(llm_config, :temperature, 0.7)),
+          timeout: Map.get(step, :timeout, Map.get(llm_config, :timeout, 30_000)),
+          user_id: Map.get(session.context, :user_id),
+          conversation_id: Map.get(session.context, :conversation_id),
+          from_cot: true
+        }
 
-      messages = [
-        %{role: "system", content: get_system_prompt(session)},
-        %{role: "user", content: prompt}
-      ]
+        # Add cancellation token if available
+        options = if session.cancellation_token do
+          CancellationToken.add_to_input(options, session.cancellation_token)
+        else
+          options
+        end
 
-      Logger.debug("Executing step #{step.name} with provider #{provider}, model #{model}, prompt: #{String.slice(prompt, 0, 100)}...")
+        messages = [
+          %{role: "system", content: get_system_prompt(session)},
+          %{role: "user", content: prompt}
+        ]
 
-      # Convert map to keyword list for Service.completion/1
-      opts = %{messages: messages} |> Map.merge(options) |> Map.to_list()
+        Logger.debug("Executing step #{step.name} with provider #{provider}, model #{model}, prompt: #{String.slice(prompt, 0, 100)}...")
 
-      case Service.completion(opts) do
-        {:ok, response} ->
-          content = extract_content(response)
-          Logger.debug("Step #{step.name} LLM response content: #{inspect(content)}")
-          {:ok, content}
+        # Convert map to keyword list for Service.completion/1
+        opts = %{messages: messages} |> Map.merge(options) |> Map.to_list()
 
-        {:error, reason} = error ->
-          Logger.error("LLM call failed for step #{step.name}: #{inspect(reason)}")
-          error
+        case Service.completion(opts) do
+          {:ok, response} ->
+            content = extract_content(response)
+            Logger.debug("Step #{step.name} LLM response content: #{inspect(content)}")
+            {:ok, content}
+
+          {:error, :cancelled} = error ->
+            Logger.info("LLM call cancelled for step #{step.name}")
+            error
+
+          {:error, reason} = error ->
+            Logger.error("LLM call failed for step #{step.name}: #{inspect(reason)}")
+            error
+        end
       end
     end
   end
@@ -331,15 +388,20 @@ defmodule RubberDuck.CoT.Manager do
     chain_module = Map.get(step, :__chain_module__, session.chain)
 
     Enum.reduce_while(validators, :ok, fn validator, :ok ->
-      if function_exported?(chain_module, validator, 1) do
-        case apply(chain_module, validator, [validation_context]) do
-          true -> {:cont, :ok}
-          false -> {:halt, {:error, "Validation failed: #{validator}"}}
-          {:error, _} = error -> {:halt, error}
-        end
+      # Check cancellation before each validator
+      if session.cancellation_token && CancellationToken.cancelled?(session.cancellation_token) do
+        {:halt, {:error, :cancelled}}
       else
-        Logger.warning("Validator #{validator} not found in #{chain_module}")
-        {:cont, :ok}
+        if function_exported?(chain_module, validator, 1) do
+          case apply(chain_module, validator, [validation_context]) do
+            true -> {:cont, :ok}
+            false -> {:halt, {:error, "Validation failed: #{validator}"}}
+            {:error, _} = error -> {:halt, error}
+          end
+        else
+          Logger.warning("Validator #{validator} not found in #{chain_module}")
+          {:cont, :ok}
+        end
       end
     end)
   end

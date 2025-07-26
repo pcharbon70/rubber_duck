@@ -60,6 +60,7 @@ defmodule RubberDuckWeb.ConversationChannel do
   require Logger
 
   alias RubberDuck.Engine.Manager, as: EngineManager
+  alias RubberDuck.Engine.{TaskRegistry, CancellationToken}
   alias RubberDuck.Conversations
   alias RubberDuck.Status
   alias RubberDuck.LLM.ErrorHandler
@@ -104,7 +105,12 @@ defmodule RubberDuckWeb.ConversationChannel do
       |> assign(:context, %{})
       |> assign(:user_id, user_id)
       |> assign(:session_id, session_id)
+      |> assign(:current_cancellation_token, nil)
 
+    # Subscribe to status updates for this conversation
+    Phoenix.PubSub.subscribe(RubberDuck.PubSub, "status:#{actual_conversation_id}:engine")
+    Phoenix.PubSub.subscribe(RubberDuck.PubSub, "status:#{actual_conversation_id}:workflow")
+    
     # Log session creation
     Logger.debug("Session created for user #{user_id}")
 
@@ -161,6 +167,17 @@ defmodule RubberDuckWeb.ConversationChannel do
       })
       {:noreply, socket}
     else
+      # Create a cancellation token for this request
+      cancellation_token = CancellationToken.create(conversation_id)
+      
+      # Clean up any previous token
+      if socket.assigns.current_cancellation_token do
+        CancellationToken.stop(socket.assigns.current_cancellation_token)
+      end
+      
+      # Update socket with new token
+      socket = assign(socket, :current_cancellation_token, cancellation_token)
+      
       input = %{
         query: content,
         context: build_context(socket, params),
@@ -171,8 +188,12 @@ defmodule RubberDuckWeb.ConversationChannel do
         model: llm_config.model,
         user_id: socket.assigns.user_id,
         temperature: llm_config[:temperature],
-        max_tokens: llm_config[:max_tokens]
+        max_tokens: llm_config[:max_tokens],
+        conversation_id: conversation_id
       }
+      
+      # Add cancellation token to input
+      input = CancellationToken.add_to_input(input, cancellation_token)
 
     start_time = System.monotonic_time(:millisecond)
 
@@ -211,6 +232,18 @@ defmodule RubberDuckWeb.ConversationChannel do
         push(socket, "response", format_response(result, content))
         {:noreply, socket}
 
+      {:error, :cancelled} ->
+        Logger.info("Conversation processing was cancelled")
+        
+        # Broadcast cancellation notification to all subscribers
+        broadcast!(socket, "processing_cancelled", %{
+          message: "Processing was cancelled",
+          timestamp: DateTime.utc_now(),
+          cancelled_by: socket.assigns.user_id
+        })
+        
+        {:noreply, socket}
+        
       {:error, reason} ->
         Logger.error("Conversation processing failed: #{inspect(reason)}")
 
@@ -342,8 +375,56 @@ defmodule RubberDuckWeb.ConversationChannel do
     
     {:noreply, socket}
   end
+  
+  @impl true
+  def handle_in("cancel_processing", _params, socket) do
+    conversation_id = socket.assigns.conversation_id
+    
+    Logger.info("Received cancel request for conversation #{conversation_id}")
+    
+    # Cancel via the cancellation token if available
+    if socket.assigns.current_cancellation_token do
+      CancellationToken.cancel(socket.assigns.current_cancellation_token, :user_requested)
+    end
+    
+    # Also cancel any registered tasks for this conversation
+    {:ok, cancelled_count} = TaskRegistry.cancel_conversation_tasks(conversation_id)
+    Logger.info("Cancelled #{cancelled_count} tasks for conversation #{conversation_id}")
+    
+    # Broadcast cancellation to all subscribers
+    broadcast!(socket, "processing_cancelled", %{
+      message: "Processing cancelled",
+      tasks_cancelled: cancelled_count,
+      timestamp: DateTime.utc_now(),
+      cancelled_by: socket.assigns.user_id
+    })
+    
+    {:noreply, socket}
+  end
 
 
+  @impl true
+  def handle_info({:status_update, category, text, metadata}, socket) do
+    # Forward status updates to the client
+    push(socket, "status_update", %{
+      category: category,
+      text: text,
+      metadata: metadata,
+      timestamp: DateTime.utc_now()
+    })
+    
+    # Check if this is a cancellation-related status
+    if String.contains?(text, "cancelled") || String.contains?(text, "cancelled") do
+      # Also send a more specific cancellation event
+      push(socket, "processing_cancelled", %{
+        message: text,
+        metadata: metadata,
+        timestamp: DateTime.utc_now()
+      })
+    end
+    
+    {:noreply, socket}
+  end
 
   # Private functions
 
