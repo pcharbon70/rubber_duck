@@ -189,6 +189,20 @@ defmodule RubberDuck.Engines.TestGeneration do
   end
 
   defp create_test_plan(analysis, input, _state) do
+    # Broadcast test plan creation
+    conversation_id = input[:conversation_id] || input[:context][:conversation_id]
+    if conversation_id do
+      RubberDuck.Status.engine(
+        conversation_id,
+        "Creating test plan",
+        %{
+          engine: :test_generation,
+          file_path: input.file_path,
+          status: :planning
+        }
+      )
+    end
+    
     plan = %{
       test_cases: plan_test_cases(analysis.functions, input),
       fixtures_needed: plan_fixtures(analysis.dependencies),
@@ -259,6 +273,20 @@ defmodule RubberDuck.Engines.TestGeneration do
   end
 
   defp generate_tests(test_plan, input, state) do
+    # Broadcast test generation start
+    conversation_id = input[:conversation_id] || input[:context][:conversation_id]
+    if conversation_id do
+      RubberDuck.Status.engine(
+        conversation_id,
+        "Generating tests",
+        %{
+          engine: :test_generation,
+          framework: input.framework,
+          status: :generating
+        }
+      )
+    end
+    
     prompt = build_test_generation_prompt(test_plan, input)
 
     opts = [
@@ -273,8 +301,34 @@ defmodule RubberDuck.Engines.TestGeneration do
       user_id: input.user_id
     ]
 
+    # Broadcast LLM call
+    if conversation_id do
+      RubberDuck.Status.engine(
+        conversation_id,
+        "Calling LLM for test generation",
+        %{
+          engine: :test_generation,
+          provider: input.provider,
+          model: input.model,
+          status: :llm_call
+        }
+      )
+    end
+
     case LLM.Service.completion(opts) do
       {:ok, response} ->
+        # Broadcast completion
+        if conversation_id do
+          RubberDuck.Status.engine(
+            conversation_id,
+            "Tests generated successfully",
+            %{
+              engine: :test_generation,
+              status: :completed
+            }
+          )
+        end
+        
         parse_test_response(response, input)
 
       {:error, reason} ->

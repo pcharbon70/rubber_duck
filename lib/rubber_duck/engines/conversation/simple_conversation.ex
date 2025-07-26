@@ -73,6 +73,19 @@ defmodule RubberDuck.Engines.Conversation.SimpleConversation do
   defp validate_input(_), do: {:error, :invalid_input}
 
   defp process_simple_query(validated, state) do
+    # Broadcast start of processing
+    conversation_id = validated.context[:conversation_id]
+    if conversation_id do
+      RubberDuck.Status.engine(
+        conversation_id,
+        "Processing simple conversation",
+        %{
+          engine: :simple_conversation,
+          status: :processing
+        }
+      )
+    end
+    
     # Build messages for LLM
     messages = build_messages(validated)
 
@@ -80,10 +93,37 @@ defmodule RubberDuck.Engines.Conversation.SimpleConversation do
     llm_opts = InputValidator.build_llm_opts(validated, messages, state)
 
     Logger.debug("Processing simple conversation query: #{String.slice(validated.query, 0, 50)}...")
+    
+    # Broadcast LLM call
+    if conversation_id do
+      RubberDuck.Status.engine(
+        conversation_id,
+        "Calling LLM for response",
+        %{
+          engine: :simple_conversation,
+          provider: validated.provider,
+          model: validated.model,
+          status: :llm_call
+        }
+      )
+    end
 
     case LLMService.completion(llm_opts) do
       {:ok, response} ->
         content = extract_content(response)
+        
+        # Broadcast completion
+        if conversation_id do
+          RubberDuck.Status.engine(
+            conversation_id,
+            "Simple conversation completed",
+            %{
+              engine: :simple_conversation,
+              status: :completed
+            }
+          )
+        end
+        
         {:ok, content}
 
       {:error, reason} ->
