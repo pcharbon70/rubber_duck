@@ -261,8 +261,7 @@ defmodule RubberDuckWeb.ConversationChannel do
             Logger.info("Generation chain steps executed: #{step_names}")
           end
           
-          # Log the full response structure for debugging (changed to info for visibility)
-          Logger.info("Full generation response being sent to client: #{inspect(formatted_response, pretty: true, limit: :infinity)}")
+          # Full response logging removed - too verbose
         end
         
         # Always log what we're sending (not just for generation)

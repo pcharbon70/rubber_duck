@@ -59,7 +59,7 @@ defmodule RubberDuck.LLM.ServiceDebug do
 
       end_time = System.monotonic_time(:millisecond)
       Logger.info("[LLM Debug] Total time: #{end_time - start_time}ms")
-      Logger.info("[LLM Debug] Result: #{inspect(result, pretty: true)}")
+      # Result logging removed - too verbose
 
       result
     else
