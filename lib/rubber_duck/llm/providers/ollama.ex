@@ -62,7 +62,6 @@ defmodule RubberDuck.LLM.Providers.Ollama do
         {:ok, %{status: 200, body: response_body}} ->
           end_time = System.monotonic_time(:millisecond)
           Logger.debug("Ollama request successful in #{end_time - start_time}ms")
-          Logger.debug("Ollama response body: #{inspect(response_body)}")
           {:ok, parse_response(response_body, request)}
 
         {:ok, response} ->

@@ -604,11 +604,9 @@ defmodule RubberDuck.Engines.Generation do
       user_id: input.user_id
     ]
 
-    Logger.debug("LLM request options: #{inspect(opts)}")
-
     case RubberDuck.LLM.Service.completion(opts) do
       {:ok, response} ->
-        Logger.debug("LLM response received: #{inspect(response)}")
+        Logger.debug("LLM response received")
         generated_code = extract_code_from_response(response, input.language)
 
         result = %{

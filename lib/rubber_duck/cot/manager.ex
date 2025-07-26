@@ -289,7 +289,7 @@ defmodule RubberDuck.CoT.Manager do
           %{role: "user", content: prompt}
         ]
 
-        Logger.debug("Executing step #{step.name} with provider #{provider}, model #{model}, prompt: #{String.slice(prompt, 0, 100)}...")
+        Logger.debug("Executing step #{step.name} with #{provider}/#{model}")
 
         # Convert map to keyword list for Service.completion/1
         opts = %{messages: messages} |> Map.merge(options) |> Map.to_list()
@@ -297,7 +297,7 @@ defmodule RubberDuck.CoT.Manager do
         case Service.completion(opts) do
           {:ok, response} ->
             content = extract_content(response)
-            Logger.debug("Step #{step.name} LLM response content: #{inspect(content)}")
+            Logger.debug("Step #{step.name} completed")
             {:ok, content}
 
           {:error, :cancelled} = error ->
@@ -354,8 +354,8 @@ defmodule RubberDuck.CoT.Manager do
 
   defp extract_llm_response_content(%{content: content}), do: content
 
-  defp extract_llm_response_content(response) do
-    Logger.error("Unknown LLM response format: #{inspect(response)}")
+  defp extract_llm_response_content(_response) do
+    Logger.error("Unknown LLM response format")
     ""
   end
 
