@@ -346,10 +346,7 @@ defmodule RubberDuck.CoT.Manager do
   end
 
   defp extract_llm_response_content(%{choices: choices}) when is_list(choices) do
-    Logger.debug("Extracting from choices: #{inspect(choices)}")
-    result = extract_choices_content(choices)
-    Logger.debug("Extracted content: #{inspect(result)}")
-    result
+    extract_choices_content(choices)
   end
 
   defp extract_llm_response_content(%{content: content}), do: content
@@ -365,8 +362,8 @@ defmodule RubberDuck.CoT.Manager do
   defp extract_choices_content([%{text: content} | _]), do: content
   defp extract_choices_content([%{"text" => content} | _]), do: content
 
-  defp extract_choices_content(choices) do
-    Logger.error("Failed to extract content from choices: #{inspect(choices)}")
+  defp extract_choices_content(_choices) do
+    Logger.error("Failed to extract content from choices")
     ""
   end
 
