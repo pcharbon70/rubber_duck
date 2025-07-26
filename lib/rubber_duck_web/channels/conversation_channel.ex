@@ -199,8 +199,9 @@ defmodule RubberDuckWeb.ConversationChannel do
       
       # Cancel any existing task
       socket = case socket.assigns.current_task do
-        {%Task{} = old_task, _context} ->
-          Task.shutdown(old_task, :brutal_kill)
+        {pid, ref, _context} when is_pid(pid) ->
+          Process.exit(pid, :kill)
+          Process.demonitor(ref, [:flush])
           assign(socket, :current_task, nil)
         _ ->
           socket
@@ -217,16 +218,18 @@ defmodule RubberDuckWeb.ConversationChannel do
         llm_config: input.llm_config
       }
       
-      # Use async_nolink to handle the long-running operation
-      # This creates a monitored task that won't crash the channel if it fails
-      task = Task.async_nolink(fn ->
+      # Spawn the task with proper monitoring
+      channel_pid = self()
+      
+      # Use spawn_monitor to create a monitored process
+      {pid, ref} = spawn_monitor(fn ->
         # Process through conversation router
         Logger.info("Starting EngineManager.execute for conversation",
           conversation_id: conversation_id,
           timeout: @default_timeout
         )
         
-        case EngineManager.execute(:conversation_router, input, @default_timeout) do
+        result = case EngineManager.execute(:conversation_router, input, @default_timeout) do
           {:ok, result} ->
             Logger.info("EngineManager.execute succeeded",
               conversation_id: conversation_id,
@@ -239,10 +242,13 @@ defmodule RubberDuckWeb.ConversationChannel do
             Logger.error("Conversation processing failed: #{inspect(reason)}")
             {:error, reason}
         end
+        
+        # Send result back to channel
+        send(channel_pid, {:async_result, result, async_context})
       end)
       
-      # Store the task reference so we can handle its completion
-      socket = assign(socket, :current_task, {task, async_context})
+      # Store the process info so we can handle its termination
+      socket = assign(socket, :current_task, {pid, ref, async_context})
       
       # Return immediately to avoid timeout
       {:noreply, socket}
@@ -402,44 +408,27 @@ defmodule RubberDuckWeb.ConversationChannel do
     {:noreply, socket}
   end
   
-  # Handle Task completion
+  # Handle process termination
   @impl true
-  def handle_info({ref, result}, socket) when is_reference(ref) do
+  def handle_info({:DOWN, ref, :process, pid, reason}, socket) do
     # Check if this is our current task
     case socket.assigns[:current_task] do
-      {%Task{ref: ^ref}, context} ->
-        # Task completed, handle the result
-        Process.demonitor(ref, [:flush])
-        
-        # Remove task from socket
+      {^pid, ^ref, context} ->
+        # Process terminated
         socket = assign(socket, :current_task, nil)
         
-        # Handle the result using our existing async_result handler
-        handle_info({:async_result, result, context}, socket)
+        if reason != :normal do
+          # Process crashed or was killed
+          Logger.error("Async process failed: #{inspect(reason)}")
+          # Handle as error
+          handle_info({:async_result, {:error, {:process_failed, reason}}, context}, socket)
+        else
+          # Normal termination, result should have been sent via async_result message
+          {:noreply, socket}
+        end
         
       _ ->
-        # Unknown task reference, ignore
-        {:noreply, socket}
-    end
-  end
-  
-  # Handle Task failure
-  @impl true
-  def handle_info({:DOWN, ref, :process, _pid, reason}, socket) do
-    # Check if this is our current task
-    case socket.assigns[:current_task] do
-      {%Task{ref: ^ref}, context} ->
-        # Task failed
-        Logger.error("Async task failed: #{inspect(reason)}")
-        
-        # Remove task from socket
-        socket = assign(socket, :current_task, nil)
-        
-        # Handle as error
-        handle_info({:async_result, {:error, {:task_failed, reason}}, context}, socket)
-        
-      _ ->
-        # Unknown task reference, ignore
+        # Unknown process reference, ignore
         {:noreply, socket}
     end
   end
@@ -524,24 +513,6 @@ defmodule RubberDuckWeb.ConversationChannel do
   end
   
   @impl true
-  def terminate(_reason, socket) do
-    # Clean up any running task
-    case socket.assigns[:current_task] do
-      {%Task{} = task, _context} ->
-        Task.shutdown(task, :brutal_kill)
-      _ ->
-        :ok
-    end
-    
-    # Clean up cancellation token
-    if socket.assigns[:current_cancellation_token] do
-      CancellationToken.stop(socket.assigns.current_cancellation_token)
-    end
-    
-    :ok
-  end
-  
-  @impl true
   def handle_info({:async_result, {:error, reason}, context}, socket) do
     Logger.error("Conversation processing failed: #{inspect(reason)}")
     
@@ -572,6 +543,25 @@ defmodule RubberDuckWeb.ConversationChannel do
     })
     
     {:noreply, socket}
+  end
+  
+  @impl true
+  def terminate(_reason, socket) do
+    # Clean up any running task
+    case socket.assigns[:current_task] do
+      {pid, ref, _context} when is_pid(pid) ->
+        Process.exit(pid, :kill)
+        Process.demonitor(ref, [:flush])
+      _ ->
+        :ok
+    end
+    
+    # Clean up cancellation token
+    if socket.assigns[:current_cancellation_token] do
+      CancellationToken.stop(socket.assigns.current_cancellation_token)
+    end
+    
+    :ok
   end
 
   # Private functions
