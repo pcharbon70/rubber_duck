@@ -8,9 +8,11 @@ import (
 
 // Config represents the TUI configuration
 type Config struct {
-	APIKey    string                    `json:"api_key,omitempty"`
-	Providers map[string]ProviderConfig `json:"providers"`
-	TUI       TUIConfig                 `json:"tui"`
+	APIKey          string                    `json:"api_key,omitempty"`
+	DefaultProvider string                    `json:"default_provider,omitempty"`
+	DefaultModel    string                    `json:"default_model,omitempty"`
+	Providers       map[string]ProviderConfig `json:"providers"`
+	TUI             TUIConfig                 `json:"tui"`
 }
 
 // ProviderConfig represents provider configuration

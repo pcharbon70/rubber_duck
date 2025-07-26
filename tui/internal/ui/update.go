@@ -108,8 +108,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.statusBar = "No assistant message to copy"
 			}
 			return m, nil
-		case "ctrl+m":
-			// Toggle mouse mode
+		case "ctrl+t":
+			// Toggle mouse mode info
 			return m, func() tea.Msg { return ToggleMouseModeMsg{} }
 		}
 		
@@ -144,17 +144,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 		
 	case ToggleMouseModeMsg:
-		// Toggle mouse mode
+		// Toggle mouse mode state (for display purposes)
 		m.mouseEnabled = !m.mouseEnabled
 		if m.mouseEnabled {
-			m.statusBar = "Mouse mode enabled - scrolling with mouse wheel"
-			m.chat.AddMessage(SystemMessage, "Mouse mode enabled. You can scroll with the mouse wheel but cannot select text. Press Ctrl+M to disable mouse mode for text selection.", "system")
+			m.statusBar = "Mouse mode is currently enabled"
+			m.chat.AddMessage(SystemMessage, "Mouse mode is currently ENABLED. You cannot select text but can scroll with the mouse wheel. To disable mouse mode, restart the TUI without the --mouse flag.", "system")
 		} else {
-			m.statusBar = "Mouse mode disabled - text selection enabled" 
-			m.chat.AddMessage(SystemMessage, "Mouse mode disabled. You can now select and copy text with your mouse. Press Ctrl+M to re-enable mouse mode for scrolling.", "system")
+			m.statusBar = "Text selection mode is active" 
+			m.chat.AddMessage(SystemMessage, "Text selection is currently ENABLED. You can select and copy text with your mouse (Ctrl+Shift+C to copy). To enable mouse scrolling, restart the TUI with the --mouse flag:\n\n./rubber_duck_tui --mouse", "system")
 		}
-		// Note: Actually toggling mouse mode requires restarting the program with different options
-		// For now, we just track the state and inform the user
 		return m, nil
 		
 	case InitiateConnectionMsg:
@@ -370,21 +368,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.chat.AddMessage(AssistantMessage, response.Response, "assistant")
 			m.messageCount = m.chat.GetMessageCount()
 			
-			// Check if response includes provider info
-			if response.RoutedTo != "" {
-				// RoutedTo might contain provider info like "openai" or "anthropic"
-				m.currentProvider = response.RoutedTo
-			}
-			
-			// Check metadata for model/provider info
-			if response.Metadata != nil {
-				if provider, ok := response.Metadata["provider"].(string); ok {
-					m.currentProvider = provider
-				}
-				if model, ok := response.Metadata["model"].(string); ok {
-					m.currentModel = model
-				}
-			}
+			// Note: Provider and model info from responses should NOT override user settings
+			// Only explicit user commands should change these values
 			
 			// Update token usage
 			m.tokenUsage = EstimateConversationTokens(m.chat.GetMessages())
@@ -407,12 +392,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} `json:"context"`
 		}
 		if err := json.Unmarshal(msg.Context, &context); err == nil {
+			// Note: Context updates should not override user-selected model/provider
+			// Only show that the server has acknowledged the preference
 			if context.Context.PreferredModel != "" {
-				// Update model and provider from context
-				m.currentModel = context.Context.PreferredModel
-				m.currentProvider = context.Context.PreferredProvider
-				m.updateHeaderState()
-				m.statusBar = fmt.Sprintf("Model preference saved: %s", context.Context.PreferredModel)
+				m.statusBar = fmt.Sprintf("Server acknowledged model preference: %s", context.Context.PreferredModel)
 			} else {
 				m.statusBar = "Context updated"
 			}
@@ -919,7 +902,9 @@ func (m Model) buildHelpContent() string {
 	help += "━━━━━━━━━━━━━━━━━━━━━\n"
 	help += "Ctrl+A    - Copy all messages to clipboard\n"
 	help += "Ctrl+L    - Copy last assistant message\n"
-	help += "Ctrl+M    - Toggle mouse mode (enable text selection)\n\n"
+	help += "Ctrl+T    - Show mouse mode status\n"
+	help += "\nText selection is enabled by default.\n"
+	help += "For mouse scrolling, start with: ./rubber_duck_tui --mouse\n\n"
 	
 	help += "CHAT:\n"
 	help += "━━━━━━━━━━━━━━━━━━━━━\n"
@@ -1197,6 +1182,56 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 				m.statusBar = fmt.Sprintf("Model set to: %s (%s)", model, provider)
 				m.chat.AddMessage(SystemMessage, fmt.Sprintf("Model set to: %s\nProvider set to: %s", model, provider), "system")
 			}
+		}
+	
+	// Config commands
+	case "config_save":
+		// Save current provider and model as defaults
+		m.config.DefaultProvider = m.currentProvider
+		m.config.DefaultModel = m.currentModel
+		
+		// Save the config
+		if err := SaveConfig(m.config); err != nil {
+			m.statusMessages.AddMessage(StatusCategoryError, fmt.Sprintf("Failed to save config: %v", err), nil)
+			m.statusBar = "Failed to save config"
+		} else {
+			m.statusBar = "Config saved"
+			message := "Default settings saved to ~/.rubber_duck/config.json"
+			if m.currentProvider != "" && m.currentModel != "" {
+				message = fmt.Sprintf("Default settings saved:\n  Provider: %s\n  Model: %s", m.currentProvider, m.currentModel)
+			} else if m.currentProvider != "" {
+				message = fmt.Sprintf("Default settings saved:\n  Provider: %s\n  Model: (server default)", m.currentProvider)
+			} else if m.currentModel != "" {
+				message = fmt.Sprintf("Default settings saved:\n  Provider: (none)\n  Model: %s", m.currentModel)
+			}
+			m.chat.AddMessage(SystemMessage, message, "system")
+		}
+		
+	case "config_load":
+		// Reload config from file
+		config, err := LoadConfig()
+		if err != nil {
+			m.statusMessages.AddMessage(StatusCategoryError, fmt.Sprintf("Failed to load config: %v", err), nil)
+			m.statusBar = "Failed to load config"
+		} else {
+			// Update model's config and current settings
+			m.config = config
+			m.currentProvider = config.DefaultProvider
+			m.currentModel = config.DefaultModel
+			m.updateHeaderState()
+			
+			message := "Settings loaded from ~/.rubber_duck/config.json"
+			if config.DefaultProvider != "" && config.DefaultModel != "" {
+				message = fmt.Sprintf("Settings loaded:\n  Provider: %s\n  Model: %s", config.DefaultProvider, config.DefaultModel)
+			} else if config.DefaultProvider != "" {
+				message = fmt.Sprintf("Settings loaded:\n  Provider: %s\n  Model: (server default)", config.DefaultProvider)
+			} else if config.DefaultModel != "" {
+				message = fmt.Sprintf("Settings loaded:\n  Provider: (none)\n  Model: %s", config.DefaultModel)
+			} else {
+				message = "Settings loaded (no default provider/model set)"
+			}
+			m.statusBar = "Config loaded"
+			m.chat.AddMessage(SystemMessage, message, "system")
 		}
 	}
 	

@@ -30,10 +30,11 @@ func main() {
 	
 	// Parse command line flags
 	var (
-		url      = flag.String("url", "ws://localhost:5555/socket", "Phoenix WebSocket URL (authenticated)")
-		authURL  = flag.String("auth-url", "ws://localhost:5555/auth_socket", "Phoenix Auth WebSocket URL")
-		apiKey   = flag.String("api-key", "", "API key for authentication")
-		debug    = flag.Bool("debug", false, "Enable debug logging")
+		url       = flag.String("url", "ws://localhost:5555/socket", "Phoenix WebSocket URL (authenticated)")
+		authURL   = flag.String("auth-url", "ws://localhost:5555/auth_socket", "Phoenix Auth WebSocket URL")
+		apiKey    = flag.String("api-key", "", "API key for authentication")
+		debug     = flag.Bool("debug", false, "Enable debug logging")
+		mouse     = flag.Bool("mouse", false, "Enable mouse support for scrolling (disables text selection)")
 	)
 	flag.Parse()
 	
@@ -70,18 +71,27 @@ func main() {
 	// Create the model
 	model := ui.NewModel()
 	
+	// Set mouse mode based on flag
+	model.SetMouseEnabled(*mouse)
+	
 	// Configure Phoenix connection
 	if *url != "" {
 		model.SetPhoenixConfig(*url, *authURL, finalAPIKey)
 	}
 
 	// Create the program with additional options to ensure full terminal usage
-	p := tea.NewProgram(model, 
+	programOpts := []tea.ProgramOption{
 		tea.WithAltScreen(),     // Use alternate screen buffer
-		tea.WithMouseCellMotion(), // Enable mouse support
 		tea.WithoutCatchPanics(), // Let us handle panics
 		tea.WithInputTTY(),       // Force TTY input handling
-	)
+	}
+	
+	// Only enable mouse support if explicitly enabled
+	if *mouse {
+		programOpts = append(programOpts, tea.WithMouseCellMotion())
+	}
+	
+	p := tea.NewProgram(model, programOpts...)
 	
 	// Store program reference for UI components
 	ui.SetProgramHolder(p)

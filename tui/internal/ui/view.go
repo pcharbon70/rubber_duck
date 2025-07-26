@@ -76,10 +76,10 @@ func (m Model) renderBase() string {
 	// Account for outer container border (2 lines) and reduce by 2 more for visibility
 	availableHeight := contentHeight - statusBarHeight - 5
 	
-	// Status messages take 35% of available conversation area
-	statusHeight := int(float64(availableHeight) * 0.35)
-	if statusHeight < 5 {
-		statusHeight = 5 // Minimum height
+	// Status messages take 10% of available conversation area
+	statusHeight := int(float64(availableHeight) * 0.10)
+	if statusHeight < 3 {
+		statusHeight = 3 // Minimum height
 	}
 	chatHeight := availableHeight - statusHeight
 	
@@ -90,14 +90,10 @@ func (m Model) renderBase() string {
 	
 	// Create styles for rounded borders
 	statusBorderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63")).
 		Width(chatWidth - 2).
 		Padding(0, 1)
 		
 	chatBorderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("62")).
 		Width(chatWidth - 2).
 		Padding(0, 1)
 	
@@ -111,10 +107,28 @@ func (m Model) renderBase() string {
 	statusSection := statusBorderStyle.Render(statusContent)
 	chatSection := chatBorderStyle.Render(m.chat.View())
 	
+	// Add separator between status bar and status messages
+	separator := lipgloss.NewStyle().
+		Width(chatWidth - 2).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).
+		BorderForeground(lipgloss.Color("240")).
+		Render("")
+	
+	// Add separator between status messages and chat
+	chatSeparator := lipgloss.NewStyle().
+		Width(chatWidth - 2).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).
+		BorderForeground(lipgloss.Color("240")).
+		Render("")
+	
 	chatContent := lipgloss.JoinVertical(
 		lipgloss.Left,
 		statusBar,        // Status bar at the top
+		separator,        // Separator after status bar
 		statusSection,
+		chatSeparator,    // Separator between status and chat
 		chatSection,
 	)
 	

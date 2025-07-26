@@ -151,14 +151,21 @@ func (c Chat) View() string {
 	title := titleStyle.Render("◆ Conversation History ◆")
 	
 	// Build the view with title
+	// Add a separator line between viewport and input
+	separator := lipgloss.NewStyle().
+		Width(c.width-2).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderTop(true).
+		BorderForeground(lipgloss.Color("240")).
+		Render("")
+	
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
 		title,
 		c.viewport.View(),
+		separator,
 		lipgloss.NewStyle().
 			Width(c.width-2).
-			Border(lipgloss.NormalBorder(), true, false, false, false).
-			BorderForeground(lipgloss.Color("240")).
 			Render(c.input.View()),
 	)
 
@@ -556,6 +563,24 @@ func (c Chat) handleSlashCommand(command string) tea.Cmd {
 			return ExecuteCommandMsg{Command: "auth_status"}
 		}
 		
+	case "config":
+		if len(parts) > 1 {
+			switch parts[1] {
+			case "save":
+				return func() tea.Msg {
+					return ExecuteCommandMsg{Command: "config_save"}
+				}
+			case "load", "reload":
+				return func() tea.Msg {
+					return ExecuteCommandMsg{Command: "config_load"}
+				}
+			default:
+				c.AddMessage(SystemMessage, "Usage: /config <save|load>\n  save - Save current provider/model as defaults\n  load - Load provider/model from config", "system")
+			}
+		} else {
+			c.AddMessage(SystemMessage, "Usage: /config <save|load>\n  save - Save current provider/model as defaults\n  load - Load provider/model from config", "system")
+		}
+		
 	case "quit", "exit", "q":
 		// Quit application
 		return tea.Quit
@@ -570,6 +595,7 @@ func (c Chat) handleSlashCommand(command string) tea.Cmd {
 		helpText += "/editor, /edit     - Toggle editor\n"
 		helpText += "/commands, /cmds   - Show command palette\n"
 		helpText += "/provider <name>   - Set provider for current model\n"
+		helpText += "/config <save|load>- Save/load default provider and model\n"
 		helpText += "/login <user> <pw> - Login to server\n"
 		helpText += "/logout            - Logout from server\n"
 		helpText += "/apikey <cmd>      - API key management\n"

@@ -175,8 +175,8 @@ func NewModel() *Model {
 		authClient:   authClient,
 		statusClient: statusClient,
 		apiKeyClient: apiKeyClient,
-		currentModel:    "",  // Empty means use default
-		currentProvider: "",  // Empty means unknown
+		currentModel:    config.DefaultModel,    // Load from config or empty for default
+		currentProvider: config.DefaultProvider, // Load from config or empty for unknown
 		temperature:     0.7,
 		authenticated:   false,
 		username:     "",
@@ -187,7 +187,7 @@ func NewModel() *Model {
 		tokenLimit:    4096,
 		categoryMetadata: make(map[string]CategoryInfo),
 		config:        config,
-		mouseEnabled:  true, // Mouse enabled by default
+		mouseEnabled:  false, // Mouse disabled by default for text selection
 	}
 	
 	// Initialize component sizes with defaults
@@ -212,6 +212,11 @@ func (m *Model) SetDimensions(width, height int) {
 	m.width = width
 	m.height = height
 	m.updateComponentSizes()
+}
+
+// SetMouseEnabled sets the mouse mode state
+func (m *Model) SetMouseEnabled(enabled bool) {
+	m.mouseEnabled = enabled
 }
 
 // updateComponentSizes recalculates component sizes based on current layout
@@ -248,10 +253,10 @@ func (m *Model) updateComponentSizes() {
 	headerHeight := 3 // chat header takes 3 lines
 	availableHeight := contentHeight - headerHeight - 2 // -2 for main borders
 	
-	// Status messages take 30% of available conversation area
-	statusHeight := int(float64(availableHeight) * 0.3)
-	if statusHeight < 5 {
-		statusHeight = 5 // Minimum height
+	// Status messages take 10% of available conversation area
+	statusHeight := int(float64(availableHeight) * 0.1)
+	if statusHeight < 3 {
+		statusHeight = 3 // Minimum height
 	}
 	chatHeight := availableHeight - statusHeight - 2 // -2 for spacing between sections
 	
