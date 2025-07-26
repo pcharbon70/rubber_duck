@@ -15,7 +15,12 @@ config :rubber_duck, :timeouts, %{
   engines: %{
     default: 10_000,
     external_router: 600_000,
-    task_registry_cleanup: 120_000
+    task_registry_cleanup: 120_000,
+    # Conversation engines
+    generation_conversation: 360_000,  # 6 minutes for code generation
+    analysis_conversation: 240_000,    # 4 minutes for analysis
+    complex_conversation: 480_000,     # 8 minutes for complex tasks
+    problem_solver: 600_000           # 10 minutes for problem solving
   },
 
   # Tool execution timeouts
@@ -65,6 +70,20 @@ config :rubber_duck, :timeouts, %{
         pattern_identification: 20_000,
         relationship_mapping: 20_000,
         synthesis: 14_000
+      }
+    },
+    generation: %{
+      total: 300_000,  # 5 minutes for full generation chain
+      steps: %{
+        understand_requirements: 20_000,
+        review_context: 120_000,
+        plan_structure: 20_000,
+        identify_dependencies: 14_000,
+        generate_implementation: 30_000,
+        add_documentation: 120_000,
+        generate_tests: 24_000,
+        validate_output: 120_000,
+        provide_alternatives: 20_000
       }
     },
     completion: %{
