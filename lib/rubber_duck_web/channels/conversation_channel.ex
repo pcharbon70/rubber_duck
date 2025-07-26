@@ -195,129 +195,48 @@ defmodule RubberDuckWeb.ConversationChannel do
       
       # Add cancellation token to input
       input = CancellationToken.add_to_input(input, cancellation_token)
-
-    start_time = System.monotonic_time(:millisecond)
-
-    # Process through conversation router
-    Logger.info("Starting EngineManager.execute for conversation",
-      conversation_id: conversation_id,
-      timeout: @default_timeout
-    )
-    
-    case EngineManager.execute(:conversation_router, input, @default_timeout) do
-      {:ok, result} ->
-        Logger.info("EngineManager.execute succeeded",
-          conversation_id: conversation_id,
-          conversation_type: result.conversation_type,
-          routed_to: result[:routed_to]
-        )
-        # Add assistant message to history
-        assistant_message = %{
-          role: "assistant",
-          content: result.response,
-          timestamp: DateTime.utc_now(),
-          metadata: Map.take(result, [:conversation_type, :routed_to, :processing_time])
-        }
-
-        messages = add_message(messages, assistant_message)
-        socket = assign(socket, :messages, messages)
-
-        # Log successful completion
-        Logger.debug("Message processed successfully")
-
-        # Send completion status
-        Status.with_timing(
-          conversation_id,
-          :info,
-          "Response sent",
-          start_time,
-          %{
-            response_length: String.length(result.response),
-            conversation_type: result.conversation_type,
-            routed_to: result[:routed_to],
-            model_used: input.llm_config[:model]
-          }
-        )
-
-        # Format the response
-        formatted_response = format_response(result, content)
+      
+      # Store socket info for async task
+      channel_pid = self()
+      
+      # Spawn task to handle long-running operation
+      Task.start(fn ->
+        start_time = System.monotonic_time(:millisecond)
         
-        # Log generation conversation responses
-        if result.conversation_type == :generation do
-          Logger.info("Generation conversation response",
-            conversation_id: conversation_id,
-            query: String.slice(content, 0, 100),
-            response_length: String.length(result.response),
-            generated_code: result[:generated_code] != nil,
-            implementation_plan_steps: length(result[:implementation_plan] || []),
-            reasoning_steps_count: length(result[:reasoning_steps] || []),
-            processing_time_ms: result[:processing_time],
-            model: input.llm_config[:model]
-          )
-          
-          # Log the reasoning step names
-          if result[:reasoning_steps] do
-            step_names = result.reasoning_steps |> Enum.map(& &1.name) |> Enum.join(", ")
-            Logger.info("Generation chain steps executed: #{step_names}")
-          end
-          
-          # Full response logging removed - too verbose
+        # Process through conversation router
+        Logger.info("Starting EngineManager.execute for conversation",
+          conversation_id: conversation_id,
+          timeout: @default_timeout
+        )
+        
+        result = case EngineManager.execute(:conversation_router, input, @default_timeout) do
+          {:ok, result} ->
+            Logger.info("EngineManager.execute succeeded",
+              conversation_id: conversation_id,
+              conversation_type: result.conversation_type,
+              routed_to: result[:routed_to]
+            )
+            {:ok, result}
+            
+          {:error, reason} ->
+            Logger.error("Conversation processing failed: #{inspect(reason)}")
+            {:error, reason}
         end
         
-        # Always log what we're sending (not just for generation)
-        Logger.info("Sending response via Phoenix channel",
-          conversation_type: result.conversation_type,
-          response_keys: Map.keys(formatted_response),
-          response_preview: String.slice(formatted_response.response, 0, 200)
-        )
-        
-        # Send response
-        push(socket, "response", formatted_response)
-        {:noreply, socket}
-
-      {:error, :cancelled} ->
-        Logger.info("Conversation processing was cancelled")
-        
-        # Broadcast cancellation notification to all subscribers
-        broadcast!(socket, "processing_cancelled", %{
-          message: "Processing was cancelled",
-          timestamp: DateTime.utc_now(),
-          cancelled_by: socket.assigns.user_id
-        })
-        
-        {:noreply, socket}
-        
-      {:error, reason} ->
-        Logger.error("Conversation processing failed: #{inspect(reason)}")
-        
-        Logger.info("Sending error response to client",
+        # Send result back to channel process
+        send(channel_pid, {:async_result, result, %{
+          start_time: start_time,
+          content: content,
+          messages: messages,
+          user_id: socket.assigns.user_id,
+          session_id: socket.assigns.session_id,
           conversation_id: conversation_id,
-          error_type: extract_error_type(reason)
-        )
-
-        # Send error status
-        Status.error(
-          conversation_id,
-          "Failed to process message",
-          Status.build_error_metadata(:conversation_error, format_error(reason), %{
-            user_id: socket.assigns.user_id,
-            session_id: socket.assigns.session_id,
-            message_length: String.length(content)
-          })
-        )
-
-        # Try error recovery
-        error_message = format_user_error(reason)
-        
-        push(socket, "error", %{
-          message: error_message,
-          type: extract_error_type(reason),
-          recoverable: is_recoverable_error?(reason),
-          details: format_error(reason)
-        })
-
-        {:noreply, socket}
-    end
+          llm_config: input.llm_config
+        }})
+      end)
+      
+      # Return immediately to avoid timeout
+      {:noreply, socket}
     end  # Close the if/else for provider/model check
   end
 
@@ -470,6 +389,118 @@ defmodule RubberDuckWeb.ConversationChannel do
         timestamp: DateTime.utc_now()
       })
     end
+    
+    {:noreply, socket}
+  end
+  
+  @impl true
+  def handle_info({:async_result, {:ok, result}, context}, socket) do
+    # Add assistant message to history
+    assistant_message = %{
+      role: "assistant",
+      content: result.response,
+      timestamp: DateTime.utc_now(),
+      metadata: Map.take(result, [:conversation_type, :routed_to, :processing_time])
+    }
+    
+    messages = add_message(context.messages, assistant_message)
+    socket = assign(socket, :messages, messages)
+    
+    # Log successful completion
+    Logger.debug("Message processed successfully")
+    
+    # Send completion status
+    Status.with_timing(
+      context.conversation_id,
+      :info,
+      "Response sent",
+      context.start_time,
+      %{
+        response_length: String.length(result.response),
+        conversation_type: result.conversation_type,
+        routed_to: result[:routed_to],
+        model_used: context.llm_config[:model]
+      }
+    )
+    
+    # Format the response
+    formatted_response = format_response(result, context.content)
+    
+    # Log generation conversation responses
+    if result.conversation_type == :generation do
+      Logger.info("Generation conversation response",
+        conversation_id: context.conversation_id,
+        query: String.slice(context.content, 0, 100),
+        response_length: String.length(result.response),
+        generated_code: result[:generated_code] != nil,
+        implementation_plan_steps: length(result[:implementation_plan] || []),
+        reasoning_steps_count: length(result[:reasoning_steps] || []),
+        processing_time_ms: result[:processing_time],
+        model: context.llm_config[:model]
+      )
+      
+      # Log the reasoning step names
+      if result[:reasoning_steps] do
+        step_names = result.reasoning_steps |> Enum.map(& &1.name) |> Enum.join(", ")
+        Logger.info("Generation chain steps executed: #{step_names}")
+      end
+    end
+    
+    # Always log what we're sending (not just for generation)
+    Logger.info("Sending response via Phoenix channel",
+      conversation_type: result.conversation_type,
+      response_keys: Map.keys(formatted_response),
+      response_preview: String.slice(formatted_response.response, 0, 200)
+    )
+    
+    # Send response
+    push(socket, "response", formatted_response)
+    {:noreply, socket}
+  end
+  
+  @impl true
+  def handle_info({:async_result, {:error, :cancelled}, context}, socket) do
+    Logger.info("Conversation processing was cancelled")
+    
+    # Broadcast cancellation notification to all subscribers
+    broadcast!(socket, "processing_cancelled", %{
+      message: "Processing was cancelled",
+      timestamp: DateTime.utc_now(),
+      cancelled_by: context.user_id
+    })
+    
+    {:noreply, socket}
+  end
+  
+  @impl true
+  def handle_info({:async_result, {:error, reason}, context}, socket) do
+    Logger.error("Conversation processing failed: #{inspect(reason)}")
+    
+    Logger.info("Sending error response to client",
+      conversation_id: context.conversation_id,
+      error_type: extract_error_type(reason)
+    )
+    
+    # Send error status
+    Status.error(
+      context.conversation_id,
+      "Failed to process message",
+      Status.build_error_metadata(:conversation_error, format_error(reason), %{
+        user_id: context.user_id,
+        session_id: context.session_id,
+        message_length: String.length(context.content)
+      })
+    )
+    
+    # Try error recovery
+    error_message = format_user_error(reason)
+    
+    push(socket, "error", %{
+      message: error_message,
+      type: extract_error_type(reason),
+      recoverable: is_recoverable_error?(reason),
+      details: format_error(reason)
+    })
     
     {:noreply, socket}
   end
