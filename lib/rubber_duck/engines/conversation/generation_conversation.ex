@@ -19,6 +19,9 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
   alias RubberDuck.CoT.Manager, as: ConversationManager
   alias RubberDuck.CoT.Chains.GenerationChain
   alias RubberDuck.Engine.InputValidator
+  
+  # Ensure the module is loaded
+  require RubberDuck.CoT.Chains.GenerationChain
 
   @impl true
   def init(config) do
@@ -98,7 +101,12 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
     cot_context = build_cot_context(validated, state)
 
     Logger.info("Processing generation conversation: #{String.slice(validated.query, 0, 50)}...")
-
+    
+    # Debug: Check chain module
+    Logger.info("Using chain module: #{inspect(state.chain_module)}")
+    Logger.info("Chain module exports config?: #{function_exported?(state.chain_module, :config, 0)}")
+    Logger.info("Chain module exports steps?: #{function_exported?(state.chain_module, :steps, 0)}")
+    
     # Execute the generation chain
     case ConversationManager.execute_chain(state.chain_module, validated.query, cot_context) do
       {:ok, result} ->

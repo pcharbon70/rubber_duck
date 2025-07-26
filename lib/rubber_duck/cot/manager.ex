@@ -89,9 +89,13 @@ defmodule RubberDuck.CoT.Manager do
   # Private functions
 
   defp get_chain_config(chain_module) do
+    Logger.debug("Checking chain module: #{inspect(chain_module)}")
+    
     if function_exported?(chain_module, :config, 0) do
+      Logger.debug("Chain module #{inspect(chain_module)} has config/0")
       {:ok, chain_module.config()}
     else
+      Logger.error("Chain module #{inspect(chain_module)} missing config/0. Exported functions: #{inspect(chain_module.__info__(:functions))}")
       {:error, "Chain module must implement config/0"}
     end
   end
