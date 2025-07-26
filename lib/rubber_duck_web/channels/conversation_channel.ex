@@ -240,13 +240,27 @@ defmodule RubberDuckWeb.ConversationChannel do
             response_length: String.length(result.response),
             generated_code: result[:generated_code] != nil,
             implementation_plan_steps: length(result[:implementation_plan] || []),
+            reasoning_steps_count: length(result[:reasoning_steps] || []),
             processing_time_ms: result[:processing_time],
             model: input.llm_config[:model]
           )
           
-          # Log the full response structure for debugging
-          Logger.debug("Full generation response structure: #{inspect(formatted_response, pretty: true, limit: :infinity)}")
+          # Log the reasoning step names
+          if result[:reasoning_steps] do
+            step_names = result.reasoning_steps |> Enum.map(& &1.name) |> Enum.join(", ")
+            Logger.info("Generation chain steps executed: #{step_names}")
+          end
+          
+          # Log the full response structure for debugging (changed to info for visibility)
+          Logger.info("Full generation response being sent to client: #{inspect(formatted_response, pretty: true, limit: :infinity)}")
         end
+        
+        # Always log what we're sending (not just for generation)
+        Logger.info("Sending response via Phoenix channel",
+          conversation_type: result.conversation_type,
+          response_keys: Map.keys(formatted_response),
+          response_preview: String.slice(formatted_response.response, 0, 200)
+        )
         
         # Send response
         push(socket, "response", formatted_response)

@@ -63,7 +63,7 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
         processing_time_ms: result.processing_time
       )
       
-      Logger.debug("Generation engine full result: #{inspect(result, pretty: true, limit: :infinity)}")
+      Logger.info("Generation engine full result: #{inspect(result, pretty: true, limit: :infinity)}")
       
       {:ok, result}
     end
@@ -102,7 +102,7 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
     # Execute the generation chain
     case ConversationManager.execute_chain(state.chain_module, validated.query, cot_context) do
       {:ok, result} ->
-        Logger.debug("CoT chain raw result: #{inspect(result, pretty: true, limit: :infinity)}")
+        Logger.info("CoT chain raw result: #{inspect(result, pretty: true, limit: :infinity)}")
         {:ok, result}
 
       {:error, reason} ->
