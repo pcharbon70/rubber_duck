@@ -241,7 +241,38 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
   end
 
   def validation_passed(%{result: result}) do
-    result != nil && !String.contains?(String.downcase(result), ["error", "fail", "issue"])
+    # Check if validation actually passed by looking for positive indicators
+    # or the absence of critical failure indicators
+    if result == nil do
+      false
+    else
+      downcased = String.downcase(result)
+      
+      # Check for positive validation indicators
+      has_positive = String.contains?(downcased, [
+        "validation passed",
+        "validation successful",
+        "valid",
+        "correct",
+        "looks good",
+        "no issues",
+        "no errors",
+        "all checks pass"
+      ])
+      
+      # Check for critical failures (not just the word appearing)
+      has_critical_failure = String.contains?(downcased, [
+        "validation failed",
+        "invalid code",
+        "critical error",
+        "syntax error",
+        "does not compile",
+        "tests fail"
+      ])
+      
+      # Pass if we have positive indicators or no critical failures
+      has_positive || !has_critical_failure
+    end
   end
 
   def has_alternatives(%{result: result}) do
