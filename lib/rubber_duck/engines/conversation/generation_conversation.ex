@@ -17,11 +17,7 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
   require Logger
 
   alias RubberDuck.CoT.Manager, as: ConversationManager
-  alias RubberDuck.CoT.Chains.GenerationChain
   alias RubberDuck.Engine.InputValidator
-  
-  # Ensure the module is loaded
-  require RubberDuck.CoT.Chains.GenerationChain
 
   @impl true
   def init(config) do
@@ -31,7 +27,7 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
       temperature: config[:temperature] || 0.6,
       # Remove hardcoded model - will come from input
       timeout: config[:timeout] || 180_000,
-      chain_module: config[:chain_module] || GenerationChain
+      chain_module: config[:chain_module] || RubberDuck.CoT.Chains.GenerationChain
     }
 
     {:ok, state}
