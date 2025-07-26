@@ -191,18 +191,19 @@ defmodule RubberDuck.Engine.TaskRegistry do
     # Remove completed/cancelled tasks older than 5 minutes
     cutoff = DateTime.add(DateTime.utc_now(), -300, :second)
     
-    stale_tasks = :ets.select(@table_name, [
-      {
-        {:"$1", %{status: :"$2", started_at: :"$3"}},
-        [{:andalso, {:"/=", :"$2", :running}, {:<, :"$3", cutoff}}],
-        [:"$1"]
-      }
-    ])
+    # Get all tasks and filter in Elixir since ETS match specs don't work well with maps
+    all_tasks = :ets.tab2list(@table_name)
     
-    Enum.each(stale_tasks, &:ets.delete(@table_name, &1))
+    stale_task_ids = all_tasks
+    |> Enum.filter(fn {_task_id, task} ->
+      task.status != :running && DateTime.compare(task.started_at, cutoff) == :lt
+    end)
+    |> Enum.map(fn {task_id, _task} -> task_id end)
     
-    if length(stale_tasks) > 0 do
-      Logger.debug("Cleaned up #{length(stale_tasks)} stale tasks")
+    Enum.each(stale_task_ids, &:ets.delete(@table_name, &1))
+    
+    if length(stale_task_ids) > 0 do
+      Logger.debug("Cleaned up #{length(stale_task_ids)} stale tasks")
     end
   end
   
