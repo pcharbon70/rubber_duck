@@ -19,6 +19,7 @@ defmodule RubberDuck.Application do
       {Registry, keys: :unique, name: RubberDuck.Projects.FileWatcher.Registry},
       # Engine system components
       RubberDuck.Engine.CapabilityRegistry,
+      RubberDuck.Engine.TaskRegistry,
       RubberDuck.Engine.Supervisor,
       # Engine loader - loads engines after startup
       RubberDuck.Engine.Loader,
