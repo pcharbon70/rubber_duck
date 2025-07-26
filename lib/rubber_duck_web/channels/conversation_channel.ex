@@ -199,8 +199,18 @@ defmodule RubberDuckWeb.ConversationChannel do
     start_time = System.monotonic_time(:millisecond)
 
     # Process through conversation router
+    Logger.info("Starting EngineManager.execute for conversation",
+      conversation_id: conversation_id,
+      timeout: @default_timeout
+    )
+    
     case EngineManager.execute(:conversation_router, input, @default_timeout) do
       {:ok, result} ->
+        Logger.info("EngineManager.execute succeeded",
+          conversation_id: conversation_id,
+          conversation_type: result.conversation_type,
+          routed_to: result[:routed_to]
+        )
         # Add assistant message to history
         assistant_message = %{
           role: "assistant",
@@ -280,6 +290,11 @@ defmodule RubberDuckWeb.ConversationChannel do
         
       {:error, reason} ->
         Logger.error("Conversation processing failed: #{inspect(reason)}")
+        
+        Logger.info("Sending error response to client",
+          conversation_id: conversation_id,
+          error_type: extract_error_type(reason)
+        )
 
         # Send error status
         Status.error(
