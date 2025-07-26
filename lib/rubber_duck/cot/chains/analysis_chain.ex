@@ -13,7 +13,7 @@ defmodule RubberDuck.CoT.Chains.AnalysisChain do
       name: :analysis,
       description: "Systematic code analysis with structured reasoning",
       max_steps: 10,
-      timeout: 45_000,
+      timeout: RubberDuck.Config.Timeouts.get([:chains, :analysis, :total], 45_000),
       template: :analytical,
       # 30 minutes
       cache_ttl: 1800
@@ -42,7 +42,7 @@ defmodule RubberDuck.CoT.Chains.AnalysisChain do
         Understanding:
         """,
         validates: [:has_understanding],
-        timeout: 10_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :analysis, :steps, :understanding], 10_000)
       },
       %{
         name: :identify_patterns,
@@ -61,7 +61,7 @@ defmodule RubberDuck.CoT.Chains.AnalysisChain do
         """,
         depends_on: :understand_code,
         validates: [:found_patterns],
-        timeout: 8_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :analysis, :steps, :context_gathering], 8_000)
       },
       %{
         name: :analyze_issues,
@@ -83,7 +83,7 @@ defmodule RubberDuck.CoT.Chains.AnalysisChain do
         """,
         depends_on: :identify_patterns,
         validates: [:issues_analyzed],
-        timeout: 10_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :analysis, :steps, :pattern_identification], 10_000)
       },
       %{
         name: :suggest_improvements,
@@ -103,7 +103,7 @@ defmodule RubberDuck.CoT.Chains.AnalysisChain do
         """,
         depends_on: :analyze_issues,
         validates: [:has_suggestions],
-        timeout: 10_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :analysis, :steps, :relationship_mapping], 10_000)
       },
       %{
         name: :prioritize_actions,
@@ -122,7 +122,7 @@ defmodule RubberDuck.CoT.Chains.AnalysisChain do
         """,
         depends_on: :suggest_improvements,
         validates: [:has_priorities],
-        timeout: 7_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :analysis, :steps, :synthesis], 7_000)
       }
     ]
   end

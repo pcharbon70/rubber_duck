@@ -17,7 +17,7 @@ defmodule RubberDuck.Tool.ExternalRouter do
   require Logger
 
   # 5 minutes default
-  @execution_timeout 300_000
+  @execution_timeout RubberDuck.Config.Timeouts.get([:engines, :external_router], 300_000)
 
   # Client API
 

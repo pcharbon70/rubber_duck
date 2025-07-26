@@ -24,9 +24,9 @@ defmodule RubberDuck.LLM.Providers.Ollama do
   alias RubberDuck.LLM.{Request, Response, ProviderConfig, Provider}
 
   @default_base_url "http://localhost:11434"
-  @default_timeout 60_000
+  @default_timeout RubberDuck.Config.Timeouts.get([:llm_providers, :ollama, :request], 60_000)
   # 5 minutes for streaming
-  @stream_timeout 300_000
+  @stream_timeout RubberDuck.Config.Timeouts.get([:llm_providers, :ollama, :streaming], 300_000)
 
   @impl true
   def execute(%Request{} = request, %ProviderConfig{} = config) do

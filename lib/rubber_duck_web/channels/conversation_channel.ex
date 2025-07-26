@@ -65,8 +65,9 @@ defmodule RubberDuckWeb.ConversationChannel do
   alias RubberDuck.Status
   alias RubberDuck.LLM.ErrorHandler
   alias RubberDuck.Engine.InputValidator
+  alias RubberDuck.Config.Timeouts
 
-  @default_timeout 60_000
+  @default_timeout Timeouts.get([:channels, :conversation], 60_000)
   @max_context_messages 20
 
   @impl true
