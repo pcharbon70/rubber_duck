@@ -91,6 +91,28 @@ guides/
 
 More guides are being written. See the [Documentation Guide](guides/README.md) for the complete list.
 
+## Configuration
+
+### Timeout Configuration
+
+RubberDuck provides a comprehensive timeout configuration system that allows tuning timeouts across all components. See the [Timeout Configuration Guide](docs/configuration/timeouts.md) for details.
+
+Key features:
+- Centralized configuration in `config/timeouts.exs`
+- Runtime overrides via environment variables
+- Dynamic timeout adjustment based on context
+- Support for JSON-based configuration overrides
+
+Quick example:
+```bash
+# Override specific timeouts
+export RUBBER_DUCK_CHANNEL_TIMEOUT=120000  # 2 minutes
+export RUBBER_DUCK_LLM_DEFAULT_TIMEOUT=60000  # 1 minute
+
+# Or use JSON for complex overrides
+export RUBBER_DUCK_TIMEOUTS_JSON='{"channels": {"conversation": 120000}}'
+```
+
 ## Development
 
 This project follows specific conventions and rules documented in `CLAUDE.md`. Key principles include:

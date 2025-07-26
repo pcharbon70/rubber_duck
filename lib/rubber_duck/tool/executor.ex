@@ -266,7 +266,8 @@ defmodule RubberDuck.Tool.Executor do
 
   defp execute_tool(tool_module, params, context) do
     execution_config = RubberDuck.Tool.execution(tool_module)
-    timeout = if execution_config, do: execution_config.timeout, else: 30_000
+    default_timeout = RubberDuck.Config.Timeouts.get([:tools, :default], 30_000)
+    timeout = if execution_config, do: execution_config.timeout, else: default_timeout
     retries = if execution_config, do: execution_config.retries, else: 0
 
     start_time = System.monotonic_time(:millisecond)

@@ -19,7 +19,7 @@ defmodule RubberDuck.MCP.Session do
 
   require Logger
 
-  @request_timeout 30_000
+  @request_timeout RubberDuck.Config.Timeouts.get([:mcp, :request], 30_000)
   @max_concurrent_requests 50
 
   defstruct [

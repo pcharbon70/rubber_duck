@@ -11,9 +11,9 @@ defmodule RubberDuck.Status.Broadcaster do
   require Logger
 
   # Default configuration values
-  @default_queue_limit 10_000
-  @default_batch_size 100
-  @default_flush_interval 50
+  @default_queue_limit RubberDuck.Config.Timeouts.get([:infrastructure, :status_broadcaster, :queue_limit], 10_000)
+  @default_batch_size RubberDuck.Config.Timeouts.get([:infrastructure, :status_broadcaster, :batch_size], 100)
+  @default_flush_interval RubberDuck.Config.Timeouts.get([:infrastructure, :status_broadcaster, :flush_interval], 50)
 
   # Client API
 

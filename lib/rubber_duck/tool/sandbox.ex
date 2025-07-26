@@ -98,7 +98,7 @@ defmodule RubberDuck.Tool.Sandbox do
   def get_default_config(level) do
     base_config = %{
       level: level,
-      timeout: 30_000,
+      timeout: RubberDuck.Config.Timeouts.get([:tools, :sandbox, :standard], 30_000),
       # 100MB
       memory_limit: 100_000_000,
       # 10 seconds
@@ -115,7 +115,7 @@ defmodule RubberDuck.Tool.Sandbox do
       :strict ->
         %{
           base_config
-          | timeout: 5_000,
+          | timeout: RubberDuck.Config.Timeouts.get([:tools, :sandbox, :minimal], 5_000),
             # 50MB
             memory_limit: 50_000_000,
             # 2 seconds
@@ -127,7 +127,7 @@ defmodule RubberDuck.Tool.Sandbox do
       :balanced ->
         %{
           base_config
-          | timeout: 15_000,
+          | timeout: RubberDuck.Config.Timeouts.get([:tools, :sandbox, :standard], 15_000),
             # 75MB
             memory_limit: 75_000_000,
             # 5 seconds
@@ -139,7 +139,7 @@ defmodule RubberDuck.Tool.Sandbox do
       :relaxed ->
         %{
           base_config
-          | timeout: 30_000,
+          | timeout: RubberDuck.Config.Timeouts.get([:tools, :sandbox, :enhanced], 30_000),
             # 150MB
             memory_limit: 150_000_000,
             # 15 seconds
@@ -151,7 +151,7 @@ defmodule RubberDuck.Tool.Sandbox do
       :none ->
         %{
           base_config
-          | timeout: 60_000,
+          | timeout: RubberDuck.Config.Timeouts.get([:tools, :sandbox, :maximum], 60_000),
             # 500MB
             memory_limit: 500_000_000,
             # 60 seconds
