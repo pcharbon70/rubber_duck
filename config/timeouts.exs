@@ -6,7 +6,7 @@ import Config
 config :rubber_duck, :timeouts, %{
   # Channel timeouts
   channels: %{
-    conversation: 120_000,
+    conversation: 360_000,  # Increased to 6 minutes to match generation engine timeout
     mcp_heartbeat: 30_000,
     mcp_message_queue_cleanup: 600_000
   },

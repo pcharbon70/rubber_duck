@@ -63,7 +63,7 @@ Edit `config/timeouts.exs` for permanent changes:
 ```elixir
 config :rubber_duck, :timeouts, %{
   channels: %{
-    conversation: 60_000  # Default: 1 minute
+    conversation: 360_000  # Default: 6 minutes
   }
 }
 ```
@@ -76,9 +76,9 @@ Channel timeouts control WebSocket connections and heartbeat intervals.
 
 ```elixir
 channels: %{
-  conversation: 60_000,           # WebSocket conversation timeout
-  mcp_heartbeat: 15_000,         # MCP channel heartbeat interval
-  mcp_message_queue_cleanup: 300_000  # Message queue cleanup (5 min)
+  conversation: 360_000,          # WebSocket conversation timeout (6 min)
+  mcp_heartbeat: 30_000,          # MCP channel heartbeat interval
+  mcp_message_queue_cleanup: 600_000  # Message queue cleanup (10 min)
 }
 ```
 
@@ -113,9 +113,14 @@ Engine timeouts control task processing and execution limits.
 
 ```elixir
 engines: %{
-  default: 5_000,                # Default engine execution
-  external_router: 300_000,      # External tool routing (5 min)
-  task_registry_cleanup: 60_000  # Task cleanup interval
+  default: 10_000,                    # Default engine execution
+  external_router: 600_000,           # External tool routing (10 min)
+  task_registry_cleanup: 120_000,     # Task cleanup interval (2 min)
+  # Conversation engines
+  generation_conversation: 360_000,   # Code generation (6 min)
+  analysis_conversation: 240_000,     # Code analysis (4 min) 
+  complex_conversation: 480_000,      # Complex tasks (8 min)
+  problem_solver: 600_000            # Problem solving (10 min)
 }
 ```
 
@@ -270,25 +275,39 @@ Chains have both total timeouts and individual step timeouts.
 ```elixir
 chains: %{
   analysis: %{
-    total: 45_000,              # Total chain timeout
+    total: 90_000,              # Total chain timeout (1.5 min)
     steps: %{
-      understanding: 10_000,     # Code comprehension
-      context_gathering: 8_000,  # Context analysis
-      pattern_identification: 10_000,
-      relationship_mapping: 10_000,
-      synthesis: 7_000          # Final synthesis
+      understanding: 20_000,     # Code comprehension
+      context_gathering: 16_000,  # Context analysis
+      pattern_identification: 20_000,
+      relationship_mapping: 20_000,
+      synthesis: 14_000          # Final synthesis
+    }
+  },
+  generation: %{
+    total: 300_000,             # Total generation timeout (5 min)
+    steps: %{
+      understand_requirements: 20_000,
+      review_context: 120_000,   # Can be slow with large codebases
+      plan_structure: 20_000,
+      identify_dependencies: 14_000,
+      generate_implementation: 30_000,
+      add_documentation: 120_000,  # Documentation generation
+      generate_tests: 24_000,
+      validate_output: 120_000,    # Validation checks
+      provide_alternatives: 20_000
     }
   },
   completion: %{
-    total: 20_000,
+    total: 40_000,
     steps: %{
-      parse_context: 5_000,
-      retrieve_patterns: 4_000,
-      generate_initial: 4_000,
-      refine_output: 6_000,
-      validate_syntax: 3_000,
-      optimize_result: 4_000,
-      format_output: 3_000
+      parse_context: 10_000,
+      retrieve_patterns: 8_000,
+      generate_initial: 8_000,
+      refine_output: 12_000,
+      validate_syntax: 6_000,
+      optimize_result: 8_000,
+      format_output: 6_000
     }
   }
 }
