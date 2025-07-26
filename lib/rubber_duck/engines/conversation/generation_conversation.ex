@@ -44,13 +44,15 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
         conversation_type: :generation,
         generated_code: extract_generated_code(response),
         implementation_plan: extract_implementation_plan(response),
+        reasoning_steps: response.reasoning_steps,  # Include all reasoning steps
         processing_time: response.duration_ms,
         metadata: %{
           provider: validated.provider,
           model: validated.model,
           temperature: validated.temperature || state.temperature,
           max_tokens: validated.max_tokens || state.max_tokens,
-          generation_type: validated.generation_type
+          generation_type: validated.generation_type,
+          total_steps: response.total_steps
         }
       }
 
