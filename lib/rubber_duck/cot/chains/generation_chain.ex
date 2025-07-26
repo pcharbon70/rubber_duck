@@ -63,7 +63,7 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
         """,
         depends_on: :understand_requirements,
         validates: [:context_reviewed],
-        timeout: 8_000
+        timeout: 60_000
       },
       %{
         name: :plan_structure,
@@ -142,7 +142,7 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
         """,
         depends_on: :generate_implementation,
         validates: [:has_documentation],
-        timeout: 8_000
+        timeout: 60_000
       },
       %{
         name: :generate_tests,
@@ -185,7 +185,7 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
         """,
         depends_on: :generate_tests,
         validates: [:validation_passed],
-        timeout: 8_000
+        timeout: 60_000
       },
       %{
         name: :provide_alternatives,
