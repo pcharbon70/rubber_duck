@@ -41,6 +41,7 @@ defmodule RubberDuck.LLM.ServiceV2 do
   }
   
   alias RubberDuck.Status
+  alias RubberDuck.Engine.CancellationToken
   
   @type provider_name :: atom()
   @type model_name :: String.t()
@@ -239,89 +240,113 @@ defmodule RubberDuck.LLM.ServiceV2 do
   
   defp execute_request(adapter, request, provider_config, opts) do
     user_id = Keyword.get(opts, :user_id)
+    conversation_id = Keyword.get(opts, :conversation_id)
     start_time = System.monotonic_time(:millisecond)
     
-    # Send telemetry for request start
-    if user_id do
-      Status.engine(
-        user_id,
-        "Starting #{request.provider} request",
-        Status.build_llm_metadata(request.model, to_string(request.provider), %{
-          request_id: request.id
-        })
-      )
-    end
-    
-    # Execute the request with retries
-    result = execute_with_retry(adapter, request, provider_config, opts[:max_retries] || 3)
-    
-    # Send telemetry for completion
-    if user_id do
-      case result do
-        {:ok, response} ->
-          Status.with_timing(
-            user_id,
-            :engine,
-            "Completed #{request.provider} request",
-            start_time,
-            Status.build_llm_metadata(request.model, to_string(request.provider), %{
-              request_id: request.id,
-              usage: response.usage
-            })
-          )
-          
-        {:error, reason} ->
-          Status.error(
-            user_id,
-            "#{request.provider} request failed",
-            Status.build_error_metadata(:provider_error, inspect(reason), %{
-              request_id: request.id,
-              provider: request.provider,
-              model: request.model
-            })
-          )
+    # Check for cancellation before starting
+    cancellation_token = Keyword.get(opts, :cancellation_token)
+    if cancellation_token && CancellationToken.cancelled?(cancellation_token) do
+      {:error, :cancelled}
+    else
+      # Send telemetry for request start (use conversation_id if available, else user_id)
+      if conversation_id || user_id do
+        Status.engine(
+          conversation_id || user_id,
+          "Starting #{request.provider} request",
+          Status.build_llm_metadata(request.model, to_string(request.provider), %{
+            request_id: request.id
+          })
+        )
       end
+      
+      # Execute the request with retries (pass opts to include cancellation_token)
+      result = execute_with_retry(adapter, request, provider_config, opts[:max_retries] || 3, 1, opts)
+      
+      # Send telemetry for completion (use conversation_id if available, else user_id)
+      if conversation_id || user_id do
+        case result do
+          {:ok, response} ->
+            Status.with_timing(
+              conversation_id || user_id,
+              :engine,
+              "Completed #{request.provider} request",
+              start_time,
+              Status.build_llm_metadata(request.model, to_string(request.provider), %{
+                request_id: request.id,
+                usage: response.usage
+              })
+            )
+            
+          {:error, :cancelled} ->
+            Status.info(
+              conversation_id || user_id,
+              "#{request.provider} request cancelled",
+              %{
+                request_id: request.id,
+                provider: request.provider,
+                model: request.model
+              }
+            )
+            
+          {:error, reason} ->
+            Status.error(
+              conversation_id || user_id,
+              "#{request.provider} request failed",
+              Status.build_error_metadata(:provider_error, inspect(reason), %{
+                request_id: request.id,
+                provider: request.provider,
+                model: request.model
+              })
+            )
+        end
+      end
+      
+      result
     end
-    
-    result
   end
   
-  defp execute_with_retry(adapter, request, config, max_retries, attempt \\ 1) do
-    case adapter.execute(request, config) do
-      {:ok, response} ->
-        # Validate response structure
-        case validate_response(response) do
-          :ok -> {:ok, response}
-          {:error, reason} -> {:error, {:invalid_response, reason}}
-        end
-        
-      {:error, reason} ->
-        # Enrich error with provider context
-        enriched_error = enrich_error(reason, request.provider, request.model)
-        
-        # Let ErrorHandler decide if we should retry
-        error_context = [
-          provider: request.provider,
-          model: request.model,
-          user_id: request.options[:user_id],
-          request_id: request.id,
-          retry_count: attempt - 1
-        ]
-        
-        case ErrorHandler.handle_error(enriched_error, error_context) do
-          {:retry, _formatted_error, delay} when attempt < max_retries ->
-            Logger.warning("Retrying LLM request after #{delay}ms (attempt #{attempt}/#{max_retries})")
-            Process.sleep(delay)
-            execute_with_retry(adapter, request, config, max_retries, attempt + 1)
-            
-          {:retry, formatted_error, _delay} ->
-            # Max retries exceeded
-            {:error, formatted_error}
-            
-          {:error, formatted_error} ->
-            # Not recoverable
-            {:error, formatted_error}
-        end
+  defp execute_with_retry(adapter, request, config, max_retries, attempt, opts) do
+    # Check for cancellation before each attempt
+    cancellation_token = Keyword.get(opts, :cancellation_token)
+    if cancellation_token && CancellationToken.cancelled?(cancellation_token) do
+      {:error, :cancelled}
+    else
+      case adapter.execute(request, config) do
+        {:ok, response} ->
+          # Validate response structure
+          case validate_response(response) do
+            :ok -> {:ok, response}
+            {:error, reason} -> {:error, {:invalid_response, reason}}
+          end
+          
+        {:error, reason} ->
+          # Enrich error with provider context
+          enriched_error = enrich_error(reason, request.provider, request.model)
+          
+          # Let ErrorHandler decide if we should retry
+          error_context = [
+            provider: request.provider,
+            model: request.model,
+            user_id: request.options[:user_id],
+            request_id: request.id,
+            retry_count: attempt - 1
+          ]
+          
+          case ErrorHandler.handle_error(enriched_error, error_context) do
+            {:retry, _formatted_error, delay} when attempt < max_retries ->
+              Logger.warning("Retrying LLM request after #{delay}ms (attempt #{attempt}/#{max_retries})")
+              Process.sleep(delay)
+              execute_with_retry(adapter, request, config, max_retries, attempt + 1, opts)
+              
+            {:retry, formatted_error, _delay} ->
+              # Max retries exceeded
+              {:error, formatted_error}
+              
+            {:error, formatted_error} ->
+              # Not recoverable
+              {:error, formatted_error}
+          end
+      end
     end
   end
   

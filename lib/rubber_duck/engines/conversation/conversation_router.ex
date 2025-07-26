@@ -147,7 +147,9 @@ defmodule RubberDuck.Engines.Conversation.ConversationRouter do
       model: validated.model,
       user_id: validated.user_id,
       temperature: validated.temperature,
-      max_tokens: validated.max_tokens
+      max_tokens: validated.max_tokens,
+      # Pass through cancellation token if present
+      cancellation_token: validated[:cancellation_token]
     }
 
     # Execute on the selected engine

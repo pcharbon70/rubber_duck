@@ -105,6 +105,8 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
       provider: validated.provider,
       model: validated.model,
       user_id: validated.user_id,
+      # Pass through cancellation token if present
+      cancellation_token: validated[:cancellation_token],
       # Context
       context:
         Map.merge(validated.context, %{
