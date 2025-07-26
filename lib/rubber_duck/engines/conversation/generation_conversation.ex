@@ -54,6 +54,15 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
         }
       }
 
+      Logger.info("Generation conversation engine result",
+        response_length: String.length(result.response),
+        has_generated_code: result.generated_code != nil,
+        implementation_plan_steps: length(result.implementation_plan),
+        processing_time_ms: result.processing_time
+      )
+      
+      Logger.debug("Generation engine full result: #{inspect(result, pretty: true, limit: :infinity)}")
+      
       {:ok, result}
     end
   end
@@ -91,6 +100,7 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
     # Execute the generation chain
     case ConversationManager.execute_chain(state.chain_module, validated.query, cot_context) do
       {:ok, result} ->
+        Logger.debug("CoT chain raw result: #{inspect(result, pretty: true, limit: :infinity)}")
         {:ok, result}
 
       {:error, reason} ->

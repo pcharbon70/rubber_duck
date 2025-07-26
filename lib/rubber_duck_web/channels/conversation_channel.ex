@@ -229,8 +229,27 @@ defmodule RubberDuckWeb.ConversationChannel do
           }
         )
 
+        # Format the response
+        formatted_response = format_response(result, content)
+        
+        # Log generation conversation responses
+        if result.conversation_type == :generation do
+          Logger.info("Generation conversation response",
+            conversation_id: conversation_id,
+            query: String.slice(content, 0, 100),
+            response_length: String.length(result.response),
+            generated_code: result[:generated_code] != nil,
+            implementation_plan_steps: length(result[:implementation_plan] || []),
+            processing_time_ms: result[:processing_time],
+            model: input.llm_config[:model]
+          )
+          
+          # Log the full response structure for debugging
+          Logger.debug("Full generation response structure: #{inspect(formatted_response, pretty: true, limit: :infinity)}")
+        end
+        
         # Send response
-        push(socket, "response", format_response(result, content))
+        push(socket, "response", formatted_response)
         {:noreply, socket}
 
       {:error, :cancelled} ->
