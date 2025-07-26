@@ -107,6 +107,7 @@ defmodule RubberDuckWeb.ConversationChannel do
       |> assign(:user_id, user_id)
       |> assign(:session_id, session_id)
       |> assign(:current_cancellation_token, nil)
+      |> assign(:current_task, nil)
 
     # Subscribe to status updates for this conversation
     Phoenix.PubSub.subscribe(RubberDuck.PubSub, "status:#{actual_conversation_id}:engine")
@@ -196,20 +197,36 @@ defmodule RubberDuckWeb.ConversationChannel do
       # Add cancellation token to input
       input = CancellationToken.add_to_input(input, cancellation_token)
       
-      # Store socket info for async task
-      channel_pid = self()
+      # Cancel any existing task
+      socket = case socket.assigns.current_task do
+        {%Task{} = old_task, _context} ->
+          Task.shutdown(old_task, :brutal_kill)
+          assign(socket, :current_task, nil)
+        _ ->
+          socket
+      end
       
-      # Spawn task to handle long-running operation
-      Task.start(fn ->
-        start_time = System.monotonic_time(:millisecond)
-        
+      # Store context for async processing
+      async_context = %{
+        start_time: System.monotonic_time(:millisecond),
+        content: content,
+        messages: messages,
+        user_id: socket.assigns.user_id,
+        session_id: socket.assigns.session_id,
+        conversation_id: conversation_id,
+        llm_config: input.llm_config
+      }
+      
+      # Use async_nolink to handle the long-running operation
+      # This creates a monitored task that won't crash the channel if it fails
+      task = Task.async_nolink(fn ->
         # Process through conversation router
         Logger.info("Starting EngineManager.execute for conversation",
           conversation_id: conversation_id,
           timeout: @default_timeout
         )
         
-        result = case EngineManager.execute(:conversation_router, input, @default_timeout) do
+        case EngineManager.execute(:conversation_router, input, @default_timeout) do
           {:ok, result} ->
             Logger.info("EngineManager.execute succeeded",
               conversation_id: conversation_id,
@@ -222,18 +239,10 @@ defmodule RubberDuckWeb.ConversationChannel do
             Logger.error("Conversation processing failed: #{inspect(reason)}")
             {:error, reason}
         end
-        
-        # Send result back to channel process
-        send(channel_pid, {:async_result, result, %{
-          start_time: start_time,
-          content: content,
-          messages: messages,
-          user_id: socket.assigns.user_id,
-          session_id: socket.assigns.session_id,
-          conversation_id: conversation_id,
-          llm_config: input.llm_config
-        }})
       end)
+      
+      # Store the task reference so we can handle its completion
+      socket = assign(socket, :current_task, {task, async_context})
       
       # Return immediately to avoid timeout
       {:noreply, socket}
@@ -393,6 +402,48 @@ defmodule RubberDuckWeb.ConversationChannel do
     {:noreply, socket}
   end
   
+  # Handle Task completion
+  @impl true
+  def handle_info({ref, result}, socket) when is_reference(ref) do
+    # Check if this is our current task
+    case socket.assigns[:current_task] do
+      {%Task{ref: ^ref}, context} ->
+        # Task completed, handle the result
+        Process.demonitor(ref, [:flush])
+        
+        # Remove task from socket
+        socket = assign(socket, :current_task, nil)
+        
+        # Handle the result using our existing async_result handler
+        handle_info({:async_result, result, context}, socket)
+        
+      _ ->
+        # Unknown task reference, ignore
+        {:noreply, socket}
+    end
+  end
+  
+  # Handle Task failure
+  @impl true
+  def handle_info({:DOWN, ref, :process, _pid, reason}, socket) do
+    # Check if this is our current task
+    case socket.assigns[:current_task] do
+      {%Task{ref: ^ref}, context} ->
+        # Task failed
+        Logger.error("Async task failed: #{inspect(reason)}")
+        
+        # Remove task from socket
+        socket = assign(socket, :current_task, nil)
+        
+        # Handle as error
+        handle_info({:async_result, {:error, {:task_failed, reason}}, context}, socket)
+        
+      _ ->
+        # Unknown task reference, ignore
+        {:noreply, socket}
+    end
+  end
+  
   @impl true
   def handle_info({:async_result, {:ok, result}, context}, socket) do
     # Add assistant message to history
@@ -470,6 +521,24 @@ defmodule RubberDuckWeb.ConversationChannel do
     })
     
     {:noreply, socket}
+  end
+  
+  @impl true
+  def terminate(_reason, socket) do
+    # Clean up any running task
+    case socket.assigns[:current_task] do
+      {%Task{} = task, _context} ->
+        Task.shutdown(task, :brutal_kill)
+      _ ->
+        :ok
+    end
+    
+    # Clean up cancellation token
+    if socket.assigns[:current_cancellation_token] do
+      CancellationToken.stop(socket.assigns.current_cancellation_token)
+    end
+    
+    :ok
   end
   
   @impl true
