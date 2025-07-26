@@ -268,7 +268,7 @@ defmodule RubberDuck.Agents.GenerationAgent do
 
       cached_result ->
         # Return cached result
-        Logger.debug("Returning cached generation for prompt: #{prompt}")
+        Logger.debug("Returning cached generation result")
 
         new_state = %{
           state

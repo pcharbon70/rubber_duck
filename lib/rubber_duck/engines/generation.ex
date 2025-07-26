@@ -731,11 +731,11 @@ defmodule RubberDuck.Engines.Generation do
 
       # Handle refactoring requests
       String.contains?(input.prompt, "Refactor") ->
-        Logger.debug("Refactoring prompt: #{inspect(input.prompt)}")
+        Logger.debug("Processing refactoring request")
         # Extract the code from the prompt
         case extract_code_from_prompt(input.prompt) do
           {:ok, code} ->
-            Logger.debug("Extracted code: #{inspect(code)}")
+            Logger.debug("Code extracted for refactoring")
             # Apply simple refactoring based on instruction
             refactor_elixir_code(code, input.prompt)
 

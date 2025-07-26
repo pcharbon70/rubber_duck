@@ -39,9 +39,7 @@ defmodule RubberDuck.LLM.Providers.Ollama do
     timeout = get_in(request.options, [:timeout]) || config.timeout || @default_timeout
 
     require Logger
-    Logger.debug("Ollama request - URL: #{url}")
-    Logger.debug("Ollama request - Body: #{inspect(body)}")
-    Logger.debug("Ollama request - Timeout: #{timeout}ms")
+    Logger.debug("Ollama request - URL: #{url}, Timeout: #{timeout}ms")
 
     req_opts = [
       json: body,
@@ -54,7 +52,6 @@ defmodule RubberDuck.LLM.Providers.Ollama do
       retry: false
     ]
 
-    Logger.debug("Ollama making HTTP request...")
     start_time = System.monotonic_time(:millisecond)
 
     result =
