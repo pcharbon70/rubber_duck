@@ -636,7 +636,8 @@ defmodule RubberDuckWeb.MCPChannel do
   end
 
   defp schedule_heartbeat do
-    Process.send_after(self(), {:heartbeat_check}, 15_000)
+    timeout = RubberDuck.Config.Timeouts.get([:channels, :mcp_heartbeat], 15_000)
+    Process.send_after(self(), {:heartbeat_check}, timeout)
   end
 
   defp generate_session_id do

@@ -36,8 +36,8 @@ defmodule RubberDuck.CircuitBreaker do
 
   @default_failure_threshold 5
   @default_success_threshold 2
-  @default_timeout 30_000
-  @default_reset_timeout 60_000
+  @default_timeout RubberDuck.Config.Timeouts.get([:infrastructure, :circuit_breaker, :call_timeout], 30_000)
+  @default_reset_timeout RubberDuck.Config.Timeouts.get([:infrastructure, :circuit_breaker, :reset_timeout], 60_000)
 
   defmodule State do
     @moduledoc false

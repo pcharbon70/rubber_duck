@@ -41,8 +41,8 @@ defmodule RubberDuck.LLM.Providers.TGI do
   alias RubberDuck.LLM.{Request, Response, ProviderConfig, Provider}
 
   @default_base_url "http://localhost:8080"
-  @default_timeout 120_000
-  @stream_timeout 300_000
+  @default_timeout RubberDuck.Config.Timeouts.get([:llm_providers, :tgi, :request], 120_000)
+  @stream_timeout RubberDuck.Config.Timeouts.get([:llm_providers, :tgi, :streaming], 300_000)
 
   @impl true
   def execute(%Request{} = request, %ProviderConfig{} = config) do
