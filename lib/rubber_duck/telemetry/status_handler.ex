@@ -127,11 +127,10 @@ defmodule RubberDuck.Telemetry.StatusHandler do
     :ok
   end
 
-  def handle_event([:rubber_duck, :status, :broadcaster, :broadcast_completed], measurements, metadata, _config) do
+  def handle_event([:rubber_duck, :status, :broadcaster, :broadcast_completed], measurements, _metadata, _config) do
     Logger.debug("Status broadcast completed",
-      recipients_count: measurements.recipients_count,
-      duration_ms: div(measurements.duration, 1_000),
-      message_type: metadata.message_type
+      message_count: measurements.message_count,
+      duration_us: measurements.duration
     )
 
     :ok
