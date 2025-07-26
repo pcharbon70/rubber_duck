@@ -27,7 +27,7 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
       max_tokens: config[:max_tokens] || 3000,
       temperature: config[:temperature] || 0.6,
       # Remove hardcoded model - will come from input
-      timeout: config[:timeout] || 60_000,
+      timeout: config[:timeout] || 180_000,
       chain_module: config[:chain_module] || GenerationChain
     }
 

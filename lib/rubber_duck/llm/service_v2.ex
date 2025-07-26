@@ -303,7 +303,7 @@ defmodule RubberDuck.LLM.ServiceV2 do
         error_context = [
           provider: request.provider,
           model: request.model,
-          user_id: request.user_id,
+          user_id: request.options[:user_id],
           request_id: request.id,
           retry_count: attempt - 1
         ]
