@@ -9,6 +9,8 @@ defmodule RubberDuck.Engine.Server do
   use GenServer
 
   require Logger
+  
+  alias RubberDuck.Engine.{TaskRegistry, CancellationToken}
 
   defmodule State do
     @moduledoc false
@@ -20,7 +22,8 @@ defmodule RubberDuck.Engine.Server do
       :last_health_check,
       :request_count,
       :error_count,
-      :health_check_interval
+      :health_check_interval,
+      :active_tasks
     ]
   end
 
@@ -88,7 +91,8 @@ defmodule RubberDuck.Engine.Server do
       started_at: DateTime.utc_now(),
       request_count: 0,
       error_count: 0,
-      health_check_interval: health_check_interval
+      health_check_interval: health_check_interval,
+      active_tasks: %{}
     }
 
     # Initialize the engine
@@ -110,14 +114,49 @@ defmodule RubberDuck.Engine.Server do
   end
 
   @impl true
-  def handle_call({:execute, input}, _from, state) do
+  def handle_call({:execute, input}, from, state) do
     start_time = System.monotonic_time(:microsecond)
+    
+    # Extract conversation_id and cancellation token
+    conversation_id = input[:conversation_id] || Map.get(input, "conversation_id")
+    cancellation_token = CancellationToken.from_input(input)
 
     # Execute with timeout
     task =
       Task.async(fn ->
-        state.engine_config.module.execute(input, state.engine_state)
+        # Add periodic cancellation checks if token provided
+        if cancellation_token do
+          # Check if already cancelled before starting
+          if CancellationToken.cancelled?(cancellation_token) do
+            {:error, :cancelled}
+          else
+            state.engine_config.module.execute(input, state.engine_state)
+          end
+        else
+          state.engine_config.module.execute(input, state.engine_state)
+        end
       end)
+
+    # Register task in TaskRegistry if conversation_id is present
+    task_id = if conversation_id do
+      case TaskRegistry.register_task(task, conversation_id, state.engine_config.name, %{
+        from: from,
+        started_at: DateTime.utc_now(),
+        input_size: map_size(input)
+      }) do
+        {:ok, id} -> id
+        _ -> nil
+      end
+    else
+      nil
+    end
+    
+    # Track task locally
+    new_active_tasks = if task_id do
+      Map.put(state.active_tasks, task_id, {task, from})
+    else
+      state.active_tasks
+    end
 
     result =
       case Task.yield(task, state.engine_config.timeout) || Task.shutdown(task) do
@@ -126,10 +165,34 @@ defmodule RubberDuck.Engine.Server do
           emit_telemetry(:execute, duration, state, %{status: :success})
           {:ok, result}
 
+        {:ok, {:error, :cancelled}} ->
+          duration = System.monotonic_time(:microsecond) - start_time
+          emit_telemetry(:execute, duration, state, %{status: :cancelled})
+          
+          # Broadcast cancellation status if we have a conversation_id
+          if conversation_id do
+            RubberDuck.Status.engine(
+              conversation_id,
+              "Processing cancelled for #{state.engine_config.name}",
+              %{
+                engine: state.engine_config.name,
+                duration_ms: div(duration, 1000),
+                cancelled_at: DateTime.utc_now()
+              }
+            )
+          end
+          
+          {:error, :cancelled}
+
         {:ok, {:error, reason}} ->
           duration = System.monotonic_time(:microsecond) - start_time
           emit_telemetry(:execute, duration, state, %{status: :error, error: reason})
           {:error, reason}
+
+        {:exit, :cancelled} ->
+          duration = System.monotonic_time(:microsecond) - start_time
+          emit_telemetry(:execute, duration, state, %{status: :cancelled})
+          {:error, :cancelled}
 
         {:exit, reason} ->
           duration = System.monotonic_time(:microsecond) - start_time
@@ -142,13 +205,28 @@ defmodule RubberDuck.Engine.Server do
           {:error, :timeout}
       end
 
+    # Unregister task from TaskRegistry
+    if task_id do
+      TaskRegistry.unregister_task(task_id)
+    end
+    
+    # Remove from local tracking
+    final_active_tasks = if task_id do
+      Map.delete(new_active_tasks, task_id)
+    else
+      new_active_tasks
+    end
+
     new_state =
       case result do
         {:ok, _} ->
-          %{state | request_count: state.request_count + 1}
+          %{state | request_count: state.request_count + 1, active_tasks: final_active_tasks}
+
+        {:error, :cancelled} ->
+          %{state | request_count: state.request_count + 1, active_tasks: final_active_tasks}
 
         {:error, _} ->
-          %{state | request_count: state.request_count + 1, error_count: state.error_count + 1}
+          %{state | request_count: state.request_count + 1, error_count: state.error_count + 1, active_tasks: final_active_tasks}
       end
 
     {:reply, result, new_state}
@@ -173,6 +251,52 @@ defmodule RubberDuck.Engine.Server do
   def handle_call(:health_check, _from, state) do
     {result, new_state} = perform_health_check(state)
     {:reply, result, new_state}
+  end
+  
+  @impl true
+  def handle_call({:cancel_task, task_id}, _from, state) do
+    case Map.get(state.active_tasks, task_id) do
+      {task, _from} ->
+        # Cancel the task
+        Task.shutdown(task, :brutal_kill)
+        
+        # Update TaskRegistry
+        TaskRegistry.unregister_task(task_id)
+        
+        # Remove from local tracking
+        new_state = %{state | active_tasks: Map.delete(state.active_tasks, task_id)}
+        
+        # Get conversation_id from TaskRegistry before it's removed
+        conversation_id = case TaskRegistry.find_task(task_id) do
+          {:ok, task_info} -> task_info.conversation_id
+          _ -> nil
+        end
+        
+        # Broadcast cancellation if we have a conversation_id
+        if conversation_id do
+          RubberDuck.Status.engine(
+            conversation_id,
+            "Task cancelled in #{state.engine_config.name}",
+            %{
+              engine: state.engine_config.name,
+              task_id: task_id,
+              cancelled_at: DateTime.utc_now()
+            }
+          )
+        end
+        
+        Logger.info("Cancelled task #{task_id} in engine #{state.engine_config.name}")
+        {:reply, :ok, new_state}
+        
+      nil ->
+        {:reply, {:error, :task_not_found}, state}
+    end
+  end
+  
+  @impl true
+  def handle_call(:get_active_tasks, _from, state) do
+    tasks = Map.keys(state.active_tasks)
+    {:reply, {:ok, tasks}, state}
   end
 
   @impl true
