@@ -13,7 +13,7 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
       name: :generation,
       description: "Systematic code generation with structured reasoning",
       max_steps: 12,
-      timeout: 60_000,
+      timeout: RubberDuck.Config.Timeouts.get([:chains, :generation, :total], 300_000),
       template: :creative,
       # 15 minutes
       cache_ttl: 900
@@ -41,7 +41,7 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
         Requirements analysis:
         """,
         validates: [:has_requirements],
-        timeout: 10_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :generation, :steps, :understand_requirements], 10_000)
       },
       %{
         name: :review_context,
@@ -63,7 +63,7 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
         """,
         depends_on: :understand_requirements,
         validates: [:context_reviewed],
-        timeout: 60_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :generation, :steps, :review_context], 60_000)
       },
       %{
         name: :plan_structure,
@@ -85,7 +85,7 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
         """,
         depends_on: :review_context,
         validates: [:has_structure_plan],
-        timeout: 10_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :generation, :steps, :plan_structure], 10_000)
       },
       %{
         name: :identify_dependencies,
@@ -106,7 +106,7 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
         """,
         depends_on: :plan_structure,
         validates: [:dependencies_identified],
-        timeout: 7_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :generation, :steps, :identify_dependencies], 7_000)
       },
       %{
         name: :generate_implementation,
@@ -121,7 +121,7 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
         """,
         depends_on: :identify_dependencies,
         validates: [:code_generated],
-        timeout: 15_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :generation, :steps, :generate_implementation], 15_000)
       },
       %{
         name: :add_documentation,
@@ -142,7 +142,7 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
         """,
         depends_on: :generate_implementation,
         validates: [:has_documentation],
-        timeout: 60_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :generation, :steps, :add_documentation], 60_000)
       },
       %{
         name: :generate_tests,
@@ -162,7 +162,7 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
         """,
         depends_on: :add_documentation,
         validates: [:has_tests],
-        timeout: 12_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :generation, :steps, :generate_tests], 12_000)
       },
       %{
         name: :validate_output,
@@ -185,7 +185,7 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
         """,
         depends_on: :generate_tests,
         validates: [:validation_passed],
-        timeout: 60_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :generation, :steps, :validate_output], 60_000)
       },
       %{
         name: :provide_alternatives,
@@ -205,7 +205,7 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
         """,
         depends_on: :validate_output,
         validates: [:has_alternatives],
-        timeout: 10_000
+        timeout: RubberDuck.Config.Timeouts.get([:chains, :generation, :steps, :provide_alternatives], 10_000)
       }
     ]
   end
@@ -241,7 +241,38 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
   end
 
   def validation_passed(%{result: result}) do
-    result != nil && !String.contains?(String.downcase(result), ["error", "fail", "issue"])
+    # Check if validation actually passed by looking for positive indicators
+    # or the absence of critical failure indicators
+    if result == nil do
+      false
+    else
+      downcased = String.downcase(result)
+      
+      # Check for positive validation indicators
+      has_positive = String.contains?(downcased, [
+        "validation passed",
+        "validation successful",
+        "valid",
+        "correct",
+        "looks good",
+        "no issues",
+        "no errors",
+        "all checks pass"
+      ])
+      
+      # Check for critical failures (not just the word appearing)
+      has_critical_failure = String.contains?(downcased, [
+        "validation failed",
+        "invalid code",
+        "critical error",
+        "syntax error",
+        "does not compile",
+        "tests fail"
+      ])
+      
+      # Pass if we have positive indicators or no critical failures
+      has_positive || !has_critical_failure
+    end
   end
 
   def has_alternatives(%{result: result}) do

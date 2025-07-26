@@ -99,7 +99,7 @@ defmodule RubberDuck.Engines do
       module RubberDuck.Engines.Conversation.ComplexConversation
       description "Handles complex queries requiring chain-of-thought reasoning"
       priority(85)
-      timeout 45_000
+      timeout RubberDuck.Config.Timeouts.get([:engines, :complex_conversation], 240_000)
 
       config(
         max_tokens: 2000,
@@ -142,7 +142,7 @@ defmodule RubberDuck.Engines do
       module RubberDuck.Engines.Conversation.AnalysisConversation
       description "Specialized in code analysis discussions and reviews"
       priority(80)
-      timeout 45_000
+      timeout RubberDuck.Config.Timeouts.get([:engines, :analysis_conversation], 120_000)
 
       config(
         max_tokens: 2000,
@@ -156,7 +156,7 @@ defmodule RubberDuck.Engines do
       module RubberDuck.Engines.Conversation.GenerationConversation
       description "Handles code generation conversations and planning"
       priority(85)
-      timeout 60_000
+      timeout RubberDuck.Config.Timeouts.get([:engines, :generation_conversation], 180_000)
 
       config(
         max_tokens: 3000,
@@ -170,7 +170,7 @@ defmodule RubberDuck.Engines do
       module RubberDuck.Engines.Conversation.ProblemSolver
       description "Specialized for debugging and problem-solving conversations"
       priority(90)
-      timeout 60_000
+      timeout RubberDuck.Config.Timeouts.get([:engines, :problem_solver], 300_000)
 
       config(
         max_tokens: 2500,

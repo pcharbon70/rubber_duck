@@ -55,7 +55,10 @@ defmodule RubberDuck.CoT.Manager do
               |> Map.put(:status, :completed)
               |> Map.put(:completed_at, DateTime.utc_now())
 
-            {:ok, final_session}
+            # Build the result structure expected by engines
+            final_result = build_final_result(final_session)
+            
+            {:ok, final_result}
 
           {:error, :cancelled, _partial_session} ->
             # Clean cancellation error
@@ -422,4 +425,49 @@ defmodule RubberDuck.CoT.Manager do
       step -> {:ok, step}
     end
   end
+
+  defp build_final_result(session) do
+    # Extract the steps from the session
+    steps = extract_steps_list(session.steps)
+    
+    # Build the result structure expected by engines
+    %{
+      query: session.query,
+      reasoning_steps: steps,
+      final_answer: get_final_answer(steps),
+      total_steps: length(steps),
+      duration_ms: calculate_duration(session),
+      status: session.status,
+      config: session.config,
+      context: session.context,
+      started_at: session.started_at
+    }
+  end
+
+  defp extract_steps_list(steps_map) when is_map(steps_map) do
+    steps_map
+    |> Map.values()
+    |> Enum.sort_by(& &1[:executed_at])
+  end
+
+  defp extract_steps_list(_), do: []
+
+  defp get_final_answer([]), do: ""
+
+  defp get_final_answer(steps) do
+    last_step = List.last(steps)
+
+    if last_step && Map.has_key?(last_step, :result) do
+      last_step.result
+    else
+      ""
+    end
+  end
+
+  defp calculate_duration(%{started_at: started_at, completed_at: completed_at}) 
+       when not is_nil(started_at) and not is_nil(completed_at) do
+    DateTime.diff(completed_at, started_at, :millisecond)
+  end
+
+  defp calculate_duration(_), do: 0
 end
