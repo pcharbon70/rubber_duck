@@ -20,6 +20,12 @@ Documentation for end users of RubberDuck:
    - Using all CLI commands
    - Common workflows and best practices
 
+2. **[Timeout Configuration Guide](user/002-timeouts-configuration.md)**
+   - Understanding timeout settings
+   - Configuration methods (env vars, JSON, config files)
+   - Timeout categories and their purposes
+   - Common scenarios and troubleshooting
+
 ### Developer Guides (`guides/developer/`)
 
 Documentation for developers extending RubberDuck:
@@ -100,6 +106,7 @@ Documentation for developers extending RubberDuck:
 - **Install RubberDuck**: [CLI Guide - Installation](user/001-command_line_interface.md#installation--setup)
 - **Connect to LLM**: [CLI Guide - Connecting to LLMs](user/001-command_line_interface.md#connecting-to-llms)
 - **Use CLI Commands**: [CLI Guide - Core Commands](user/001-command_line_interface.md#core-commands)
+- **Configure Timeouts**: [Timeout Configuration Guide](user/002-timeouts-configuration.md)
 - **Understand the Codebase**: [Implementation Plan](../planning/implementation_plan.md)
 
 ## 📝 Contributing to Documentation
