@@ -199,8 +199,18 @@ defmodule RubberDuckWeb.ConversationChannel do
     start_time = System.monotonic_time(:millisecond)
 
     # Process through conversation router
+    Logger.info("Starting EngineManager.execute for conversation",
+      conversation_id: conversation_id,
+      timeout: @default_timeout
+    )
+    
     case EngineManager.execute(:conversation_router, input, @default_timeout) do
       {:ok, result} ->
+        Logger.info("EngineManager.execute succeeded",
+          conversation_id: conversation_id,
+          conversation_type: result.conversation_type,
+          routed_to: result[:routed_to]
+        )
         # Add assistant message to history
         assistant_message = %{
           role: "assistant",
@@ -229,8 +239,40 @@ defmodule RubberDuckWeb.ConversationChannel do
           }
         )
 
+        # Format the response
+        formatted_response = format_response(result, content)
+        
+        # Log generation conversation responses
+        if result.conversation_type == :generation do
+          Logger.info("Generation conversation response",
+            conversation_id: conversation_id,
+            query: String.slice(content, 0, 100),
+            response_length: String.length(result.response),
+            generated_code: result[:generated_code] != nil,
+            implementation_plan_steps: length(result[:implementation_plan] || []),
+            reasoning_steps_count: length(result[:reasoning_steps] || []),
+            processing_time_ms: result[:processing_time],
+            model: input.llm_config[:model]
+          )
+          
+          # Log the reasoning step names
+          if result[:reasoning_steps] do
+            step_names = result.reasoning_steps |> Enum.map(& &1.name) |> Enum.join(", ")
+            Logger.info("Generation chain steps executed: #{step_names}")
+          end
+          
+          # Full response logging removed - too verbose
+        end
+        
+        # Always log what we're sending (not just for generation)
+        Logger.info("Sending response via Phoenix channel",
+          conversation_type: result.conversation_type,
+          response_keys: Map.keys(formatted_response),
+          response_preview: String.slice(formatted_response.response, 0, 200)
+        )
+        
         # Send response
-        push(socket, "response", format_response(result, content))
+        push(socket, "response", formatted_response)
         {:noreply, socket}
 
       {:error, :cancelled} ->
@@ -247,6 +289,11 @@ defmodule RubberDuckWeb.ConversationChannel do
         
       {:error, reason} ->
         Logger.error("Conversation processing failed: #{inspect(reason)}")
+        
+        Logger.info("Sending error response to client",
+          conversation_id: conversation_id,
+          error_type: extract_error_type(reason)
+        )
 
         # Send error status
         Status.error(

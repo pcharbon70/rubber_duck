@@ -152,14 +152,16 @@ defmodule RubberDuck.Engines.Conversation.ConversationRouter do
       cancellation_token: validated[:cancellation_token]
     }
 
-    # Execute on the selected engine
-    case EngineManager.execute(engine_name, engine_input, state.timeout) do
+    # Execute on the selected engine with a longer timeout
+    # Router passes through the external router timeout to target engines
+    engine_timeout = RubberDuck.Config.Timeouts.get([:engines, :external_router], 600_000)
+    case EngineManager.execute(engine_name, engine_input, engine_timeout) do
       {:ok, result} ->
         {:ok, result}
 
       {:error, :engine_not_found} ->
         Logger.warning("Engine #{engine_name} not found, falling back to simple conversation")
-        EngineManager.execute(state.simple_engine, engine_input, state.timeout)
+        EngineManager.execute(state.simple_engine, engine_input, engine_timeout)
 
       {:error, reason} ->
         Logger.error("Engine execution failed: #{inspect(reason)}")

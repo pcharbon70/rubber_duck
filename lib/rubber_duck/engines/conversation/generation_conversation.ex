@@ -17,7 +17,6 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
   require Logger
 
   alias RubberDuck.CoT.Manager, as: ConversationManager
-  alias RubberDuck.CoT.Chains.GenerationChain
   alias RubberDuck.Engine.InputValidator
 
   @impl true
@@ -28,7 +27,7 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
       temperature: config[:temperature] || 0.6,
       # Remove hardcoded model - will come from input
       timeout: config[:timeout] || 180_000,
-      chain_module: config[:chain_module] || GenerationChain
+      chain_module: config[:chain_module] || RubberDuck.CoT.Chains.GenerationChain
     }
 
     {:ok, state}
@@ -44,16 +43,25 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
         conversation_type: :generation,
         generated_code: extract_generated_code(response),
         implementation_plan: extract_implementation_plan(response),
+        reasoning_steps: response.reasoning_steps,  # Include all reasoning steps
         processing_time: response.duration_ms,
         metadata: %{
           provider: validated.provider,
           model: validated.model,
           temperature: validated.temperature || state.temperature,
           max_tokens: validated.max_tokens || state.max_tokens,
-          generation_type: validated.generation_type
+          generation_type: validated.generation_type,
+          total_steps: response.total_steps
         }
       }
 
+      Logger.info("Generation conversation engine result",
+        response_length: String.length(result.response),
+        has_generated_code: result.generated_code != nil,
+        implementation_plan_steps: length(result.implementation_plan),
+        processing_time_ms: result.processing_time
+      )
+      
       {:ok, result}
     end
   end
@@ -87,7 +95,12 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
     cot_context = build_cot_context(validated, state)
 
     Logger.info("Processing generation conversation: #{String.slice(validated.query, 0, 50)}...")
-
+    
+    # Debug: Check chain module
+    Logger.info("Using chain module: #{inspect(state.chain_module)}")
+    Logger.info("Chain module exports config?: #{function_exported?(state.chain_module, :config, 0)}")
+    Logger.info("Chain module exports steps?: #{function_exported?(state.chain_module, :steps, 0)}")
+    
     # Execute the generation chain
     case ConversationManager.execute_chain(state.chain_module, validated.query, cot_context) do
       {:ok, result} ->

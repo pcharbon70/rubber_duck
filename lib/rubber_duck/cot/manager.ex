@@ -89,9 +89,13 @@ defmodule RubberDuck.CoT.Manager do
   # Private functions
 
   defp get_chain_config(chain_module) do
+    Logger.debug("Checking chain module: #{inspect(chain_module)}")
+    
     if function_exported?(chain_module, :config, 0) do
+      Logger.debug("Chain module #{inspect(chain_module)} has config/0")
       {:ok, chain_module.config()}
     else
+      Logger.error("Chain module #{inspect(chain_module)} missing config/0. Exported functions: #{inspect(chain_module.__info__(:functions))}")
       {:error, "Chain module must implement config/0"}
     end
   end
@@ -285,7 +289,7 @@ defmodule RubberDuck.CoT.Manager do
           %{role: "user", content: prompt}
         ]
 
-        Logger.debug("Executing step #{step.name} with provider #{provider}, model #{model}, prompt: #{String.slice(prompt, 0, 100)}...")
+        Logger.debug("Executing step #{step.name} with #{provider}/#{model}")
 
         # Convert map to keyword list for Service.completion/1
         opts = %{messages: messages} |> Map.merge(options) |> Map.to_list()
@@ -293,7 +297,7 @@ defmodule RubberDuck.CoT.Manager do
         case Service.completion(opts) do
           {:ok, response} ->
             content = extract_content(response)
-            Logger.debug("Step #{step.name} LLM response content: #{inspect(content)}")
+            Logger.debug("Step #{step.name} completed")
             {:ok, content}
 
           {:error, :cancelled} = error ->
@@ -342,16 +346,13 @@ defmodule RubberDuck.CoT.Manager do
   end
 
   defp extract_llm_response_content(%{choices: choices}) when is_list(choices) do
-    Logger.debug("Extracting from choices: #{inspect(choices)}")
-    result = extract_choices_content(choices)
-    Logger.debug("Extracted content: #{inspect(result)}")
-    result
+    extract_choices_content(choices)
   end
 
   defp extract_llm_response_content(%{content: content}), do: content
 
-  defp extract_llm_response_content(response) do
-    Logger.error("Unknown LLM response format: #{inspect(response)}")
+  defp extract_llm_response_content(_response) do
+    Logger.error("Unknown LLM response format")
     ""
   end
 
@@ -361,8 +362,8 @@ defmodule RubberDuck.CoT.Manager do
   defp extract_choices_content([%{text: content} | _]), do: content
   defp extract_choices_content([%{"text" => content} | _]), do: content
 
-  defp extract_choices_content(choices) do
-    Logger.error("Failed to extract content from choices: #{inspect(choices)}")
+  defp extract_choices_content(_choices) do
+    Logger.error("Failed to extract content from choices")
     ""
   end
 
@@ -386,7 +387,21 @@ defmodule RubberDuck.CoT.Manager do
       step: step
     }
 
-    Logger.debug("Validation context for step #{step.name}: result=#{inspect(result)}")
+    Logger.debug("Validating step #{step.name}")
+    
+    # Broadcast validation status if we have a conversation_id
+    conversation_id = get_in(session, [:context, :conversation_id])
+    if conversation_id do
+      Status.workflow(
+        conversation_id,
+        "Validating step: #{step.name}",
+        %{
+          step_name: step.name,
+          chain: inspect(session.chain),
+          status: :validating
+        }
+      )
+    end
 
     chain_module = Map.get(step, :__chain_module__, session.chain)
 

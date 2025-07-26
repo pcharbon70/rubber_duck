@@ -166,6 +166,20 @@ defmodule RubberDuck.Engines.Refactoring do
   end
 
   defp generate_refactoring_suggestions(analysis, input, state) do
+    # Broadcast start of suggestion generation
+    conversation_id = input[:conversation_id] || input[:context][:conversation_id]
+    if conversation_id do
+      RubberDuck.Status.engine(
+        conversation_id,
+        "Generating refactoring suggestions",
+        %{
+          engine: :refactoring,
+          file_path: input.file_path,
+          status: :generating_suggestions
+        }
+      )
+    end
+    
     # Use LLM to generate refactoring suggestions
     prompt = build_refactoring_prompt(analysis, input)
 
@@ -180,9 +194,35 @@ defmodule RubberDuck.Engines.Refactoring do
       max_tokens: input.max_tokens || state.config[:max_tokens] || 4096,
       user_id: input.user_id
     ]
+    
+    # Broadcast LLM call
+    if conversation_id do
+      RubberDuck.Status.engine(
+        conversation_id,
+        "Calling LLM for refactoring suggestions",
+        %{
+          engine: :refactoring,
+          provider: input.provider,
+          model: input.model,
+          status: :llm_call
+        }
+      )
+    end
 
     case LLM.Service.completion(opts) do
       {:ok, response} ->
+        # Broadcast completion
+        if conversation_id do
+          RubberDuck.Status.engine(
+            conversation_id,
+            "Refactoring suggestions generated",
+            %{
+              engine: :refactoring,
+              status: :suggestions_ready
+            }
+          )
+        end
+        
         parse_refactoring_response(response, input)
 
       {:error, reason} ->

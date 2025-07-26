@@ -124,6 +124,20 @@ defmodule RubberDuck.CoT.Executor do
 
   defp execute_steps_sequential([step | remaining], session, chain_config) do
     Logger.info("Executing step: #{step.name}")
+    
+    # Broadcast step execution status if we have a conversation_id
+    conversation_id = get_in(session, [:context, :conversation_id])
+    if conversation_id do
+      RubberDuck.Status.workflow(
+        conversation_id,
+        "Executing step: #{step.name}",
+        %{
+          step_name: step.name,
+          chain: inspect(session.chain),
+          status: :executing
+        }
+      )
+    end
 
     # Check if step should be skipped
     if should_skip_step?(step, session) do
@@ -135,6 +149,20 @@ defmodule RubberDuck.CoT.Executor do
         {:ok, step_result} ->
           # Update session with step result
           updated_session = add_step_result(session, step, step_result)
+          
+          # Broadcast step completion if we have a conversation_id
+          conversation_id = get_in(session, [:context, :conversation_id])
+          if conversation_id do
+            RubberDuck.Status.workflow(
+              conversation_id,
+              "Completed step: #{step.name}",
+              %{
+                step_name: step.name,
+                chain: inspect(session.chain),
+                status: :completed
+              }
+            )
+          end
 
           # Continue with remaining steps
           execute_steps_sequential(remaining, updated_session, chain_config)

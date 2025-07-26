@@ -113,6 +113,20 @@ defmodule RubberDuck.Engines.Completion do
           }
 
           Logger.debug("Executing CoT completion chain")
+          
+          # Broadcast start of completion
+          conversation_id = validated_input[:conversation_id] || validated_input[:context][:conversation_id]
+          if conversation_id do
+            RubberDuck.Status.engine(
+              conversation_id,
+              "Processing code completion",
+              %{
+                engine: :completion,
+                language: validated_input.language,
+                status: :processing
+              }
+            )
+          end
 
           # Execute CoT completion chain
           case ConversationManager.execute_chain(CompletionChain, format_completion_query(validated_input), cot_context) do
@@ -134,6 +148,19 @@ defmodule RubberDuck.Engines.Completion do
                 %{count: length(filtered), cot: true},
                 %{language: validated_input.language}
               )
+              
+              # Broadcast completion success
+              if conversation_id do
+                RubberDuck.Status.engine(
+                  conversation_id,
+                  "Code completions ready",
+                  %{
+                    engine: :completion,
+                    count: length(filtered),
+                    status: :completed
+                  }
+                )
+              end
 
               {:ok, %{completions: filtered, state: updated_state}}
 
@@ -359,6 +386,21 @@ defmodule RubberDuck.Engines.Completion do
   defp generate_llm_completions(fim_context, input, state) do
     # Build FIM prompt for the LLM
     prompt = build_fim_prompt(fim_context, input)
+    
+    # Broadcast LLM call for legacy path
+    conversation_id = input[:conversation_id] || input[:context][:conversation_id]
+    if conversation_id do
+      RubberDuck.Status.engine(
+        conversation_id,
+        "Calling LLM for code completion",
+        %{
+          engine: :completion,
+          provider: input.provider,
+          model: input.model,
+          status: :llm_call
+        }
+      )
+    end
 
     # Use provider and model from input (validated to be present)
     opts = [
