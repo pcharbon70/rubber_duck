@@ -387,7 +387,21 @@ defmodule RubberDuck.CoT.Manager do
       step: step
     }
 
-    Logger.debug("Validation context for step #{step.name}: result=#{inspect(result)}")
+    Logger.debug("Validating step #{step.name}")
+    
+    # Broadcast validation status if we have a conversation_id
+    conversation_id = get_in(session, [:context, :conversation_id])
+    if conversation_id do
+      Status.workflow(
+        conversation_id,
+        "Validating step: #{step.name}",
+        %{
+          step_name: step.name,
+          chain: inspect(session.chain),
+          status: :validating
+        }
+      )
+    end
 
     chain_module = Map.get(step, :__chain_module__, session.chain)
 
