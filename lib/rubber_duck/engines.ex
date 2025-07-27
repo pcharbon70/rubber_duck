@@ -180,5 +180,19 @@ defmodule RubberDuck.Engines do
         tags: [:conversation, :problem_solving, :debugging]
       )
     end
+
+    engine :planning_conversation do
+      module RubberDuck.Engines.Conversation.PlanningConversation
+      description "Handles planning-related conversations and creates actionable plans"
+      priority(85)
+      timeout 60_000
+
+      config(
+        max_tokens: 3000,
+        temperature: 0.7,
+        capabilities: [:plan_creation, :task_decomposition, :planning_strategy, :execution_planning, :project_architecture],
+        tags: [:conversation, :planning, :task_management]
+      )
+    end
   end
 end

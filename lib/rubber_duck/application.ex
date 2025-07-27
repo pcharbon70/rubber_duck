@@ -17,6 +17,8 @@ defmodule RubberDuck.Application do
       {Registry, keys: :unique, name: RubberDuck.Engine.Registry, id: RubberDuck.Engine.ProcessRegistry},
       # Registry for file watchers
       {Registry, keys: :unique, name: RubberDuck.Projects.FileWatcher.Registry},
+      # Registry for plan executors
+      {Registry, keys: :unique, name: RubberDuck.ExecutorRegistry},
       # Engine system components
       RubberDuck.Engine.CapabilityRegistry,
       RubberDuck.Engine.TaskRegistry,
