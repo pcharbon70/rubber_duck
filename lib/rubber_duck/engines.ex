@@ -194,5 +194,24 @@ defmodule RubberDuck.Engines do
         tags: [:conversation, :planning, :task_management]
       )
     end
+
+    # Planning Engines
+    engine :task_decomposer do
+      module RubberDuck.Planning.TaskDecomposer
+      description "Decomposes high-level requests into structured, actionable tasks"
+      priority(75)
+      timeout 45_000
+
+      config(
+        max_tokens: 4000,
+        temperature: 0.6,
+        default_strategy: :hierarchical,
+        max_depth: 5,
+        min_task_size: 1,
+        validation_enabled: true,
+        capabilities: [:task_decomposition, :dependency_analysis, :complexity_estimation, :pattern_matching],
+        tags: [:planning, :decomposition, :task_management]
+      )
+    end
   end
 end

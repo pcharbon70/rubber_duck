@@ -18,6 +18,7 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
 
   alias RubberDuck.Planning.{Plan, Task}
   alias RubberDuck.Planning.Critics.Orchestrator
+  alias RubberDuck.Planning.Decomposer
   alias RubberDuck.Engine.InputValidator
   alias RubberDuck.LLM.Service, as: LLMService
 
@@ -237,18 +238,73 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   end
 
   defp decompose_plan_tasks(plan, validated) do
-    _context = %{
+    context = %{
       plan_type: plan.type,
       user_id: validated.user_id,
       language: validated.context[:language] || "elixir",
-      constraints: plan.constraints_data || %{}
+      constraints: plan.constraints_data || %{},
+      strategy: determine_decomposition_strategy(plan)
     }
     
-    # TaskDecomposer not implemented yet
-    # For now, return plan without decomposition
-    Logger.info("Task decomposition not implemented yet for plan #{plan.id}")
-    {:ok, plan}
+    # Use the Decomposer to break down the plan into tasks
+    case Decomposer.decompose(plan.description, context) do
+      {:ok, tasks} ->
+        # Convert decomposer output to Task resources
+        task_attrs = tasks
+          |> Enum.map(fn task ->
+            %{
+              plan_id: plan.id,
+              name: task[:name],
+              description: task[:description],
+              position: task[:position],
+              complexity: ensure_atom(task[:complexity]),
+              status: :pending,
+              success_criteria: task[:success_criteria],
+              validation_rules: task[:validation_rules],
+              metadata: task[:metadata] || %{}
+            }
+          end)
+        
+        # Create tasks in batch
+        case Ash.bulk_create(Task, task_attrs, return_records?: true, return_errors?: true) do
+          %{records: created_tasks} when is_list(created_tasks) ->
+            {:ok, %{plan | tasks: created_tasks}}
+          
+          %{errors: errors} ->
+            Logger.error("Failed to create tasks: #{inspect(errors)}")
+            {:ok, plan}  # Continue without tasks
+          
+          error ->
+            Logger.error("Failed to create tasks: #{inspect(error)}")
+            {:ok, plan}  # Continue without tasks
+        end
+      
+      {:error, reason} ->
+        Logger.error("Task decomposition failed for plan #{plan.id}: #{inspect(reason)}")
+        {:ok, plan}  # Continue without decomposition
+    end
   end
+  
+  defp determine_decomposition_strategy(plan) do
+    case plan.type do
+      :feature -> :hierarchical
+      :refactor -> :linear
+      :bugfix -> :linear
+      :analysis -> :tree_of_thought
+      :migration -> :linear
+      _ -> :hierarchical
+    end
+  end
+  
+  defp ensure_atom(value) when is_atom(value), do: value
+  defp ensure_atom(value) when is_binary(value) do
+    try do
+      String.to_existing_atom(value)
+    rescue
+      ArgumentError -> :medium
+    end
+  end
+  defp ensure_atom(_), do: :medium
 
 
   defp format_planning_response(plan, _validated) do

@@ -107,14 +107,26 @@ defmodule RubberDuck.Planning.TaskDecomposer do
 
     case LLM.completion(model: state.llm_config[:model] || "gpt-4", messages: [%{role: "user", content: prompt}]) do
       {:ok, response} ->
-        strategy =
-          response.content
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> ""
+        end
+        
+        strategy_atom = content
           |> String.trim()
           |> String.downcase()
-          |> String.to_existing_atom()
+          |> then(fn s ->
+            try do
+              String.to_existing_atom(s)
+            rescue
+              ArgumentError -> nil
+            end
+          end)
 
-        if strategy in @decomposition_strategies do
-          {:ok, strategy}
+        if strategy_atom in @decomposition_strategies do
+          {:ok, strategy_atom}
         else
           {:ok, state.default_strategy}
         end
@@ -160,8 +172,16 @@ defmodule RubberDuck.Planning.TaskDecomposer do
            response_format: %{type: "json_object"}
          ) do
       {:ok, response} ->
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> "[]"
+        end
+        
         tasks =
-          Jason.decode!(response.content)
+          Jason.decode!(content)
+          |> List.wrap()  # Ensure it's a list even if single object returned
           |> Enum.with_index()
           |> Enum.map(fn {task, index} ->
             Map.merge(task, %{
@@ -216,14 +236,25 @@ defmodule RubberDuck.Planning.TaskDecomposer do
            response_format: %{type: "json_object"}
          ) do
       {:ok, response} ->
-        approaches = Jason.decode!(response.content)
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> "{\"approaches\": []}"
+        end
+        
+        approaches = case Jason.decode!(content) do
+          %{"approaches" => apps} when is_list(apps) -> apps
+          apps when is_list(apps) -> apps
+          _ -> []
+        end
 
         # Evaluate approaches and select best one
         {:ok, best_approach} = select_best_approach(approaches, input, state)
 
         # Convert to task list
         tasks =
-          best_approach["tasks"]
+          (best_approach["tasks"] || [])
           |> Enum.with_index()
           |> Enum.map(fn {task, index} ->
             Map.merge(task, %{"position" => index})
@@ -274,11 +305,17 @@ defmodule RubberDuck.Planning.TaskDecomposer do
 
     case LLM.completion(model: state.llm_config[:model] || "gpt-4", messages: [%{role: "user", content: prompt}]) do
       {:ok, response} ->
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> "medium"
+        end
+        
         complexity =
-          response.content
+          content
           |> String.trim()
           |> String.downcase()
-          |> String.replace("_", "_")
 
         {:ok, complexity}
 
@@ -304,7 +341,14 @@ defmodule RubberDuck.Planning.TaskDecomposer do
            response_format: %{type: "json_object"}
          ) do
       {:ok, response} ->
-        {:ok, Jason.decode!(response.content)}
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> "{\"criteria\": [\"Task completed successfully\"]}"
+        end
+        
+        {:ok, Jason.decode!(content)}
 
       _ ->
         {:ok, %{"criteria" => ["Task completed successfully"]}}
@@ -381,8 +425,17 @@ defmodule RubberDuck.Planning.TaskDecomposer do
            response_format: %{type: "json_object"}
          ) do
       {:ok, response} ->
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> "[]"
+        end
+        
         deps =
-          Jason.decode!(response.content)
+          content
+          |> Jason.decode!()
+          |> List.wrap()  # Ensure it's a list
           |> Enum.map(fn dep ->
             %{
               from: "task_#{dep["from"]}",
