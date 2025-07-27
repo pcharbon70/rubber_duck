@@ -145,8 +145,12 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
       # Try to parse JSON from the response
       case Jason.decode(content) do
         {:ok, data} when is_map(data) ->
+          # Make plan name unique by adding timestamp if needed
+          base_name = data["name"] || generate_plan_name(validated.query)
+          unique_name = ensure_unique_plan_name(base_name)
+          
           plan_data = %{
-            name: data["name"] || generate_plan_name(validated.query),
+            name: unique_name,
             description: data["description"] || validated.query,
             type: parse_plan_type(data["type"]) || detect_plan_type(validated.query),
             context: Map.merge(validated.context || %{}, data["context"] || %{}),
@@ -163,7 +167,7 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
           Logger.warning("Failed to parse JSON, falling back to basic extraction")
           # Fallback to basic extraction
           {:ok, %{
-            name: generate_plan_name(validated.query),
+            name: ensure_unique_plan_name(generate_plan_name(validated.query)),
             description: validated.query,
             type: detect_plan_type(validated.query),
             context: validated.context || %{},
@@ -182,7 +186,7 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
         Logger.error("Error parsing plan data: #{inspect(e)}")
         # Still try to create a basic plan instead of failing completely
         {:ok, %{
-          name: generate_plan_name(validated.query),
+          name: ensure_unique_plan_name(generate_plan_name(validated.query)),
           description: validated.query,
           type: detect_plan_type(validated.query),
           context: validated.context || %{},
@@ -486,6 +490,12 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
       |> Enum.join(" ")
     
     "Plan: #{words}"
+  end
+  
+  defp ensure_unique_plan_name(base_name) do
+    # Add a timestamp suffix to make names unique
+    timestamp = DateTime.utc_now() |> DateTime.to_unix(:millisecond)
+    "#{base_name} - #{timestamp}"
   end
 
   defp detect_plan_type(query) do
