@@ -173,10 +173,17 @@ defmodule RubberDuck.Planning.Critics.Orchestrator do
     # Batch create validations
     case Ash.bulk_create(Validation, validations, 
       domain: RubberDuck.Planning,
-      return_records?: true
+      return_records?: true,
+      return_errors?: true
     ) do
-      %{records: records} -> {:ok, records}
-      error -> {:error, error}
+      %{records: records} when is_list(records) -> 
+        {:ok, records}
+      %{errors: errors} -> 
+        Logger.error("Failed to create validations: #{inspect(errors)}")
+        {:error, errors}
+      error -> 
+        Logger.error("Unexpected bulk_create result: #{inspect(error)}")
+        {:error, error}
     end
   end
 
