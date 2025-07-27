@@ -231,19 +231,18 @@ defmodule RubberDuck.Planning.TaskDecomposer do
   end
 
   defp tree_of_thought_decomposition(input, state) do
-    # Generate multiple decomposition approaches
-    prompt = """
-    Generate 3 different approaches to decompose this request:
-
-    Request: #{input.query}
-
-    For each approach:
-    1. Name the approach
-    2. List the tasks in that approach
-    3. Explain why this approach might be good
-
-    Return as JSON.
-    """
+    alias RubberDuck.Planning.DecompositionTemplates
+    
+    # Extract goals and constraints from context
+    goals = input[:goals] || extract_goals_from_query(input.query)
+    constraints = input[:constraints] || input[:context][:constraints] || %{}
+    
+    # Get the tree-of-thought template
+    prompt = DecompositionTemplates.get_template(:tree_of_thought, %{
+      request: input.query,
+      goals: format_goals(goals),
+      constraints: format_constraints(constraints)
+    })
 
     case LLM.completion(
            model: state.llm_config[:model] || "gpt-4",
@@ -255,31 +254,89 @@ defmodule RubberDuck.Planning.TaskDecomposer do
         content = case response do
           %{content: c} when is_binary(c) -> c
           %{choices: [%{message: %{content: c}} | _]} -> c
-          _ -> "{\"approaches\": []}"
+          _ -> "[]"
         end
         
+        # Parse approaches - expecting an array of approaches
         approaches = case Jason.decode!(content) do
+          approaches when is_list(approaches) -> approaches
           %{"approaches" => apps} when is_list(apps) -> apps
-          apps when is_list(apps) -> apps
           _ -> []
         end
 
-        # Evaluate approaches and select best one
-        {:ok, best_approach} = select_best_approach(approaches, input, state)
+        if length(approaches) == 0 do
+          Logger.error("No approaches generated for tree-of-thought decomposition")
+          {:error, :no_approaches_generated}
+        else
+          # Evaluate all approaches and select the best one
+          {:ok, best_approach, comparison} = evaluate_and_select_approach(approaches, input, state)
 
-        # Convert to task list
-        tasks =
-          (best_approach["tasks"] || [])
-          |> Enum.with_index()
-          |> Enum.map(fn {task, index} ->
-            Map.merge(task, %{"position" => index})
-          end)
-
-        {:ok, tasks}
+          # Convert selected approach's tasks to our standard format
+          tasks = format_approach_tasks(best_approach, comparison)
+          
+          {:ok, tasks}
+        end
 
       error ->
+        Logger.error("Tree-of-thought decomposition failed: #{inspect(error)}")
         error
     end
+  end
+  
+  defp extract_goals_from_query(query) do
+    # Simple extraction - in real implementation might use LLM
+    cond do
+      String.contains?(query, "implement") -> ["Complete implementation", "Working functionality"]
+      String.contains?(query, "fix") -> ["Resolve issue", "Prevent regression"]
+      String.contains?(query, "optimize") -> ["Improve performance", "Maintain functionality"]
+      true -> ["Complete the requested task"]
+    end
+  end
+  
+  defp format_goals(goals) when is_list(goals), do: Enum.join(goals, ", ")
+  defp format_goals(goals) when is_binary(goals), do: goals
+  defp format_goals(_), do: "Complete the requested task"
+  
+  defp format_constraints(constraints) when is_map(constraints) do
+    constraints
+    |> Enum.map(fn {k, v} -> "#{k}: #{v}" end)
+    |> Enum.join(", ")
+  end
+  defp format_constraints(_), do: "None specified"
+  
+  defp format_approach_tasks(approach, comparison) do
+    tasks = approach["tasks"] || []
+    approach_metadata = %{
+      "approach_name" => approach["approach_name"],
+      "philosophy" => approach["philosophy"],
+      "risk_level" => approach["risk_level"],
+      "confidence_score" => approach["confidence_score"],
+      "selection_reason" => comparison["selection_reason"]
+    }
+    
+    tasks
+    |> Enum.with_index()
+    |> Enum.map(fn {task, index} ->
+      # Base task structure
+      base_task = %{
+        "name" => task["name"] || "Task #{index + 1}",
+        "description" => task["description"] || "",
+        "complexity" => task["complexity"] || "medium",
+        "position" => index,
+        "depends_on" => task["dependencies"] || (if index > 0, do: [index - 1], else: [])
+      }
+      
+      # Add approach metadata
+      metadata = Map.merge(
+        task["metadata"] || %{},
+        Map.merge(approach_metadata, %{
+          "approach_confidence" => approach["confidence_score"],
+          "task_risk" => task["risk"] || approach["risk_level"]
+        })
+      )
+      
+      Map.put(base_task, "metadata", metadata)
+    end)
   end
 
   # Task refinement
@@ -763,10 +820,164 @@ defmodule RubberDuck.Planning.TaskDecomposer do
     end)
   end
 
-  defp select_best_approach(approaches, _input, _state) do
-    # Use LLM to evaluate and select best approach
-    # For now, just select first one
-    {:ok, List.first(approaches)}
+  defp evaluate_and_select_approach(approaches, input, state) do
+    # Score each approach based on multiple criteria
+    scored_approaches = approaches
+    |> Enum.map(fn approach ->
+      score = calculate_approach_score(approach, input, state)
+      {approach, score}
+    end)
+    |> Enum.sort_by(fn {_approach, score} -> score.total end, :desc)
+    
+    # Get the best approach
+    {best_approach, best_score} = List.first(scored_approaches)
+    
+    # Create comparison data
+    comparison = %{
+      "selected_approach" => best_approach["approach_name"],
+      "selection_reason" => generate_selection_reason(best_approach, best_score, scored_approaches),
+      "scores" => Enum.map(scored_approaches, fn {app, score} ->
+        %{
+          "approach" => app["approach_name"],
+          "total_score" => score.total,
+          "breakdown" => score
+        }
+      end),
+      "alternatives" => Enum.map(tl(scored_approaches), fn {app, _score} ->
+        %{
+          "name" => app["approach_name"],
+          "philosophy" => app["philosophy"],
+          "pros" => app["pros"],
+          "cons" => app["cons"]
+        }
+      end)
+    }
+    
+    {:ok, best_approach, comparison}
+  end
+  
+  defp calculate_approach_score(approach, input, _state) do
+    # Extract context preferences
+    preferences = get_preferences(input)
+    
+    # Base scores from approach data
+    confidence = parse_float(approach["confidence_score"], 0.5)
+    risk_score = risk_to_score(approach["risk_level"])
+    
+    # Calculate component scores
+    scores = %{
+      confidence: confidence * preferences.confidence_weight,
+      risk_alignment: calculate_risk_alignment(risk_score, preferences.risk_tolerance) * preferences.risk_weight,
+      effort_efficiency: calculate_effort_efficiency(approach["estimated_total_effort"], preferences.time_constraint) * preferences.effort_weight,
+      goal_alignment: calculate_goal_alignment(approach, input[:goals]) * preferences.goal_weight,
+      pros_cons_balance: calculate_pros_cons_balance(approach) * 0.1
+    }
+    
+    # Calculate total weighted score
+    total = Enum.reduce(scores, 0, fn {_key, value}, acc -> acc + value end)
+    
+    Map.put(scores, :total, total)
+  end
+  
+  defp get_preferences(input) do
+    context = input[:context] || %{}
+    
+    # Default weights that sum to 1.0
+    %{
+      confidence_weight: context[:confidence_weight] || 0.3,
+      risk_weight: context[:risk_weight] || 0.3,
+      effort_weight: context[:effort_weight] || 0.2,
+      goal_weight: context[:goal_weight] || 0.2,
+      risk_tolerance: context[:risk_tolerance] || :medium,
+      time_constraint: context[:time_constraint] || "2w"
+    }
+  end
+  
+  defp parse_float(value, _default) when is_float(value), do: value
+  defp parse_float(value, _default) when is_integer(value), do: value / 1.0
+  defp parse_float(value, default) when is_binary(value) do
+    case Float.parse(value) do
+      {float, _} -> float
+      :error -> default
+    end
+  end
+  defp parse_float(_, default), do: default
+  
+  defp risk_to_score("low"), do: 0.9
+  defp risk_to_score("medium"), do: 0.5
+  defp risk_to_score("high"), do: 0.2
+  defp risk_to_score(_), do: 0.5
+  
+  defp calculate_risk_alignment(risk_score, tolerance) do
+    case tolerance do
+      :low -> risk_score  # Prefer low risk
+      :medium -> 0.5 + (risk_score - 0.5) * 0.5  # Moderate preference
+      :high -> 1.0 - risk_score  # Prefer high risk/high reward
+      _ -> 0.5
+    end
+  end
+  
+  defp calculate_effort_efficiency(effort, time_constraint) do
+    effort_days = effort_to_days(effort)
+    constraint_days = effort_to_days(time_constraint)
+    
+    if effort_days <= constraint_days do
+      # Under time constraint - higher score for faster delivery
+      1.0 - (effort_days / constraint_days) * 0.3
+    else
+      # Over time constraint - penalize
+      0.3 * (constraint_days / effort_days)
+    end
+  end
+  
+  defp effort_to_days("1d"), do: 1
+  defp effort_to_days("2d"), do: 2
+  defp effort_to_days("3d"), do: 3
+  defp effort_to_days("1w"), do: 5
+  defp effort_to_days("2w"), do: 10
+  defp effort_to_days("3w"), do: 15
+  defp effort_to_days("1m"), do: 20
+  defp effort_to_days(_), do: 10
+  
+  defp calculate_goal_alignment(approach, goals) do
+    # Simple alignment based on whether approach mentions goals
+    # In real implementation, might use semantic similarity
+    if goals && approach["best_when"] do
+      goals_text = format_goals(goals) |> String.downcase()
+      best_when = String.downcase(approach["best_when"])
+      
+      if String.contains?(best_when, ["fast", "quick"]) && String.contains?(goals_text, ["quick", "fast"]) do
+        0.9
+      else
+        0.7  # Default reasonable alignment
+      end
+    else
+      0.7
+    end
+  end
+  
+  defp calculate_pros_cons_balance(approach) do
+    pros_count = length(approach["pros"] || [])
+    cons_count = length(approach["cons"] || [])
+    
+    if pros_count + cons_count > 0 do
+      pros_count / (pros_count + cons_count)
+    else
+      0.5
+    end
+  end
+  
+  defp generate_selection_reason(approach, score, all_scored) do
+    other_names = all_scored
+    |> Enum.drop(1)
+    |> Enum.map(fn {app, _} -> app["approach_name"] end)
+    |> Enum.join(", ")
+    
+    "Selected '#{approach["approach_name"]}' (score: #{Float.round(score.total, 2)}) due to " <>
+    "#{approach["philosophy"]}. This approach offers the best balance of " <>
+    "confidence (#{approach["confidence_score"]}), risk (#{approach["risk_level"]}), " <>
+    "and effort (#{approach["estimated_total_effort"]}). " <>
+    if(length(all_scored) > 1, do: "Alternative approaches considered: #{other_names}.", else: "")
   end
 
   defp calculate_max_depth(_tasks) do
