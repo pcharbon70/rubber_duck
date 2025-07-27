@@ -24,22 +24,25 @@ func (h *ProblemSolvingResponseHandler) FormatResponse(response phoenix.Conversa
 	// Add problem-solving header
 	parts = append(parts, "## 🎯 Problem Solving\n")
 	
-	// Add problem statement if available
-	if problem, ok := response.Metadata["problem_statement"].(string); ok {
-		parts = append(parts, h.addSectionHeader("Problem"))
-		parts = append(parts, fmt.Sprintf("> %s\n", problem))
+	// Add root cause if available
+	if rootCause, ok := response.Metadata["root_cause"].(string); ok && rootCause != "" {
+		parts = append(parts, h.addSectionHeader("Root Cause"))
+		parts = append(parts, fmt.Sprintf("> %s\n", h.addEmphasis(rootCause)))
 	}
 	
-	// Add approach if available
-	if approach, ok := response.Metadata["approach"].(string); ok {
-		parts = append(parts, h.addSectionHeader("Approach"))
-		parts = append(parts, approach, "")
+	// Add reasoning steps if available
+	if reasoningSteps, ok := response.Metadata["reasoning_steps"].([]any); ok && len(reasoningSteps) > 0 {
+		parts = append(parts, h.addSectionHeader("Reasoning Process"))
+		for i, step := range reasoningSteps {
+			parts = append(parts, fmt.Sprintf("%d. %v", i+1, step))
+		}
+		parts = append(parts, "")
 	}
 	
-	// Check for structured steps in metadata
-	if steps, ok := response.Metadata["solution_steps"].([]any); ok && len(steps) > 0 {
+	// Check for solution steps in metadata
+	if solutionSteps, ok := response.Metadata["solution_steps"].([]any); ok && len(solutionSteps) > 0 {
 		parts = append(parts, h.addSectionHeader("Solution Steps"))
-		for i, step := range steps {
+		for i, step := range solutionSteps {
 			parts = append(parts, fmt.Sprintf("**Step %d**: %v", i+1, step))
 		}
 		parts = append(parts, "")
@@ -50,34 +53,24 @@ func (h *ProblemSolvingResponseHandler) FormatResponse(response phoenix.Conversa
 		// If we already have structured steps, this is additional detail
 		if _, hasSteps := response.Metadata["solution_steps"]; hasSteps {
 			parts = append(parts, h.addSectionHeader("Detailed Solution"))
+		} else {
+			parts = append(parts, h.addSectionHeader("Solution"))
 		}
 		parts = append(parts, response.Response)
 	}
 	
-	// Add outcome/result if available
-	if outcome, ok := response.Metadata["outcome"].(string); ok {
-		parts = append(parts, h.addSectionHeader("Outcome"))
-		parts = append(parts, fmt.Sprintf("✅ %s", outcome))
+	// Add footer with steps and processing time
+	var footer []string
+	if totalSteps, ok := response.Metadata["total_steps"].(float64); ok {
+		footer = append(footer, fmt.Sprintf("Total steps: %.0f", totalSteps))
+	}
+	if processingTime, ok := response.Metadata["processing_time"].(float64); ok {
+		footer = append(footer, fmt.Sprintf("Processing time: %.0fms", processingTime))
 	}
 	
-	// Add alternatives if available
-	if alternatives, ok := response.Metadata["alternatives"].([]any); ok && len(alternatives) > 0 {
-		parts = append(parts, h.addSectionHeader("Alternative Solutions"))
-		for _, alt := range alternatives {
-			parts = append(parts, fmt.Sprintf("• %v", alt))
-		}
-	}
-	
-	// Add remaining metadata
-	filteredMetadata := make(map[string]any)
-	for k, v := range response.Metadata {
-		if k != "problem_statement" && k != "approach" && k != "solution_steps" && 
-		   k != "outcome" && k != "alternatives" {
-			filteredMetadata[k] = v
-		}
-	}
-	if len(filteredMetadata) > 0 {
-		parts = append(parts, h.formatMetadata(filteredMetadata))
+	if len(footer) > 0 {
+		parts = append(parts, "\n---")
+		parts = append(parts, "*"+strings.Join(footer, " | ")+"*")
 	}
 	
 	return strings.Join(parts, "\n")

@@ -21,21 +21,36 @@ func (h *GenerationResponseHandler) GetConversationType() string {
 func (h *GenerationResponseHandler) FormatResponse(response phoenix.ConversationMessage) string {
 	var parts []string
 	
-	// Add generation header
-	parts = append(parts, "## 🔧 Generated Content\n")
+	// Add generation header with type if available
+	generationType := ""
+	if gType, ok := response.Metadata["generation_type"].(string); ok {
+		generationType = h.formatGenerationType(gType)
+	}
+	parts = append(parts, fmt.Sprintf("## 🔧 %sGeneration\n", generationType))
+	
+	// Add implementation plan if available
+	if implementationPlan, ok := response.Metadata["implementation_plan"].([]any); ok && len(implementationPlan) > 0 {
+		parts = append(parts, h.addSectionHeader("Implementation Plan"))
+		for i, step := range implementationPlan {
+			parts = append(parts, fmt.Sprintf("%d. %v", i+1, step))
+		}
+		parts = append(parts, "")
+	}
+	
+	// Add reasoning steps if available
+	if reasoningSteps, ok := response.Metadata["reasoning_steps"].([]any); ok && len(reasoningSteps) > 0 {
+		parts = append(parts, h.addSectionHeader("Reasoning"))
+		for i, step := range reasoningSteps {
+			parts = append(parts, fmt.Sprintf("%d. %v", i+1, step))
+		}
+		parts = append(parts, "")
+	}
 	
 	// Check for generated code in metadata
-	if code, ok := response.Metadata["generated_code"].(string); ok {
-		language := "text"
-		if lang, ok := response.Metadata["language"].(string); ok {
-			language = lang
-		}
-		
-		// Add description if available
-		if desc, ok := response.Metadata["description"].(string); ok {
-			parts = append(parts, fmt.Sprintf("*%s*\n", desc))
-		}
-		
+	if code, ok := response.Metadata["generated_code"].(string); ok && code != "" {
+		parts = append(parts, h.addSectionHeader("Generated Code"))
+		// Try to determine language from generation type
+		language := h.inferLanguage(generationType)
 		parts = append(parts, h.addCodeBlock(code, language))
 		parts = append(parts, "\n💡 **Tip**: You can copy the code above using Ctrl+L to copy the last assistant message.\n")
 		
@@ -45,40 +60,53 @@ func (h *GenerationResponseHandler) FormatResponse(response phoenix.Conversation
 			parts = append(parts, response.Response)
 		}
 	} else {
-		// No structured code in metadata, check if response contains code blocks
+		// No structured code in metadata, use response
+		parts = append(parts, response.Response)
 		if strings.Contains(response.Response, "```") {
-			parts = append(parts, response.Response)
 			parts = append(parts, "\n💡 **Tip**: You can copy the code above using Ctrl+L to copy the last assistant message.")
-		} else {
-			parts = append(parts, response.Response)
 		}
 	}
 	
-	// Add usage notes if available
-	if usage, ok := response.Metadata["usage_notes"].(string); ok {
-		parts = append(parts, h.addSectionHeader("Usage Notes"))
-		parts = append(parts, usage)
+	// Add footer with steps and processing time
+	var footer []string
+	if totalSteps, ok := response.Metadata["total_steps"].(float64); ok {
+		footer = append(footer, fmt.Sprintf("Total steps: %.0f", totalSteps))
+	}
+	if processingTime, ok := response.Metadata["processing_time"].(float64); ok {
+		footer = append(footer, fmt.Sprintf("Processing time: %.0fms", processingTime))
 	}
 	
-	// Add dependencies if available
-	if deps, ok := response.Metadata["dependencies"].([]any); ok && len(deps) > 0 {
-		parts = append(parts, h.addSectionHeader("Dependencies"))
-		for _, dep := range deps {
-			parts = append(parts, fmt.Sprintf("• %v", dep))
-		}
-	}
-	
-	// Add remaining metadata
-	filteredMetadata := make(map[string]any)
-	for k, v := range response.Metadata {
-		if k != "generated_code" && k != "language" && k != "description" && 
-		   k != "usage_notes" && k != "dependencies" {
-			filteredMetadata[k] = v
-		}
-	}
-	if len(filteredMetadata) > 0 {
-		parts = append(parts, h.formatMetadata(filteredMetadata))
+	if len(footer) > 0 {
+		parts = append(parts, "\n---")
+		parts = append(parts, "*"+strings.Join(footer, " | ")+"*")
 	}
 	
 	return strings.Join(parts, "\n")
+}
+
+// formatGenerationType formats the generation type for display
+func (h *GenerationResponseHandler) formatGenerationType(gType string) string {
+	typeMap := map[string]string{
+		"function":           "Function ",
+		"module":            "Module ",
+		"api":               "API ",
+		"test":              "Test ",
+		"scaffold":          "Scaffold ",
+		"feature":           "Feature ",
+		"general_generation": "",
+	}
+	
+	if formatted, ok := typeMap[gType]; ok {
+		return formatted
+	}
+	return ""
+}
+
+// inferLanguage tries to infer programming language from generation type
+func (h *GenerationResponseHandler) inferLanguage(genType string) string {
+	// This is a simple heuristic, could be improved
+	if strings.Contains(genType, "Test") {
+		return "elixir" // Assuming Elixir for tests in this project
+	}
+	return "elixir" // Default to Elixir for RubberDuck project
 }

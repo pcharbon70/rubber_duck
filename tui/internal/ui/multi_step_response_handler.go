@@ -21,95 +21,37 @@ func (h *MultiStepResponseHandler) GetConversationType() string {
 func (h *MultiStepResponseHandler) FormatResponse(response phoenix.ConversationMessage) string {
 	var parts []string
 	
-	// Add multi-step header
-	parts = append(parts, "## 📋 Multi-Step Process\n")
-	
-	// Add overview if available
-	if overview, ok := response.Metadata["overview"].(string); ok {
-		parts = append(parts, fmt.Sprintf("**Overview**: %s\n", overview))
-	}
-	
-	// Check for structured steps in metadata
-	if steps, ok := response.Metadata["steps"].([]any); ok && len(steps) > 0 {
-		totalSteps := len(steps)
-		currentStep := 1
-		
-		// Get current step if available
-		if current, ok := response.Metadata["current_step"].(float64); ok {
-			currentStep = int(current)
-		}
-		
-		// Add progress bar
-		progress := h.createProgressBar(currentStep, totalSteps)
-		parts = append(parts, progress, "")
-		
-		// Add steps with status indicators
-		parts = append(parts, h.addSectionHeader("Steps"))
-		for i, step := range steps {
-			stepNum := i + 1
-			status := h.getStepStatus(stepNum, currentStep)
-			
-			// Format step based on its structure
-			var stepText string
-			switch s := step.(type) {
-			case string:
-				stepText = s
-			case map[string]any:
-				if name, ok := s["name"].(string); ok {
-					stepText = name
-				} else if desc, ok := s["description"].(string); ok {
-					stepText = desc
-				} else {
-					stepText = fmt.Sprintf("%v", s)
-				}
-			default:
-				stepText = fmt.Sprintf("%v", step)
-			}
-			
-			parts = append(parts, fmt.Sprintf("%s **Step %d**: %s", status, stepNum, stepText))
-		}
-		parts = append(parts, "")
+	// Add multi-step header with step number
+	stepNumber := 0
+	if stepNum, ok := response.Metadata["step_number"].(float64); ok {
+		stepNumber = int(stepNum)
+		parts = append(parts, fmt.Sprintf("## 📋 Multi-Step Process (Step %d)\n", stepNumber))
+	} else {
+		parts = append(parts, "## 📋 Multi-Step Process\n")
 	}
 	
 	// Main response content
-	if response.Response != "" {
-		// If we have steps, this is current step detail
-		if _, hasSteps := response.Metadata["steps"]; hasSteps {
-			if currentStep, ok := response.Metadata["current_step"].(float64); ok {
-				parts = append(parts, fmt.Sprintf("### Current Step %d Details", int(currentStep)))
-			} else {
-				parts = append(parts, h.addSectionHeader("Details"))
-			}
-		}
-		parts = append(parts, response.Response)
+	parts = append(parts, response.Response)
+	
+	// Add context information
+	var footer []string
+	
+	if contextMessages, ok := response.Metadata["context_messages"].(float64); ok && contextMessages > 0 {
+		footer = append(footer, fmt.Sprintf("Context messages: %.0f", contextMessages))
 	}
 	
-	// Add next steps if available
-	if nextSteps, ok := response.Metadata["next_steps"].([]any); ok && len(nextSteps) > 0 {
-		parts = append(parts, h.addSectionHeader("Next Steps"))
-		for _, next := range nextSteps {
-			parts = append(parts, fmt.Sprintf("→ %v", next))
-		}
+	if processingTime, ok := response.Metadata["processing_time"].(float64); ok {
+		footer = append(footer, fmt.Sprintf("Processing time: %.0fms", processingTime))
 	}
 	
-	// Add completion status if available
-	if completed, ok := response.Metadata["completed"].(bool); ok && completed {
-		parts = append(parts, "\n✅ **Process Complete!**")
-		if summary, ok := response.Metadata["summary"].(string); ok {
-			parts = append(parts, fmt.Sprintf("\n%s", summary))
-		}
+	if len(footer) > 0 {
+		parts = append(parts, "\n---")
+		parts = append(parts, "*"+strings.Join(footer, " | ")+"*")
 	}
 	
-	// Add remaining metadata
-	filteredMetadata := make(map[string]any)
-	for k, v := range response.Metadata {
-		if k != "overview" && k != "steps" && k != "current_step" && 
-		   k != "next_steps" && k != "completed" && k != "summary" {
-			filteredMetadata[k] = v
-		}
-	}
-	if len(filteredMetadata) > 0 {
-		parts = append(parts, h.formatMetadata(filteredMetadata))
+	// Add navigation hint
+	if stepNumber > 0 {
+		parts = append(parts, "\n💡 **Tip**: Continue with the next step or ask follow-up questions.")
 	}
 	
 	return strings.Join(parts, "\n")

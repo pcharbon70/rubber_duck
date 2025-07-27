@@ -34,12 +34,24 @@ func NewResponseHandlerRegistry() *ResponseHandlerRegistry {
 	registry.defaultHandler = &SimpleResponseHandler{}
 	
 	// Register built-in handlers
-	registry.RegisterHandler(&SimpleResponseHandler{})
-	registry.RegisterHandler(&ComplexResponseHandler{})
-	registry.RegisterHandler(&AnalysisResponseHandler{})
-	registry.RegisterHandler(&GenerationResponseHandler{})
-	registry.RegisterHandler(&ProblemSolvingResponseHandler{})
-	registry.RegisterHandler(&MultiStepResponseHandler{})
+	// Note: conversation_type comes as string representation of Elixir atoms
+	registry.handlers["simple"] = &SimpleResponseHandler{}
+	registry.handlers["simple_conversation"] = &SimpleResponseHandler{}
+	
+	registry.handlers["complex"] = &ComplexResponseHandler{}
+	registry.handlers["complex_conversation"] = &ComplexResponseHandler{}
+	
+	registry.handlers["analysis"] = &AnalysisResponseHandler{}
+	registry.handlers["analysis_conversation"] = &AnalysisResponseHandler{}
+	
+	registry.handlers["generation"] = &GenerationResponseHandler{}
+	registry.handlers["generation_conversation"] = &GenerationResponseHandler{}
+	
+	registry.handlers["problem_solving"] = &ProblemSolvingResponseHandler{}
+	registry.handlers["problem_solver"] = &ProblemSolvingResponseHandler{}
+	
+	registry.handlers["multi_step"] = &MultiStepResponseHandler{}
+	registry.handlers["multi_step_conversation"] = &MultiStepResponseHandler{}
 	
 	return registry
 }

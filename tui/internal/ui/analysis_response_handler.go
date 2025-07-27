@@ -21,14 +21,18 @@ func (h *AnalysisResponseHandler) GetConversationType() string {
 func (h *AnalysisResponseHandler) FormatResponse(response phoenix.ConversationMessage) string {
 	var parts []string
 	
-	// Add analysis header
-	parts = append(parts, "## 📊 Analysis Results\n")
+	// Add analysis header with type if available
+	analysisType := ""
+	if aType, ok := response.Metadata["analysis_type"].(string); ok {
+		analysisType = h.formatAnalysisType(aType)
+	}
+	parts = append(parts, fmt.Sprintf("## 📊 %sAnalysis Results\n", analysisType))
 	
-	// Check for structured analysis in metadata
-	if findings, ok := response.Metadata["findings"].([]any); ok && len(findings) > 0 {
-		parts = append(parts, h.addSectionHeader("Findings"))
-		for i, finding := range findings {
-			parts = append(parts, fmt.Sprintf("%d. %v", i+1, finding))
+	// Add analysis points if available
+	if analysisPoints, ok := response.Metadata["analysis_points"].([]any); ok && len(analysisPoints) > 0 {
+		parts = append(parts, h.addSectionHeader("Key Analysis Points"))
+		for _, point := range analysisPoints {
+			parts = append(parts, fmt.Sprintf("• %v", point))
 		}
 		parts = append(parts, "")
 	}
@@ -36,38 +40,35 @@ func (h *AnalysisResponseHandler) FormatResponse(response phoenix.ConversationMe
 	// Main response content
 	parts = append(parts, response.Response)
 	
-	// Add conclusions if available
-	if conclusions, ok := response.Metadata["conclusions"].([]any); ok && len(conclusions) > 0 {
-		parts = append(parts, h.addSectionHeader("Conclusions"))
-		for _, conclusion := range conclusions {
-			parts = append(parts, fmt.Sprintf("• %s", h.addEmphasis(fmt.Sprintf("%v", conclusion))))
-		}
-	}
-	
 	// Add recommendations if available
 	if recommendations, ok := response.Metadata["recommendations"].([]any); ok && len(recommendations) > 0 {
 		parts = append(parts, h.addSectionHeader("Recommendations"))
-		for _, rec := range recommendations {
-			parts = append(parts, fmt.Sprintf("→ %v", rec))
+		for i, rec := range recommendations {
+			parts = append(parts, fmt.Sprintf("%d. %s", i+1, h.addEmphasis(fmt.Sprintf("%v", rec))))
 		}
 	}
 	
-	// Add data summary if available
-	if dataSummary, ok := response.Metadata["data_summary"].(string); ok {
-		parts = append(parts, h.addSectionHeader("Data Summary"))
-		parts = append(parts, h.addCodeBlock(dataSummary, ""))
-	}
-	
-	// Add remaining metadata
-	filteredMetadata := make(map[string]any)
-	for k, v := range response.Metadata {
-		if k != "findings" && k != "conclusions" && k != "recommendations" && k != "data_summary" {
-			filteredMetadata[k] = v
-		}
-	}
-	if len(filteredMetadata) > 0 {
-		parts = append(parts, h.formatMetadata(filteredMetadata))
+	// Add processing time
+	if processingTime, ok := response.Metadata["processing_time"].(float64); ok {
+		parts = append(parts, fmt.Sprintf("\n---\n*Processing time: %.0fms*", processingTime))
 	}
 	
 	return strings.Join(parts, "\n")
+}
+
+// formatAnalysisType formats the analysis type for display
+func (h *AnalysisResponseHandler) formatAnalysisType(aType string) string {
+	typeMap := map[string]string{
+		"security":          "Security ",
+		"performance":       "Performance ",
+		"architecture":      "Architecture ",
+		"code_review":       "Code Review ",
+		"complexity":        "Complexity ",
+		"general_analysis":  "",
+	}
+	
+	if formatted, ok := typeMap[aType]; ok {
+		return formatted
+	}
+	return ""
 }

@@ -1,6 +1,10 @@
 package ui
 
-import "github.com/rubber_duck/tui/internal/phoenix"
+import (
+	"fmt"
+
+	"github.com/rubber_duck/tui/internal/phoenix"
+)
 
 // SimpleResponseHandler handles simple conversation responses
 type SimpleResponseHandler struct {
@@ -14,12 +18,12 @@ func (h *SimpleResponseHandler) GetConversationType() string {
 
 // FormatResponse formats a simple response
 func (h *SimpleResponseHandler) FormatResponse(response phoenix.ConversationMessage) string {
-	// Simple responses are just returned as-is with optional metadata
+	// Simple responses are just returned as-is
 	formatted := response.Response
 	
-	// Add metadata if present
-	if len(response.Metadata) > 0 {
-		formatted += h.formatMetadata(response.Metadata)
+	// Add processing time if available
+	if processingTime, ok := response.Metadata["processing_time"].(float64); ok {
+		formatted += fmt.Sprintf("\n\n*Processing time: %.0fms*", processingTime)
 	}
 	
 	return formatted

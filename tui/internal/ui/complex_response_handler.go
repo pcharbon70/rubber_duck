@@ -24,34 +24,31 @@ func (h *ComplexResponseHandler) FormatResponse(response phoenix.ConversationMes
 	// Add a header indicating this is a complex response
 	parts = append(parts, "## 🔍 Complex Analysis\n")
 	
-	// Process the response, looking for natural sections
-	content := response.Response
-	
-	// If the response already has markdown headers, preserve them
-	if strings.Contains(content, "##") || strings.Contains(content, "###") {
-		parts = append(parts, content)
-	} else {
-		// Try to identify sections based on content patterns
-		sections := h.identifySections(content)
-		for i, section := range sections {
-			if i > 0 {
-				parts = append(parts, "\n---\n")
-			}
-			parts = append(parts, section)
+	// Add reasoning steps if available
+	if reasoningSteps, ok := response.Metadata["reasoning_steps"].([]any); ok && len(reasoningSteps) > 0 {
+		parts = append(parts, h.addSectionHeader("Reasoning Process"))
+		for i, step := range reasoningSteps {
+			parts = append(parts, fmt.Sprintf("%d. %v", i+1, step))
 		}
+		parts = append(parts, "")
 	}
 	
-	// Add key insights if available in metadata
-	if insights, ok := response.Metadata["insights"].([]any); ok && len(insights) > 0 {
-		parts = append(parts, h.addSectionHeader("Key Insights"))
-		for _, insight := range insights {
-			parts = append(parts, fmt.Sprintf("• %v", insight))
-		}
+	// Main response content
+	parts = append(parts, h.addSectionHeader("Response"))
+	parts = append(parts, response.Response)
+	
+	// Add total steps and processing time
+	var footer []string
+	if totalSteps, ok := response.Metadata["total_steps"].(float64); ok {
+		footer = append(footer, fmt.Sprintf("Total steps: %.0f", totalSteps))
+	}
+	if processingTime, ok := response.Metadata["processing_time"].(float64); ok {
+		footer = append(footer, fmt.Sprintf("Processing time: %.0fms", processingTime))
 	}
 	
-	// Add metadata
-	if len(response.Metadata) > 0 {
-		parts = append(parts, h.formatMetadata(response.Metadata))
+	if len(footer) > 0 {
+		parts = append(parts, "\n---")
+		parts = append(parts, "*"+strings.Join(footer, " | ")+"*")
 	}
 	
 	return strings.Join(parts, "\n")
