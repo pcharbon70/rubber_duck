@@ -37,9 +37,12 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
   def execute(input, state) do
     with {:ok, validated} <- validate_input(input),
          {:ok, response} <- generate_code_conversation(validated, state) do
+      # Build a comprehensive response that includes code and explanation
+      comprehensive_response = build_comprehensive_response(response, validated)
+      
       result = %{
         query: validated.query,
-        response: response.final_answer,
+        response: comprehensive_response,
         conversation_type: :generation,
         generated_code: extract_generated_code(response),
         implementation_plan: extract_implementation_plan(response),
@@ -220,6 +223,53 @@ defmodule RubberDuck.Engines.Conversation.GenerationConversation do
   end
 
   defp parse_plan_steps(_), do: []
+  
+  defp build_comprehensive_response(response, validated) do
+    # Find the key steps that contain the actual implementation and documentation
+    steps_map = Map.new(response.reasoning_steps, &{&1.name, &1})
+    
+    # Get the documented code (which should have both code and explanation)
+    documented_code = get_in(steps_map, [:add_documentation, :result]) || ""
+    
+    # Get the test code
+    test_code = get_in(steps_map, [:generate_tests, :result]) || ""
+    
+    # Get alternatives
+    alternatives = get_in(steps_map, [:provide_alternatives, :result]) || ""
+    
+    # Get requirements understanding for context
+    requirements = get_in(steps_map, [:understand_requirements, :result]) || ""
+    
+    # Build a comprehensive response
+    case validated.generation_type do
+      type when type in [:function, :module, :api, :feature] ->
+        # For code generation, combine explanation with code
+        """
+        Based on your request, I'll provide a detailed explanation and complete code example.
+
+        ## Understanding Your Requirements
+        #{requirements}
+
+        ## Complete Implementation
+        #{documented_code}
+
+        ## Tests
+        #{test_code}
+
+        ## Alternative Approaches
+        #{alternatives}
+        """
+        
+      _ ->
+        # For other types, use the documented code as the main response
+        if String.length(documented_code) > 100 do
+          documented_code
+        else
+          # Fallback to the final answer if documented code is too short
+          response.final_answer
+        end
+    end
+  end
 
   defp generate_session_id do
     "generation_conv_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}"
