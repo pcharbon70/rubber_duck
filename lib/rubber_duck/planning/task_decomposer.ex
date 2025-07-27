@@ -9,7 +9,6 @@ defmodule RubberDuck.Planning.TaskDecomposer do
 
   @behaviour RubberDuck.Engine
 
-  alias RubberDuck.CoT
   # alias RubberDuck.Planning.{Plan, Task, TaskDependency}
   alias RubberDuck.LLM.Service, as: LLM
   alias RubberDuck.Planning.Critics.Orchestrator
@@ -107,14 +106,26 @@ defmodule RubberDuck.Planning.TaskDecomposer do
 
     case LLM.completion(model: state.llm_config[:model] || "gpt-4", messages: [%{role: "user", content: prompt}]) do
       {:ok, response} ->
-        strategy =
-          response.content
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> ""
+        end
+        
+        strategy_atom = content
           |> String.trim()
           |> String.downcase()
-          |> String.to_existing_atom()
+          |> then(fn s ->
+            try do
+              String.to_existing_atom(s)
+            rescue
+              ArgumentError -> nil
+            end
+          end)
 
-        if strategy in @decomposition_strategies do
-          {:ok, strategy}
+        if strategy_atom in @decomposition_strategies do
+          {:ok, strategy_atom}
         else
           {:ok, state.default_strategy}
         end
@@ -160,8 +171,16 @@ defmodule RubberDuck.Planning.TaskDecomposer do
            response_format: %{type: "json_object"}
          ) do
       {:ok, response} ->
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> "[]"
+        end
+        
         tasks =
-          Jason.decode!(response.content)
+          Jason.decode!(content)
+          |> List.wrap()  # Ensure it's a list even if single object returned
           |> Enum.with_index()
           |> Enum.map(fn {task, index} ->
             Map.merge(task, %{
@@ -178,37 +197,14 @@ defmodule RubberDuck.Planning.TaskDecomposer do
   end
 
   defp hierarchical_decomposition(input, state) do
-    # Use CoT for hierarchical decomposition
-    {:ok, result} =
-      CoT.simple_reason(
-        input.query,
-        [
-          {:analyze, "What are the main components or phases of this request?"},
-          {:decompose, "For each component, what are the specific tasks needed?"},
-          {:structure, "How should these tasks be organized hierarchically?"}
-        ],
-        format: :structured
-      )
-
-    # Convert CoT result to task structure
-    tasks = extract_hierarchical_tasks(result, state)
-    {:ok, tasks}
-  end
-
-  defp tree_of_thought_decomposition(input, state) do
-    # Generate multiple decomposition approaches
-    prompt = """
-    Generate 3 different approaches to decompose this request:
-
-    Request: #{input.query}
-
-    For each approach:
-    1. Name the approach
-    2. List the tasks in that approach
-    3. Explain why this approach might be good
-
-    Return as JSON.
-    """
+    alias RubberDuck.Planning.DecompositionTemplates
+    
+    # Get the hierarchical decomposition template
+    prompt = DecompositionTemplates.get_template(:hierarchical_decomposition, %{
+      request: input.query,
+      context: inspect(input[:context] || %{}),
+      scope: input[:scope] || "Complete implementation"
+    })
 
     case LLM.completion(
            model: state.llm_config[:model] || "gpt-4",
@@ -216,24 +212,131 @@ defmodule RubberDuck.Planning.TaskDecomposer do
            response_format: %{type: "json_object"}
          ) do
       {:ok, response} ->
-        approaches = Jason.decode!(response.content)
-
-        # Evaluate approaches and select best one
-        {:ok, best_approach} = select_best_approach(approaches, input, state)
-
-        # Convert to task list
-        tasks =
-          best_approach["tasks"]
-          |> Enum.with_index()
-          |> Enum.map(fn {task, index} ->
-            Map.merge(task, %{"position" => index})
-          end)
-
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> "{\"phases\": []}"
+        end
+        
+        # Parse and extract hierarchical tasks
+        hierarchical_data = Jason.decode!(content)
+        tasks = extract_hierarchical_tasks(hierarchical_data, state)
         {:ok, tasks}
 
       error ->
+        Logger.error("Hierarchical decomposition failed: #{inspect(error)}")
         error
     end
+  end
+
+  defp tree_of_thought_decomposition(input, state) do
+    alias RubberDuck.Planning.DecompositionTemplates
+    
+    # Extract goals and constraints from context
+    goals = input[:goals] || extract_goals_from_query(input.query)
+    constraints = input[:constraints] || input[:context][:constraints] || %{}
+    
+    # Get the tree-of-thought template
+    prompt = DecompositionTemplates.get_template(:tree_of_thought, %{
+      request: input.query,
+      goals: format_goals(goals),
+      constraints: format_constraints(constraints)
+    })
+
+    case LLM.completion(
+           model: state.llm_config[:model] || "gpt-4",
+           messages: [%{role: "user", content: prompt}],
+           response_format: %{type: "json_object"}
+         ) do
+      {:ok, response} ->
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> "[]"
+        end
+        
+        # Parse approaches - expecting an array of approaches
+        approaches = case Jason.decode!(content) do
+          approaches when is_list(approaches) -> approaches
+          %{"approaches" => apps} when is_list(apps) -> apps
+          _ -> []
+        end
+
+        if length(approaches) == 0 do
+          Logger.error("No approaches generated for tree-of-thought decomposition")
+          {:error, :no_approaches_generated}
+        else
+          # Evaluate all approaches and select the best one
+          {:ok, best_approach, comparison} = evaluate_and_select_approach(approaches, input, state)
+
+          # Convert selected approach's tasks to our standard format
+          tasks = format_approach_tasks(best_approach, comparison)
+          
+          {:ok, tasks}
+        end
+
+      error ->
+        Logger.error("Tree-of-thought decomposition failed: #{inspect(error)}")
+        error
+    end
+  end
+  
+  defp extract_goals_from_query(query) do
+    # Simple extraction - in real implementation might use LLM
+    cond do
+      String.contains?(query, "implement") -> ["Complete implementation", "Working functionality"]
+      String.contains?(query, "fix") -> ["Resolve issue", "Prevent regression"]
+      String.contains?(query, "optimize") -> ["Improve performance", "Maintain functionality"]
+      true -> ["Complete the requested task"]
+    end
+  end
+  
+  defp format_goals(goals) when is_list(goals), do: Enum.join(goals, ", ")
+  defp format_goals(goals) when is_binary(goals), do: goals
+  defp format_goals(_), do: "Complete the requested task"
+  
+  defp format_constraints(constraints) when is_map(constraints) do
+    constraints
+    |> Enum.map(fn {k, v} -> "#{k}: #{v}" end)
+    |> Enum.join(", ")
+  end
+  defp format_constraints(_), do: "None specified"
+  
+  defp format_approach_tasks(approach, comparison) do
+    tasks = approach["tasks"] || []
+    approach_metadata = %{
+      "approach_name" => approach["approach_name"],
+      "philosophy" => approach["philosophy"],
+      "risk_level" => approach["risk_level"],
+      "confidence_score" => approach["confidence_score"],
+      "selection_reason" => comparison["selection_reason"]
+    }
+    
+    tasks
+    |> Enum.with_index()
+    |> Enum.map(fn {task, index} ->
+      # Base task structure
+      base_task = %{
+        "name" => task["name"] || "Task #{index + 1}",
+        "description" => task["description"] || "",
+        "complexity" => task["complexity"] || "medium",
+        "position" => index,
+        "depends_on" => task["dependencies"] || (if index > 0, do: [index - 1], else: [])
+      }
+      
+      # Add approach metadata
+      metadata = Map.merge(
+        task["metadata"] || %{},
+        Map.merge(approach_metadata, %{
+          "approach_confidence" => approach["confidence_score"],
+          "task_risk" => task["risk"] || approach["risk_level"]
+        })
+      )
+      
+      Map.put(base_task, "metadata", metadata)
+    end)
   end
 
   # Task refinement
@@ -274,11 +377,17 @@ defmodule RubberDuck.Planning.TaskDecomposer do
 
     case LLM.completion(model: state.llm_config[:model] || "gpt-4", messages: [%{role: "user", content: prompt}]) do
       {:ok, response} ->
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> "medium"
+        end
+        
         complexity =
-          response.content
+          content
           |> String.trim()
           |> String.downcase()
-          |> String.replace("_", "_")
 
         {:ok, complexity}
 
@@ -304,7 +413,14 @@ defmodule RubberDuck.Planning.TaskDecomposer do
            response_format: %{type: "json_object"}
          ) do
       {:ok, response} ->
-        {:ok, Jason.decode!(response.content)}
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> "{\"criteria\": [\"Task completed successfully\"]}"
+        end
+        
+        {:ok, Jason.decode!(content)}
 
       _ ->
         {:ok, %{"criteria" => ["Task completed successfully"]}}
@@ -381,8 +497,17 @@ defmodule RubberDuck.Planning.TaskDecomposer do
            response_format: %{type: "json_object"}
          ) do
       {:ok, response} ->
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> "[]"
+        end
+        
         deps =
-          Jason.decode!(response.content)
+          content
+          |> Jason.decode!()
+          |> List.wrap()  # Ensure it's a list
           |> Enum.map(fn dep ->
             %{
               from: "task_#{dep["from"]}",
@@ -595,16 +720,264 @@ defmodule RubberDuck.Planning.TaskDecomposer do
     }
   end
 
-  defp extract_hierarchical_tasks(_cot_result, _state) do
-    # Extract tasks from CoT reasoning result
-    # This is a simplified version - real implementation would be more sophisticated
-    []
+  defp extract_hierarchical_tasks(hierarchical_data, _state) do
+    phases = hierarchical_data["phases"] || []
+    dependencies = hierarchical_data["dependencies"] || []
+    critical_path = hierarchical_data["critical_path"] || []
+    
+    # Flatten the hierarchical structure into a task list
+    {tasks, _position} = phases
+    |> Enum.reduce({[], 0}, fn phase, {acc_tasks, position} ->
+      phase_tasks = extract_tasks_from_phase(phase, position, critical_path)
+      {acc_tasks ++ phase_tasks, position + length(phase_tasks)}
+    end)
+    
+    # Add dependencies to tasks
+    tasks_with_deps = add_dependencies_to_tasks(tasks, dependencies)
+    
+    tasks_with_deps
+  end
+  
+  defp extract_tasks_from_phase(phase, start_position, critical_path) do
+    phase_id = phase["id"]
+    phase_name = phase["name"]
+    phase_tasks = phase["tasks"] || []
+    
+    phase_tasks
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {task, task_index} ->
+      task_position = start_position + task_index
+      
+      # Create the main task
+      main_task = %{
+        "id" => task["id"],
+        "name" => task["name"],
+        "description" => task["description"],
+        "complexity" => task["complexity"] || "medium",
+        "position" => task_position,
+        "phase_id" => phase_id,
+        "phase_name" => phase_name,
+        "hierarchy_level" => 2,
+        "is_critical" => task["id"] in critical_path,
+        "metadata" => %{
+          "phase" => phase_name,
+          "hierarchy_level" => 2,
+          "is_critical_path" => task["id"] in critical_path
+        }
+      }
+      
+      # Extract subtasks if present
+      subtasks = task["subtasks"] || []
+      if Enum.empty?(subtasks) do
+        [main_task]
+      else
+        subtask_list = subtasks
+        |> Enum.with_index()
+        |> Enum.map(fn {subtask, subtask_index} ->
+          %{
+            "id" => subtask["id"],
+            "name" => subtask["name"],
+            "description" => subtask["description"],
+            "complexity" => "simple",  # Subtasks are typically simpler
+            "position" => task_position + (subtask_index + 1) * 0.1,  # Decimal positions for subtasks
+            "parent_task_id" => task["id"],
+            "phase_id" => phase_id,
+            "phase_name" => phase_name,
+            "hierarchy_level" => 3,
+            "metadata" => %{
+              "phase" => phase_name,
+              "parent_task" => task["name"],
+              "hierarchy_level" => 3
+            }
+          }
+        end)
+        
+        [main_task | subtask_list]
+      end
+    end)
+  end
+  
+  defp add_dependencies_to_tasks(tasks, dependencies) do
+    # Create a map of task IDs to positions for quick lookup
+    id_to_position = tasks
+    |> Enum.reduce(%{}, fn task, acc ->
+      Map.put(acc, task["id"], task["position"])
+    end)
+    
+    # Add dependency information to tasks
+    tasks
+    |> Enum.map(fn task ->
+      # Find dependencies where this task is the "to" task
+      task_deps = dependencies
+      |> Enum.filter(fn dep -> dep["to"] == task["id"] end)
+      |> Enum.map(fn dep -> 
+        # Convert from task ID to position
+        id_to_position[dep["from"]]
+      end)
+      |> Enum.filter(&(&1 != nil))
+      
+      Map.put(task, "depends_on", task_deps)
+    end)
   end
 
-  defp select_best_approach(approaches, _input, _state) do
-    # Use LLM to evaluate and select best approach
-    # For now, just select first one
-    {:ok, List.first(approaches)}
+  defp evaluate_and_select_approach(approaches, input, state) do
+    # Score each approach based on multiple criteria
+    scored_approaches = approaches
+    |> Enum.map(fn approach ->
+      score = calculate_approach_score(approach, input, state)
+      {approach, score}
+    end)
+    |> Enum.sort_by(fn {_approach, score} -> score.total end, :desc)
+    
+    # Get the best approach
+    {best_approach, best_score} = List.first(scored_approaches)
+    
+    # Create comparison data
+    comparison = %{
+      "selected_approach" => best_approach["approach_name"],
+      "selection_reason" => generate_selection_reason(best_approach, best_score, scored_approaches),
+      "scores" => Enum.map(scored_approaches, fn {app, score} ->
+        %{
+          "approach" => app["approach_name"],
+          "total_score" => score.total,
+          "breakdown" => score
+        }
+      end),
+      "alternatives" => Enum.map(tl(scored_approaches), fn {app, _score} ->
+        %{
+          "name" => app["approach_name"],
+          "philosophy" => app["philosophy"],
+          "pros" => app["pros"],
+          "cons" => app["cons"]
+        }
+      end)
+    }
+    
+    {:ok, best_approach, comparison}
+  end
+  
+  defp calculate_approach_score(approach, input, _state) do
+    # Extract context preferences
+    preferences = get_preferences(input)
+    
+    # Base scores from approach data
+    confidence = parse_float(approach["confidence_score"], 0.5)
+    risk_score = risk_to_score(approach["risk_level"])
+    
+    # Calculate component scores
+    scores = %{
+      confidence: confidence * preferences.confidence_weight,
+      risk_alignment: calculate_risk_alignment(risk_score, preferences.risk_tolerance) * preferences.risk_weight,
+      effort_efficiency: calculate_effort_efficiency(approach["estimated_total_effort"], preferences.time_constraint) * preferences.effort_weight,
+      goal_alignment: calculate_goal_alignment(approach, input[:goals]) * preferences.goal_weight,
+      pros_cons_balance: calculate_pros_cons_balance(approach) * 0.1
+    }
+    
+    # Calculate total weighted score
+    total = Enum.reduce(scores, 0, fn {_key, value}, acc -> acc + value end)
+    
+    Map.put(scores, :total, total)
+  end
+  
+  defp get_preferences(input) do
+    context = input[:context] || %{}
+    
+    # Default weights that sum to 1.0
+    %{
+      confidence_weight: context[:confidence_weight] || 0.3,
+      risk_weight: context[:risk_weight] || 0.3,
+      effort_weight: context[:effort_weight] || 0.2,
+      goal_weight: context[:goal_weight] || 0.2,
+      risk_tolerance: context[:risk_tolerance] || :medium,
+      time_constraint: context[:time_constraint] || "2w"
+    }
+  end
+  
+  defp parse_float(value, _default) when is_float(value), do: value
+  defp parse_float(value, _default) when is_integer(value), do: value / 1.0
+  defp parse_float(value, default) when is_binary(value) do
+    case Float.parse(value) do
+      {float, _} -> float
+      :error -> default
+    end
+  end
+  defp parse_float(_, default), do: default
+  
+  defp risk_to_score("low"), do: 0.9
+  defp risk_to_score("medium"), do: 0.5
+  defp risk_to_score("high"), do: 0.2
+  defp risk_to_score(_), do: 0.5
+  
+  defp calculate_risk_alignment(risk_score, tolerance) do
+    case tolerance do
+      :low -> risk_score  # Prefer low risk
+      :medium -> 0.5 + (risk_score - 0.5) * 0.5  # Moderate preference
+      :high -> 1.0 - risk_score  # Prefer high risk/high reward
+      _ -> 0.5
+    end
+  end
+  
+  defp calculate_effort_efficiency(effort, time_constraint) do
+    effort_days = effort_to_days(effort)
+    constraint_days = effort_to_days(time_constraint)
+    
+    if effort_days <= constraint_days do
+      # Under time constraint - higher score for faster delivery
+      1.0 - (effort_days / constraint_days) * 0.3
+    else
+      # Over time constraint - penalize
+      0.3 * (constraint_days / effort_days)
+    end
+  end
+  
+  defp effort_to_days("1d"), do: 1
+  defp effort_to_days("2d"), do: 2
+  defp effort_to_days("3d"), do: 3
+  defp effort_to_days("1w"), do: 5
+  defp effort_to_days("2w"), do: 10
+  defp effort_to_days("3w"), do: 15
+  defp effort_to_days("1m"), do: 20
+  defp effort_to_days(_), do: 10
+  
+  defp calculate_goal_alignment(approach, goals) do
+    # Simple alignment based on whether approach mentions goals
+    # In real implementation, might use semantic similarity
+    if goals && approach["best_when"] do
+      goals_text = format_goals(goals) |> String.downcase()
+      best_when = String.downcase(approach["best_when"])
+      
+      if String.contains?(best_when, ["fast", "quick"]) && String.contains?(goals_text, ["quick", "fast"]) do
+        0.9
+      else
+        0.7  # Default reasonable alignment
+      end
+    else
+      0.7
+    end
+  end
+  
+  defp calculate_pros_cons_balance(approach) do
+    pros_count = length(approach["pros"] || [])
+    cons_count = length(approach["cons"] || [])
+    
+    if pros_count + cons_count > 0 do
+      pros_count / (pros_count + cons_count)
+    else
+      0.5
+    end
+  end
+  
+  defp generate_selection_reason(approach, score, all_scored) do
+    other_names = all_scored
+    |> Enum.drop(1)
+    |> Enum.map(fn {app, _} -> app["approach_name"] end)
+    |> Enum.join(", ")
+    
+    "Selected '#{approach["approach_name"]}' (score: #{Float.round(score.total, 2)}) due to " <>
+    "#{approach["philosophy"]}. This approach offers the best balance of " <>
+    "confidence (#{approach["confidence_score"]}), risk (#{approach["risk_level"]}), " <>
+    "and effort (#{approach["estimated_total_effort"]}). " <>
+    if(length(all_scored) > 1, do: "Alternative approaches considered: #{other_names}.", else: "")
   end
 
   defp calculate_max_depth(_tasks) do
