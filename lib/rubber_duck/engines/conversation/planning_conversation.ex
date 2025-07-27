@@ -285,8 +285,8 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
           name: extract_task_name(desc),
           description: desc,
           position: index,
-          complexity: :medium,
-          status: :pending
+          complexity: :medium
+          # status is set automatically to :pending by the create action
         }
       end)
     
@@ -332,7 +332,7 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
               description: task[:description],
               position: task[:position],
               complexity: ensure_atom(task[:complexity]),
-              status: :pending,
+              # status is set automatically to :pending by the create action
               success_criteria: task[:success_criteria],
               validation_rules: task[:validation_rules],
               metadata: task[:metadata] || %{}
@@ -403,7 +403,12 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   end
 
   defp format_plan_details(plan) do
-    task_count = length(plan.tasks || [])
+    # Handle case where tasks might not be loaded
+    task_count = case plan.tasks do
+      tasks when is_list(tasks) -> length(tasks)
+      %Ash.NotLoaded{} -> 0
+      nil -> 0
+    end
     
     details = ["**Plan Details:**"]
     details = details ++ ["- Type: #{plan.type}"]
@@ -482,13 +487,20 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   defp format_blocking_issues(_), do: "No specific issues listed"
 
   defp serialize_plan(plan) do
+    # Handle case where tasks might not be loaded
+    task_count = case plan.tasks do
+      tasks when is_list(tasks) -> length(tasks)
+      %Ash.NotLoaded{} -> 0
+      nil -> 0
+    end
+    
     %{
       id: plan.id,
       name: plan.name,
       description: plan.description,
       type: plan.type,
       status: plan.status,
-      task_count: length(plan.tasks || []),
+      task_count: task_count,
       validation_status: plan.validation_results["initial"][:summary]
     }
   end
