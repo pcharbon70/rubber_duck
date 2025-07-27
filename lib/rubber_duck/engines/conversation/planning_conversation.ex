@@ -291,10 +291,7 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
       end)
     
     # Create tasks in batch
-    case Ash.bulk_create(Task, tasks, 
-      domain: RubberDuck.Planning,
-      return_records?: true
-    ) do
+    case Ash.bulk_create(Task, tasks, domain: RubberDuck.Planning, return_records?: true) do
       %{records: created_tasks} when is_list(created_tasks) ->
         {:ok, %{plan | tasks: created_tasks}}
       
@@ -333,11 +330,7 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
           end)
         
         # Create tasks in batch
-        case Ash.bulk_create(Task, task_attrs, 
-          domain: RubberDuck.Planning,
-          return_records?: true, 
-          return_errors?: true
-        ) do
+        case Ash.bulk_create(Task, task_attrs, domain: RubberDuck.Planning, return_records?: true, return_errors?: true) do
           %{records: created_tasks} when is_list(created_tasks) ->
             {:ok, %{plan | tasks: created_tasks}}
           
