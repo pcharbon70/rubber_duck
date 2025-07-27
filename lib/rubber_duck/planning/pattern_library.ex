@@ -501,7 +501,12 @@ defmodule RubberDuck.Planning.PatternLibrary do
               "complexity" => to_string(task.complexity),
               "success_criteria" => %{"criteria" => task.success_criteria},
               "optional" => Map.get(task, :optional, false),
-              "position" => phase_idx * 100 + task_idx
+              "position" => phase_idx * 100 + task_idx,
+              "hierarchy_level" => 2,  # Pattern tasks are level 2 (phases are level 1)
+              "metadata" => %{
+                "from_pattern" => pattern_name,
+                "phase_index" => phase_idx
+              }
             }
           end)
         end)

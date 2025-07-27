@@ -48,6 +48,7 @@ defmodule RubberDuckWeb.PlanningChannel do
   alias RubberDuck.Planning.Plan
   alias RubberDuck.Planning.Critics.Orchestrator
   alias RubberDuck.Planning.Execution.PlanExecutor
+  alias RubberDuck.Planning.Decomposer
 
   @default_limit 20
   @max_limit 100
@@ -381,21 +382,20 @@ defmodule RubberDuckWeb.PlanningChannel do
 
   defp decompose_task(params, socket) do
     # Use TaskDecomposer to break down the task
-    _context = Map.merge(params.context, %{
+    context = Map.merge(params.context, %{
       user_id: socket.assigns.user_id,
       constraints: params.constraints
     })
     
-    # TaskDecomposer not implemented yet
-    # For now, return a simple task list
-    {:ok, [
-      %{
-        name: "Initial task",
-        description: params.description,
-        complexity: :medium,
-        position: 0
-      }
-    ]}
+    # Use the public API module to decompose the task
+    case Decomposer.decompose(params.description, context) do
+      {:ok, tasks} ->
+        {:ok, tasks}
+      
+      {:error, reason} ->
+        Logger.error("Task decomposition failed: #{inspect(reason)}")
+        {:error, reason}
+    end
   end
 
   defp list_user_plans(user_id, filters, limit) do
@@ -486,15 +486,32 @@ defmodule RubberDuckWeb.PlanningChannel do
   end
 
   defp serialize_task(task) do
-    %{
-      id: task.id,
-      name: task.name,
-      description: task.description,
-      complexity: task.complexity,
-      status: task.status,
-      position: task.position,
-      dependencies: task.dependencies || []
-    }
+    # Handle both Ash resource tasks and decomposer output tasks
+    case task do
+      %{id: id} ->
+        # Ash resource with ID
+        %{
+          id: id,
+          name: task.name,
+          description: task.description,
+          complexity: task.complexity,
+          status: task.status,
+          position: task.position,
+          dependencies: task.dependencies || []
+        }
+      
+      %{} ->
+        # Decomposer output without ID (new task)
+        %{
+          name: task[:name] || task["name"],
+          description: task[:description] || task["description"],
+          complexity: task[:complexity] || task["complexity"],
+          position: task[:position] || task["position"],
+          success_criteria: task[:success_criteria] || task["success_criteria"],
+          validation_rules: task[:validation_rules] || task["validation_rules"],
+          metadata: task[:metadata] || task["metadata"] || %{}
+        }
+    end
   end
 
   defp format_error(reason) when is_binary(reason), do: reason
