@@ -291,13 +291,23 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
       end)
     
     # Create tasks in batch
-    case Ash.bulk_create(Task, tasks, domain: RubberDuck.Planning, return_records?: true) do
-      %{records: created_tasks} when is_list(created_tasks) ->
-        {:ok, %{plan | tasks: created_tasks}}
-      
-      error ->
-        Logger.error("Failed to create tasks: #{inspect(error)}")
-        {:ok, plan}  # Continue without tasks
+    # Try creating tasks individually to avoid bulk_create domain issues
+    created_tasks = tasks
+    |> Enum.map(fn task_attrs ->
+      case Ash.create(Task, task_attrs, domain: RubberDuck.Planning) do
+        {:ok, task} -> task
+        {:error, error} -> 
+          Logger.error("Failed to create task: #{inspect(error)}")
+          nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+    
+    if length(created_tasks) > 0 do
+      {:ok, %{plan | tasks: created_tasks}}
+    else
+      Logger.error("Failed to create any tasks")
+      {:ok, plan}  # Continue without tasks
     end
   end
 
@@ -329,18 +339,23 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
             }
           end)
         
-        # Create tasks in batch
-        case Ash.bulk_create(Task, task_attrs, domain: RubberDuck.Planning, return_records?: true, return_errors?: true) do
-          %{records: created_tasks} when is_list(created_tasks) ->
-            {:ok, %{plan | tasks: created_tasks}}
-          
-          %{errors: errors} ->
-            Logger.error("Failed to create tasks: #{inspect(errors)}")
-            {:ok, plan}  # Continue without tasks
-          
-          error ->
-            Logger.error("Failed to create tasks: #{inspect(error)}")
-            {:ok, plan}  # Continue without tasks
+        # Create tasks individually to avoid bulk_create domain issues
+        created_tasks = task_attrs
+        |> Enum.map(fn attrs ->
+          case Ash.create(Task, attrs, domain: RubberDuck.Planning) do
+            {:ok, task} -> task
+            {:error, error} -> 
+              Logger.error("Failed to create task: #{inspect(error)}")
+              nil
+          end
+        end)
+        |> Enum.reject(&is_nil/1)
+        
+        if length(created_tasks) > 0 do
+          {:ok, %{plan | tasks: created_tasks}}
+        else
+          Logger.error("Failed to create any tasks from decomposition")
+          {:ok, plan}  # Continue without tasks
         end
       
       {:error, reason} ->
