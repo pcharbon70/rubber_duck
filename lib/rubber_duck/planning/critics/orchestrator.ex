@@ -171,7 +171,10 @@ defmodule RubberDuck.Planning.Critics.Orchestrator do
       end)
 
     # Batch create validations
-    case Ash.bulk_create(Validation, validations, return_records?: true) do
+    case Ash.bulk_create(Validation, validations, 
+      domain: RubberDuck.Planning,
+      return_records?: true
+    ) do
       %{records: records} -> {:ok, records}
       error -> {:error, error}
     end
