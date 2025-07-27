@@ -52,6 +52,7 @@ type Model struct {
 	authClient   interface{} // Will be *phoenix.AuthClient
 	statusClient interface{} // Will be *phoenix.StatusClient
 	apiKeyClient interface{} // Will be *phoenix.ApiKeyClient
+	planningClient interface{} // Will be *phoenix.PlanningClient
 	socket       *phx.Socket
 	authSocket   *phx.Socket // Separate socket for auth operations
 	channel      *phx.Channel
@@ -134,6 +135,7 @@ func NewModel() *Model {
 	authClient := phoenix.NewAuthClient()
 	statusClient := phoenix.NewStatusClient()
 	apiKeyClient := phoenix.NewApiKeyClient()
+	planningClient := phoenix.NewPlanningClient()
 	
 	// Create chat header
 	chatHeader := NewChatHeader()
@@ -181,6 +183,7 @@ func NewModel() *Model {
 		authClient:   authClient,
 		statusClient: statusClient,
 		apiKeyClient: apiKeyClient,
+		planningClient: planningClient,
 		currentModel:    config.DefaultModel,    // Load from config or empty for default
 		currentProvider: config.DefaultProvider, // Load from config or empty for unknown
 		temperature:     0.7,
@@ -301,6 +304,11 @@ func (m *Model) GetStatusClient() interface{} {
 // GetApiKeyClient returns the ApiKey client interface
 func (m *Model) GetApiKeyClient() interface{} {
 	return m.apiKeyClient
+}
+
+// GetPlanningClient returns the Planning client interface
+func (m *Model) GetPlanningClient() interface{} {
+	return m.planningClient
 }
 
 // SetSystemMessage sets the system message to display in the status bar

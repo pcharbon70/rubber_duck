@@ -612,6 +612,20 @@ func (c Chat) handleSlashCommand(command string) tea.Cmd {
 			c.AddMessage(SystemMessage, "Usage: /config <save|load>\n  save - Save current provider/model as defaults\n  load - Load provider/model from config", "system")
 		}
 		
+	case "plan":
+		// Start planning session with remaining input as query
+		if len(parts) > 1 {
+			query := strings.Join(parts[1:], " ")
+			return func() tea.Msg {
+				return ExecuteCommandMsg{
+					Command: "start_planning",
+					Args:    map[string]string{"query": query},
+				}
+			}
+		} else {
+			c.AddMessage(SystemMessage, "Usage: /plan <query>\nExample: /plan create a REST API for user management", "system")
+		}
+		
 	case "quit", "exit", "q":
 		// Quit application
 		return tea.Quit
@@ -628,6 +642,7 @@ func (c Chat) handleSlashCommand(command string) tea.Cmd {
 		helpText += "/provider <name>   - Set provider for current model\n"
 		helpText += "/config <save|load>- Save/load default provider and model\n"
 		helpText += "/timestamps <cmd>  - Control timestamp display\n"
+		helpText += "/plan <query>      - Start AI planning session\n"
 		helpText += "/login <user> <pw> - Login to server\n"
 		helpText += "/logout            - Logout from server\n"
 		helpText += "/apikey <cmd>      - API key management\n"

@@ -56,6 +56,7 @@ type InitiateConnectionMsg struct{}
 type JoinConversationChannelMsg struct{}
 type JoinStatusChannelMsg struct{}
 type JoinApiKeyChannelMsg struct{}
+type JoinPlanningChannelMsg struct{}
 type SwitchToUserSocketMsg struct{}
 type AuthSocketConnectedMsg struct{}
 

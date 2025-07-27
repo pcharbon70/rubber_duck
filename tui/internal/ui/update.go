@@ -203,10 +203,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.switchingSocket = false // Clear the switching flag
 			m.statusBar = "Connected to authenticated socket - Joining channels..."
 			m.updateHeaderState()
-			// Join conversation, status, and api_keys channels
+			// Join conversation, status, api_keys, and planning channels
 			return m, tea.Batch(
 				func() tea.Msg { return JoinConversationChannelMsg{} },
 				func() tea.Msg { return JoinApiKeyChannelMsg{} },
+				func() tea.Msg { return JoinPlanningChannelMsg{} },
 			)
 		}
 		
@@ -533,6 +534,80 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 		
+	// Planning channel messages
+	case phoenix.PlanningChannelJoinedMsg:
+		m.statusBar = "Planning channel joined"
+		return m, nil
+		
+	case phoenix.PlanningStartedMsg:
+		// Parse planning started data
+		var data map[string]any
+		if err := json.Unmarshal(msg.Data, &data); err == nil {
+			if sessionID, ok := data["session_id"].(string); ok {
+				m.chat.AddMessage(SystemMessage, fmt.Sprintf("Planning session started (ID: %s)", sessionID), "planning")
+			}
+		}
+		m.statusMessages.AddMessage(StatusCategoryInfo, "Planning started", nil)
+		return m, nil
+		
+	case phoenix.PlanningStepMsg:
+		// Parse planning step data
+		var data map[string]any
+		if err := json.Unmarshal(msg.Data, &data); err == nil {
+			stepID := data["step_id"]
+			stepType := data["type"]
+			description := data["description"]
+			
+			stepMsg := fmt.Sprintf("Planning Step: %s\nType: %s\nDescription: %s", stepID, stepType, description)
+			
+			// Add any additional details
+			if details, ok := data["details"].(map[string]any); ok {
+				stepMsg += "\nDetails:"
+				for k, v := range details {
+					stepMsg += fmt.Sprintf("\n  - %s: %v", k, v)
+				}
+			}
+			
+			m.chat.AddMessage(SystemMessage, stepMsg, "planning")
+		}
+		return m, nil
+		
+	case phoenix.PlanningCompletedMsg:
+		// Parse planning completed data
+		var data map[string]any
+		if err := json.Unmarshal(msg.Data, &data); err == nil {
+			summary := data["summary"]
+			if steps, ok := data["steps"].([]any); ok {
+				completedMsg := fmt.Sprintf("Planning completed!\nSummary: %s\n\nSteps (%d):", summary, len(steps))
+				for i, step := range steps {
+					if stepMap, ok := step.(map[string]any); ok {
+						completedMsg += fmt.Sprintf("\n%d. %s", i+1, stepMap["description"])
+					}
+				}
+				m.chat.AddMessage(SystemMessage, completedMsg, "planning")
+			}
+		}
+		m.statusMessages.AddMessage(StatusCategoryInfo, "Planning completed", nil)
+		return m, nil
+		
+	case phoenix.PlanningErrorMsg:
+		// Parse planning error data
+		var data map[string]any
+		if err := json.Unmarshal(msg.Data, &data); err == nil {
+			errorMsg := fmt.Sprintf("Planning error: %s", data["message"])
+			if details, ok := data["details"].(string); ok && details != "" {
+				errorMsg += fmt.Sprintf("\nDetails: %s", details)
+			}
+			m.chat.AddMessage(ErrorMessage, errorMsg, "planning")
+			m.statusMessages.AddMessage(StatusCategoryError, "Planning failed", nil)
+		}
+		return m, nil
+		
+	case phoenix.PlanningCancelledMsg:
+		m.chat.AddMessage(SystemMessage, "Planning cancelled", "planning")
+		m.statusMessages.AddMessage(StatusCategoryInfo, "Planning cancelled", nil)
+		return m, nil
+		
 	// Join conversation channel after authentication
 	case JoinConversationChannelMsg:
 		if m.authenticated {
@@ -570,6 +645,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				apiKeyClient.SetProgram(m.ProgramHolder())
 				apiKeyClient.SetUserID(m.userID)
 				return m, apiKeyClient.JoinApiKeyChannel()
+			}
+		}
+		return m, nil
+		
+	// Join planning channel for authenticated user
+	case JoinPlanningChannelMsg:
+		if m.authenticated {
+			m.statusBar = "Joining planning channel..."
+			if planningClient, ok := m.planningClient.(*phoenix.PlanningClient); ok {
+				planningClient.SetSocket(m.socket)
+				planningClient.SetProgram(m.ProgramHolder())
+				return m, planningClient.JoinPlanningChannel()
 			}
 		}
 		return m, nil
@@ -946,6 +1033,7 @@ func (m Model) buildHelpContent() string {
 	help += "/help     - Show this help\n"
 	help += "/model    - Set AI model (e.g., /model gpt4 [provider])\n"
 	help += "/provider - Set provider (e.g., /provider azure)\n"
+	help += "/plan     - Start AI planning session (e.g., /plan create REST API)\n"
 	help += "/clear    - New conversation\n"
 	help += "/tree     - Toggle file tree\n"
 	help += "/editor   - Toggle editor\n"
@@ -1212,6 +1300,33 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 				m.chat.AddMessage(SystemMessage, fmt.Sprintf("Model set to: %s\nProvider set to: %s", model, provider), "system")
 			}
 		}
+	
+	// Planning commands
+	case "start_planning":
+		// Start a planning session
+		if !m.authenticated {
+			m.statusMessages.AddMessage(StatusCategoryError, "You must be authenticated to use planning", nil)
+			return m, nil
+		}
+		
+		// Get the query from args
+		query := msg.Args["query"]
+		if query == "" {
+			m.statusMessages.AddMessage(StatusCategoryError, "Please provide a query for planning", nil)
+			return m, nil
+		}
+		
+		// Start planning with context
+		m.statusBar = "Starting planning session..."
+		if planningClient, ok := m.planningClient.(*phoenix.PlanningClient); ok {
+			// Create context with current model/provider info
+			context := map[string]any{
+				"provider": m.currentProvider,
+				"model":    m.currentModel,
+			}
+			return m, planningClient.StartPlanning(query, context)
+		}
+		return m, nil
 	
 	// Config commands
 	case "config_save":
