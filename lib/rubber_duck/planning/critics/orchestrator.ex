@@ -170,20 +170,24 @@ defmodule RubberDuck.Planning.Critics.Orchestrator do
         })
       end)
 
-    # Batch create validations
-    case Ash.bulk_create(Validation, validations, 
-      domain: RubberDuck.Planning,
-      return_records?: true,
-      return_errors?: true
-    ) do
-      %{records: records} when is_list(records) -> 
-        {:ok, records}
-      %{errors: errors} -> 
-        Logger.error("Failed to create validations: #{inspect(errors)}")
-        {:error, errors}
-      error -> 
-        Logger.error("Unexpected bulk_create result: #{inspect(error)}")
-        {:error, error}
+    # Create validations one by one in a transaction
+    # This avoids the bulk_create domain inference issue
+    result = Ash.transaction(fn ->
+      validations
+      |> Enum.map(fn attrs ->
+        case Ash.create(Validation, attrs, domain: RubberDuck.Planning) do
+          {:ok, record} -> 
+            record
+          {:error, error} ->
+            Logger.error("Failed to create validation: #{inspect(error)}")
+            raise "Failed to create validation: #{inspect(error)}"
+        end
+      end)
+    end, domain: RubberDuck.Planning)
+    
+    case result do
+      {:ok, records} -> {:ok, records}
+      {:error, error} -> {:error, error}
     end
   end
 
