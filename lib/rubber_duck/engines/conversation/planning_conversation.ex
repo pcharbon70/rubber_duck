@@ -122,7 +122,8 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
 
     llm_opts = InputValidator.build_llm_opts(validated, messages, state)
     # Add response_format if the provider supports it
-    llm_opts = Map.put(llm_opts, :response_format, %{type: "json_object"})
+    # InputValidator.build_llm_opts returns a keyword list
+    llm_opts = Keyword.put(llm_opts, :response_format, %{type: "json_object"})
     
     case LLMService.completion(llm_opts) do
       {:ok, response} ->
