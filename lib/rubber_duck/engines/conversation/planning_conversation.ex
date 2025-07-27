@@ -94,14 +94,24 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
         content: """
         You are a planning assistant. Extract structured plan information from the user's query.
         
-        Respond with a JSON object containing:
-        - name: A concise name for the plan
-        - description: A detailed description of what needs to be done
-        - type: One of [feature, refactor, bugfix, analysis, migration]
-        - tasks: Initial list of high-level tasks (optional)
-        - context: Relevant context from the query
+        You MUST respond with ONLY a valid JSON object (no other text) containing:
+        - name: A concise name for the plan (string)
+        - description: A detailed description of what needs to be done (string)
+        - type: One of exactly these values: "feature", "refactor", "bugfix", "analysis", or "migration" (string)
+        - tasks: Initial list of high-level tasks (array of strings, optional)
+        - context: Relevant context from the query (object, optional)
+        
+        Example response format:
+        {
+          "name": "Implement User Authentication",
+          "description": "Add JWT-based authentication to the Phoenix application",
+          "type": "feature",
+          "tasks": ["Set up JWT library", "Create auth context", "Add login endpoint"],
+          "context": {"technology": "JWT", "framework": "Phoenix"}
+        }
         
         Focus on understanding the user's intent and creating an actionable plan.
+        IMPORTANT: Reply with ONLY the JSON object, no explanations or other text.
         """
       },
       %{
@@ -111,6 +121,8 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
     ]
 
     llm_opts = InputValidator.build_llm_opts(validated, messages, state)
+    # Add response_format if the provider supports it
+    llm_opts = Map.put(llm_opts, :response_format, %{type: "json_object"})
     
     case LLMService.completion(llm_opts) do
       {:ok, response} ->
@@ -126,14 +138,17 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
     try do
       content = extract_content(response)
       
+      # Log the content for debugging
+      Logger.debug("LLM response content: #{inspect(String.slice(content, 0, 200))}...")
+      
       # Try to parse JSON from the response
       case Jason.decode(content) do
-        {:ok, data} ->
+        {:ok, data} when is_map(data) ->
           plan_data = %{
             name: data["name"] || generate_plan_name(validated.query),
             description: data["description"] || validated.query,
-            type: String.to_existing_atom(data["type"] || "feature"),
-            context: Map.merge(validated.context, data["context"] || %{}),
+            type: parse_plan_type(data["type"]) || detect_plan_type(validated.query),
+            context: Map.merge(validated.context || %{}, data["context"] || %{}),
             metadata: %{
               created_via: "planning_conversation",
               user_id: validated.user_id,
@@ -143,23 +158,52 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
           
           {:ok, plan_data}
         
-        {:error, _} ->
+        {:error, %Jason.DecodeError{}} ->
+          Logger.warning("Failed to parse JSON, falling back to basic extraction")
           # Fallback to basic extraction
           {:ok, %{
             name: generate_plan_name(validated.query),
             description: validated.query,
             type: detect_plan_type(validated.query),
-            context: validated.context,
+            context: validated.context || %{},
             metadata: %{
               created_via: "planning_conversation",
               user_id: validated.user_id
             }
           }}
+        
+        other ->
+          Logger.error("Unexpected JSON decode result: #{inspect(other)}")
+          {:error, :invalid_json_response}
       end
     rescue
       e ->
         Logger.error("Error parsing plan data: #{inspect(e)}")
-        {:error, :plan_extraction_failed}
+        # Still try to create a basic plan instead of failing completely
+        {:ok, %{
+          name: generate_plan_name(validated.query),
+          description: validated.query,
+          type: detect_plan_type(validated.query),
+          context: validated.context || %{},
+          metadata: %{
+            created_via: "planning_conversation", 
+            user_id: validated.user_id,
+            error: "Failed to parse LLM response"
+          }
+        }}
+    end
+  end
+  
+  defp parse_plan_type(nil), do: nil
+  defp parse_plan_type(type) when is_atom(type), do: type
+  defp parse_plan_type(type) when is_binary(type) do
+    case String.downcase(type) do
+      "feature" -> :feature
+      "refactor" -> :refactor
+      "bugfix" -> :bugfix
+      "analysis" -> :analysis 
+      "migration" -> :migration
+      _ -> nil
     end
   end
 
