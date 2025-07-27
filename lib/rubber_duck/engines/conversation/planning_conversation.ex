@@ -163,6 +163,21 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
           
           {:ok, plan_data}
         
+        {:ok, _non_map_data} ->
+          # JSON decode succeeded but didn't return a map (e.g., returned a string)
+          Logger.warning("LLM returned non-JSON response, falling back to basic extraction")
+          {:ok, %{
+            name: ensure_unique_plan_name(generate_plan_name(validated.query)),
+            description: validated.query,
+            type: detect_plan_type(validated.query),
+            context: validated.context || %{},
+            metadata: %{
+              created_via: "planning_conversation",
+              user_id: validated.user_id,
+              fallback_reason: "LLM returned plain text instead of JSON"
+            }
+          }}
+        
         {:error, %Jason.DecodeError{}} ->
           Logger.warning("Failed to parse JSON, falling back to basic extraction")
           # Fallback to basic extraction
