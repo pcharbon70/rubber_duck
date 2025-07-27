@@ -47,6 +47,10 @@ type CopyToClipboardMsg struct {
 // Mouse mode toggle message
 type ToggleMouseModeMsg struct{}
 
+// Cancel processing message
+type CancelRequestMsg struct{}
+type ProcessingCancelledMsg struct{}
+
 // Connection messages
 type InitiateConnectionMsg struct{}
 type JoinConversationChannelMsg struct{}

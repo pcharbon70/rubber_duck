@@ -114,6 +114,12 @@ func (c Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Let ctrl+c bubble up for quit handling
 				return c, nil
 				
+			case tea.KeyEsc:
+				// Return cancel request message to be handled by main update
+				return c, func() tea.Msg {
+					return CancelRequestMsg{}
+				}
+				
 			default:
 				// Handle multiline with Ctrl+Enter (represented as Ctrl+J in some terminals)
 				if msg.Type == tea.KeyCtrlJ {
@@ -563,6 +569,31 @@ func (c Chat) handleSlashCommand(command string) tea.Cmd {
 			return ExecuteCommandMsg{Command: "auth_status"}
 		}
 		
+	case "timestamps", "ts":
+		if len(parts) > 1 {
+			switch parts[1] {
+			case "on", "enable", "show":
+				return func() tea.Msg {
+					return ExecuteCommandMsg{Command: "timestamps_on"}
+				}
+			case "off", "disable", "hide":
+				return func() tea.Msg {
+					return ExecuteCommandMsg{Command: "timestamps_off"}
+				}
+			case "toggle":
+				return func() tea.Msg {
+					return ExecuteCommandMsg{Command: "timestamps_toggle"}
+				}
+			default:
+				c.AddMessage(SystemMessage, "Usage: /timestamps <on|off|toggle>\n  on    - Show timestamps in status messages\n  off   - Hide timestamps in status messages\n  toggle - Toggle timestamp display", "system")
+			}
+		} else {
+			// No subcommand, show current state and usage
+			return func() tea.Msg {
+				return ExecuteCommandMsg{Command: "timestamps_status"}
+			}
+		}
+		
 	case "config":
 		if len(parts) > 1 {
 			switch parts[1] {
@@ -596,6 +627,7 @@ func (c Chat) handleSlashCommand(command string) tea.Cmd {
 		helpText += "/commands, /cmds   - Show command palette\n"
 		helpText += "/provider <name>   - Set provider for current model\n"
 		helpText += "/config <save|load>- Save/load default provider and model\n"
+		helpText += "/timestamps <cmd>  - Control timestamp display\n"
 		helpText += "/login <user> <pw> - Login to server\n"
 		helpText += "/logout            - Logout from server\n"
 		helpText += "/apikey <cmd>      - API key management\n"

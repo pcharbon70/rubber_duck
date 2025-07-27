@@ -101,6 +101,12 @@ type Model struct {
 	
 	// Mouse mode toggle
 	mouseEnabled bool
+	
+	// Processing state
+	isProcessing bool // True when waiting for response from server
+	
+	// Response handlers
+	responseHandlers *ResponseHandlerRegistry
 }
 
 // CategoryInfo stores metadata about a status category
@@ -188,6 +194,7 @@ func NewModel() *Model {
 		categoryMetadata: make(map[string]CategoryInfo),
 		config:        config,
 		mouseEnabled:  false, // Mouse disabled by default for text selection
+		responseHandlers: NewResponseHandlerRegistry(),
 	}
 	
 	// Initialize component sizes with defaults

@@ -185,6 +185,11 @@ func (c *Client) setupChannelHandlers(channel *phx.Channel) {
 		})
 	})
 	
+	// Handle processing cancelled
+	channel.On("processing_cancelled", func(payload any) {
+		c.program.Send(ProcessingCancelledMsg{})
+	})
+	
 	// Handle conversation history
 	channel.On("history", func(payload any) {
 		if data, ok := payload.(map[string]any); ok {
@@ -254,9 +259,9 @@ func (c *Client) Push(event string, payload map[string]any) tea.Cmd {
 		})
 		
 		push.Receive("timeout", func(response any) {
-			// For get_history, we handle the response through channel events
-			if event == "get_history" {
-				// History is handled by the "history" channel event, ignore push timeout
+			// For certain events, we handle the response through channel events, not push replies
+			if event == "get_history" || event == "message" || event == "cancel_processing" {
+				// These are handled by channel events, ignore push timeout
 				return
 			}
 			
@@ -270,12 +275,37 @@ func (c *Client) Push(event string, payload map[string]any) tea.Cmd {
 	}
 }
 
+// PushAsync sends a message to the Phoenix channel without waiting for responses
+// Use this for events where responses come through channel events, not push replies
+func (c *Client) PushAsync(event string, payload map[string]any) tea.Cmd {
+	return func() tea.Msg {
+		if c.channel == nil {
+			return ErrorMsg{
+				Err:       fmt.Errorf("channel not joined"),
+				Component: "Phoenix Push",
+			}
+		}
+		
+		// Just push without setting up response handlers
+		_, err := c.channel.Push(event, payload)
+		if err != nil {
+			return ErrorMsg{
+				Err:       err,
+				Component: "Phoenix Push",
+			}
+		}
+		
+		// Don't wait for any responses - they'll come through channel events
+		return nil
+	}
+}
+
 // SendMessage sends a message to the conversation channel
 func (c *Client) SendMessage(content string) tea.Cmd {
 	payload := map[string]any{
 		"content": content,
 	}
-	return c.Push("message", payload)
+	return c.PushAsync("message", payload)
 }
 
 // SendMessageWithConfig sends a message with LLM configuration
@@ -294,7 +324,12 @@ func (c *Client) SendMessageWithConfig(content string, model string, provider st
 		payload["llm_config"] = llmConfig
 	}
 	
-	return c.Push("message", payload)
+	return c.PushAsync("message", payload)
+}
+
+// CancelProcessing sends a cancel request to stop current processing
+func (c *Client) CancelProcessing() tea.Cmd {
+	return c.PushAsync("cancel_processing", map[string]any{})
 }
 
 // StartNewConversation starts a new conversation
@@ -304,7 +339,7 @@ func (c *Client) StartNewConversation() tea.Cmd {
 
 // GetConversationHistory requests the conversation history
 func (c *Client) GetConversationHistory(limit int) tea.Cmd {
-	return c.Push("get_history", map[string]any{
+	return c.PushAsync("get_history", map[string]any{
 		"limit": limit,
 	})
 }

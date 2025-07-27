@@ -49,6 +49,8 @@ type (
 		Context json.RawMessage
 	}
 	
+	ProcessingCancelledMsg struct{}
+	
 	ConversationResetMsg struct {
 		SessionInfo json.RawMessage
 	}

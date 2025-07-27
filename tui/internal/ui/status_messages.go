@@ -168,19 +168,15 @@ func (s StatusMessages) buildContent() string {
 		
 		style := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
 		
-		// Format line
-		categoryText := style.Bold(true).Render(fmt.Sprintf("[%s]", strings.ToUpper(string(msg.Category))))
-		
+		// Format line without category brackets
 		if s.showTimestamp {
 			timestamp := msg.Timestamp.Format("15:04:05")
 			timeText := timeStyle.Render(timestamp)
-			content.WriteString(fmt.Sprintf("%s %s ", categoryText, timeText))
-		} else {
-			content.WriteString(fmt.Sprintf("%s ", categoryText))
+			content.WriteString(fmt.Sprintf("%s ", timeText))
 		}
 		
-		// Add the message text
-		content.WriteString(msg.Text)
+		// Add the message text with the category color
+		content.WriteString(style.Render(msg.Text))
 		
 		// Add metadata if present and it's an error or has details
 		if msg.Category == StatusCategoryError && msg.Metadata != nil {
@@ -196,6 +192,25 @@ func (s StatusMessages) buildContent() string {
 // GetMessageCount returns the number of messages
 func (s *StatusMessages) GetMessageCount() int {
 	return len(s.messages)
+}
+
+// SetShowTimestamp enables or disables timestamp display
+func (s *StatusMessages) SetShowTimestamp(show bool) {
+	s.showTimestamp = show
+	// Re-render content with new timestamp setting
+	s.viewport.SetContent(s.buildContent())
+}
+
+// ToggleTimestamps toggles timestamp display on/off
+func (s *StatusMessages) ToggleTimestamps() {
+	s.showTimestamp = !s.showTimestamp
+	// Re-render content with new timestamp setting
+	s.viewport.SetContent(s.buildContent())
+}
+
+// GetShowTimestamp returns the current timestamp display setting
+func (s *StatusMessages) GetShowTimestamp() bool {
+	return s.showTimestamp
 }
 
 // ScrollUp scrolls the viewport up

@@ -312,6 +312,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tokenLimit = GetModelTokenLimit(m.currentModel)
 		m.updateHeaderState()
 		m.statusBar = "Sending message..."
+		m.isProcessing = true // Mark as processing
 		if client, ok := m.phoenixClient.(*phoenix.Client); ok && m.connected {
 			// Always send with provider and model configuration
 			return m, client.SendMessageWithConfig(msg.Content, m.currentModel, m.currentProvider, m.temperature)
@@ -360,12 +361,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ExecuteCommandMsg:
 		return m.handleCommand(msg)
 		
+	case CancelRequestMsg:
+		// Only process cancel if we're currently processing
+		if m.isProcessing {
+			m.statusBar = "Cancelling..."
+			if client, ok := m.phoenixClient.(*phoenix.Client); ok && m.connected {
+				return m, client.CancelProcessing()
+			}
+		}
+		return m, nil
+		
+	case ProcessingCancelledMsg:
+		m.isProcessing = false
+		m.statusBar = "Request cancelled"
+		m.chat.AddMessage(SystemMessage, "Request cancelled by user", "system")
+		return m, nil
+		
 	// Phoenix conversation messages
 	case phoenix.ConversationResponseMsg:
 		// Parse the response
 		var response phoenix.ConversationMessage
 		if err := json.Unmarshal(msg.Response, &response); err == nil {
-			m.chat.AddMessage(AssistantMessage, response.Response, "assistant")
+			// Use response handler to format the response based on conversation type
+			formattedResponse := m.responseHandlers.FormatResponse(response)
+			
+			// Add formatted response to chat
+			m.chat.AddMessage(AssistantMessage, formattedResponse, "assistant")
 			m.messageCount = m.chat.GetMessageCount()
 			
 			// Note: Provider and model info from responses should NOT override user settings
@@ -375,7 +396,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tokenUsage = EstimateConversationTokens(m.chat.GetMessages())
 			m.tokenLimit = GetModelTokenLimit(m.currentModel)
 			m.updateHeaderState()
-			m.statusBar = "Response received"
+			
+			// Update status bar with conversation type
+			if response.ConversationType != "" {
+				m.statusBar = fmt.Sprintf("Response received (%s)", response.ConversationType)
+			} else {
+				m.statusBar = "Response received"
+			}
+			m.isProcessing = false // Clear processing state
 		}
 		return m, nil
 		
@@ -482,6 +510,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Phoenix error handling
 	case phoenix.ErrorMsg:
 		m.err = msg.Err
+		m.isProcessing = false // Clear processing state on error
 		// Use error handler to prevent spam
 		if display, message := m.errorHandler.HandleError(msg.Err, msg.Component); display {
 			m.statusBar = message
@@ -1233,6 +1262,33 @@ func (m Model) handleCommand(msg ExecuteCommandMsg) (Model, tea.Cmd) {
 			m.statusBar = "Config loaded"
 			m.chat.AddMessage(SystemMessage, message, "system")
 		}
+	
+	// Timestamp commands
+	case "timestamps_on":
+		m.statusMessages.SetShowTimestamp(true)
+		m.statusBar = "Timestamps enabled"
+		m.chat.AddMessage(SystemMessage, "Timestamps enabled for status messages", "system")
+		
+	case "timestamps_off":
+		m.statusMessages.SetShowTimestamp(false)
+		m.statusBar = "Timestamps disabled"
+		m.chat.AddMessage(SystemMessage, "Timestamps disabled for status messages", "system")
+		
+	case "timestamps_toggle":
+		m.statusMessages.ToggleTimestamps()
+		status := "enabled"
+		if !m.statusMessages.GetShowTimestamp() {
+			status = "disabled"
+		}
+		m.statusBar = fmt.Sprintf("Timestamps %s", status)
+		m.chat.AddMessage(SystemMessage, fmt.Sprintf("Timestamps %s for status messages", status), "system")
+		
+	case "timestamps_status":
+		status := "enabled"
+		if !m.statusMessages.GetShowTimestamp() {
+			status = "disabled"
+		}
+		m.chat.AddMessage(SystemMessage, fmt.Sprintf("Timestamps are currently %s\n\nUsage: /timestamps <on|off|toggle>\n  on    - Show timestamps in status messages\n  off   - Hide timestamps in status messages\n  toggle - Toggle timestamp display", status), "system")
 	}
 	
 	return m, nil
