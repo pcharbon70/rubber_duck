@@ -113,7 +113,8 @@ defmodule RubberDuck.Engines do
       module RubberDuck.Engines.Conversation.ConversationRouter
       description "Routes conversation queries to appropriate specialized engines"
       priority(100)
-      timeout 5_000
+      # Increase timeout to accommodate long-running engines it routes to
+      timeout 600_000  # 10 minutes
 
       config(
         max_tokens: 500,
