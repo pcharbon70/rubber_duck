@@ -9,7 +9,6 @@ defmodule RubberDuck.Planning.TaskDecomposer do
 
   @behaviour RubberDuck.Engine
 
-  alias RubberDuck.CoT
   # alias RubberDuck.Planning.{Plan, Task, TaskDependency}
   alias RubberDuck.LLM.Service, as: LLM
   alias RubberDuck.Planning.Critics.Orchestrator
@@ -198,21 +197,37 @@ defmodule RubberDuck.Planning.TaskDecomposer do
   end
 
   defp hierarchical_decomposition(input, state) do
-    # Use CoT for hierarchical decomposition
-    {:ok, result} =
-      CoT.simple_reason(
-        input.query,
-        [
-          {:analyze, "What are the main components or phases of this request?"},
-          {:decompose, "For each component, what are the specific tasks needed?"},
-          {:structure, "How should these tasks be organized hierarchically?"}
-        ],
-        format: :structured
-      )
+    alias RubberDuck.Planning.DecompositionTemplates
+    
+    # Get the hierarchical decomposition template
+    prompt = DecompositionTemplates.get_template(:hierarchical_decomposition, %{
+      request: input.query,
+      context: inspect(input[:context] || %{}),
+      scope: input[:scope] || "Complete implementation"
+    })
 
-    # Convert CoT result to task structure
-    tasks = extract_hierarchical_tasks(result, state)
-    {:ok, tasks}
+    case LLM.completion(
+           model: state.llm_config[:model] || "gpt-4",
+           messages: [%{role: "user", content: prompt}],
+           response_format: %{type: "json_object"}
+         ) do
+      {:ok, response} ->
+        # Extract content from LLM response structure
+        content = case response do
+          %{content: c} when is_binary(c) -> c
+          %{choices: [%{message: %{content: c}} | _]} -> c
+          _ -> "{\"phases\": []}"
+        end
+        
+        # Parse and extract hierarchical tasks
+        hierarchical_data = Jason.decode!(content)
+        tasks = extract_hierarchical_tasks(hierarchical_data, state)
+        {:ok, tasks}
+
+      error ->
+        Logger.error("Hierarchical decomposition failed: #{inspect(error)}")
+        error
+    end
   end
 
   defp tree_of_thought_decomposition(input, state) do
@@ -648,10 +663,104 @@ defmodule RubberDuck.Planning.TaskDecomposer do
     }
   end
 
-  defp extract_hierarchical_tasks(_cot_result, _state) do
-    # Extract tasks from CoT reasoning result
-    # This is a simplified version - real implementation would be more sophisticated
-    []
+  defp extract_hierarchical_tasks(hierarchical_data, _state) do
+    phases = hierarchical_data["phases"] || []
+    dependencies = hierarchical_data["dependencies"] || []
+    critical_path = hierarchical_data["critical_path"] || []
+    
+    # Flatten the hierarchical structure into a task list
+    {tasks, _position} = phases
+    |> Enum.reduce({[], 0}, fn phase, {acc_tasks, position} ->
+      phase_tasks = extract_tasks_from_phase(phase, position, critical_path)
+      {acc_tasks ++ phase_tasks, position + length(phase_tasks)}
+    end)
+    
+    # Add dependencies to tasks
+    tasks_with_deps = add_dependencies_to_tasks(tasks, dependencies)
+    
+    tasks_with_deps
+  end
+  
+  defp extract_tasks_from_phase(phase, start_position, critical_path) do
+    phase_id = phase["id"]
+    phase_name = phase["name"]
+    phase_tasks = phase["tasks"] || []
+    
+    phase_tasks
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {task, task_index} ->
+      task_position = start_position + task_index
+      
+      # Create the main task
+      main_task = %{
+        "id" => task["id"],
+        "name" => task["name"],
+        "description" => task["description"],
+        "complexity" => task["complexity"] || "medium",
+        "position" => task_position,
+        "phase_id" => phase_id,
+        "phase_name" => phase_name,
+        "hierarchy_level" => 2,
+        "is_critical" => task["id"] in critical_path,
+        "metadata" => %{
+          "phase" => phase_name,
+          "hierarchy_level" => 2,
+          "is_critical_path" => task["id"] in critical_path
+        }
+      }
+      
+      # Extract subtasks if present
+      subtasks = task["subtasks"] || []
+      if Enum.empty?(subtasks) do
+        [main_task]
+      else
+        subtask_list = subtasks
+        |> Enum.with_index()
+        |> Enum.map(fn {subtask, subtask_index} ->
+          %{
+            "id" => subtask["id"],
+            "name" => subtask["name"],
+            "description" => subtask["description"],
+            "complexity" => "simple",  # Subtasks are typically simpler
+            "position" => task_position + (subtask_index + 1) * 0.1,  # Decimal positions for subtasks
+            "parent_task_id" => task["id"],
+            "phase_id" => phase_id,
+            "phase_name" => phase_name,
+            "hierarchy_level" => 3,
+            "metadata" => %{
+              "phase" => phase_name,
+              "parent_task" => task["name"],
+              "hierarchy_level" => 3
+            }
+          }
+        end)
+        
+        [main_task | subtask_list]
+      end
+    end)
+  end
+  
+  defp add_dependencies_to_tasks(tasks, dependencies) do
+    # Create a map of task IDs to positions for quick lookup
+    id_to_position = tasks
+    |> Enum.reduce(%{}, fn task, acc ->
+      Map.put(acc, task["id"], task["position"])
+    end)
+    
+    # Add dependency information to tasks
+    tasks
+    |> Enum.map(fn task ->
+      # Find dependencies where this task is the "to" task
+      task_deps = dependencies
+      |> Enum.filter(fn dep -> dep["to"] == task["id"] end)
+      |> Enum.map(fn dep -> 
+        # Convert from task ID to position
+        id_to_position[dep["from"]]
+      end)
+      |> Enum.filter(&(&1 != nil))
+      
+      Map.put(task, "depends_on", task_deps)
+    end)
   end
 
   defp select_best_approach(approaches, _input, _state) do
