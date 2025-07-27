@@ -31,6 +31,7 @@ defmodule RubberDuck.Engines.Conversation.ConversationRouter do
       generation_engine: config[:generation_engine] || :generation_conversation,
       problem_solver_engine: config[:problem_solver_engine] || :problem_solver,
       multi_step_engine: config[:multi_step_engine] || :multi_step_conversation,
+      planning_engine: config[:planning_engine] || :planning_conversation,
       timeout: config[:timeout] || 60_000
     }
 
@@ -105,11 +106,16 @@ defmodule RubberDuck.Engines.Conversation.ConversationRouter do
 
     engine_name =
       cond do
+        # Planning-specific routing
+        contains_any?(query_lower, ["plan", "planning", "roadmap", "strategy", "organize", "decompose", "task list", "project"]) ->
+          state.planning_engine
+
         # Specific engine routing based on content
         contains_any?(query_lower, ["analyze", "review", "check", "inspect", "examine"]) ->
           state.analysis_engine
 
-        contains_any?(query_lower, ["generate", "create", "write", "build", "implement"]) ->
+        contains_any?(query_lower, ["generate", "create", "write", "build", "implement"]) and 
+          not contains_any?(query_lower, ["plan", "roadmap"]) ->
           state.generation_engine
 
         contains_any?(query_lower, ["debug", "fix", "error", "issue", "problem", "troubleshoot"]) ->

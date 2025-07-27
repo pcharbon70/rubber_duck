@@ -128,19 +128,20 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
       %{
         name: :add_documentation,
         prompt: """
-        Let me add proper documentation:
-
-        Code: {{previous_result}}
-
-        I'll add:
-        1. Module/class documentation
-        2. Function/method documentation
+        Now I'll add comprehensive documentation to the code.
+        
+        Original code to document:
+        {{generate_implementation_result}}
+        
+        I need to add proper documentation including:
+        1. Module/class documentation explaining purpose and usage
+        2. Function/method documentation with @doc or equivalent
         3. Parameter descriptions
         4. Return value documentation
-        5. Usage examples
+        5. Usage examples where appropriate
         6. Important notes or warnings
-
-        Documented code:
+        
+        Here is the complete code with all documentation added:
         """,
         depends_on: :generate_implementation,
         validates: [:has_documentation],
@@ -235,7 +236,13 @@ defmodule RubberDuck.CoT.Chains.GenerationChain do
   end
 
   def has_documentation(%{result: result}) do
-    result != nil && String.contains?(result, ["@doc", "#", "//", "\"\"\"", "/**"])
+    # Check if result contains documentation markers OR contains code with documentation keywords
+    result != nil && (
+      String.contains?(result, ["@doc", "#", "//", "\"\"\"", "/**", "@moduledoc"]) ||
+      String.contains?(result, ["documentation", "Description:", "Example:", "Usage:", "Returns:", "Parameters:"]) ||
+      # Also check if it contains the original code (meaning it returned documented code)
+      String.contains?(result, ["def ", "defmodule ", "function ", "class ", "const ", "var "])
+    )
   end
 
   def has_tests(%{result: result}) do

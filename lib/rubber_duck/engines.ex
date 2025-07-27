@@ -113,7 +113,8 @@ defmodule RubberDuck.Engines do
       module RubberDuck.Engines.Conversation.ConversationRouter
       description "Routes conversation queries to appropriate specialized engines"
       priority(100)
-      timeout 5_000
+      # Increase timeout to accommodate long-running engines it routes to
+      timeout 600_000  # 10 minutes
 
       config(
         max_tokens: 500,
@@ -177,6 +178,20 @@ defmodule RubberDuck.Engines do
         temperature: 0.4,
         capabilities: [:debugging, :troubleshooting, :error_analysis, :root_cause_analysis, :solution_generation],
         tags: [:conversation, :problem_solving, :debugging]
+      )
+    end
+
+    engine :planning_conversation do
+      module RubberDuck.Engines.Conversation.PlanningConversation
+      description "Handles planning-related conversations and creates actionable plans"
+      priority(85)
+      timeout 60_000
+
+      config(
+        max_tokens: 3000,
+        temperature: 0.7,
+        capabilities: [:plan_creation, :task_decomposition, :planning_strategy, :execution_planning, :project_architecture],
+        tags: [:conversation, :planning, :task_management]
       )
     end
   end
