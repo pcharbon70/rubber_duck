@@ -518,10 +518,40 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
 
   defp serialize_plan(plan) do
     # Handle case where tasks might not be loaded
-    task_count = case plan.tasks do
-      tasks when is_list(tasks) -> length(tasks)
-      %Ash.NotLoaded{} -> 0
-      nil -> 0
+    tasks = case plan.tasks do
+      tasks when is_list(tasks) -> 
+        # Serialize each task
+        Enum.map(tasks, fn task ->
+          %{
+            id: task.id,
+            name: task.name,
+            description: task.description,
+            position: task.position,
+            status: task.status,
+            complexity: task.complexity,
+            success_criteria: task.success_criteria,
+            validation_rules: task.validation_rules,
+            metadata: task.metadata,
+            dependencies: serialize_dependencies(task)
+          }
+        end)
+      %Ash.NotLoaded{} -> []
+      nil -> []
+    end
+    
+    # Extract validation details
+    validation_results = if plan.validation_results && plan.validation_results["initial"] do
+      initial_validation = plan.validation_results["initial"]
+      %{
+        summary: initial_validation[:summary] || initial_validation["summary"],
+        hard_critics: initial_validation[:hard_critics] || initial_validation["hard_critics"] || [],
+        soft_critics: initial_validation[:soft_critics] || initial_validation["soft_critics"] || [],
+        blocking_issues: initial_validation[:blocking_issues] || initial_validation["blocking_issues"] || [],
+        suggestions: initial_validation[:suggestions] || initial_validation["suggestions"] || [],
+        all_validations: initial_validation[:all_validations] || initial_validation["all_validations"] || []
+      }
+    else
+      nil
     end
     
     %{
@@ -530,9 +560,43 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
       description: plan.description,
       type: plan.type,
       status: plan.status,
-      task_count: task_count,
-      validation_status: plan.validation_results["initial"][:summary]
+      context: plan.context,
+      metadata: plan.metadata,
+      tasks: tasks,
+      task_count: length(tasks),
+      validation_results: validation_results,
+      validation_status: validation_results && validation_results.summary,
+      constraints: serialize_constraints(plan),
+      created_at: plan.created_at,
+      updated_at: plan.updated_at
     }
+  end
+  
+  defp serialize_dependencies(task) do
+    case task.dependencies do
+      deps when is_list(deps) -> deps
+      %Ash.NotLoaded{} -> []
+      nil -> []
+    end
+  end
+  
+  defp serialize_constraints(plan) do
+    case plan.constraints do
+      constraints when is_list(constraints) -> 
+        Enum.map(constraints, fn c ->
+          %{
+            id: c.id,
+            name: c.name,
+            type: c.type,
+            condition: c.condition,
+            severity: c.severity,
+            applies_to: c.applies_to,
+            metadata: c.metadata
+          }
+        end)
+      %Ash.NotLoaded{} -> []
+      nil -> []
+    end
   end
 
   defp plan_ready?(%{validation_results: %{"initial" => %{summary: :failed}}}), do: false
