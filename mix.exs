@@ -92,7 +92,12 @@ defmodule RubberDuck.MixProject do
       {:file_system, "~> 1.1.0"},
 
       # JSON Schema validation
-      {:ex_json_schema, "~> 0.10"}
+      {:ex_json_schema, "~> 0.10"},
+
+      # Jido autonomous agent framework
+      {:jido, "~> 1.2.0"},
+      # CloudEvents for signal messaging
+      {:cloudevents, "~> 0.6.1"}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
