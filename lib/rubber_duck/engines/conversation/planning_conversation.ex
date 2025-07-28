@@ -18,7 +18,7 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
 
   alias RubberDuck.Planning.{Plan, Task}
   alias RubberDuck.Planning.Critics.Orchestrator
-  alias RubberDuck.Planning.{Decomposer, PlanImprover, PlanFixer}
+  alias RubberDuck.Planning.{Decomposer, PlanImprover, PlanFixer, HierarchicalPlanBuilder}
   alias RubberDuck.Engine.InputValidator
   alias RubberDuck.LLM.Service, as: LLMService
 
@@ -307,6 +307,15 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   end
 
   defp validate_plan(plan) do
+    # Ensure full hierarchical structure is loaded for validation
+    plan = case Ash.load(plan, [
+      phases: [tasks: [:subtasks, :dependencies]],
+      tasks: [:subtasks, :dependencies]
+    ], domain: RubberDuck.Planning) do
+      {:ok, loaded} -> loaded
+      _ -> plan
+    end
+    
     orchestrator = Orchestrator.new()
     
     case Orchestrator.validate(orchestrator, plan) do
@@ -367,40 +376,22 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
     
     # Use the Decomposer to break down the plan into tasks
     case Decomposer.decompose(plan.description, context) do
-      {:ok, tasks} ->
-        # Convert decomposer output to Task resources
-        task_attrs = tasks
-          |> Enum.map(fn task ->
-            %{
-              plan_id: plan.id,
-              name: task[:name],
-              description: task[:description],
-              position: task[:position],
-              complexity: ensure_atom(task[:complexity]),
-              # status is set automatically to :pending by the create action
-              success_criteria: task[:success_criteria],
-              validation_rules: task[:validation_rules],
-              metadata: task[:metadata] || %{}
-            }
-          end)
+      {:ok, tasks} when is_list(tasks) ->
+        # Check if we got hierarchical data (with phases) or just tasks
+        # If decomposer returns a list, it's simple tasks
+        HierarchicalPlanBuilder.build_tasks_only(plan, tasks, domain: RubberDuck.Planning)
+      
+      {:ok, decomposition_data} when is_map(decomposition_data) ->
+        # Check if we got hierarchical data (with phases)
+        has_phases = Map.has_key?(decomposition_data, "phases") || Map.has_key?(decomposition_data, :phases)
         
-        # Create tasks individually to avoid bulk_create domain issues
-        created_tasks = task_attrs
-        |> Enum.map(fn attrs ->
-          case Ash.create(Task, attrs, domain: RubberDuck.Planning) do
-            {:ok, task} -> task
-            {:error, error} -> 
-              Logger.error("Failed to create task: #{inspect(error)}")
-              nil
-          end
-        end)
-        |> Enum.reject(&is_nil/1)
-        
-        if length(created_tasks) > 0 do
-          {:ok, %{plan | tasks: created_tasks}}
+        if has_phases do
+          # Use hierarchical plan builder for phase-based plans
+          HierarchicalPlanBuilder.build_plan(plan, decomposition_data, domain: RubberDuck.Planning)
         else
-          Logger.error("Failed to create any tasks from decomposition")
-          {:ok, plan}  # Continue without tasks
+          # Convert map to task list if it has "tasks" key
+          tasks = decomposition_data["tasks"] || decomposition_data[:tasks] || []
+          HierarchicalPlanBuilder.build_tasks_only(plan, tasks, domain: RubberDuck.Planning)
         end
       
       {:error, reason} ->
@@ -419,16 +410,6 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
       _ -> :hierarchical
     end
   end
-  
-  defp ensure_atom(value) when is_atom(value), do: value
-  defp ensure_atom(value) when is_binary(value) do
-    try do
-      String.to_existing_atom(value)
-    rescue
-      ArgumentError -> :medium
-    end
-  end
-  defp ensure_atom(_), do: :medium
 
 
   defp format_planning_response(plan, _validated) do
@@ -460,16 +441,36 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   end
 
   defp format_plan_details(plan) do
-    # Handle case where tasks might not be loaded
+    # Load hierarchical structure if needed
+    plan = case plan do
+      %{phases: %Ash.NotLoaded{}} ->
+        case Ash.load(plan, [:phases, :tasks], domain: RubberDuck.Planning) do
+          {:ok, loaded} -> loaded
+          _ -> plan
+        end
+      _ -> plan
+    end
+    
+    # Count phases and tasks
+    phase_count = case plan.phases do
+      phases when is_list(phases) -> length(phases)
+      _ -> 0
+    end
+    
     task_count = case plan.tasks do
       tasks when is_list(tasks) -> length(tasks)
-      %Ash.NotLoaded{} -> 0
-      nil -> 0
+      _ -> 0
     end
     
     details = ["**Plan Details:**"]
     details = details ++ ["- Type: #{plan.type}"]
     details = details ++ ["- Status: #{plan.status}"]
+    
+    details = if phase_count > 0 do
+      details ++ ["- Structure: #{phase_count} phases"]
+    else
+      details
+    end
     
     if task_count > 0 do
       details ++ ["- Tasks: #{task_count} tasks identified"]
@@ -574,41 +575,40 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   defp format_blocking_issues(_), do: "No specific issues listed"
 
   defp serialize_plan(plan) do
-    # Handle case where tasks might not be loaded
-    tasks = case plan.tasks do
+    # Load plan with hierarchical structure if not already loaded
+    plan = case plan do
+      %{phases: %Ash.NotLoaded{}} -> 
+        {:ok, loaded} = Ash.load(plan, [phases: [tasks: :subtasks]], domain: RubberDuck.Planning)
+        loaded
+      _ -> plan
+    end
+    
+    # Serialize phases if they exist
+    phases = case plan do
+      %{phases: phases} when is_list(phases) and phases != [] ->
+        Enum.map(phases, &serialize_phase/1)
+      _ -> nil
+    end
+    
+    # Handle case where tasks might not be loaded or are orphan tasks (no phase)
+    orphan_tasks = case plan.tasks do
       tasks when is_list(tasks) -> 
-        # Serialize each task
-        Enum.map(tasks, fn task ->
-          %{
-            id: task.id,
-            name: task.name,
-            description: task.description,
-            position: task.position,
-            status: task.status,
-            complexity: task.complexity,
-            success_criteria: task.success_criteria,
-            validation_rules: task.validation_rules,
-            metadata: task.metadata,
-            dependencies: serialize_dependencies(task)
-          }
-        end)
+        # Only serialize tasks that don't belong to a phase
+        tasks
+        |> Enum.filter(& is_nil(&1.phase_id))
+        |> Enum.map(&serialize_task/1)
       %Ash.NotLoaded{} -> []
       nil -> []
     end
     
-    # Extract validation details
-    validation_results = if plan.validation_results && plan.validation_results["initial"] do
-      initial_validation = plan.validation_results["initial"]
-      %{
-        summary: initial_validation[:summary] || initial_validation["summary"],
-        hard_critics: initial_validation[:hard_critics] || initial_validation["hard_critics"] || [],
-        soft_critics: initial_validation[:soft_critics] || initial_validation["soft_critics"] || [],
-        blocking_issues: initial_validation[:blocking_issues] || initial_validation["blocking_issues"] || [],
-        suggestions: initial_validation[:suggestions] || initial_validation["suggestions"] || [],
-        all_validations: initial_validation[:all_validations] || initial_validation["all_validations"] || []
-      }
+    # Calculate total task count across all phases and orphan tasks
+    total_task_count = if phases do
+      phase_task_count = phases |> Enum.reduce(0, fn phase, acc -> 
+        acc + length(phase.tasks || [])
+      end)
+      phase_task_count + length(orphan_tasks)
     else
-      nil
+      length(orphan_tasks)
     end
     
     %{
@@ -619,13 +619,57 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
       status: plan.status,
       context: plan.context,
       metadata: plan.metadata,
-      tasks: tasks,
-      task_count: length(tasks),
-      validation_results: validation_results,
-      validation_status: validation_results && validation_results.summary,
-      constraints: serialize_constraints(plan),
+      phases: phases,
+      orphan_tasks: orphan_tasks,  # Tasks not belonging to any phase
+      task_count: total_task_count,
       created_at: plan.created_at,
       updated_at: plan.updated_at
+    }
+  end
+  
+  defp serialize_phase(phase) do
+    %{
+      id: phase.id,
+      name: phase.name,
+      description: phase.description,
+      position: phase.position,
+      number: phase.metadata["number"],
+      metadata: phase.metadata,
+      tasks: serialize_tasks_with_subtasks(phase.tasks || [])
+    }
+  end
+  
+  defp serialize_tasks_with_subtasks(tasks) do
+    # Only serialize top-level tasks (those without parent_id)
+    tasks
+    |> Enum.filter(& is_nil(&1.parent_id))
+    |> Enum.map(&serialize_task_with_subtasks/1)
+  end
+  
+  defp serialize_task_with_subtasks(task) do
+    base_task = serialize_task(task)
+    
+    # Add subtasks if they exist
+    case task do
+      %{subtasks: subtasks} when is_list(subtasks) and subtasks != [] ->
+        Map.put(base_task, :subtasks, Enum.map(subtasks, &serialize_task_with_subtasks/1))
+      _ ->
+        base_task
+    end
+  end
+  
+  defp serialize_task(task) do
+    %{
+      id: task.id,
+      name: task.name,
+      description: task.description,
+      position: task.position,
+      number: task.number,
+      status: task.status,
+      complexity: task.complexity,
+      success_criteria: task.success_criteria,
+      metadata: task.metadata,
+      dependencies: serialize_dependencies(task)
     }
   end
   
@@ -637,24 +681,6 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
     end
   end
   
-  defp serialize_constraints(plan) do
-    case plan.constraints do
-      constraints when is_list(constraints) -> 
-        Enum.map(constraints, fn c ->
-          %{
-            id: c.id,
-            name: c.name,
-            type: c.type,
-            condition: c.condition,
-            severity: c.severity,
-            applies_to: c.applies_to,
-            metadata: c.metadata
-          }
-        end)
-      %Ash.NotLoaded{} -> []
-      nil -> []
-    end
-  end
 
   defp plan_ready?(%{validation_results: %{"initial" => %{summary: :failed}}}), do: false
   defp plan_ready?(%{status: :ready}), do: true

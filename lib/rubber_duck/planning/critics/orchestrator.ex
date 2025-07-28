@@ -11,6 +11,12 @@ defmodule RubberDuck.Planning.Critics.Orchestrator do
   """
 
   alias RubberDuck.Planning.Critics.{CriticBehaviour, HardCritic, SoftCritic}
+  alias RubberDuck.Planning.Critics.{
+    PhaseStructureCritic,
+    HierarchicalDependencyCritic,
+    TaskDecompositionCritic,
+    HierarchicalCompletenessCritic
+  }
   alias RubberDuck.Planning.{Validation, Plan, Task}
 
   require Logger
@@ -23,6 +29,7 @@ defmodule RubberDuck.Planning.Critics.Orchestrator do
   defstruct [
     :hard_critics,
     :soft_critics,
+    :hierarchical_critics,
     :custom_critics,
     :config,
     :cache_enabled,
@@ -33,6 +40,7 @@ defmodule RubberDuck.Planning.Critics.Orchestrator do
   @type t :: %__MODULE__{
           hard_critics: [module()],
           soft_critics: [module()],
+          hierarchical_critics: [module()],
           custom_critics: [module()],
           config: map(),
           cache_enabled: boolean(),
@@ -47,12 +55,22 @@ defmodule RubberDuck.Planning.Critics.Orchestrator do
     %__MODULE__{
       hard_critics: Keyword.get(opts, :hard_critics, HardCritic.all_critics()),
       soft_critics: Keyword.get(opts, :soft_critics, SoftCritic.all_critics()),
+      hierarchical_critics: Keyword.get(opts, :hierarchical_critics, default_hierarchical_critics()),
       custom_critics: Keyword.get(opts, :custom_critics, []),
       config: Keyword.get(opts, :config, %{}),
       cache_enabled: Keyword.get(opts, :cache_enabled, true),
       parallel_execution: Keyword.get(opts, :parallel_execution, true),
       timeout: Keyword.get(opts, :timeout, @default_timeout)
     }
+  end
+
+  defp default_hierarchical_critics do
+    [
+      PhaseStructureCritic,
+      HierarchicalDependencyCritic,
+      TaskDecompositionCritic,
+      HierarchicalCompletenessCritic
+    ]
   end
 
   @doc """
@@ -202,8 +220,12 @@ defmodule RubberDuck.Planning.Critics.Orchestrator do
   # Private functions
 
   defp perform_validation(orchestrator, target, opts, cache_key) do
+    # Include hierarchical critics for plans
+    hierarchical = if is_plan?(target), do: orchestrator.hierarchical_critics, else: []
+    
     all_critics =
       orchestrator.hard_critics ++
+        hierarchical ++
         orchestrator.soft_critics ++
         orchestrator.custom_critics
 
@@ -321,6 +343,9 @@ defmodule RubberDuck.Planning.Critics.Orchestrator do
   defp get_target_id(%Task{id: id}), do: {:task, id}
   defp get_target_id(%{id: id}), do: {:unknown, id}
   defp get_target_id(_), do: {:unknown, :no_id}
+  
+  defp is_plan?(%Plan{}), do: true
+  defp is_plan?(_), do: false
 
   defp generate_cache_key(target_id, opts) do
     opts_hash = :erlang.phash2(opts)

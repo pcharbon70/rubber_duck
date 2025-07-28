@@ -182,6 +182,11 @@ defmodule RubberDuck.Planning.Plan do
   end
 
   relationships do
+    has_many :phases, RubberDuck.Planning.Phase do
+      destination_attribute :plan_id
+      sort :position
+    end
+
     has_many :tasks, RubberDuck.Planning.Task do
       destination_attribute :plan_id
       sort :position
