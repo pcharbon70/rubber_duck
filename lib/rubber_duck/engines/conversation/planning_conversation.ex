@@ -18,7 +18,7 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
 
   alias RubberDuck.Planning.{Plan, Task}
   alias RubberDuck.Planning.Critics.Orchestrator
-  alias RubberDuck.Planning.{Decomposer, PlanImprover}
+  alias RubberDuck.Planning.{Decomposer, PlanImprover, PlanFixer}
   alias RubberDuck.Engine.InputValidator
   alias RubberDuck.LLM.Service, as: LLMService
 
@@ -259,24 +259,44 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   defp maybe_improve_plan(plan, validation_results) do
     # Check if automatic improvement is enabled (default: true)
     auto_improve = Application.get_env(:rubber_duck, :auto_improve_plans, true)
+    auto_fix = Application.get_env(:rubber_duck, :auto_fix_plans, true)
     
     validation_summary = validation_results["summary"] || validation_results[:summary]
     
-    if auto_improve && (validation_summary == :warning || validation_summary == "warning") do
-      Logger.info("Plan has warnings, attempting automatic improvement")
-      
-      case PlanImprover.improve(plan, validation_results) do
-        {:ok, improved_plan, new_validation} ->
-          Logger.info("Plan successfully improved")
-          {:ok, improved_plan, new_validation}
-          
-        error ->
-          Logger.warning("Plan improvement failed: #{inspect(error)}, using original plan")
-          {:ok, plan, validation_results}
-      end
-    else
-      # No improvement needed or disabled
-      {:ok, plan, validation_results}
+    cond do
+      auto_fix && (validation_summary == :failed || validation_summary == "failed") ->
+        Logger.info("Plan validation failed, attempting automatic fixes")
+        
+        case PlanFixer.fix(plan, validation_results) do
+          {:ok, fixed_plan, new_validation} ->
+            Logger.info("Plan successfully fixed")
+            # Mark that the plan was auto-fixed
+            updated_fixed_plan = %{fixed_plan | 
+              metadata: Map.put(fixed_plan.metadata || %{}, "auto_fixed", true)
+            }
+            {:ok, updated_fixed_plan, new_validation}
+            
+          error ->
+            Logger.warning("Plan fix failed: #{inspect(error)}, returning failed validation")
+            {:ok, plan, validation_results}
+        end
+        
+      auto_improve && (validation_summary == :warning || validation_summary == "warning") ->
+        Logger.info("Plan has warnings, attempting automatic improvement")
+        
+        case PlanImprover.improve(plan, validation_results) do
+          {:ok, improved_plan, new_validation} ->
+            Logger.info("Plan successfully improved")
+            {:ok, improved_plan, new_validation}
+            
+          error ->
+            Logger.warning("Plan improvement failed: #{inspect(error)}, using original plan")
+            {:ok, plan, validation_results}
+        end
+        
+      true ->
+        # No improvement needed or disabled
+        {:ok, plan, validation_results}
     end
   end
 
@@ -414,11 +434,16 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   defp format_planning_response(plan, _validated) do
     validation_summary = plan.validation_results["initial"]
     
-    # Check if plan was improved
-    improvement_note = if plan.metadata && Map.get(plan.metadata, "auto_improved") do
-      "\n💡 **Note:** This plan was automatically improved to address validation warnings."
-    else
-      ""
+    # Check if plan was improved or fixed
+    auto_note = cond do
+      plan.metadata && Map.get(plan.metadata, "auto_fixed") ->
+        "\n🔧 **Note:** This plan was automatically fixed to resolve validation failures."
+        
+      plan.metadata && Map.get(plan.metadata, "auto_improved") ->
+        "\n💡 **Note:** This plan was automatically improved to address validation warnings."
+        
+      true ->
+        ""
     end
     
     response = """
@@ -426,7 +451,7 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
 
     #{format_plan_details(plan)}
 
-    #{format_validation_summary(validation_summary)}#{improvement_note}
+    #{format_validation_summary(validation_summary)}#{auto_note}
 
     #{format_next_steps(plan, validation_summary)}
     """
