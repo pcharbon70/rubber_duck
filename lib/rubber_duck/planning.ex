@@ -27,6 +27,7 @@ defmodule RubberDuck.Planning do
 
   resources do
     resource RubberDuck.Planning.Plan
+    resource RubberDuck.Planning.Phase
     resource RubberDuck.Planning.Task
     resource RubberDuck.Planning.TaskDependency
     resource RubberDuck.Planning.Constraint

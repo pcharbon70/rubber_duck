@@ -17,9 +17,13 @@ defmodule RubberDuck.Planning.Task do
 
     custom_indexes do
       index [:plan_id]
+      index [:phase_id]
+      index [:parent_id]
       index [:status]
       index [:position]
       index [:plan_id, :position]
+      index [:phase_id, :position]
+      index [:number]
     end
   end
 
@@ -28,7 +32,7 @@ defmodule RubberDuck.Planning.Task do
 
     create :create do
       primary? true
-      accept [:plan_id, :name, :description, :complexity, :position, :success_criteria, :validation_rules, :metadata]
+      accept [:plan_id, :phase_id, :parent_id, :name, :description, :complexity, :position, :success_criteria, :validation_rules, :metadata, :number]
 
       change set_attribute(:status, :pending)
       change set_attribute(:created_at, &DateTime.utc_now/0)
@@ -37,7 +41,7 @@ defmodule RubberDuck.Planning.Task do
 
     update :update do
       primary? true
-      accept [:name, :description, :complexity, :position, :status, :success_criteria, :validation_rules, :metadata]
+      accept [:name, :description, :complexity, :position, :status, :success_criteria, :validation_rules, :metadata, :number]
 
       change set_attribute(:updated_at, &DateTime.utc_now/0)
     end
@@ -189,6 +193,12 @@ defmodule RubberDuck.Planning.Task do
       description "Position in the task list for ordering"
     end
 
+    attribute :number, :string do
+      allow_nil? true
+      public? true
+      description "Hierarchical task number (e.g., '1.2.3' for phase 1, task 2, subtask 3)"
+    end
+
     attribute :success_criteria, :map do
       allow_nil? true
       public? true
@@ -222,6 +232,21 @@ defmodule RubberDuck.Planning.Task do
     belongs_to :plan, RubberDuck.Planning.Plan do
       attribute_writable? true
       allow_nil? false
+    end
+
+    belongs_to :phase, RubberDuck.Planning.Phase do
+      attribute_writable? true
+      allow_nil? true
+    end
+
+    belongs_to :parent, __MODULE__ do
+      attribute_writable? true
+      allow_nil? true
+    end
+
+    has_many :subtasks, __MODULE__ do
+      destination_attribute :parent_id
+      sort :position
     end
 
     many_to_many :dependencies, __MODULE__ do
@@ -308,6 +333,29 @@ defmodule RubberDuck.Planning.Task do
 
         Enum.map(records, fn record ->
           Map.get(complexity_scores, record.complexity, 5)
+        end)
+      end
+    end
+
+    calculate :subtask_count, :integer do
+      calculation fn records, _opts ->
+        Enum.map(records, fn record ->
+          case record.subtasks do
+            %Ash.NotLoaded{} -> 0
+            subtasks -> length(subtasks)
+          end
+        end)
+      end
+    end
+
+    calculate :is_leaf_task, :boolean do
+      calculation fn records, _opts ->
+        Enum.map(records, fn record ->
+          case record.subtasks do
+            %Ash.NotLoaded{} -> true
+            [] -> true
+            _ -> false
+          end
         end)
       end
     end

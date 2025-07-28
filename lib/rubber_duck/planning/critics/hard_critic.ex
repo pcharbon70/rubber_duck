@@ -88,7 +88,13 @@ defmodule RubberDuck.Planning.Critics.HardCritic do
   end
 
   defmodule DependencyValidator do
-    @moduledoc "Validates task dependencies and detects cycles"
+    @moduledoc """
+    Validates task dependencies and detects cycles.
+    
+    Note: This validator handles basic flat dependency validation.
+    For hierarchical plans with phases and subtasks, the HierarchicalDependencyCritic
+    provides more comprehensive validation.
+    """
     @behaviour CriticBehaviour
 
     @impl true
@@ -98,7 +104,7 @@ defmodule RubberDuck.Planning.Critics.HardCritic do
     def type, do: :hard
 
     @impl true
-    def priority, do: 20
+    def priority, do: 25  # Lower priority than HierarchicalDependencyCritic
 
     @impl true
     def validate(%Task{} = task, opts) do
@@ -211,10 +217,54 @@ defmodule RubberDuck.Planning.Critics.HardCritic do
       {visited, rec_stack, cycles}
     end
 
-    defp get_plan_tasks(%Plan{} = _plan) do
-      # This would need to load tasks from the plan
-      # For now, return empty list
-      []
+    defp get_plan_tasks(%Plan{} = plan) do
+      # Load all tasks including those in phases and subtasks
+      plan = case plan do
+        %{phases: %Ash.NotLoaded{}} ->
+          case Ash.load(plan, [phases: [tasks: :subtasks], tasks: :subtasks]) do
+            {:ok, loaded} -> loaded
+            _ -> plan
+          end
+        _ -> plan
+      end
+      
+      # Collect all tasks from phases
+      phase_tasks = case plan.phases do
+        phases when is_list(phases) ->
+          phases
+          |> Enum.flat_map(fn phase ->
+            case phase.tasks do
+              tasks when is_list(tasks) -> 
+                tasks ++ collect_subtasks(tasks)
+              _ -> []
+            end
+          end)
+        _ -> []
+      end
+      
+      # Collect orphan tasks (not in any phase)
+      orphan_tasks = case plan.tasks do
+        tasks when is_list(tasks) ->
+          tasks
+          |> Enum.filter(& is_nil(&1.phase_id))
+          |> Enum.flat_map(fn task ->
+            [task | collect_subtasks([task])]
+          end)
+        _ -> []
+      end
+      
+      phase_tasks ++ orphan_tasks
+    end
+    
+    defp collect_subtasks(tasks) do
+      tasks
+      |> Enum.flat_map(fn task ->
+        case task.subtasks do
+          subtasks when is_list(subtasks) ->
+            subtasks ++ collect_subtasks(subtasks)
+          _ -> []
+        end
+      end)
     end
   end
 
