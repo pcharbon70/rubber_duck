@@ -18,7 +18,7 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
 
   alias RubberDuck.Planning.{Plan, Task}
   alias RubberDuck.Planning.Critics.Orchestrator
-  alias RubberDuck.Planning.Decomposer
+  alias RubberDuck.Planning.{Decomposer, PlanImprover}
   alias RubberDuck.Engine.InputValidator
   alias RubberDuck.LLM.Service, as: LLMService
 
@@ -230,12 +230,13 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   defp create_and_validate_plan(plan_data, validated) do
     # Create the plan
     with {:ok, plan} <- create_plan(plan_data),
-         {:ok, validation_results} <- validate_plan(plan) do
+         {:ok, validation_results} <- validate_plan(plan),
+         {:ok, improved_plan, final_validation} <- maybe_improve_plan(plan, validation_results) do
       
-      # Update plan with validation results
-      {:ok, updated_plan} = plan
+      # Update plan with final validation results
+      {:ok, updated_plan} = improved_plan
         |> Ash.Changeset.for_update(:add_validation_result, %{
-          validation_results: %{"initial" => validation_results}
+          validation_results: %{"initial" => final_validation}
         })
         |> Ash.update()
       
@@ -252,6 +253,30 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
             {:ok, updated_plan}
           end
       end
+    end
+  end
+  
+  defp maybe_improve_plan(plan, validation_results) do
+    # Check if automatic improvement is enabled (default: true)
+    auto_improve = Application.get_env(:rubber_duck, :auto_improve_plans, true)
+    
+    validation_summary = validation_results["summary"] || validation_results[:summary]
+    
+    if auto_improve && (validation_summary == :warning || validation_summary == "warning") do
+      Logger.info("Plan has warnings, attempting automatic improvement")
+      
+      case PlanImprover.improve(plan, validation_results) do
+        {:ok, improved_plan, new_validation} ->
+          Logger.info("Plan successfully improved")
+          {:ok, improved_plan, new_validation}
+          
+        error ->
+          Logger.warning("Plan improvement failed: #{inspect(error)}, using original plan")
+          {:ok, plan, validation_results}
+      end
+    else
+      # No improvement needed or disabled
+      {:ok, plan, validation_results}
     end
   end
 
@@ -389,12 +414,19 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   defp format_planning_response(plan, _validated) do
     validation_summary = plan.validation_results["initial"]
     
+    # Check if plan was improved
+    improvement_note = if plan.metadata && Map.get(plan.metadata, "auto_improved") do
+      "\n💡 **Note:** This plan was automatically improved to address validation warnings."
+    else
+      ""
+    end
+    
     response = """
     I've created a #{plan.type} plan: "#{plan.name}"
 
     #{format_plan_details(plan)}
 
-    #{format_validation_summary(validation_summary)}
+    #{format_validation_summary(validation_summary)}#{improvement_note}
 
     #{format_next_steps(plan, validation_summary)}
     """
