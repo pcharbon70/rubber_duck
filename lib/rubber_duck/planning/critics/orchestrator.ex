@@ -170,10 +170,32 @@ defmodule RubberDuck.Planning.Critics.Orchestrator do
         })
       end)
 
-    # Batch create validations
-    case Ash.bulk_create(Validation, validations, return_records?: true) do
-      %{records: records} -> {:ok, records}
-      error -> {:error, error}
+    # Create validations one by one
+    # This avoids the bulk_create domain inference issue
+    # Since we need all validations to be created together, we'll collect results
+    # and return error if any fail
+    results = validations
+    |> Enum.map(fn attrs ->
+      Ash.create(Validation, attrs, domain: RubberDuck.Planning)
+    end)
+    
+    # Check if all succeeded
+    errors = results
+    |> Enum.filter(fn 
+      {:error, _} -> true
+      _ -> false
+    end)
+    
+    if Enum.empty?(errors) do
+      # All succeeded, extract the records
+      records = Enum.map(results, fn {:ok, record} -> record end)
+      {:ok, records}
+    else
+      # Log errors and return the first one
+      Enum.each(errors, fn {:error, error} ->
+        Logger.error("Failed to create validation: #{inspect(error)}")
+      end)
+      List.first(errors)
     end
   end
 

@@ -18,7 +18,7 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
 
   alias RubberDuck.Planning.{Plan, Task}
   alias RubberDuck.Planning.Critics.Orchestrator
-  alias RubberDuck.Planning.Decomposer
+  alias RubberDuck.Planning.{Decomposer, PlanImprover, PlanFixer}
   alias RubberDuck.Engine.InputValidator
   alias RubberDuck.LLM.Service, as: LLMService
 
@@ -94,14 +94,24 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
         content: """
         You are a planning assistant. Extract structured plan information from the user's query.
         
-        Respond with a JSON object containing:
-        - name: A concise name for the plan
-        - description: A detailed description of what needs to be done
-        - type: One of [feature, refactor, bugfix, analysis, migration]
-        - tasks: Initial list of high-level tasks (optional)
-        - context: Relevant context from the query
+        You MUST respond with ONLY a valid JSON object (no other text) containing:
+        - name: A concise name for the plan (string)
+        - description: A detailed description of what needs to be done (string)
+        - type: One of exactly these values: "feature", "refactor", "bugfix", "analysis", or "migration" (string)
+        - tasks: Initial list of high-level tasks (array of strings, optional)
+        - context: Relevant context from the query (object, optional)
+        
+        Example response format:
+        {
+          "name": "Implement User Authentication",
+          "description": "Add JWT-based authentication to the Phoenix application",
+          "type": "feature",
+          "tasks": ["Set up JWT library", "Create auth context", "Add login endpoint"],
+          "context": {"technology": "JWT", "framework": "Phoenix"}
+        }
         
         Focus on understanding the user's intent and creating an actionable plan.
+        IMPORTANT: Reply with ONLY the JSON object, no explanations or other text.
         """
       },
       %{
@@ -111,6 +121,9 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
     ]
 
     llm_opts = InputValidator.build_llm_opts(validated, messages, state)
+    # Add response_format if the provider supports it
+    # InputValidator.build_llm_opts returns a keyword list
+    llm_opts = Keyword.put(llm_opts, :response_format, %{type: "json_object"})
     
     case LLMService.completion(llm_opts) do
       {:ok, response} ->
@@ -126,14 +139,21 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
     try do
       content = extract_content(response)
       
+      # Log the content for debugging
+      Logger.debug("LLM response content: #{inspect(String.slice(content, 0, 200))}...")
+      
       # Try to parse JSON from the response
       case Jason.decode(content) do
-        {:ok, data} ->
+        {:ok, data} when is_map(data) ->
+          # Make plan name unique by adding timestamp if needed
+          base_name = data["name"] || generate_plan_name(validated.query)
+          unique_name = ensure_unique_plan_name(base_name)
+          
           plan_data = %{
-            name: data["name"] || generate_plan_name(validated.query),
+            name: unique_name,
             description: data["description"] || validated.query,
-            type: String.to_existing_atom(data["type"] || "feature"),
-            context: Map.merge(validated.context, data["context"] || %{}),
+            type: parse_plan_type(data["type"]) || detect_plan_type(validated.query),
+            context: Map.merge(validated.context || %{}, data["context"] || %{}),
             metadata: %{
               created_via: "planning_conversation",
               user_id: validated.user_id,
@@ -143,35 +163,80 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
           
           {:ok, plan_data}
         
-        {:error, _} ->
-          # Fallback to basic extraction
+        {:ok, _non_map_data} ->
+          # JSON decode succeeded but didn't return a map (e.g., returned a string)
+          Logger.warning("LLM returned non-JSON response, falling back to basic extraction")
           {:ok, %{
-            name: generate_plan_name(validated.query),
+            name: ensure_unique_plan_name(generate_plan_name(validated.query)),
             description: validated.query,
             type: detect_plan_type(validated.query),
-            context: validated.context,
+            context: validated.context || %{},
+            metadata: %{
+              created_via: "planning_conversation",
+              user_id: validated.user_id,
+              fallback_reason: "LLM returned plain text instead of JSON"
+            }
+          }}
+        
+        {:error, %Jason.DecodeError{}} ->
+          Logger.warning("Failed to parse JSON, falling back to basic extraction")
+          # Fallback to basic extraction
+          {:ok, %{
+            name: ensure_unique_plan_name(generate_plan_name(validated.query)),
+            description: validated.query,
+            type: detect_plan_type(validated.query),
+            context: validated.context || %{},
             metadata: %{
               created_via: "planning_conversation",
               user_id: validated.user_id
             }
           }}
+        
+        other ->
+          Logger.error("Unexpected JSON decode result: #{inspect(other)}")
+          {:error, :invalid_json_response}
       end
     rescue
       e ->
         Logger.error("Error parsing plan data: #{inspect(e)}")
-        {:error, :plan_extraction_failed}
+        # Still try to create a basic plan instead of failing completely
+        {:ok, %{
+          name: ensure_unique_plan_name(generate_plan_name(validated.query)),
+          description: validated.query,
+          type: detect_plan_type(validated.query),
+          context: validated.context || %{},
+          metadata: %{
+            created_via: "planning_conversation", 
+            user_id: validated.user_id,
+            error: "Failed to parse LLM response"
+          }
+        }}
+    end
+  end
+  
+  defp parse_plan_type(nil), do: nil
+  defp parse_plan_type(type) when is_atom(type), do: type
+  defp parse_plan_type(type) when is_binary(type) do
+    case String.downcase(type) do
+      "feature" -> :feature
+      "refactor" -> :refactor
+      "bugfix" -> :bugfix
+      "analysis" -> :analysis 
+      "migration" -> :migration
+      _ -> nil
     end
   end
 
   defp create_and_validate_plan(plan_data, validated) do
     # Create the plan
     with {:ok, plan} <- create_plan(plan_data),
-         {:ok, validation_results} <- validate_plan(plan) do
+         {:ok, validation_results} <- validate_plan(plan),
+         {:ok, improved_plan, final_validation} <- maybe_improve_plan(plan, validation_results) do
       
-      # Update plan with validation results
-      {:ok, updated_plan} = plan
+      # Update plan with final validation results
+      {:ok, updated_plan} = improved_plan
         |> Ash.Changeset.for_update(:add_validation_result, %{
-          validation_results: %{"initial" => validation_results}
+          validation_results: %{"initial" => final_validation}
         })
         |> Ash.update()
       
@@ -188,6 +253,50 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
             {:ok, updated_plan}
           end
       end
+    end
+  end
+  
+  defp maybe_improve_plan(plan, validation_results) do
+    # Check if automatic improvement is enabled (default: true)
+    auto_improve = Application.get_env(:rubber_duck, :auto_improve_plans, true)
+    auto_fix = Application.get_env(:rubber_duck, :auto_fix_plans, true)
+    
+    validation_summary = validation_results["summary"] || validation_results[:summary]
+    
+    cond do
+      auto_fix && (validation_summary == :failed || validation_summary == "failed") ->
+        Logger.info("Plan validation failed, attempting automatic fixes")
+        
+        case PlanFixer.fix(plan, validation_results) do
+          {:ok, fixed_plan, new_validation} ->
+            Logger.info("Plan successfully fixed")
+            # Mark that the plan was auto-fixed
+            updated_fixed_plan = %{fixed_plan | 
+              metadata: Map.put(fixed_plan.metadata || %{}, "auto_fixed", true)
+            }
+            {:ok, updated_fixed_plan, new_validation}
+            
+          error ->
+            Logger.warning("Plan fix failed: #{inspect(error)}, returning failed validation")
+            {:ok, plan, validation_results}
+        end
+        
+      auto_improve && (validation_summary == :warning || validation_summary == "warning") ->
+        Logger.info("Plan has warnings, attempting automatic improvement")
+        
+        case PlanImprover.improve(plan, validation_results) do
+          {:ok, improved_plan, new_validation} ->
+            Logger.info("Plan successfully improved")
+            {:ok, improved_plan, new_validation}
+            
+          error ->
+            Logger.warning("Plan improvement failed: #{inspect(error)}, using original plan")
+            {:ok, plan, validation_results}
+        end
+        
+      true ->
+        # No improvement needed or disabled
+        {:ok, plan, validation_results}
     end
   end
 
@@ -221,19 +330,29 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
           name: extract_task_name(desc),
           description: desc,
           position: index,
-          complexity: :medium,
-          status: :pending
+          complexity: :medium
+          # status is set automatically to :pending by the create action
         }
       end)
     
     # Create tasks in batch
-    case Ash.bulk_create(Task, tasks, return_records?: true) do
-      %{records: created_tasks} when is_list(created_tasks) ->
-        {:ok, %{plan | tasks: created_tasks}}
-      
-      error ->
-        Logger.error("Failed to create tasks: #{inspect(error)}")
-        {:ok, plan}  # Continue without tasks
+    # Try creating tasks individually to avoid bulk_create domain issues
+    created_tasks = tasks
+    |> Enum.map(fn task_attrs ->
+      case Ash.create(Task, task_attrs, domain: RubberDuck.Planning) do
+        {:ok, task} -> task
+        {:error, error} -> 
+          Logger.error("Failed to create task: #{inspect(error)}")
+          nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+    
+    if length(created_tasks) > 0 do
+      {:ok, %{plan | tasks: created_tasks}}
+    else
+      Logger.error("Failed to create any tasks")
+      {:ok, plan}  # Continue without tasks
     end
   end
 
@@ -258,25 +377,30 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
               description: task[:description],
               position: task[:position],
               complexity: ensure_atom(task[:complexity]),
-              status: :pending,
+              # status is set automatically to :pending by the create action
               success_criteria: task[:success_criteria],
               validation_rules: task[:validation_rules],
               metadata: task[:metadata] || %{}
             }
           end)
         
-        # Create tasks in batch
-        case Ash.bulk_create(Task, task_attrs, return_records?: true, return_errors?: true) do
-          %{records: created_tasks} when is_list(created_tasks) ->
-            {:ok, %{plan | tasks: created_tasks}}
-          
-          %{errors: errors} ->
-            Logger.error("Failed to create tasks: #{inspect(errors)}")
-            {:ok, plan}  # Continue without tasks
-          
-          error ->
-            Logger.error("Failed to create tasks: #{inspect(error)}")
-            {:ok, plan}  # Continue without tasks
+        # Create tasks individually to avoid bulk_create domain issues
+        created_tasks = task_attrs
+        |> Enum.map(fn attrs ->
+          case Ash.create(Task, attrs, domain: RubberDuck.Planning) do
+            {:ok, task} -> task
+            {:error, error} -> 
+              Logger.error("Failed to create task: #{inspect(error)}")
+              nil
+          end
+        end)
+        |> Enum.reject(&is_nil/1)
+        
+        if length(created_tasks) > 0 do
+          {:ok, %{plan | tasks: created_tasks}}
+        else
+          Logger.error("Failed to create any tasks from decomposition")
+          {:ok, plan}  # Continue without tasks
         end
       
       {:error, reason} ->
@@ -310,12 +434,24 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   defp format_planning_response(plan, _validated) do
     validation_summary = plan.validation_results["initial"]
     
+    # Check if plan was improved or fixed
+    auto_note = cond do
+      plan.metadata && Map.get(plan.metadata, "auto_fixed") ->
+        "\n🔧 **Note:** This plan was automatically fixed to resolve validation failures."
+        
+      plan.metadata && Map.get(plan.metadata, "auto_improved") ->
+        "\n💡 **Note:** This plan was automatically improved to address validation warnings."
+        
+      true ->
+        ""
+    end
+    
     response = """
     I've created a #{plan.type} plan: "#{plan.name}"
 
     #{format_plan_details(plan)}
 
-    #{format_validation_summary(validation_summary)}
+    #{format_validation_summary(validation_summary)}#{auto_note}
 
     #{format_next_steps(plan, validation_summary)}
     """
@@ -324,7 +460,12 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   end
 
   defp format_plan_details(plan) do
-    task_count = length(plan.tasks || [])
+    # Handle case where tasks might not be loaded
+    task_count = case plan.tasks do
+      tasks when is_list(tasks) -> length(tasks)
+      %Ash.NotLoaded{} -> 0
+      nil -> 0
+    end
     
     details = ["**Plan Details:**"]
     details = details ++ ["- Type: #{plan.type}"]
@@ -338,22 +479,48 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
     |> Enum.join("\n")
   end
 
-  defp format_validation_summary(%{summary: summary} = validation) do
+  defp format_validation_summary(validation) when is_map(validation) do
+    # Handle both atom and string keys
+    summary = validation[:summary] || validation["summary"]
+    
     case summary do
       :passed ->
         "✅ **Validation Status:** All checks passed! The plan is ready for execution."
       
       :warning ->
-        _warnings = validation[:soft_critics] || []
+        suggestions = validation[:suggestions] || validation["suggestions"] || []
         """
         ⚠️  **Validation Status:** Passed with warnings
         
         Suggestions for improvement:
-        #{format_suggestions(validation[:suggestions] || [])}
+        #{format_suggestions(suggestions)}
         """
       
       :failed ->
-        issues = validation[:blocking_issues] || []
+        issues = validation[:blocking_issues] || validation["blocking_issues"] || []
+        """
+        ❌ **Validation Status:** Failed - blocking issues found
+        
+        **Blocking Issues:**
+        #{format_blocking_issues(issues)}
+        
+        These issues must be resolved before the plan can be executed.
+        """
+      
+      "passed" ->
+        "✅ **Validation Status:** All checks passed! The plan is ready for execution."
+      
+      "warning" ->
+        suggestions = validation[:suggestions] || validation["suggestions"] || []
+        """
+        ⚠️  **Validation Status:** Passed with warnings
+        
+        Suggestions for improvement:
+        #{format_suggestions(suggestions)}
+        """
+      
+      "failed" ->
+        issues = validation[:blocking_issues] || validation["blocking_issues"] || []
         """
         ❌ **Validation Status:** Failed - blocking issues found
         
@@ -366,6 +533,10 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
       _ ->
         "**Validation Status:** Unknown"
     end
+  end
+  
+  defp format_validation_summary(_) do
+    "**Validation Status:** No validation data available"
   end
 
   defp format_next_steps(plan, _validation) do
@@ -403,15 +574,86 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   defp format_blocking_issues(_), do: "No specific issues listed"
 
   defp serialize_plan(plan) do
+    # Handle case where tasks might not be loaded
+    tasks = case plan.tasks do
+      tasks when is_list(tasks) -> 
+        # Serialize each task
+        Enum.map(tasks, fn task ->
+          %{
+            id: task.id,
+            name: task.name,
+            description: task.description,
+            position: task.position,
+            status: task.status,
+            complexity: task.complexity,
+            success_criteria: task.success_criteria,
+            validation_rules: task.validation_rules,
+            metadata: task.metadata,
+            dependencies: serialize_dependencies(task)
+          }
+        end)
+      %Ash.NotLoaded{} -> []
+      nil -> []
+    end
+    
+    # Extract validation details
+    validation_results = if plan.validation_results && plan.validation_results["initial"] do
+      initial_validation = plan.validation_results["initial"]
+      %{
+        summary: initial_validation[:summary] || initial_validation["summary"],
+        hard_critics: initial_validation[:hard_critics] || initial_validation["hard_critics"] || [],
+        soft_critics: initial_validation[:soft_critics] || initial_validation["soft_critics"] || [],
+        blocking_issues: initial_validation[:blocking_issues] || initial_validation["blocking_issues"] || [],
+        suggestions: initial_validation[:suggestions] || initial_validation["suggestions"] || [],
+        all_validations: initial_validation[:all_validations] || initial_validation["all_validations"] || []
+      }
+    else
+      nil
+    end
+    
     %{
       id: plan.id,
       name: plan.name,
       description: plan.description,
       type: plan.type,
       status: plan.status,
-      task_count: length(plan.tasks || []),
-      validation_status: plan.validation_results["initial"][:summary]
+      context: plan.context,
+      metadata: plan.metadata,
+      tasks: tasks,
+      task_count: length(tasks),
+      validation_results: validation_results,
+      validation_status: validation_results && validation_results.summary,
+      constraints: serialize_constraints(plan),
+      created_at: plan.created_at,
+      updated_at: plan.updated_at
     }
+  end
+  
+  defp serialize_dependencies(task) do
+    case task.dependencies do
+      deps when is_list(deps) -> deps
+      %Ash.NotLoaded{} -> []
+      nil -> []
+    end
+  end
+  
+  defp serialize_constraints(plan) do
+    case plan.constraints do
+      constraints when is_list(constraints) -> 
+        Enum.map(constraints, fn c ->
+          %{
+            id: c.id,
+            name: c.name,
+            type: c.type,
+            condition: c.condition,
+            severity: c.severity,
+            applies_to: c.applies_to,
+            metadata: c.metadata
+          }
+        end)
+      %Ash.NotLoaded{} -> []
+      nil -> []
+    end
   end
 
   defp plan_ready?(%{validation_results: %{"initial" => %{summary: :failed}}}), do: false
@@ -434,6 +676,12 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
       |> Enum.join(" ")
     
     "Plan: #{words}"
+  end
+  
+  defp ensure_unique_plan_name(base_name) do
+    # Add a timestamp suffix to make names unique
+    timestamp = DateTime.utc_now() |> DateTime.to_unix(:millisecond)
+    "#{base_name} - #{timestamp}"
   end
 
   defp detect_plan_type(query) do

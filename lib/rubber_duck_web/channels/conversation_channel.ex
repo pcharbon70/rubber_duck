@@ -640,7 +640,7 @@ defmodule RubberDuckWeb.ConversationChannel do
   end
 
   defp extract_metadata(result) do
-    %{
+    base_metadata = %{
       processing_time: result[:processing_time],
       model_used: result[:metadata][:model],
       steps: result[:reasoning_steps] || result[:solution_steps],
@@ -650,6 +650,35 @@ defmodule RubberDuckWeb.ConversationChannel do
       implementation_plan: result[:implementation_plan],
       root_cause: result[:root_cause]
     }
+    
+    # Add planning-specific metadata
+    metadata = if result.conversation_type == :planning do
+      Map.merge(base_metadata, %{
+        plan: result[:plan],
+        validation_summary: result[:validation_summary],
+        ready_for_execution: result[:ready_for_execution],
+        plan_type: result[:metadata][:plan_type],
+        plan_id: result[:metadata][:plan_id]
+      })
+    else
+      base_metadata
+    end
+    
+    # Add router metadata if present
+    metadata = if result[:router_metadata] do
+      Map.put(metadata, :router_metadata, result[:router_metadata])
+    else
+      metadata
+    end
+    
+    # Add classification if routed
+    metadata = if result[:classification] do
+      Map.put(metadata, :classification, result[:classification])
+    else
+      metadata
+    end
+    
+    metadata
     |> Enum.reject(fn {_, v} -> is_nil(v) end)
     |> Map.new()
   end
