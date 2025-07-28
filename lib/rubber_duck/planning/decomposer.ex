@@ -133,79 +133,12 @@ defmodule RubberDuck.Planning.Decomposer do
   end
 
   defp format_tasks_for_planning(tasks) when is_list(tasks) do
+    # Return the list of tasks directly for the HierarchicalPlanBuilder
+    # The builder will handle the creation of proper Task resources
     tasks
-    |> Enum.with_index()
-    |> Enum.map(fn {task, index} ->
-      # Base task structure
-      base_task = %{
-        name: task["name"] || "Task #{index + 1}",
-        description: task["description"] || "",
-        position: task["position"] || index,
-        complexity: normalize_complexity(task["complexity"]),
-        success_criteria: format_success_criteria(task["success_criteria"]),
-        validation_rules: task["validation_rules"] || %{},
-        metadata: %{
-          estimated_duration: task["estimated_duration"],
-          risks: task["risks"] || [],
-          prerequisites: task["prerequisites"] || [],
-          optional: task["optional"] || false
-        }
-      }
-      
-      # Add hierarchical metadata if present
-      metadata_updates = []
-      
-      metadata_updates = if task["phase_id"], do: [{:phase_id, task["phase_id"]} | metadata_updates], else: metadata_updates
-      metadata_updates = if task["phase_name"], do: [{:phase, task["phase_name"]} | metadata_updates], else: metadata_updates
-      metadata_updates = if task["phase"], do: [{:phase, task["phase"]} | metadata_updates], else: metadata_updates  # Also check for "phase" directly
-      metadata_updates = if task["parent_task_id"], do: [{:parent_task_id, task["parent_task_id"]} | metadata_updates], else: metadata_updates
-      metadata_updates = if task["hierarchy_level"], do: [{:hierarchy_level, task["hierarchy_level"]} | metadata_updates], else: metadata_updates
-      metadata_updates = if task["is_critical"], do: [{:is_critical_path, task["is_critical"]} | metadata_updates], else: metadata_updates
-      
-      metadata_updates = if task["metadata"] && is_map(task["metadata"]) do
-        metadata_updates ++ Map.to_list(task["metadata"])
-      else
-        metadata_updates
-      end
-      
-      # Merge additional metadata
-      updated_metadata = Enum.reduce(metadata_updates, base_task.metadata, fn {k, v}, acc ->
-        Map.put(acc, k, v)
-      end)
-      
-      Map.put(base_task, :metadata, updated_metadata)
-    end)
   end
 
   defp format_tasks_for_planning(_), do: []
-
-  defp normalize_complexity(nil), do: :medium
-  defp normalize_complexity(complexity) when is_atom(complexity), do: complexity
-  
-  defp normalize_complexity(complexity) when is_binary(complexity) do
-    case String.downcase(complexity) do
-      "trivial" -> :trivial
-      "simple" -> :simple
-      "medium" -> :medium
-      "complex" -> :complex
-      "very_complex" -> :very_complex
-      _ -> :medium
-    end
-  end
-  
-  defp normalize_complexity(_), do: :medium
-
-  defp format_success_criteria(%{"criteria" => criteria}) when is_list(criteria) do
-    %{"criteria" => criteria}
-  end
-  
-  defp format_success_criteria(criteria) when is_list(criteria) do
-    %{"criteria" => criteria}
-  end
-  
-  defp format_success_criteria(_) do
-    %{"criteria" => ["Task completed successfully"]}
-  end
 
   defp format_error(:execution_failed), do: "Failed to execute task decomposition"
   defp format_error({:engine_error, _, reason}), do: "Engine error: #{inspect(reason)}"
