@@ -53,6 +53,9 @@ func NewResponseHandlerRegistry() *ResponseHandlerRegistry {
 	registry.handlers["multi_step"] = &MultiStepResponseHandler{}
 	registry.handlers["multi_step_conversation"] = &MultiStepResponseHandler{}
 	
+	registry.handlers["planning"] = &PlanningResponseHandler{}
+	registry.handlers["planning_conversation"] = &PlanningResponseHandler{}
+	
 	return registry
 }
 
