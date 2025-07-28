@@ -601,21 +601,6 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
       nil -> []
     end
     
-    # Extract validation details
-    validation_results = if plan.validation_results && plan.validation_results["initial"] do
-      initial_validation = plan.validation_results["initial"]
-      %{
-        summary: initial_validation[:summary] || initial_validation["summary"],
-        hard_critics: initial_validation[:hard_critics] || initial_validation["hard_critics"] || [],
-        soft_critics: initial_validation[:soft_critics] || initial_validation["soft_critics"] || [],
-        blocking_issues: initial_validation[:blocking_issues] || initial_validation["blocking_issues"] || [],
-        suggestions: initial_validation[:suggestions] || initial_validation["suggestions"] || [],
-        all_validations: initial_validation[:all_validations] || initial_validation["all_validations"] || []
-      }
-    else
-      nil
-    end
-    
     # Calculate total task count across all phases and orphan tasks
     total_task_count = if phases do
       phase_task_count = phases |> Enum.reduce(0, fn phase, acc -> 
@@ -637,9 +622,6 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
       phases: phases,
       orphan_tasks: orphan_tasks,  # Tasks not belonging to any phase
       task_count: total_task_count,
-      validation_results: validation_results,
-      validation_status: validation_results && validation_results.summary,
-      constraints: serialize_constraints(plan),
       created_at: plan.created_at,
       updated_at: plan.updated_at
     }
@@ -686,7 +668,6 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
       status: task.status,
       complexity: task.complexity,
       success_criteria: task.success_criteria,
-      validation_rules: task.validation_rules,
       metadata: task.metadata,
       dependencies: serialize_dependencies(task)
     }
@@ -700,24 +681,6 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
     end
   end
   
-  defp serialize_constraints(plan) do
-    case plan.constraints do
-      constraints when is_list(constraints) -> 
-        Enum.map(constraints, fn c ->
-          %{
-            id: c.id,
-            name: c.name,
-            type: c.type,
-            condition: c.condition,
-            severity: c.severity,
-            applies_to: c.applies_to,
-            metadata: c.metadata
-          }
-        end)
-      %Ash.NotLoaded{} -> []
-      nil -> []
-    end
-  end
 
   defp plan_ready?(%{validation_results: %{"initial" => %{summary: :failed}}}), do: false
   defp plan_ready?(%{status: :ready}), do: true
