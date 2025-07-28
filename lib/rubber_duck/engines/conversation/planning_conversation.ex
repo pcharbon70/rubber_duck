@@ -422,22 +422,48 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
     |> Enum.join("\n")
   end
 
-  defp format_validation_summary(%{summary: summary} = validation) do
+  defp format_validation_summary(validation) when is_map(validation) do
+    # Handle both atom and string keys
+    summary = validation[:summary] || validation["summary"]
+    
     case summary do
       :passed ->
         "✅ **Validation Status:** All checks passed! The plan is ready for execution."
       
       :warning ->
-        _warnings = validation[:soft_critics] || []
+        suggestions = validation[:suggestions] || validation["suggestions"] || []
         """
         ⚠️  **Validation Status:** Passed with warnings
         
         Suggestions for improvement:
-        #{format_suggestions(validation[:suggestions] || [])}
+        #{format_suggestions(suggestions)}
         """
       
       :failed ->
-        issues = validation[:blocking_issues] || []
+        issues = validation[:blocking_issues] || validation["blocking_issues"] || []
+        """
+        ❌ **Validation Status:** Failed - blocking issues found
+        
+        **Blocking Issues:**
+        #{format_blocking_issues(issues)}
+        
+        These issues must be resolved before the plan can be executed.
+        """
+      
+      "passed" ->
+        "✅ **Validation Status:** All checks passed! The plan is ready for execution."
+      
+      "warning" ->
+        suggestions = validation[:suggestions] || validation["suggestions"] || []
+        """
+        ⚠️  **Validation Status:** Passed with warnings
+        
+        Suggestions for improvement:
+        #{format_suggestions(suggestions)}
+        """
+      
+      "failed" ->
+        issues = validation[:blocking_issues] || validation["blocking_issues"] || []
         """
         ❌ **Validation Status:** Failed - blocking issues found
         
@@ -450,6 +476,10 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
       _ ->
         "**Validation Status:** Unknown"
     end
+  end
+  
+  defp format_validation_summary(_) do
+    "**Validation Status:** No validation data available"
   end
 
   defp format_next_steps(plan, _validation) do
