@@ -307,6 +307,15 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   end
 
   defp validate_plan(plan) do
+    # Ensure full hierarchical structure is loaded for validation
+    plan = case Ash.load(plan, [
+      phases: [tasks: [:subtasks, :dependencies]],
+      tasks: [:subtasks, :dependencies]
+    ], domain: RubberDuck.Planning) do
+      {:ok, loaded} -> loaded
+      _ -> plan
+    end
+    
     orchestrator = Orchestrator.new()
     
     case Orchestrator.validate(orchestrator, plan) do
@@ -432,16 +441,36 @@ defmodule RubberDuck.Engines.Conversation.PlanningConversation do
   end
 
   defp format_plan_details(plan) do
-    # Handle case where tasks might not be loaded
+    # Load hierarchical structure if needed
+    plan = case plan do
+      %{phases: %Ash.NotLoaded{}} ->
+        case Ash.load(plan, [:phases, :tasks], domain: RubberDuck.Planning) do
+          {:ok, loaded} -> loaded
+          _ -> plan
+        end
+      _ -> plan
+    end
+    
+    # Count phases and tasks
+    phase_count = case plan.phases do
+      phases when is_list(phases) -> length(phases)
+      _ -> 0
+    end
+    
     task_count = case plan.tasks do
       tasks when is_list(tasks) -> length(tasks)
-      %Ash.NotLoaded{} -> 0
-      nil -> 0
+      _ -> 0
     end
     
     details = ["**Plan Details:**"]
     details = details ++ ["- Type: #{plan.type}"]
     details = details ++ ["- Status: #{plan.status}"]
+    
+    details = if phase_count > 0 do
+      details ++ ["- Structure: #{phase_count} phases"]
+    else
+      details
+    end
     
     if task_count > 0 do
       details ++ ["- Tasks: #{task_count} tasks identified"]
