@@ -33,6 +33,7 @@ defmodule RubberDuck.Agents.PlanDecomposerAgent do
       active_decompositions: [type: :map, default: %{}],
       cache: [type: :map, default: %{}],
       cache_enabled: [type: :boolean, default: true],
+      persist_to_db: [type: :boolean, default: true],
       strategies: [type: {:list, :atom}, default: [:linear, :hierarchical, :tree_of_thought]],
       default_strategy: [type: :atom, default: :hierarchical],
       max_depth: [type: :integer, default: 5],
@@ -41,6 +42,7 @@ defmodule RubberDuck.Agents.PlanDecomposerAgent do
     ]
   
   alias RubberDuck.Planning.Critics.Orchestrator
+  alias RubberDuck.Planning.{Plan, Task, TaskDependency}
   alias RubberDuck.Agents.PlanDecomposer.{
     LinearDecomposer,
     HierarchicalDecomposer, 
@@ -48,6 +50,7 @@ defmodule RubberDuck.Agents.PlanDecomposerAgent do
   }
   
   require Logger
+  require Ash.Query
   
   # Signal handlers
   
@@ -146,7 +149,7 @@ defmodule RubberDuck.Agents.PlanDecomposerAgent do
   defp spawn_decomposition_task(agent, decomposition) do
     # Since we're in an agent context, we need to handle this differently
     # We'll perform the decomposition synchronously for now
-    Task.start(fn ->
+    Elixir.Task.start(fn ->
       try do
         # Emit progress signal
         emit_signal(agent, %{
@@ -294,10 +297,23 @@ defmodule RubberDuck.Agents.PlanDecomposerAgent do
   end
   
   defp emit_decomposition_complete(agent, plan_id, result) do
+    # Persist tasks if configured
+    persisted_result = if agent.state[:persist_to_db] != false do
+      case persist_decomposition(plan_id, result) do
+        {:ok, persisted} -> 
+          Map.put(result, :persisted, persisted)
+        {:error, reason} ->
+          Logger.error("Failed to persist decomposition: #{inspect(reason)}")
+          Map.put(result, :persist_error, reason)
+      end
+    else
+      result
+    end
+    
     emit_signal(agent, %{
       "type" => "decomposition_complete",
       "plan_id" => plan_id,
-      "result" => result,
+      "result" => persisted_result,
       "timestamp" => DateTime.utc_now()
     })
   end
@@ -311,6 +327,197 @@ defmodule RubberDuck.Agents.PlanDecomposerAgent do
     })
   end
   
+  # Persistence functions
+  
+  defp persist_decomposition(plan_id, %{tasks: tasks, dependencies: dependencies} = result) do
+    # First, verify the plan exists and update its status
+    with {:ok, plan} <- get_and_update_plan(plan_id),
+         {:ok, created_tasks} <- create_tasks(tasks, plan_id),
+         task_id_map <- create_task_id_mapping(tasks, created_tasks),
+         {:ok, created_deps} <- create_dependencies(dependencies, task_id_map) do
+      
+      # Update plan metadata with decomposition info
+      update_plan_metadata(plan, result, created_tasks)
+      
+      {:ok, %{
+        tasks: created_tasks,
+        dependencies: created_deps,
+        task_count: length(created_tasks),
+        dependency_count: length(created_deps),
+        plan_id: plan.id
+      }}
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  rescue
+    e ->
+      Logger.error("Decomposition persistence failed: #{inspect(e)}")
+      {:error, {:persistence_exception, e}}
+  end
+  
+  defp get_and_update_plan(plan_id) do
+    case Ash.get(Plan, plan_id, domain: RubberDuck.Planning) do
+      {:ok, plan} ->
+        # Update plan status to indicate decomposition is complete
+        case Ash.update(plan, %{
+          status: :ready,
+          metadata: Map.merge(plan.metadata || %{}, %{
+            "decomposed_at" => DateTime.utc_now(),
+            "decomposition_complete" => true
+          })
+        }, domain: RubberDuck.Planning) do
+          {:ok, updated_plan} -> {:ok, updated_plan}
+          error -> error
+        end
+        
+      error -> 
+        Logger.error("Failed to find plan #{plan_id}: #{inspect(error)}")
+        error
+    end
+  end
+  
+  defp create_tasks(tasks, plan_id) do
+    prepared_tasks = prepare_tasks_for_persistence(tasks, plan_id)
+    
+    Ash.bulk_create(prepared_tasks, Task, :create,
+      return_records?: true,
+      return_errors?: true,
+      stop_on_error?: true,
+      authorize?: false,
+      domain: RubberDuck.Planning
+    )
+    |> case do
+      %{records: created_tasks, errors: []} ->
+        {:ok, created_tasks}
+        
+      %{errors: errors} ->
+        {:error, {:task_creation_failed, errors}}
+    end
+  end
+  
+  defp update_plan_metadata(plan, decomposition_result, created_tasks) do
+    metadata_update = %{
+      "decomposition_strategy" => decomposition_result.strategy,
+      "total_tasks_created" => length(created_tasks),
+      "complexity_distribution" => calculate_complexity_distribution(created_tasks),
+      "last_decomposed_at" => DateTime.utc_now()
+    }
+    
+    Ash.update(plan, %{
+      metadata: Map.merge(plan.metadata || %{}, metadata_update)
+    }, domain: RubberDuck.Planning)
+  end
+  
+  defp calculate_complexity_distribution(tasks) do
+    tasks
+    |> Enum.group_by(& &1.complexity)
+    |> Enum.map(fn {complexity, tasks} -> {complexity, length(tasks)} end)
+    |> Map.new()
+  end
+  
+  defp prepare_tasks_for_persistence(tasks, plan_id) do
+    tasks
+    |> Enum.with_index()
+    |> Enum.map(fn {task, index} ->
+      %{
+        plan_id: plan_id,
+        name: task["name"] || "Task #{index + 1}",
+        description: task["description"] || "",
+        complexity: to_complexity_atom(task["complexity"]),
+        position: task["position"] || index,
+        number: "#{index + 1}",
+        success_criteria: task["success_criteria"] || %{},
+        validation_rules: task["validation_rules"] || %{},
+        metadata: Map.merge(
+          task["metadata"] || %{},
+          %{
+            "decomposer_task_id" => task["id"] || "task_#{index}",
+            "phase_name" => task["phase_name"],
+            "is_critical" => task["is_critical"] || false
+          }
+        )
+      }
+    end)
+  end
+  
+  defp create_task_id_mapping(original_tasks, created_tasks) do
+    # Map from original task IDs to database task IDs
+    created_by_position = created_tasks
+    |> Enum.map(fn task -> {task.position, task.id} end)
+    |> Map.new()
+    
+    original_tasks
+    |> Enum.with_index()
+    |> Enum.map(fn {task, index} ->
+      original_id = task["id"] || "task_#{index}"
+      position = task["position"] || index
+      db_id = Map.get(created_by_position, position)
+      {original_id, db_id}
+    end)
+    |> Map.new()
+  end
+  
+  defp create_dependencies(dependencies, task_id_map) do
+    dependency_attrs = dependencies
+    |> Enum.map(fn %{from: from_id, to: to_id} ->
+      from_db_id = Map.get(task_id_map, from_id)
+      to_db_id = Map.get(task_id_map, to_id)
+      
+      if from_db_id && to_db_id do
+        %{
+          dependency_id: from_db_id,
+          task_id: to_db_id
+        }
+      else
+        nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+    
+    # Create dependencies
+    created = dependency_attrs
+    |> Enum.map(fn attrs ->
+      # Try using Ash.Changeset to see accepted attributes
+      changeset = TaskDependency
+      |> Ash.Changeset.for_create(:create, attrs, domain: RubberDuck.Planning)
+      
+      case Ash.create(changeset) do
+        {:ok, dep} -> dep
+        {:error, reason} -> 
+          Logger.error("Failed to create dependency: #{inspect(reason)}")
+          Logger.error("Attempted attrs: #{inspect(attrs)}")
+          nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+    
+    if length(created) == length(dependency_attrs) do
+      {:ok, created}
+    else
+      {:error, :some_dependencies_failed}
+    end
+  end
+  
+  defp to_complexity_atom(complexity) when is_atom(complexity), do: complexity
+  defp to_complexity_atom(complexity) when is_binary(complexity) do
+    case complexity do
+      "trivial" -> :trivial
+      "simple" -> :simple
+      "medium" -> :medium
+      "complex" -> :complex
+      "very_complex" -> :very_complex
+      _ -> :medium
+    end
+  end
+  defp to_complexity_atom(_), do: :medium
+  
+  # Test helpers - only available in test environment
+  if Mix.env() == :test do
+    @doc false
+    def test_persist_decomposition(plan_id, result) do
+      persist_decomposition(plan_id, result)
+    end
+  end
   
   # Health check
   
