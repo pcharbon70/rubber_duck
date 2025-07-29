@@ -21,7 +21,21 @@ defmodule RubberDuck.Workflows.Version do
   end
   
   actions do
-    defaults [:create, :read, :update, :destroy]
+    defaults [:read, :update, :destroy]
+    
+    create :create do
+      primary? true
+      accept [:module, :version, :definition, :compatibility, :is_current, :metadata]
+    end
+    
+    read :get_current do
+      argument :module, :atom do
+        allow_nil? false
+      end
+      
+      filter expr(module == ^arg(:module) and is_current == true)
+      get? true
+    end
   end
   
   attributes do

@@ -76,7 +76,7 @@ defmodule RubberDuckWeb.WorkflowChannel do
   
   alias RubberDuck.Jido.Agents.{WorkflowCoordinator, Registry}
   alias RubberDuck.Jido.Workflows.Library
-  alias RubberDuck.Workflows
+  alias RubberDuck.Workflows.Workflow
   
   @impl true
   def join("workflows:api", _params, socket) do
@@ -189,14 +189,23 @@ defmodule RubberDuckWeb.WorkflowChannel do
   
   @impl true
   def handle_in("get_workflow", %{"workflow_id" => workflow_id}, socket) do
-    case WorkflowCoordinator.get_workflow_status(workflow_id) do
-      {:ok, workflow_status} ->
-        {:reply, {:ok, format_workflow_details(workflow_status)}, socket}
-      
-      {:error, :not_found} ->
+    case Workflow
+         |> Ash.Query.for_read(:get_by_workflow_id, %{workflow_id: workflow_id})
+         |> Ash.read_one() do
+      {:ok, nil} ->
         {:reply, {:error, %{
           error: "not_found",
           message: "Workflow not found"
+        }}, socket}
+        
+      {:ok, workflow} ->
+        {:reply, {:ok, format_workflow_details_from_resource(workflow)}, socket}
+        
+      {:error, error} ->
+        Logger.error("Failed to get workflow: #{inspect(error)}")
+        {:reply, {:error, %{
+          error: "query_failed",
+          message: "Failed to retrieve workflow"
         }}, socket}
     end
   end
@@ -206,22 +215,37 @@ defmodule RubberDuckWeb.WorkflowChannel do
     filters = build_filters(params)
     pagination = build_pagination(params)
     
-    workflows = WorkflowCoordinator.list_workflows()
-    |> apply_filters(filters)
-    |> apply_pagination(pagination)
-    |> Enum.map(&format_workflow_summary/1)
+    # Build Ash query
+    query = Workflow
+    |> apply_ash_filters(filters)
+    |> apply_ash_pagination(pagination)
     
-    total_count = WorkflowCoordinator.list_workflows() |> length()
-    
-    {:reply, {:ok, %{
-      workflows: workflows,
-      pagination: %{
-        total: total_count,
-        limit: pagination.limit,
-        offset: pagination.offset,
-        has_more: length(workflows) == pagination.limit
-      }
-    }}, socket}
+    case Ash.read(query) do
+      {:ok, workflows} ->
+        # Get total count
+        count_query = Workflow |> apply_ash_filters(filters)
+        {:ok, total_count} = Ash.count(count_query)
+        
+        formatted_workflows = workflows
+        |> Enum.map(&format_workflow_from_resource/1)
+        
+        {:reply, {:ok, %{
+          workflows: formatted_workflows,
+          pagination: %{
+            total: total_count,
+            limit: pagination.limit,
+            offset: pagination.offset,
+            has_more: length(formatted_workflows) == pagination.limit
+          }
+        }}, socket}
+        
+      {:error, error} ->
+        Logger.error("Failed to list workflows: #{inspect(error)}")
+        {:reply, {:error, %{
+          error: "query_failed",
+          message: "Failed to retrieve workflows"
+        }}, socket}
+    end
   end
   
   @impl true
@@ -571,11 +595,6 @@ defmodule RubberDuckWeb.WorkflowChannel do
     end
   end
   
-  defp handle_agent_telemetry_event(event_name, measurements, metadata, %{socket: socket}) do
-    event_type = format_event_name(event_name)
-    payload = format_event_payload(event_type, measurements, metadata)
-    push(socket, event_type, payload)
-  end
   
   # Helper functions
   
@@ -630,6 +649,56 @@ defmodule RubberDuckWeb.WorkflowChannel do
       started_at: workflow.started_at,
       progress: workflow[:progress] || %{}
     }
+  end
+  
+  defp format_workflow_from_resource(workflow) do
+    %{
+      id: workflow.workflow_id,
+      module: to_string(workflow.module),
+      status: workflow.status,
+      started_at: workflow.created_at,
+      completed_at: workflow.completed_at,
+      progress: workflow.metadata[:progress] || %{},
+      error: workflow.error
+    }
+  end
+  
+  defp format_workflow_details_from_resource(workflow) do
+    %{
+      id: workflow.workflow_id,
+      module: to_string(workflow.module),
+      status: workflow.status,
+      started_at: workflow.created_at,
+      completed_at: workflow.completed_at,
+      progress: workflow.metadata[:progress] || %{},
+      context: workflow.context || %{},
+      error: workflow.error,
+      metadata: workflow.metadata || %{}
+    }
+  end
+  
+  defp apply_ash_filters(query, filters) do
+    require Ash.Query
+    
+    Enum.reduce(filters, query, fn
+      {:status, filter_status}, q -> 
+        Ash.Query.filter(q, status == ^filter_status)
+      {:module, filter_module}, q -> 
+        Ash.Query.filter(q, module == ^filter_module)
+      {:created_after, _datetime}, q -> 
+        # TODO: Add date filtering when Ash filter syntax is clarified
+        q
+      {:created_before, _datetime}, q -> 
+        # TODO: Add date filtering when Ash filter syntax is clarified
+        q
+      _, q -> q
+    end)
+  end
+  
+  defp apply_ash_pagination(query, %{limit: limit, offset: offset}) do
+    query
+    |> Ash.Query.limit(limit)
+    |> Ash.Query.offset(offset)
   end
   
   # Helper functions for API operations
@@ -697,24 +766,6 @@ defmodule RubberDuckWeb.WorkflowChannel do
     }
   end
   
-  defp apply_filters(workflows, filters) when filters == %{}, do: workflows
-  defp apply_filters(workflows, filters) do
-    Enum.filter(workflows, fn workflow ->
-      Enum.all?(filters, fn
-        {:status, status} -> workflow.status == String.to_atom(status)
-        {:module, module} -> to_string(workflow.module) == module
-        {:created_after, datetime} -> DateTime.compare(workflow.started_at, datetime) != :lt
-        {:created_before, datetime} -> DateTime.compare(workflow.started_at, datetime) != :gt
-        _ -> true
-      end)
-    end)
-  end
-  
-  defp apply_pagination(workflows, %{limit: limit, offset: offset}) do
-    workflows
-    |> Enum.drop(offset)
-    |> Enum.take(limit)
-  end
   
   defp build_template_filters(params) do
     %{

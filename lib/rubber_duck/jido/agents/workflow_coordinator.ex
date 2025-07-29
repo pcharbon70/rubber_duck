@@ -34,6 +34,7 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
   require Logger
   
   alias RubberDuck.Jido.Agents.WorkflowPersistenceAsh, as: WorkflowPersistence
+  alias RubberDuck.Workflows.Workflow
   
   
   @type workflow_id :: String.t()
@@ -138,8 +139,7 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
     end
     
     state = %{
-      workflows: %{},
-      persist_enabled: Keyword.get(opts, :persist, false),
+      persist_enabled: Keyword.get(opts, :persist, true), # Default to true now
       telemetry_enabled: Keyword.get(opts, :telemetry, true),
       cleanup_interval: opts[:cleanup_interval]
     }
@@ -223,37 +223,37 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
   def handle_call({:start_workflow, module, inputs, opts}, _from, state) do
     workflow_id = generate_workflow_id()
     
-    # Start workflow asynchronously
-    Task.start_link(fn ->
-      execute_workflow_async(workflow_id, module, inputs, opts, state)
-    end)
-    
-    # Track workflow
-    new_workflows = Map.put(state.workflows, workflow_id, %{
-      module: module,
-      status: :running,
-      started_at: DateTime.utc_now()
-    })
-    
-    {:reply, {:ok, workflow_id}, %{state | workflows: new_workflows}}
+    # Create workflow record in database
+    case create_workflow_record(workflow_id, module, inputs, opts) do
+      {:ok, _workflow} ->
+        # Start workflow asynchronously
+        Task.start_link(fn ->
+          execute_workflow_async(workflow_id, module, inputs, opts, state)
+        end)
+        
+        {:reply, {:ok, workflow_id}, state}
+        
+      {:error, error} ->
+        Logger.error("Failed to create workflow record: #{inspect(error)}")
+        {:reply, {:error, error}, state}
+    end
   end
   
   @impl true
   def handle_call({:get_status, workflow_id}, _from, state) do
-    status = case Map.get(state.workflows, workflow_id) do
-      nil ->
-        # Check persisted state
-        if state.persist_enabled do
-          case WorkflowPersistence.load_workflow_state(workflow_id) do
-            {:ok, workflow_state} -> {:ok, workflow_state}
-            {:error, _} -> {:error, :not_found}
-          end
-        else
-          {:error, :not_found}
-        end
-        
-      workflow ->
-        {:ok, workflow}
+    status = case WorkflowPersistence.load_workflow_state(workflow_id) do
+      {:ok, workflow} -> 
+        {:ok, %{
+          id: workflow.workflow_id,
+          module: workflow.module,
+          status: workflow.status,
+          started_at: workflow.created_at,
+          completed_at: workflow.completed_at,
+          error: workflow.error,
+          metadata: workflow.metadata
+        }}
+      {:error, _} -> 
+        {:error, :not_found}
     end
     
     {:reply, status, state}
@@ -269,13 +269,12 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
             resume_workflow_async(workflow_id, reactor_state, additional_inputs, context, state)
           end)
           
-          # Update tracking
-          new_workflows = Map.put(state.workflows, workflow_id, %{
-            status: :running,
+          # Update status in database
+          update_workflow_status(workflow_id, :running, %{
             resumed_at: DateTime.utc_now()
           })
           
-          {:reply, :ok, %{state | workflows: new_workflows}}
+          {:reply, :ok, state}
           
         {:ok, %{metadata: %{status: status}}} ->
           {:reply, {:error, {:invalid_status, status}}, state}
@@ -297,39 +296,54 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
   
   @impl true
   def handle_call(:list_workflows, _from, state) do
-    workflows = Enum.map(state.workflows, fn {id, info} ->
-      Map.put(info, :id, id)
-    end)
+    workflows = case Workflow
+                     |> Ash.read() do
+      {:ok, workflows} ->
+        workflows
+        |> Enum.filter(fn w -> w.status in [:running, :halted] end)
+        |> Enum.map(fn w ->
+          %{
+            id: w.workflow_id,
+            module: w.module,
+            status: w.status,
+            started_at: w.created_at,
+            metadata: w.metadata
+          }
+        end)
+      {:error, _} -> []
+    end
     
     {:reply, workflows, state}
   end
   
   @impl true
   def handle_call({:update_workflow, workflow_id, updates}, _from, state) do
-    case Map.get(state.workflows, workflow_id) do
-      nil ->
+    case WorkflowPersistence.load_workflow_state(workflow_id) do
+      {:ok, workflow} ->
+        # Update workflow in database
+        attrs = %{
+          context: Map.merge(workflow.context, Map.get(updates, :context, %{})),
+          metadata: Map.merge(workflow.metadata, Map.get(updates, :metadata, %{}))
+        }
+        
+        case workflow
+             |> Ash.Changeset.for_update(:update, attrs)
+             |> Ash.update() do
+          {:ok, updated_workflow} ->
+            {:reply, {:ok, format_workflow(updated_workflow)}, state}
+          {:error, error} ->
+            {:reply, {:error, error}, state}
+        end
+        
+      {:error, _} ->
         {:reply, {:error, :not_found}, state}
-      
-      workflow_state ->
-        # Basic validation - only allow updating certain fields
-        allowed_updates = [:context, :metadata, :timeout]
-        filtered_updates = Map.take(updates, allowed_updates)
-        
-        updated_workflow = Map.merge(workflow_state, filtered_updates)
-        updated_workflows = Map.put(state.workflows, workflow_id, updated_workflow)
-        new_state = %{state | workflows: updated_workflows}
-        
-        {:reply, {:ok, updated_workflow}, new_state}
     end
   end
   
   @impl true
   def handle_call({:get_workflow_logs, workflow_id, opts}, _from, state) do
-    case Map.get(state.workflows, workflow_id) do
-      nil ->
-        {:reply, {:error, :not_found}, state}
-      
-      _workflow_state ->
+    case WorkflowPersistence.load_workflow_state(workflow_id) do
+      {:ok, _workflow} ->
         # Fetch logs from telemetry or logging system
         # For now, return mock logs
         limit = Keyword.get(opts, :limit, 100)
@@ -338,44 +352,75 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
         
         logs = generate_mock_logs(workflow_id, limit, offset, level)
         {:reply, {:ok, logs}, state}
+        
+      {:error, _} ->
+        {:reply, {:error, :not_found}, state}
     end
   end
   
   @impl true
   def handle_info(:cleanup, state) do
-    # Clean up completed workflows older than 1 hour
-    cutoff = DateTime.add(DateTime.utc_now(), -3600, :second)
+    # Clean up completed workflows older than configured time
+    days_old = div(state.cleanup_interval || :timer.hours(24), :timer.hours(24))
     
-    new_workflows = state.workflows
-    |> Enum.reject(fn {_id, workflow} ->
-      workflow.status in [:completed, :failed] and
-      DateTime.compare(workflow.completed_at || workflow.started_at, cutoff) == :lt
-    end)
-    |> Map.new()
+    # Use Ash action to cleanup old workflows
+    case Workflow
+         |> Ash.bulk_destroy(:cleanup_old, %{days_old: days_old}) do
+      {:ok, _result} ->
+        Logger.info("Cleaned up workflows older than #{days_old} days")
+      {:error, error} ->
+        Logger.error("Failed to cleanup old workflows: #{inspect(error)}")
+    end
     
     # Schedule next cleanup
     if state.cleanup_interval do
       Process.send_after(self(), :cleanup, state.cleanup_interval)
     end
     
-    {:noreply, %{state | workflows: new_workflows}}
+    {:noreply, state}
   end
   
   @impl true
-  def handle_info({:workflow_completed, workflow_id, result}, state) do
-    # Update workflow status
-    new_workflows = Map.update(state.workflows, workflow_id, nil, fn workflow ->
-      %{workflow | 
-        status: if(match?({:ok, _}, result), do: :completed, else: :failed),
-        completed_at: DateTime.utc_now(),
-        result: result
-      }
-    end)
-    
-    {:noreply, %{state | workflows: new_workflows}}
+  def handle_info({:workflow_completed, workflow_id, _result}, state) do
+    # This is now handled in execute_workflow_async
+    Logger.debug("Workflow #{workflow_id} completed notification received")
+    {:noreply, state}
   end
   
   # Private functions
+  
+  defp create_workflow_record(workflow_id, module, inputs, opts) do
+    context = build_context(workflow_id, opts)
+    
+    attrs = %{
+      workflow_id: workflow_id,
+      module: module,
+      status: :running,
+      reactor_state: %{inputs: inputs},
+      context: context,
+      metadata: %{
+        opts: opts,
+        started_at: DateTime.utc_now()
+      }
+    }
+    
+    Workflow
+    |> Ash.Changeset.for_create(:create, attrs)
+    |> Ash.create()
+  end
+  
+  defp format_workflow(workflow) do
+    %{
+      id: workflow.workflow_id,
+      module: workflow.module,
+      status: workflow.status,
+      started_at: workflow.created_at,
+      completed_at: workflow.completed_at,
+      error: workflow.error,
+      context: workflow.context,
+      metadata: workflow.metadata
+    }
+  end
   
   defp generate_workflow_id do
     "wf_" <> :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
@@ -385,7 +430,7 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
     base_context = %{
       workflow_id: workflow_id,
       started_at: System.system_time(:microsecond),
-      coordinator_pid: self()
+      coordinator_pid: self() |> :erlang.term_to_binary() |> Base.encode64()
     }
     
     Map.merge(base_context, Keyword.get(opts, :context, %{}))
@@ -394,18 +439,109 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
   defp execute_workflow_async(workflow_id, module, inputs, opts, state) do
     context = build_context(workflow_id, opts)
     
-    result = execute_workflow(module, inputs, Keyword.put(opts, :context, context))
+    # Execute workflow
+    start_time = System.monotonic_time(:microsecond)
     
-    # Notify coordinator
-    send(state.coordinator_pid || self(), {:workflow_completed, workflow_id, result})
+    result = case Reactor.run(module, inputs, context, opts) do
+      {:ok, result} ->
+        duration = System.monotonic_time(:microsecond) - start_time
+        
+        # Update workflow state in database
+        update_workflow_status(workflow_id, :completed, %{
+          result: result,
+          duration: duration
+        })
+        
+        if state.telemetry_enabled do
+          :telemetry.execute(
+            [:rubber_duck, :workflow, :complete],
+            %{duration: duration},
+            %{workflow_id: workflow_id, module: module, status: :success}
+          )
+        end
+        
+        {:ok, result}
+        
+      {:halted, reactor_state} ->
+        duration = System.monotonic_time(:microsecond) - start_time
+        
+        # Update workflow state in database
+        update_workflow_status(workflow_id, :halted, %{
+          reactor_state: reactor_state,
+          duration: duration
+        })
+        
+        if state.telemetry_enabled do
+          :telemetry.execute(
+            [:rubber_duck, :workflow, :halt],
+            %{duration: duration},
+            %{workflow_id: workflow_id, module: module}
+          )
+        end
+        
+        {:halted, workflow_id}
+        
+      {:error, errors} ->
+        duration = System.monotonic_time(:microsecond) - start_time
+        
+        # Update workflow state in database
+        update_workflow_status(workflow_id, :failed, %{
+          error: %{errors: errors},
+          duration: duration
+        })
+        
+        if state.telemetry_enabled do
+          :telemetry.execute(
+            [:rubber_duck, :workflow, :error],
+            %{duration: duration, error_count: length(errors)},
+            %{workflow_id: workflow_id, module: module, errors: errors}
+          )
+        end
+        
+        {:error, errors}
+    end
+    
+    result
   end
   
-  defp resume_workflow_async(workflow_id, reactor_state, additional_inputs, context, state) do
+  defp update_workflow_status(workflow_id, status, metadata) do
+    case WorkflowPersistence.load_workflow_state(workflow_id) do
+      {:ok, workflow} ->
+        attrs = %{
+          status: status,
+          metadata: Map.merge(workflow.metadata || %{}, metadata)
+        }
+        
+        # Add error if present
+        attrs = if error = metadata[:error] do
+          Map.put(attrs, :error, error)
+        else
+          attrs
+        end
+        
+        # Update reactor state if present
+        attrs = if reactor_state = metadata[:reactor_state] do
+          Map.put(attrs, :reactor_state, reactor_state)
+        else
+          attrs
+        end
+        
+        workflow
+        |> Ash.Changeset.for_update(:update_status, attrs)
+        |> Ash.update()
+        
+      {:error, error} ->
+        Logger.error("Failed to update workflow status: #{inspect(error)}")
+        {:error, error}
+    end
+  end
+  
+  defp resume_workflow_async(workflow_id, reactor_state, additional_inputs, context, _state) do
     # Resume reactor execution
     result = Reactor.run(reactor_state, additional_inputs, context)
     
     # Notify coordinator
-    send(state.coordinator_pid || self(), {:workflow_completed, workflow_id, result})
+    send(self(), {:workflow_completed, workflow_id, result})
   end
   
   
