@@ -32,7 +32,7 @@ defmodule RubberDuck.Jido.Proper.ExampleAgent do
   end
   
   @impl Jido.Agent
-  def on_after_run(agent, result, metadata) do
+  def on_after_run(agent, _result, metadata) do
     # Update last_action and status after running
     updated_agent = 
       agent

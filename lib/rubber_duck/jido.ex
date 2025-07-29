@@ -78,24 +78,21 @@ defmodule RubberDuck.Jido do
     }
     
     # Validate against schema
-    case validate_agent_state(agent_module, agent.state) do
-      :ok ->
-        # Store in registry
-        :ok = AgentRegistry.register(agent)
-        
-        # Emit telemetry
-        :telemetry.execute(
-          [:rubber_duck, :jido, :agent, :created],
-          %{count: 1},
-          %{agent_id: agent_id, module: agent_module}
-        )
-        
-        Logger.info("Created Jido agent #{agent_id} of type #{inspect(agent_module)}")
-        {:ok, agent}
-        
-      {:error, errors} ->
-        {:error, {:validation_failed, errors}}
-    end
+    # Validate agent state
+    :ok = validate_agent_state(agent_module, agent.state)
+    
+    # Store in registry
+    :ok = AgentRegistry.register(agent)
+    
+    # Emit telemetry
+    :telemetry.execute(
+      [:rubber_duck, :jido, :agent, :created],
+      %{count: 1},
+      %{agent_id: agent_id, module: agent_module}
+    )
+    
+    Logger.info("Created Jido agent #{agent_id} of type #{inspect(agent_module)}")
+    {:ok, agent}
   end
   
   @doc """

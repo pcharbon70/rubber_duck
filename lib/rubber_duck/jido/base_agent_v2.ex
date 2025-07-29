@@ -125,7 +125,10 @@ defmodule RubberDuck.Jido.BaseAgentV2 do
           "agent_type" => __MODULE__
         })
         
-        SignalDispatcher.emit(:broadcast, enhanced_signal)
+        # TODO: Implement SignalDispatcher in a future phase
+        # SignalDispatcher.emit(:broadcast, enhanced_signal)
+        Logger.debug("Signal emission placeholder: #{inspect(enhanced_signal)}")
+        :ok
       end
       
       @doc """

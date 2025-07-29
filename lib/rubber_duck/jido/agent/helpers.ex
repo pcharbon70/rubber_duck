@@ -6,7 +6,6 @@ defmodule RubberDuck.Jido.Agent.Helpers do
   """
   
   require Logger
-  alias RubberDuck.Jido.SignalDispatcher
   
   @doc """
   Emits a signal to a specific agent.
@@ -24,11 +23,12 @@ defmodule RubberDuck.Jido.Agent.Helpers do
   def subscribe(agent_pid, pattern) when is_pid(agent_pid) and is_binary(pattern) do
     subscription_id = generate_subscription_id()
     
-    # Register subscription with SignalDispatcher
-    case SignalDispatcher.subscribe(pattern, agent_pid, subscription_id) do
-      :ok -> {:ok, subscription_id}
-      error -> error
-    end
+    # TODO: Register subscription with SignalDispatcher when implemented
+    # case SignalDispatcher.subscribe(pattern, agent_pid, subscription_id) do
+    #   :ok -> {:ok, subscription_id}
+    #   error -> error
+    # end
+    {:ok, subscription_id}
   end
   
   @doc """
@@ -36,7 +36,8 @@ defmodule RubberDuck.Jido.Agent.Helpers do
   """
   @spec unsubscribe(pid(), String.t()) :: :ok
   def unsubscribe(agent_pid, subscription_id) when is_pid(agent_pid) and is_binary(subscription_id) do
-    SignalDispatcher.unsubscribe(subscription_id)
+    # TODO: Implement when SignalDispatcher is available
+    # SignalDispatcher.unsubscribe(subscription_id)
     :ok
   end
   
