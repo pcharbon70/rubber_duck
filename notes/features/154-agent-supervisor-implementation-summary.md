@@ -122,10 +122,50 @@ Successfully implemented the core agent supervisor architecture for managing Jid
 - Agent Server reports load metrics to Registry
 - Supervisor delegates discovery methods to Registry
 
+## Phase 3: Agent Pool Management (15.1.4.3) - COMPLETED
+
+### 6. Pool Manager (`RubberDuck.Jido.Agents.PoolManager`)
+- **Purpose**: Efficient resource management through agent pooling
+- **Features**:
+  - Configurable pool sizes (min, max, target)
+  - Multiple pooling strategies (round-robin, least-loaded, random)
+  - Dynamic scaling based on load metrics
+  - Overflow handling (queue, spawn, error)
+  - Pool warmup on startup
+  - Back-pressure mechanisms
+  - Graceful shutdown handling
+
+- **Key Methods**:
+  - `start_pool/2` - Start a pool with configuration
+  - `checkout/2` - Get an agent from the pool
+  - `checkin/2` - Return agent to pool
+  - `execute/4` - Execute action on pooled agent
+  - `scale/2` - Manual pool scaling
+  - `stats/1` - Pool statistics
+
+### Pool Configuration
+```elixir
+min_size: 1              # Minimum agents in pool
+max_size: 10             # Maximum agents in pool
+target_size: 5           # Initial/target size
+strategy: :least_loaded  # :round_robin, :random, :least_loaded
+overflow: :queue         # :queue, :spawn, :error
+max_overflow: 50         # Max queued requests
+scale_up_threshold: 0.8  # Load threshold to scale up
+scale_down_threshold: 0.2 # Load threshold to scale down
+scale_interval: 10_000   # Check interval (ms)
+cooldown_period: 30_000  # Cooldown between scaling
+```
+
+### Integration Updates
+- Supervisor provides pool management functions
+- Pools use Registry for agent discovery
+- Dynamic scaling with load history tracking
+- Automatic agent replacement on crashes
+
 ## Known Limitations
 1. Health monitoring system pending (Phase 15.1.4.4)  
-2. Pool management not implemented (Phase 15.1.4.3)
-3. Some integration tests failing due to missing dependencies
+2. Lifecycle telemetry not implemented (Phase 15.1.4.5)
 
 ## Migration Notes
 - Existing agents using BaseAgent work without modification
@@ -188,4 +228,34 @@ stats = Supervisor.stats()
 #   agents_by_module: %{MyAgent => 3, OtherAgent => 2},
 #   restart_stats: %{...}
 # }
+```
+
+### Agent Pool Management
+```elixir
+# Start a pool
+{:ok, _} = Supervisor.start_pool(MyAgent,
+  name: :worker_pool,
+  min_size: 2,
+  max_size: 10,
+  target_size: 5,
+  strategy: :least_loaded
+)
+
+# Execute work on the pool
+{:ok, result} = Supervisor.execute_on_pool(:worker_pool, MyAction, %{work: "data"})
+
+# Check pool statistics
+stats = PoolManager.stats(:worker_pool)
+# => %{
+#   pool_size: 5,
+#   available: 3,
+#   busy: 2,
+#   queue_depth: 0,
+#   current_load: 0.4,
+#   executions: 142,
+#   scaling_events: 2
+# }
+
+# Manual scaling
+PoolManager.scale(:worker_pool, 8)
 ```

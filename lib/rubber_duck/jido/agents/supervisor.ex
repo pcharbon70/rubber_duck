@@ -245,6 +245,22 @@ defmodule RubberDuck.Jido.Agents.Supervisor do
   defdelegate query(criteria), to: RubberDuck.Jido.Agents.Registry
   
   @doc """
+  Starts an agent pool.
+  """
+  defdelegate start_pool(agent_module, opts \\ []), to: RubberDuck.Jido.Agents.PoolManager
+  
+  @doc """
+  Stops an agent pool.
+  """
+  defdelegate stop_pool(pool), to: RubberDuck.Jido.Agents.PoolManager
+  
+  @doc """
+  Executes an action on a pooled agent.
+  """
+  defdelegate execute_on_pool(pool, action, params \\ %{}, timeout \\ 5000), 
+    to: RubberDuck.Jido.Agents.PoolManager, as: :execute
+  
+  @doc """
   Gets supervision tree statistics.
   """
   def stats do
