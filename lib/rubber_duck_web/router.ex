@@ -86,7 +86,7 @@ defmodule RubberDuckWeb.Router do
   scope "/api", RubberDuckWeb do
     pipe_through :api
 
-    # Add API routes here
+    # Add any HTTP-only API routes here if needed in the future
   end
 
   # Enable LiveDashboard in development

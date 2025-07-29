@@ -36,6 +36,10 @@ defmodule RubberDuckWeb.UserSocket do
   channel("status:*", RubberDuckWeb.StatusChannel)
   channel("api_keys:*", RubberDuckWeb.ApiKeyChannel)
   channel("planning:*", RubberDuckWeb.PlanningChannel)
+  
+  # Workflow API channels
+  channel("workflows:*", RubberDuckWeb.WorkflowChannel)
+  channel("agents:*", RubberDuckWeb.WorkflowChannel)
 
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After
