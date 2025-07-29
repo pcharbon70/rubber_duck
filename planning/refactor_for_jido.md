@@ -152,41 +152,43 @@ This section establishes the foundational Jido framework components and agent in
   - [x] Add resource usage monitoring
   - [x] Build telemetry dashboards
 
-#### 15.1.5 Workflow Engine Integration
-- [ ] **15.1.5.1 Create Workflow Definition DSL**
-  - [ ] Implement workflow DSL macros
-  - [ ] Add step definition syntax
-  - [ ] Create branching constructs
-  - [ ] Implement parallel execution
-  - [ ] Add error handling syntax
+#### 15.1.5 Reactor Workflow Integration
 
-- [ ] **15.1.5.2 Build Workflow Executor**
-  - [ ] Create RubberDuck.Agents.WorkflowEngine
-  - [ ] Implement step execution
-  - [ ] Add state management
-  - [ ] Create checkpoint system
-  - [ ] Implement rollback support
+This section integrates the Reactor library for workflow orchestration, providing a robust DSL for defining and executing complex agent workflows with built-in compensation, retry, and dependency resolution capabilities.
+- [ ] **15.1.5.1 Implement Reactor-based Workflows**
+  - [ ] Define workflow modules using `use Reactor`
+  - [ ] Create reusable step modules with `use Reactor.Step`
+  - [ ] Implement agent-specific workflow patterns
+  - [ ] Add Jido agent integration with Reactor steps
+  - [ ] Create workflow composition strategies
+
+- [ ] **15.1.5.2 Create Agent Workflow Coordinator**
+  - [ ] Create RubberDuck.Agents.WorkflowCoordinator
+  - [ ] Integrate Reactor execution with agent system
+  - [ ] Implement context passing for agent state
+  - [ ] Add middleware for telemetry and monitoring
+  - [ ] Create workflow-to-agent signal translation
 
 - [ ] **15.1.5.3 Implement Workflow Persistence**
-  - [ ] Create workflow state storage
-  - [ ] Add execution history
-  - [ ] Implement resume capability
-  - [ ] Create versioning system
-  - [ ] Add migration support
+  - [ ] Use Reactor's built-in state management
+  - [ ] Add agent-specific state persistence
+  - [ ] Implement checkpoint integration with agents
+  - [ ] Create workflow state recovery mechanisms
+  - [ ] Add version management for workflows
 
 - [ ] **15.1.5.4 Add Workflow Monitoring**
-  - [ ] Create execution tracking
-  - [ ] Implement progress monitoring
-  - [ ] Add performance metrics
-  - [ ] Create visualization tools
-  - [ ] Build debugging interface
+  - [ ] Use Reactor.Middleware.Telemetry
+  - [ ] Create custom middleware for agent metrics
+  - [ ] Integrate with existing telemetry system
+  - [ ] Add workflow visualization tools
+  - [ ] Build debugging tools using Reactor features
 
-- [ ] **15.1.5.5 Create Workflow Templates**
-  - [ ] Build common workflow patterns
-  - [ ] Create reusable components
-  - [ ] Add parameterization
-  - [ ] Implement composition
-  - [ ] Create documentation
+- [ ] **15.1.5.5 Build Agent Workflow Library**
+  - [ ] Create common agent workflow patterns (sequential, parallel, fan-out)
+  - [ ] Build reusable Reactor steps for agent operations
+  - [ ] Implement compensation and undo for agent actions
+  - [ ] Create workflow composition patterns
+  - [ ] Add documentation and usage examples
 
 #### 15.1.6 Unit Tests
 - [ ] Test agent lifecycle management
