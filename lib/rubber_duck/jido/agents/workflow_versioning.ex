@@ -39,8 +39,10 @@ defmodule RubberDuck.Jido.Agents.WorkflowVersioning do
       )
   """
   
+  use GenServer
   require Logger
-  alias RubberDuck.Workflows.Version
+  # Use Elixir's built-in Version module for semantic versioning
+  # alias RubberDuck.Workflows.Version
   
   @type version :: String.t()
   @type compatibility_spec :: String.t()
