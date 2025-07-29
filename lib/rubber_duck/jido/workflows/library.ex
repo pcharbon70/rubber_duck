@@ -78,6 +78,7 @@ defmodule RubberDuck.Jido.Workflows.Library do
     atom_name = String.to_atom(name)
     get_template(atom_name)
   end
+  
   def get_template(name) when is_atom(name) do
     case Map.get(@workflow_templates, name) do
       nil -> {:error, :not_found}
@@ -143,15 +144,6 @@ defmodule RubberDuck.Jido.Workflows.Library do
     end
   end
   
-  @doc """
-  Gets a workflow template for customization.
-  """
-  def get_template(name) when is_atom(name) do
-    case Map.get(@workflow_templates, name) do
-      nil -> {:error, :template_not_found}
-      module -> {:ok, module}
-    end
-  end
   
   @doc """
   Creates a custom workflow based on a template.

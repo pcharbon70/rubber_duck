@@ -174,13 +174,14 @@ defmodule RubberDuck.Jido.Agents.WorkflowPersistenceAsh do
     attrs = %{
       module: module,
       version: version,
-      definition: definition
+      definition: definition,
+      is_current: true
     }
     
     case Version
          |> Ash.Changeset.for_create(:create, attrs)
          |> Ash.create() do
-      {:ok, _version} -> {:ok, version}
+      {:ok, created_version} -> {:ok, created_version.version}
       {:error, error} -> {:error, error}
     end
   end
