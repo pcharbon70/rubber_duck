@@ -257,6 +257,12 @@ defmodule RubberDuck.Jido.Agents.Server do
     health = check_health(state)
     {:reply, {:ok, health}, state}
   end
+
+  @impl true
+  def handle_call({:health_probe, probe_type}, _from, state) do
+    result = perform_health_probe(probe_type, state)
+    {:reply, result, state}
+  end
   
   @impl true
   def handle_cast({:signal, signal}, state) do
@@ -369,5 +375,53 @@ defmodule RubberDuck.Jido.Agents.Server do
     end
   rescue
     _ -> :permanent
+  end
+
+  defp perform_health_probe(:liveness, state) do
+    # Liveness: Is the agent process responding?
+    # We're already in a handle_call, so if we're here, we're alive
+    {:ok, %{
+      alive: true,
+      agent_id: state.agent_id,
+      uptime: DateTime.diff(DateTime.utc_now(), state.stats.started_at, :second)
+    }}
+  end
+
+  defp perform_health_probe(:readiness, state) do
+    # Readiness: Can the agent accept new work?
+    # Check current load and error rate
+    error_rate = if state.stats.actions_executed > 0 do
+      state.stats.errors / state.stats.actions_executed
+    else
+      0.0
+    end
+    
+    ready = state.stats.current_load < 10 and error_rate < 0.5
+    
+    {:ok, %{
+      ready: ready,
+      current_load: state.stats.current_load,
+      error_rate: error_rate,
+      processing_count: state.stats.processing_count
+    }}
+  end
+
+  defp perform_health_probe(:startup, state) do
+    # Startup: Has the agent completed initialization?
+    uptime = DateTime.diff(DateTime.utc_now(), state.stats.started_at, :second)
+    
+    # Consider started if uptime > 5 seconds and we've executed at least one action
+    # or if uptime > 30 seconds regardless
+    started = uptime > 30 or (uptime > 5 and state.stats.actions_executed > 0)
+    
+    {:ok, %{
+      started: started,
+      uptime: uptime,
+      actions_executed: state.stats.actions_executed
+    }}
+  end
+
+  defp perform_health_probe(unknown_probe, _state) do
+    {:error, {:unknown_probe_type, unknown_probe}}
   end
 end

@@ -163,9 +163,54 @@ cooldown_period: 30_000  # Cooldown between scaling
 - Dynamic scaling with load history tracking
 - Automatic agent replacement on crashes
 
+## Phase 4: Health Monitoring System (15.1.4.4) - COMPLETED
+
+### 7. Health Monitor (`RubberDuck.Jido.Agents.HealthMonitor`)
+- **Purpose**: Comprehensive health monitoring and self-healing for agents
+- **Features**:
+  - Standardized health check protocol with configurable intervals
+  - Three probe types: liveness, readiness, and startup
+  - Circuit breaker pattern with automatic recovery
+  - Health aggregation and reporting across all agents
+  - Alert triggering based on consecutive failures
+  - ETS-based storage for high-performance health lookups
+  - Automatic cleanup when agents terminate
+  - Telemetry integration for observability
+
+- **Key Methods**:
+  - `monitor_agent/2` - Start monitoring an agent with custom config
+  - `stop_monitoring/1` - Stop monitoring an agent
+  - `get_health/1` - Get current health status
+  - `probe/2` - Perform specific health probe
+  - `health_report/0` - Get aggregate health report
+  - `trip_circuit/1` - Manually trip circuit breaker
+  - `reset_circuit/1` - Manually reset circuit breaker
+
+### Health Check Integration
+- Agent Server enhanced with health probe handlers
+- Three probe implementations:
+  - **Liveness**: Process is alive and responding
+  - **Readiness**: Agent can accept new work (load < 10, error rate < 50%)
+  - **Startup**: Agent has completed initialization
+
+### Circuit Breaker Configuration
+```elixir
+circuit_breaker_enabled: true
+failure_threshold: 3        # Failures before unhealthy
+recovery_threshold: 2       # Successes before healthy
+circuit_open_duration: 60_000  # 1 minute
+circuit_half_open_checks: 3
+alert_threshold: 5          # Consecutive failures before alert
+```
+
+### Integration Updates
+- HealthMonitor added to supervision tree
+- Agent Server responds to health probe requests
+- Automatic monitoring on agent start (optional)
+- Health status preserved even after monitor stops
+
 ## Known Limitations
-1. Health monitoring system pending (Phase 15.1.4.4)  
-2. Lifecycle telemetry not implemented (Phase 15.1.4.5)
+1. Lifecycle telemetry not implemented (Phase 15.1.4.5)
 
 ## Migration Notes
 - Existing agents using BaseAgent work without modification
@@ -258,4 +303,47 @@ stats = PoolManager.stats(:worker_pool)
 
 # Manual scaling
 PoolManager.scale(:worker_pool, 8)
+```
+
+### Health Monitoring
+```elixir
+# Monitor an agent with custom configuration
+HealthMonitor.monitor_agent("critical_agent",
+  check_interval: 5000,      # Check every 5 seconds
+  timeout: 2000,             # 2 second timeout for probes
+  failure_threshold: 3,      # 3 failures before unhealthy
+  circuit_breaker_enabled: true,
+  alert_threshold: 5         # Alert after 5 consecutive failures
+)
+
+# Get health status
+{:ok, health} = HealthMonitor.get_health("critical_agent")
+# => %{
+#   status: :healthy,
+#   liveness: :healthy,
+#   readiness: :healthy,
+#   startup: :complete,
+#   consecutive_failures: 0,
+#   circuit_state: :closed,
+#   last_check: ~U[2025-01-20 10:30:00Z]
+# }
+
+# Perform specific probe
+{:healthy, details} = HealthMonitor.probe("critical_agent", :readiness)
+# => {:healthy, %{ready: true, current_load: 2, error_rate: 0.0}}
+
+# Get aggregate health report
+report = HealthMonitor.health_report()
+# => %{
+#   total_agents: 10,
+#   healthy: 8,
+#   unhealthy: 1,
+#   unknown: 1,
+#   circuit_open: 0,
+#   by_agent: %{...}
+# }
+
+# Manual circuit control
+HealthMonitor.trip_circuit("problematic_agent")  # Force circuit open
+HealthMonitor.reset_circuit("recovered_agent")   # Force circuit closed
 ```

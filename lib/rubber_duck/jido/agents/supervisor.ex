@@ -69,7 +69,10 @@ defmodule RubberDuck.Jido.Agents.Supervisor do
       {RubberDuck.Jido.Agents.RestartTracker, []},
       
       # Shutdown coordinator for graceful termination
-      {RubberDuck.Jido.Agents.ShutdownCoordinator, []}
+      {RubberDuck.Jido.Agents.ShutdownCoordinator, []},
+      
+      # Health monitoring system
+      {RubberDuck.Jido.Agents.HealthMonitor, []}
     ]
     
     Supervisor.init(children, 
