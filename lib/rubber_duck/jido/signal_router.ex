@@ -1,19 +1,23 @@
 defmodule RubberDuck.Jido.SignalRouter do
   @moduledoc """
-  Routes CloudEvents signals to appropriate Jido actions.
+  Routes CloudEvents signals to appropriate Jido actions with strict validation.
   
   This module handles:
-  - Signal to action mapping
-  - Signal pattern matching and subscriptions
+  - Strict CloudEvents 1.0 validation
+  - Dynamic signal to action mapping via Config
+  - Dead letter queue for failed signals
   - Broadcasting signals to multiple agents
-  - CloudEvents format compliance
+  - Signal pattern matching and subscriptions
+  
+  All signals must be valid CloudEvents. No backward compatibility is provided.
   """
   
   use GenServer
   require Logger
   
-  alias RubberDuck.Jido
   alias RubberDuck.Jido.{AgentRegistry, Runtime}
+  alias RubberDuck.Jido.CloudEvents.Validator
+  alias RubberDuck.Jido.SignalRouter.{Config, DeadLetterQueue}
   
   @subscription_table :rubber_duck_jido_subscriptions
   
@@ -24,7 +28,10 @@ defmodule RubberDuck.Jido.SignalRouter do
   end
   
   @doc """
-  Routes a signal to an agent by converting it to appropriate actions.
+  Routes a signal to an agent with strict CloudEvents validation.
+  
+  The signal must be a valid CloudEvent or it will be rejected.
+  Failed signals are sent to the dead letter queue.
   """
   @spec route(map(), map()) :: :ok | {:error, term()}
   def route(agent, signal) do
@@ -32,19 +39,29 @@ defmodule RubberDuck.Jido.SignalRouter do
   end
   
   @doc """
-  Broadcasts a signal to all matching agents.
+  Internal routing function used by DLQ for retries.
   """
-  @spec broadcast(map(), keyword()) :: :ok
+  @spec route_with_validation(map()) :: :ok | {:error, term()}
+  def route_with_validation(signal) do
+    GenServer.call(__MODULE__, {:route_validated, signal})
+  end
+  
+  @doc """
+  Broadcasts a signal to all matching agents.
+  
+  The signal must be a valid CloudEvent.
+  """
+  @spec broadcast(map(), keyword()) :: :ok | {:error, term()}
   def broadcast(signal, opts \\ []) do
-    GenServer.cast(__MODULE__, {:broadcast, signal, opts})
+    GenServer.call(__MODULE__, {:broadcast, signal, opts})
   end
   
   @doc """
   Subscribes an agent to signals matching a pattern.
   """
-  @spec subscribe(String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
-  def subscribe(agent_id, pattern) do
-    GenServer.call(__MODULE__, {:subscribe, agent_id, pattern})
+  @spec subscribe(String.t(), String.t(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def subscribe(agent_id, pattern, opts \\ []) do
+    GenServer.call(__MODULE__, {:subscribe, agent_id, pattern, opts})
   end
   
   @doc """
@@ -70,8 +87,8 @@ defmodule RubberDuck.Jido.SignalRouter do
     # Create subscription table
     :ets.new(@subscription_table, [
       :named_table,
+      :set,
       :public,
-      :bag,
       read_concurrency: true
     ])
     
@@ -79,52 +96,91 @@ defmodule RubberDuck.Jido.SignalRouter do
       stats: %{
         routed: 0,
         broadcast: 0,
-        errors: 0
-      },
-      signal_mappings: load_signal_mappings()
+        errors: 0,
+        validation_failures: 0,
+        dlq_sent: 0
+      }
     }
     
-    Logger.info("SignalRouter started")
+    Logger.info("SignalRouter started with strict CloudEvents validation")
     
     {:ok, state}
   end
   
   @impl true
   def handle_call({:route, agent, signal}, _from, state) do
-    # Convert to CloudEvent format if needed
-    cloud_event = ensure_cloud_event(signal)
-    
-    # Find matching action
-    case map_signal_to_action(cloud_event, state.signal_mappings) do
-      {:ok, action_module, params} ->
-        # Execute action asynchronously
-        Task.start(fn ->
-          case Runtime.execute(agent, action_module, params) do
-            {:ok, _result, updated_agent} ->
-              # Update the agent in the registry
-              AgentRegistry.update(updated_agent)
-              
-            {:error, reason} ->
-              Logger.error("Failed to execute action #{inspect(action_module)}: #{inspect(reason)}")
-          end
-        end)
+    # Validate CloudEvent format
+    case Validator.validate(signal) do
+      :ok ->
+        do_route(agent, signal, state)
         
-        state = update_in(state.stats.routed, &(&1 + 1))
-        {:reply, :ok, state}
+      {:error, validation_errors} ->
+        Logger.error("Invalid CloudEvent: #{inspect(validation_errors)}")
         
-      {:error, :no_mapping} ->
-        Logger.warning("No action mapping for signal type: #{cloud_event["type"]}")
-        state = update_in(state.stats.errors, &(&1 + 1))
-        {:reply, {:error, :no_action_mapping}, state}
+        # Send to DLQ
+        {:ok, _id} = DeadLetterQueue.add(signal, {:validation_failed, validation_errors})
+        
+        state = state
+        |> update_in([:stats, :validation_failures], &(&1 + 1))
+        |> update_in([:stats, :dlq_sent], &(&1 + 1))
+        
+        # Emit telemetry
+        :telemetry.execute(
+          [:rubber_duck, :signal_router, :validation_failed],
+          %{count: 1},
+          %{errors: validation_errors}
+        )
+        
+        {:reply, {:error, {:validation_failed, validation_errors}}, state}
     end
   end
   
   @impl true
-  def handle_call({:subscribe, agent_id, pattern}, _from, state) do
+  def handle_call({:route_validated, signal}, _from, state) do
+    # For DLQ retries - assumes signal is already validated
+    case find_agent_for_signal(signal) do
+      {:ok, agent} ->
+        do_route(agent, signal, state)
+        
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+  
+  @impl true
+  def handle_call({:broadcast, signal, opts}, _from, state) do
+    # Validate CloudEvent format
+    case Validator.validate(signal) do
+      :ok ->
+        # Async broadcast
+        GenServer.cast(self(), {:do_broadcast, signal, opts})
+        
+        state = update_in(state.stats.broadcast, &(&1 + 1))
+        {:reply, :ok, state}
+        
+      {:error, validation_errors} ->
+        Logger.error("Invalid CloudEvent for broadcast: #{inspect(validation_errors)}")
+        
+        state = update_in(state.stats.validation_failures, &(&1 + 1))
+        {:reply, {:error, {:validation_failed, validation_errors}}, state}
+    end
+  end
+  
+  @impl true
+  def handle_call({:subscribe, agent_id, pattern, opts}, _from, state) do
     subscription_id = generate_subscription_id()
     
+    subscription = %{
+      id: subscription_id,
+      agent_id: agent_id,
+      pattern: pattern,
+      priority: Keyword.get(opts, :priority, 50),
+      filters: Keyword.get(opts, :filters, []),
+      created_at: DateTime.utc_now()
+    }
+    
     # Store subscription
-    :ets.insert(@subscription_table, {pattern, agent_id, subscription_id})
+    :ets.insert(@subscription_table, {subscription_id, subscription})
     
     Logger.debug("Agent #{agent_id} subscribed to pattern #{pattern}")
     
@@ -133,29 +189,26 @@ defmodule RubberDuck.Jido.SignalRouter do
   
   @impl true
   def handle_call({:unsubscribe, subscription_id}, _from, state) do
-    # Remove all entries with this subscription_id
-    :ets.match_delete(@subscription_table, {:_, :_, subscription_id})
-    
+    :ets.delete(@subscription_table, subscription_id)
     {:reply, :ok, state}
   end
   
   @impl true
   def handle_call(:stats, _from, state) do
     stats = Map.merge(state.stats, %{
-      subscriptions: :ets.info(@subscription_table, :size)
+      subscriptions: :ets.info(@subscription_table, :size),
+      dlq_stats: DeadLetterQueue.stats()
     })
     
     {:reply, stats, state}
   end
   
   @impl true
-  def handle_cast({:broadcast, signal, opts}, state) do
-    # Convert to CloudEvent
-    cloud_event = ensure_cloud_event(signal)
-    signal_type = cloud_event["type"]
+  def handle_cast({:do_broadcast, signal, opts}, state) do
+    signal_type = signal["type"]
     
     # Find matching subscriptions
-    matching_agents = find_matching_subscriptions(signal_type)
+    matching_agents = find_matching_subscriptions(signal_type, signal)
     
     # Apply optional filters
     filtered_agents = apply_broadcast_filters(matching_agents, opts)
@@ -164,88 +217,121 @@ defmodule RubberDuck.Jido.SignalRouter do
     Enum.each(filtered_agents, fn agent_id ->
       case AgentRegistry.get(agent_id) do
         {:ok, agent} ->
-          handle_call({:route, agent, cloud_event}, nil, state)
+          spawn(fn -> do_route_internal(agent, signal) end)
           
         {:error, :not_found} ->
           # Clean up stale subscription
-          :ets.match_delete(@subscription_table, {:_, agent_id, :_})
+          cleanup_agent_subscriptions(agent_id)
       end
     end)
     
-    state = update_in(state.stats.broadcast, &(&1 + 1))
     {:noreply, state}
   end
   
   # Private functions
   
-  defp ensure_cloud_event(%{"specversion" => _} = event), do: event
-  defp ensure_cloud_event(signal) do
-    %{
-      "specversion" => "1.0",
-      "id" => Uniq.UUID.uuid4(),
-      "source" => signal["source"] || "rubber_duck.jido",
-      "type" => signal["type"] || signal[:type] || "unknown",
-      "time" => DateTime.utc_now() |> DateTime.to_iso8601(),
-      "datacontenttype" => "application/json",
-      "data" => signal["data"] || signal[:data] || signal
-    }
-  end
-  
-  defp map_signal_to_action(cloud_event, mappings) do
-    signal_type = cloud_event["type"]
-    
-    # Check direct mappings first
-    case Map.get(mappings, signal_type) do
-      nil ->
-        # Try pattern matching
-        find_pattern_mapping(signal_type, mappings)
+  defp do_route(agent, signal, state) do
+    case do_route_internal(agent, signal) do
+      :ok ->
+        state = update_in(state.stats.routed, &(&1 + 1))
+        {:reply, :ok, state}
         
-      {action_module, param_extractor} ->
-        params = param_extractor.(cloud_event)
-        {:ok, action_module, params}
+      {:error, reason} = error ->
+        Logger.error("Failed to route signal: #{inspect(reason)}")
+        
+        # Send to DLQ with agent_id in metadata
+        signal_with_agent = ensure_agent_in_extensions(signal, agent.id)
+        {:ok, _id} = DeadLetterQueue.add(signal_with_agent, reason, agent_id: agent.id)
+        
+        state = state
+        |> update_in([:stats, :errors], &(&1 + 1))
+        |> update_in([:stats, :dlq_sent], &(&1 + 1))
+        
+        {:reply, error, state}
     end
   end
   
-  defp find_pattern_mapping(signal_type, mappings) do
-    Enum.find_value(mappings, {:error, :no_mapping}, fn
-      {pattern, {action_module, param_extractor}} when is_binary(pattern) ->
-        if String.contains?(pattern, "*") && pattern_matches?(signal_type, pattern) do
-          params = param_extractor.(%{"type" => signal_type})
-          {:ok, action_module, params}
-        else
-          nil
+  defp do_route_internal(agent, signal) do
+    # Find action for signal type using Config
+    case Config.find_route(signal["type"]) do
+      {:ok, action_module, param_extractor} ->
+        params = param_extractor.(signal)
+        
+        # Execute action
+        case Runtime.execute(agent, action_module, params) do
+          {:ok, _result, updated_agent} ->
+            # Update the agent in the registry
+            AgentRegistry.update(updated_agent)
+            
+            # Emit telemetry
+            :telemetry.execute(
+              [:rubber_duck, :signal_router, :routed],
+              %{count: 1},
+              %{signal_type: signal["type"], agent_id: agent.id}
+            )
+            
+            :ok
+            
+          {:error, reason} ->
+            {:error, {:action_failed, reason}}
         end
         
-      _ ->
-        nil
+      {:error, :no_route} ->
+        {:error, {:no_route, signal["type"]}}
+    end
+  end
+  
+  defp find_agent_for_signal(signal) do
+    # For DLQ retries, we need to find an appropriate agent
+    # This is a simplified version - in production you might store agent_id with the signal
+    case signal["extensions"]["agent_id"] do
+      nil -> {:error, :no_agent_specified}
+      agent_id -> AgentRegistry.get(agent_id)
+    end
+  end
+  
+  defp find_matching_subscriptions(signal_type, signal) do
+    :ets.tab2list(@subscription_table)
+    |> Enum.filter(fn {_id, sub} ->
+      pattern_matches?(signal_type, sub.pattern) and
+      filters_match?(signal, sub.filters)
     end)
+    |> Enum.sort_by(fn {_id, sub} -> -sub.priority end)
+    |> Enum.map(fn {_id, sub} -> sub.agent_id end)
+    |> Enum.uniq()
   end
   
   defp pattern_matches?(signal_type, pattern) do
-    regex = 
-      pattern
-      |> String.replace(".", "\\.")
-      |> String.replace("*", ".*")
-      |> Regex.compile!()
-    
-    Regex.match?(regex, signal_type)
+    if String.contains?(pattern, "*") do
+      regex = 
+        pattern
+        |> String.replace(".", "\\.")
+        |> String.replace("*", ".*")
+        |> Regex.compile!()
+      
+      Regex.match?(regex, signal_type)
+    else
+      signal_type == pattern
+    end
   end
   
-  defp find_matching_subscriptions(signal_type) do
-    :ets.foldl(
-      fn
-        {pattern, agent_id, _sub_id}, acc ->
-          if pattern_matches?(signal_type, pattern) do
-            [agent_id | acc]
-          else
-            acc
-          end
-      end,
-      [],
-      @subscription_table
-    )
-    |> Enum.uniq()
+  defp filters_match?(_signal, []), do: true
+  defp filters_match?(signal, filters) do
+    Enum.all?(filters, fn filter ->
+      apply_filter(signal, filter)
+    end)
   end
+  
+  defp apply_filter(signal, {:source, pattern}) do
+    pattern_matches?(signal["source"], pattern)
+  end
+  defp apply_filter(signal, {:subject, pattern}) do
+    case signal["subject"] do
+      nil -> false
+      subject -> pattern_matches?(subject, pattern)
+    end
+  end
+  defp apply_filter(_signal, _), do: true
   
   defp apply_broadcast_filters(agent_ids, opts) do
     agent_ids
@@ -268,38 +354,19 @@ defmodule RubberDuck.Jido.SignalRouter do
     Enum.take(agent_ids, limit)
   end
   
+  defp cleanup_agent_subscriptions(agent_id) do
+    :ets.select_delete(@subscription_table, [
+      {{:_, %{agent_id: :"$1"}}, [{:==, :"$1", agent_id}], [true]}
+    ])
+  end
+  
   defp generate_subscription_id do
     "sub_#{Uniq.UUID.uuid4()}"
   end
   
-  defp load_signal_mappings do
-    # Default signal to action mappings
-    # Can be extended or loaded from config
-    %{
-      "increment" => {RubberDuck.Jido.Actions.Increment, &extract_increment_params/1},
-      "add_message" => {RubberDuck.Jido.Actions.AddMessage, &extract_message_params/1},
-      "update_status" => {RubberDuck.Jido.Actions.UpdateStatus, &extract_status_params/1}
-    }
-  end
-  
-  defp extract_increment_params(event) do
-    data = event["data"] || %{}
-    %{amount: data["amount"] || 1}
-  end
-  
-  defp extract_message_params(event) do
-    data = event["data"] || %{}
-    %{
-      message: data["message"] || "",
-      timestamp: data["timestamp"] != false
-    }
-  end
-  
-  defp extract_status_params(event) do
-    data = event["data"] || %{}
-    %{
-      status: String.to_atom(data["status"] || "idle"),
-      reason: data["reason"]
-    }
+  defp ensure_agent_in_extensions(signal, agent_id) do
+    extensions = Map.get(signal, "extensions", %{})
+    updated_extensions = Map.put(extensions, "agent_id", agent_id)
+    Map.put(signal, "extensions", updated_extensions)
   end
 end

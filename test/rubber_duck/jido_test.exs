@@ -5,6 +5,8 @@ defmodule RubberDuck.JidoTest do
   alias RubberDuck.Jido.Agents.ExampleAgent
   alias RubberDuck.Jido.Actions.{Increment, AddMessage, UpdateStatus}
   
+  import RubberDuck.Test.CloudEventsHelper
+  
   describe "agent creation" do
     test "creates agent with default state" do
       {:ok, agent} = Jido.create_agent(ExampleAgent)
@@ -115,16 +117,25 @@ defmodule RubberDuck.JidoTest do
     end
     
     test "routes increment signal to action", %{agent: agent} do
-      :ok = Jido.send_signal(agent, %{
-        "type" => "increment",
-        "data" => %{"amount" => 3}
-      })
+      signal = increment_event(3)
+      :ok = Jido.send_signal(agent, signal)
       
       # Allow async processing
       Process.sleep(50)
       
       {:ok, updated_agent} = Jido.get_agent(agent.id)
       assert updated_agent.state.counter == 3
+    end
+    
+    test "rejects invalid CloudEvent", %{agent: agent} do
+      # Missing required fields
+      invalid_signal = %{
+        "type" => "increment",
+        "data" => %{"amount" => 3}
+      }
+      
+      assert {:error, {:validation_failed, errors}} = Jido.send_signal(agent, invalid_signal)
+      assert length(errors) > 0
     end
   end
   
