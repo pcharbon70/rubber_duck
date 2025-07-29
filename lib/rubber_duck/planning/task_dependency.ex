@@ -23,7 +23,12 @@ defmodule RubberDuck.Planning.TaskDependency do
   end
 
   actions do
-    defaults [:create, :read, :destroy]
+    defaults [:read, :destroy]
+    
+    create :create do
+      primary? true
+      accept [:task_id, :dependency_id]
+    end
   end
 
   attributes do
