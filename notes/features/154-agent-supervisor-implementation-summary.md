@@ -96,11 +96,36 @@ Successfully implemented the core agent supervisor architecture for managing Jid
   - Rolling restart functionality
   - Statistics and monitoring
 
+## Phase 2: Agent Registry (15.1.4.2) - COMPLETED
+
+### 5. Agent Registry (`RubberDuck.Jido.Agents.Registry`)
+- **Purpose**: Fast agent discovery and metadata management
+- **Features**:
+  - ETS-based registry with high-performance lookups
+  - Automatic registration/deregistration on agent lifecycle
+  - Tag-based and capability-based discovery
+  - Load-based agent selection
+  - Query API for complex criteria matching
+  - Process monitoring for automatic cleanup
+  - Node-aware for distributed systems
+
+- **Key Methods**:
+  - `register/3` - Register agent with metadata
+  - `find_by_tag/1` - Find agents by tag
+  - `find_by_capability/1` - Find agents by capability
+  - `get_least_loaded/1` - Get agent with lowest load
+  - `query/1` - Complex criteria matching
+
+### Integration Updates
+- Supervisor automatically registers agents on start
+- Supervisor unregisters agents on stop
+- Agent Server reports load metrics to Registry
+- Supervisor delegates discovery methods to Registry
+
 ## Known Limitations
-1. Registry module not yet implemented (Phase 15.1.4.2)
-2. Health monitoring system pending (Phase 15.1.4.4)  
-3. Pool management not implemented (Phase 15.1.4.3)
-4. Some integration tests failing due to missing dependencies
+1. Health monitoring system pending (Phase 15.1.4.4)  
+2. Pool management not implemented (Phase 15.1.4.3)
+3. Some integration tests failing due to missing dependencies
 
 ## Migration Notes
 - Existing agents using BaseAgent work without modification
@@ -113,15 +138,19 @@ Successfully implemented the core agent supervisor architecture for managing Jid
 3. Build Health Monitoring (15.1.4.4) for proactive issue detection
 4. Add Lifecycle Telemetry (15.1.4.5) for complete observability
 
-## Code Example
+## Code Examples
+
+### Basic Agent Management
 ```elixir
 # Start the supervisor
 {:ok, _} = RubberDuck.Jido.Agents.Supervisor.start_link()
 
-# Start an agent
+# Start an agent with tags and capabilities
 {:ok, pid} = Supervisor.start_agent(MyAgent, %{initial: "state"},
   id: "my_agent_123",
   restart: :permanent,
+  tags: [:worker, :compute],
+  capabilities: [:process_data],
   metadata: %{owner: "system"}
 )
 
@@ -130,13 +159,33 @@ Successfully implemented the core agent supervisor architecture for managing Jid
 
 # Graceful shutdown
 :ok = Supervisor.stop_agent("my_agent_123")
+```
+
+### Agent Discovery and Load Balancing
+```elixir
+# Find agents by tag
+workers = Supervisor.find_by_tag(:worker)
+
+# Find agents by capability
+processors = Supervisor.find_by_capability(:process_data)
+
+# Get least loaded worker
+{:ok, agent} = Supervisor.get_least_loaded(:worker)
+{:ok, result} = Server.execute_action(agent.pid, ProcessAction, data)
+
+# Query with multiple criteria
+agents = Supervisor.query(%{
+  module: MyAgent,
+  tags: :compute,
+  capabilities: :gpu_acceleration
+})
 
 # Get statistics
 stats = Supervisor.stats()
 # => %{
-#   total_agents: 1,
-#   active_agents: 1, 
-#   agents_by_module: %{MyAgent => 1},
+#   total_agents: 5,
+#   active_agents: 5, 
+#   agents_by_module: %{MyAgent => 3, OtherAgent => 2},
 #   restart_stats: %{...}
 # }
 ```

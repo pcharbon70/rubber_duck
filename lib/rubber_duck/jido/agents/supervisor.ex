@@ -54,6 +54,9 @@ defmodule RubberDuck.Jido.Agents.Supervisor do
     Logger.info("Starting Jido Agent Supervisor with strategy: #{strategy}")
     
     children = [
+      # Agent registry for discovery and metadata
+      {RubberDuck.Jido.Agents.Registry, []},
+      
       # Dynamic supervisor for runtime agent creation
       {DynamicSupervisor, 
         name: RubberDuck.Jido.Agents.DynamicSupervisor,
@@ -104,7 +107,21 @@ defmodule RubberDuck.Jido.Agents.Supervisor do
         
         case DynamicSupervisor.start_child(RubberDuck.Jido.Agents.DynamicSupervisor, child_spec) do
           {:ok, pid} ->
-            Logger.info("Started Jido agent #{inspect(agent_module)} with id #{id} and pid #{inspect(pid)}")
+            # Register agent in the registry
+            registry_metadata = Map.merge(metadata, %{
+              module: agent_module,
+              tags: Keyword.get(opts, :tags, []),
+              capabilities: Keyword.get(opts, :capabilities, []),
+              node: node()
+            })
+            
+            case RubberDuck.Jido.Agents.Registry.register(id, pid, registry_metadata) do
+              :ok ->
+                Logger.info("Started and registered Jido agent #{inspect(agent_module)} with id #{id} and pid #{inspect(pid)}")
+              {:error, reason} ->
+                Logger.warning("Agent started but registry failed: #{inspect(reason)}")
+            end
+            
             :telemetry.execute(
               [:rubber_duck, :jido, :agent, :started],
               %{count: 1},
@@ -136,6 +153,9 @@ defmodule RubberDuck.Jido.Agents.Supervisor do
       {:ok, pid} ->
         Logger.info("Initiating graceful shutdown for agent #{agent_id}")
         
+        # Unregister from registry first
+        RubberDuck.Jido.Agents.Registry.unregister(agent_id)
+        
         # Coordinate shutdown
         RubberDuck.Jido.Agents.ShutdownCoordinator.coordinate_shutdown(agent_id, pid, timeout)
         
@@ -148,27 +168,16 @@ defmodule RubberDuck.Jido.Agents.Supervisor do
   Lists all supervised agents with their metadata.
   """
   def list_agents do
-    DynamicSupervisor.which_children(RubberDuck.Jido.Agents.DynamicSupervisor)
-    |> Enum.map(fn {_, pid, _, _} -> 
-      case get_agent_info(pid) do
-        {:ok, info} -> info
-        _ -> nil
-      end
-    end)
-    |> Enum.reject(&is_nil/1)
+    # Use Registry as the source of truth
+    RubberDuck.Jido.Agents.Registry.list_agents()
   end
   
   @doc """
   Gets detailed agent info by ID.
   """
   def get_agent(agent_id) do
-    case find_agent_pid(agent_id) do
-      {:ok, pid} ->
-        get_agent_info(pid)
-        
-      error ->
-        error
-    end
+    # Use Registry as the source of truth
+    RubberDuck.Jido.Agents.Registry.get_agent(agent_id)
   end
   
   @doc """
@@ -209,6 +218,31 @@ defmodule RubberDuck.Jido.Agents.Supervisor do
     Logger.info("Rolling restart completed")
     :ok
   end
+  
+  @doc """
+  Finds agents by tag.
+  """
+  defdelegate find_by_tag(tag), to: RubberDuck.Jido.Agents.Registry
+  
+  @doc """
+  Finds agents by capability.
+  """
+  defdelegate find_by_capability(capability), to: RubberDuck.Jido.Agents.Registry
+  
+  @doc """
+  Finds agents by module.
+  """
+  defdelegate find_by_module(module), to: RubberDuck.Jido.Agents.Registry
+  
+  @doc """
+  Gets the least loaded agent.
+  """
+  defdelegate get_least_loaded(tag \\ nil), to: RubberDuck.Jido.Agents.Registry
+  
+  @doc """
+  Queries agents with criteria.
+  """
+  defdelegate query(criteria), to: RubberDuck.Jido.Agents.Registry
   
   @doc """
   Gets supervision tree statistics.
@@ -267,34 +301,14 @@ defmodule RubberDuck.Jido.Agents.Supervisor do
   end
   
   defp find_agent_pid(agent_id) do
-    # TODO: Use registry when implemented in phase 15.1.4.2
-    # For now, scan all children
-    find_agent_pid_by_scan(agent_id)
-  end
-  
-  defp find_agent_pid_by_scan(agent_id) do
-    # Fallback: scan all children
-    DynamicSupervisor.which_children(RubberDuck.Jido.Agents.DynamicSupervisor)
-    |> Enum.find_value({:error, :not_found}, fn {_, pid, _, _} ->
-      case RubberDuck.Jido.Agents.Server.get_id(pid) do
-        {:ok, ^agent_id} -> {:ok, pid}
-        _ -> false
-      end
-    end)
-  end
-  
-  defp get_agent_info(pid) when is_pid(pid) do
-    try do
-      case RubberDuck.Jido.Agents.Server.get_info(pid) do
-        {:ok, info} -> {:ok, info}
-        _ -> {:error, :info_unavailable}
-      end
-    catch
-      :exit, _ -> {:error, :agent_dead}
+    case RubberDuck.Jido.Agents.Registry.get_agent(agent_id) do
+      {:ok, agent_info} -> {:ok, agent_info.pid}
+      {:error, :not_found} -> {:error, :not_found}
     end
   end
   
-  defp restart_agent(%{agent_id: agent_id, pid: pid}) do
+  
+  defp restart_agent(%{id: agent_id, pid: pid}) do
     Logger.info("Restarting agent #{agent_id}")
     
     # Record restart
@@ -312,13 +326,13 @@ defmodule RubberDuck.Jido.Agents.Supervisor do
   
   defp group_by_module(agents) do
     agents
-    |> Enum.group_by(& &1.agent_module)
+    |> Enum.group_by(& &1.module)
     |> Map.new(fn {module, list} -> {module, length(list)} end)
   end
   
   defp group_by_restart_policy(agents) do
     agents
-    |> Enum.group_by(& &1.restart_policy)
+    |> Enum.group_by(fn agent -> Map.get(agent.metadata, :restart_policy, :permanent) end)
     |> Map.new(fn {policy, list} -> {policy, length(list)} end)
   end
   

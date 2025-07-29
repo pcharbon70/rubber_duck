@@ -17,6 +17,9 @@ defmodule RubberDuck.Jido.Agents.ExampleAgent do
       messages: [type: {:list, :string}, default: []],
       status: [type: {:in, [:idle, :busy, :error]}, default: :idle],
       last_action: [type: {:or, [:string, nil]}, default: nil]
+    ],
+    actions: [
+      RubberDuck.Jido.Actions.Increment
     ]
   
   require Logger

@@ -119,15 +119,13 @@ defmodule RubberDuck.Jido.Agents.Server do
             started_at: DateTime.utc_now(),
             actions_executed: 0,
             signals_received: 0,
-            errors: 0
+            errors: 0,
+            current_load: 0,
+            processing_count: 0
           }
         }
         
-        # Register with registry if available
-        # TODO: Implement in phase 15.1.4.2
-        # if Code.ensure_loaded?(RubberDuck.Jido.Agents.Registry) do
-        #   RubberDuck.Jido.Agents.Registry.register(agent_id, self(), metadata)
-        # end
+        # Note: Registration is handled by the supervisor
         
         # Send telemetry
         :telemetry.execute(
@@ -174,10 +172,24 @@ defmodule RubberDuck.Jido.Agents.Server do
     
     start_time = System.monotonic_time(:microsecond)
     
+    # Update load metrics
+    new_stats = state.stats
+    |> Map.update!(:current_load, &(&1 + 1))
+    |> Map.update!(:processing_count, &(&1 + 1))
+    
+    # Report load to registry
+    RubberDuck.Jido.Agents.Registry.update_load(state.agent_id, new_stats.current_load)
+    
+    state = %{state | stats: new_stats}
+    
     # Plan and execute the action through the agent module
     result = with {:ok, planned_agent} <- state.agent_module.plan(state.agent, action, params),
-                  {:ok, executed_agent} <- state.agent_module.run(planned_agent) do
-      {:ok, executed_agent}
+                  run_result <- state.agent_module.run(planned_agent) do
+      case run_result do
+        {:ok, executed_agent, _metadata} -> {:ok, executed_agent}
+        {:ok, executed_agent} -> {:ok, executed_agent}
+        error -> error
+      end
     end
     
     duration = System.monotonic_time(:microsecond) - start_time
@@ -185,7 +197,12 @@ defmodule RubberDuck.Jido.Agents.Server do
     # Update stats and agent based on result
     {reply, new_state} = case result do
       {:ok, updated_agent} ->
-        stats = Map.update!(state.stats, :actions_executed, &(&1 + 1))
+        stats = state.stats
+        |> Map.update!(:actions_executed, &(&1 + 1))
+        |> Map.update!(:current_load, &(max(0, &1 - 1)))
+        
+        # Report decreased load to registry
+        RubberDuck.Jido.Agents.Registry.update_load(state.agent_id, stats.current_load)
         
         :telemetry.execute(
           [:rubber_duck, :jido, :agent, :action_executed],
@@ -203,6 +220,10 @@ defmodule RubberDuck.Jido.Agents.Server do
         stats = state.stats
         |> Map.update!(:actions_executed, &(&1 + 1))
         |> Map.update!(:errors, &(&1 + 1))
+        |> Map.update!(:current_load, &(max(0, &1 - 1)))
+        
+        # Report decreased load to registry
+        RubberDuck.Jido.Agents.Registry.update_load(state.agent_id, stats.current_load)
         
         :telemetry.execute(
           [:rubber_duck, :jido, :agent, :action_failed],
@@ -265,11 +286,8 @@ defmodule RubberDuck.Jido.Agents.Server do
   def terminate(reason, state) do
     Logger.info("Agent server #{state.agent_id} terminating: #{inspect(reason)}")
     
-    # Unregister from registry
-    # TODO: Implement in phase 15.1.4.2
-    # if Code.ensure_loaded?(RubberDuck.Jido.Agents.Registry) do
-    #   RubberDuck.Jido.Agents.Registry.unregister(state.agent_id)
-    # end
+    # Note: Unregistration is handled by the Supervisor when it stops agents
+    # The Registry also monitors processes and auto-unregisters on termination
     
     # Send telemetry
     :telemetry.execute(
