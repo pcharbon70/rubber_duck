@@ -72,7 +72,17 @@ defmodule RubberDuck.Jido.Agents.Supervisor do
       {RubberDuck.Jido.Agents.ShutdownCoordinator, []},
       
       # Health monitoring system
-      {RubberDuck.Jido.Agents.HealthMonitor, []}
+      {RubberDuck.Jido.Agents.HealthMonitor, []},
+      
+      # Metrics aggregation
+      {RubberDuck.Jido.Agents.Metrics, []},
+      
+      # Start telemetry handlers after other components
+      {Task, fn -> 
+        Process.sleep(100)  # Give other components time to start
+        RubberDuck.Jido.Agents.Telemetry.attach_default_handlers()
+        RubberDuck.Jido.Agents.Telemetry.start_resource_monitoring()
+      end}
     ]
     
     Supervisor.init(children, 

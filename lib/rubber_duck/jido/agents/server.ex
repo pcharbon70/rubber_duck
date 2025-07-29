@@ -134,6 +134,9 @@ defmodule RubberDuck.Jido.Agents.Server do
           %{agent_module: agent_module, agent_id: agent_id}
         )
         
+        # Also emit lifecycle telemetry
+        RubberDuck.Jido.Agents.Telemetry.agent_spawned(agent_id, agent_module, metadata)
+        
         {:ok, state}
         
       {:error, reason} ->
@@ -170,8 +173,6 @@ defmodule RubberDuck.Jido.Agents.Server do
   def handle_call({:execute_action, action, params}, _from, state) do
     Logger.debug("Executing action #{inspect(action)} on agent #{state.agent_id}")
     
-    start_time = System.monotonic_time(:microsecond)
-    
     # Update load metrics
     new_stats = state.stats
     |> Map.update!(:current_load, &(&1 + 1))
@@ -181,6 +182,17 @@ defmodule RubberDuck.Jido.Agents.Server do
     RubberDuck.Jido.Agents.Registry.update_load(state.agent_id, new_stats.current_load)
     
     state = %{state | stats: new_stats}
+    
+    # Use telemetry for action execution
+    start_time = System.monotonic_time()
+    metadata = %{agent_id: state.agent_id, agent_module: state.agent_module, action: action}
+    
+    # Emit start event
+    :telemetry.execute(
+      [:rubber_duck, :agent, :action, :start],
+      %{system_time: System.system_time()},
+      metadata
+    )
     
     # Plan and execute the action through the agent module
     result = with {:ok, planned_agent} <- state.agent_module.plan(state.agent, action, params),
@@ -192,7 +204,7 @@ defmodule RubberDuck.Jido.Agents.Server do
       end
     end
     
-    duration = System.monotonic_time(:microsecond) - start_time
+    duration = System.monotonic_time() - start_time
     
     # Update stats and agent based on result
     {reply, new_state} = case result do
@@ -204,14 +216,11 @@ defmodule RubberDuck.Jido.Agents.Server do
         # Report decreased load to registry
         RubberDuck.Jido.Agents.Registry.update_load(state.agent_id, stats.current_load)
         
+        # Emit stop event
         :telemetry.execute(
-          [:rubber_duck, :jido, :agent, :action_executed],
+          [:rubber_duck, :agent, :action, :stop],
           %{duration: duration},
-          %{
-            agent_id: state.agent_id,
-            action: action,
-            success: true
-          }
+          metadata
         )
         
         {{:ok, updated_agent}, %{state | agent: updated_agent, stats: stats}}
@@ -225,15 +234,15 @@ defmodule RubberDuck.Jido.Agents.Server do
         # Report decreased load to registry
         RubberDuck.Jido.Agents.Registry.update_load(state.agent_id, stats.current_load)
         
+        # Emit exception event
         :telemetry.execute(
-          [:rubber_duck, :jido, :agent, :action_failed],
+          [:rubber_duck, :agent, :action, :exception],
           %{duration: duration},
-          %{
-            agent_id: state.agent_id,
-            action: action,
-            reason: reason
-          }
+          Map.merge(metadata, %{kind: :error, reason: reason})
         )
+        
+        # Emit error telemetry
+        RubberDuck.Jido.Agents.Telemetry.agent_error(state.agent_id, reason, metadata)
         
         {error, %{state | stats: stats}}
     end
@@ -289,6 +298,19 @@ defmodule RubberDuck.Jido.Agents.Server do
   end
   
   @impl true
+  def handle_info({:system, :drain}, state) do
+    # Handle graceful shutdown drain phase
+    Logger.debug("Agent #{state.agent_id} entering drain phase")
+    {:noreply, state}
+  end
+  
+  @impl true
+  def handle_info(msg, state) do
+    Logger.warning("Agent server #{state.agent_id} received unexpected message: #{inspect(msg)}")
+    {:noreply, state}
+  end
+  
+  @impl true
   def terminate(reason, state) do
     Logger.info("Agent server #{state.agent_id} terminating: #{inspect(reason)}")
     
@@ -305,6 +327,12 @@ defmodule RubberDuck.Jido.Agents.Server do
         reason: reason
       }
     )
+    
+    # Also emit lifecycle telemetry
+    RubberDuck.Jido.Agents.Telemetry.agent_terminated(state.agent_id, reason, %{
+      agent_module: state.agent_module,
+      uptime: DateTime.diff(DateTime.utc_now(), state.stats.started_at, :second)
+    })
     
     :ok
   end

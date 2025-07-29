@@ -209,8 +209,80 @@ alert_threshold: 5          # Consecutive failures before alert
 - Automatic monitoring on agent start (optional)
 - Health status preserved even after monitor stops
 
+## Phase 5: Agent Lifecycle Telemetry (15.1.4.5) - COMPLETED
+
+### 8. Telemetry Module (`RubberDuck.Jido.Agents.Telemetry`)
+- **Purpose**: Comprehensive telemetry and observability for agents
+- **Features**:
+  - Lifecycle event tracking (spawn, terminate, state changes, errors, recovery)
+  - Performance event tracking with span support
+  - Resource usage reporting (memory, CPU, message queues)
+  - Default handlers for logging and metrics
+  - Integration with standard telemetry libraries
+
+- **Key Methods**:
+  - `agent_spawned/3` - Emit spawn event
+  - `agent_terminated/3` - Emit termination event
+  - `agent_state_changed/4` - Track state transitions
+  - `agent_error/3` - Track errors
+  - `span_action/4` - Wrap action execution with telemetry
+  - `report_agent_resources/2` - Report resource usage
+  - `attach_default_handlers/0` - Set up default logging
+
+### 9. Metrics Module (`RubberDuck.Jido.Agents.Metrics`)
+- **Purpose**: Real-time metrics aggregation and export
+- **Features**:
+  - Time-series data collection with circular buffers
+  - Statistical aggregations (P50, P95, P99, mean)
+  - Throughput and error rate calculations
+  - Prometheus and StatsD export formats
+  - Per-agent and system-wide metrics
+  - Automatic telemetry event collection
+
+- **Key Methods**:
+  - `record_action/4` - Record action execution
+  - `record_resources/4` - Record resource usage
+  - `get_agent_metrics/1` - Get metrics for specific agent
+  - `get_system_metrics/0` - Get system-wide metrics
+  - `export_prometheus/0` - Export in Prometheus format
+  - `export_statsd/0` - Export in StatsD format
+
+### Telemetry Events
+
+The system emits the following telemetry events:
+
+#### Lifecycle Events
+- `[:rubber_duck, :agent, :spawn]` - Agent process started
+- `[:rubber_duck, :agent, :terminate]` - Agent process stopped
+- `[:rubber_duck, :agent, :state_change]` - Agent state changed
+- `[:rubber_duck, :agent, :error]` - Error occurred
+- `[:rubber_duck, :agent, :recovery]` - Agent recovered
+
+#### Performance Events
+- `[:rubber_duck, :agent, :action, :start]` - Action execution started
+- `[:rubber_duck, :agent, :action, :stop]` - Action execution completed
+- `[:rubber_duck, :agent, :action, :exception]` - Action execution failed
+- `[:rubber_duck, :agent, :queue, :depth]` - Queue depth measurement
+
+#### Resource Events
+- `[:rubber_duck, :agent, :memory]` - Memory usage
+- `[:rubber_duck, :agent, :cpu]` - CPU usage (via reductions)
+- `[:rubber_duck, :agent, :message_queue]` - Message queue length
+
+#### Health Events
+- `[:rubber_duck, :agent, :health_check]` - Health check performed
+- `[:rubber_duck, :agent, :circuit_breaker]` - Circuit state changed
+- `[:rubber_duck, :agent, :health_alert]` - Health alert triggered
+
+### Integration Updates
+- Telemetry and Metrics added to supervision tree
+- Agent Server emits lifecycle and action events
+- Automatic resource monitoring with configurable intervals
+- Metrics aggregation runs every second
+- Default handlers log important events
+
 ## Known Limitations
-1. Lifecycle telemetry not implemented (Phase 15.1.4.5)
+None - all phases of 15.1.4 are now complete!
 
 ## Migration Notes
 - Existing agents using BaseAgent work without modification
@@ -346,4 +418,50 @@ report = HealthMonitor.health_report()
 # Manual circuit control
 HealthMonitor.trip_circuit("problematic_agent")  # Force circuit open
 HealthMonitor.reset_circuit("recovered_agent")   # Force circuit closed
+```
+
+### Telemetry and Metrics
+```elixir
+# Attach default telemetry handlers
+Telemetry.attach_default_handlers()
+
+# Custom telemetry handler
+:telemetry.attach(
+  "my-agent-handler",
+  [:rubber_duck, :agent, :spawn],
+  fn _event, measurements, metadata, _config ->
+    IO.puts("Agent spawned: #{metadata.agent_id}")
+  end,
+  nil
+)
+
+# Start automatic resource monitoring
+Telemetry.start_resource_monitoring(30_000)  # Every 30 seconds
+
+# Get agent metrics
+{:ok, metrics} = Metrics.get_agent_metrics("worker_1")
+# => %{
+#   latency_p50: 1200,      # microseconds
+#   latency_p95: 3500,
+#   latency_p99: 8000,
+#   latency_mean: 1850.5,
+#   throughput: 125.3,      # ops/sec
+#   error_rate: 0.02        # 2% errors
+# }
+
+# Get system-wide metrics
+{:ok, system} = Metrics.get_system_metrics()
+# => %{
+#   total_agents: 25,
+#   total_throughput: 3150.5,
+#   avg_latency: 1650.3,
+#   total_errors: 42
+# }
+
+# Export metrics for monitoring systems
+{:ok, prometheus_data} = Metrics.export_prometheus()
+# Returns Prometheus-formatted metrics string
+
+{:ok, statsd_data} = Metrics.export_statsd()
+# Returns StatsD-formatted metrics
 ```
