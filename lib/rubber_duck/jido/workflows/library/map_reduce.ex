@@ -44,10 +44,10 @@ defmodule RubberDuck.Jido.Workflows.Library.MapReduce do
     argument :map_action, input(:map_action)
     argument :reduce_action, input(:reduce_action)
     
-    run fn arguments, _context, _options ->
-      with :ok <- validate_data(arguments.data),
-           :ok <- validate_action(arguments.map_action),
-           :ok <- validate_action(arguments.reduce_action) do
+    run fn %{data: data, map_action: map_action, reduce_action: reduce_action} ->
+      with :ok <- validate_data(data),
+           :ok <- validate_action(map_action),
+           :ok <- validate_action(reduce_action) do
         {:ok, :valid}
       else
         {:error, reason} -> {:error, {:validation_failed, reason}}
@@ -59,9 +59,9 @@ defmodule RubberDuck.Jido.Workflows.Library.MapReduce do
     argument :data, input(:data)
     argument :batch_size, input(:chunk_size)
     
-    run fn arguments, _context, _options ->
-      batch_size = arguments[:batch_size] || 10
-      batches = Enum.chunk_every(arguments.data, batch_size)
+    run fn %{data: data, chunk_size: chunk_size} ->
+      batch_size = chunk_size || 10
+      batches = Enum.chunk_every(data, batch_size)
       
       {:ok, %{
         batches: batches,
@@ -80,15 +80,15 @@ defmodule RubberDuck.Jido.Workflows.Library.MapReduce do
     argument :agents, result(:select_map_agents)
     argument :map_action, input(:map_action)
     
-    run fn arguments, _context, _options ->
+    run fn %{batches: batches, agents: agents, map_action: map_action} ->
       # Create tasks for each batch-agent pair
-      tasks = arguments.batches
-      |> Enum.zip(Stream.cycle(arguments.agents))
+      tasks = batches
+      |> Enum.zip(Stream.cycle(agents))
       |> Enum.map(fn {batch, agent_id} ->
         %{
           agent_id: agent_id,
           batch: batch,
-          map_action: arguments.map_action
+          map_action: map_action
         }
       end)
       
@@ -99,11 +99,11 @@ defmodule RubberDuck.Jido.Workflows.Library.MapReduce do
   step :execute_map_phase do
     argument :tasks, result(:distribute_map_tasks)
     
-    run fn arguments, _context, _options ->
+    run fn %{tasks: tasks} ->
       timeout = 30_000
       
       # Execute map tasks in parallel
-      results = arguments.tasks
+      results = tasks
       |> Task.async_stream(
         fn task ->
           params = %{

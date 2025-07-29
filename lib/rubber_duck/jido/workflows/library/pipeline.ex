@@ -44,12 +44,12 @@ defmodule RubberDuck.Jido.Workflows.Library.Pipeline do
     argument :stages, input(:stages)
     argument :data, input(:data)
     
-    run fn arguments, _context, _options ->
-      with :ok <- validate_steps(arguments.stages),
-           :ok <- validate_data(arguments.data) do
+    run fn %{stages: stages, data: data} ->
+      with :ok <- validate_steps(stages),
+           :ok <- validate_data(data) do
         {:ok, %{
-          stages: arguments.stages,
-          step_count: length(arguments.stages)
+          stages: stages,
+          step_count: length(stages)
         }}
       end
     end
@@ -58,10 +58,10 @@ defmodule RubberDuck.Jido.Workflows.Library.Pipeline do
   step :initialize_pipeline do
     argument :data, input(:data)
     
-    run fn arguments, _context, _options ->
+    run fn %{data: data} ->
       {:ok, %{
-        current_data: arguments.data,
-        workflow_id: arguments[:workflow_id] || generate_id(),
+        current_data: data,
+        workflow_id: generate_id(),
         completed_steps: [],
         step_results: %{}
       }}
@@ -74,13 +74,13 @@ defmodule RubberDuck.Jido.Workflows.Library.Pipeline do
     argument :pipeline_state, result(:initialize_pipeline)
     argument :stages, input(:stages)
     
-    run fn arguments, context, _options ->
+    run fn %{pipeline_state: pipeline_state, stages: stages} ->
       execute_steps(
-        arguments.steps,
-        arguments.pipeline_state,
-        arguments[:checkpoint_after] || [],
-        arguments[:timeout] || 30_000,
-        context
+        stages,
+        pipeline_state,
+        [],
+        30_000,
+        %{}
       )
     end
   end
@@ -88,8 +88,8 @@ defmodule RubberDuck.Jido.Workflows.Library.Pipeline do
   step :finalize_result do
     argument :pipeline_result, result(:execute_pipeline)
     
-    run fn arguments, _context, _options ->
-      {:ok, arguments.pipeline_result.current_data}
+    run fn %{pipeline_result: pipeline_result} ->
+      {:ok, pipeline_result.current_data}
     end
   end
   
