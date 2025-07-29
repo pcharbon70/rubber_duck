@@ -112,6 +112,20 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
     GenServer.call(__MODULE__, :list_workflows)
   end
   
+  @doc """
+  Update workflow parameters for running workflows.
+  """
+  def update_workflow(workflow_id, updates) do
+    GenServer.call(__MODULE__, {:update_workflow, workflow_id, updates})
+  end
+  
+  @doc """
+  Get workflow execution logs.
+  """
+  def get_workflow_logs(workflow_id, opts \\ []) do
+    GenServer.call(__MODULE__, {:get_workflow_logs, workflow_id, opts})
+  end
+  
   # Server callbacks
   
   @impl true
@@ -291,6 +305,43 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
   end
   
   @impl true
+  def handle_call({:update_workflow, workflow_id, updates}, _from, state) do
+    case Map.get(state.workflows, workflow_id) do
+      nil ->
+        {:reply, {:error, :not_found}, state}
+      
+      workflow_state ->
+        # Basic validation - only allow updating certain fields
+        allowed_updates = [:context, :metadata, :timeout]
+        filtered_updates = Map.take(updates, allowed_updates)
+        
+        updated_workflow = Map.merge(workflow_state, filtered_updates)
+        updated_workflows = Map.put(state.workflows, workflow_id, updated_workflow)
+        new_state = %{state | workflows: updated_workflows}
+        
+        {:reply, {:ok, updated_workflow}, new_state}
+    end
+  end
+  
+  @impl true
+  def handle_call({:get_workflow_logs, workflow_id, opts}, _from, state) do
+    case Map.get(state.workflows, workflow_id) do
+      nil ->
+        {:reply, {:error, :not_found}, state}
+      
+      _workflow_state ->
+        # Fetch logs from telemetry or logging system
+        # For now, return mock logs
+        limit = Keyword.get(opts, :limit, 100)
+        offset = Keyword.get(opts, :offset, 0)
+        level = Keyword.get(opts, :level, "info")
+        
+        logs = generate_mock_logs(workflow_id, limit, offset, level)
+        {:reply, {:ok, logs}, state}
+    end
+  end
+  
+  @impl true
   def handle_info(:cleanup, state) do
     # Clean up completed workflows older than 1 hour
     cutoff = DateTime.add(DateTime.utc_now(), -3600, :second)
@@ -359,4 +410,41 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
   
   
   # Telemetry helpers
+  
+  defp generate_mock_logs(workflow_id, limit, offset, level) do
+    # Generate mock log entries for demo purposes
+    # In a real implementation, this would query the logging system
+    base_logs = [
+      %{
+        timestamp: DateTime.utc_now() |> DateTime.add(-300, :second),
+        level: "info",
+        message: "Workflow #{workflow_id} started",
+        metadata: %{workflow_id: workflow_id, step: "initialization"}
+      },
+      %{
+        timestamp: DateTime.utc_now() |> DateTime.add(-280, :second),
+        level: "debug",
+        message: "Agent selection for step 'validate_input'",
+        metadata: %{workflow_id: workflow_id, step: "validate_input", agent_id: "agent_123"}
+      },
+      %{
+        timestamp: DateTime.utc_now() |> DateTime.add(-260, :second),
+        level: "info",
+        message: "Step 'validate_input' completed successfully",
+        metadata: %{workflow_id: workflow_id, step: "validate_input", duration: 1200}
+      }
+    ]
+    
+    # Filter by level if specified
+    filtered_logs = if level != "info" do
+      Enum.filter(base_logs, fn log -> log.level == level end)
+    else
+      base_logs
+    end
+    
+    # Apply pagination
+    filtered_logs
+    |> Enum.drop(offset)
+    |> Enum.take(limit)
+  end
 end
