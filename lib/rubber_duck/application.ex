@@ -39,6 +39,8 @@ defmodule RubberDuck.Application do
       # Agent system components
       RubberDuck.Agents.AgentRegistry,
       RubberDuck.Agents.Supervisor,
+      # Jido agent framework integration
+      RubberDuck.Jido.Supervisor,
       # Context building components
       RubberDuck.Context.Cache,
       RubberDuck.Context.AdaptiveSelector,
