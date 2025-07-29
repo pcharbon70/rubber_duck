@@ -9,7 +9,7 @@ defmodule RubberDuck.Tool.Composition.Patterns.ParallelAggregation do
   - Error handling for partial failures
   """
 
-  use RubberDuck.Workflows.Workflow
+  use RubberDuck.Workflows.WorkflowBehavior
 
   workflow do
     # Parallel data fetching from multiple sources

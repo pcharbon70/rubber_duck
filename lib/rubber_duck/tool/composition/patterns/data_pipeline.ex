@@ -10,7 +10,7 @@ defmodule RubberDuck.Tool.Composition.Patterns.DataPipeline do
   - Error handling and monitoring
   """
 
-  use RubberDuck.Workflows.Workflow
+  use RubberDuck.Workflows.WorkflowBehavior
 
   workflow do
     # Step 1: Fetch data from source

@@ -9,7 +9,7 @@ defmodule RubberDuck.Tool.Composition.Patterns.ConditionalProcessing do
   - Result aggregation
   """
 
-  use RubberDuck.Workflows.Workflow
+  use RubberDuck.Workflows.WorkflowBehavior
 
   workflow do
     # Step 1: Assess the input to determine processing path

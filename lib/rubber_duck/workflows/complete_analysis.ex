@@ -36,7 +36,7 @@ defmodule RubberDuck.Workflows.CompleteAnalysis do
       })
   """
 
-  use RubberDuck.Workflows.Workflow
+  use RubberDuck.Workflows.WorkflowBehavior
 
   alias RubberDuck.Analysis.{Analyzer, AST}
   alias RubberDuck.LLM.Service, as: LLMService

@@ -10,7 +10,7 @@ defmodule RubberDuck.Tool.Composition.Patterns.BatchProcessing do
   - Progress tracking and reporting
   """
 
-  use RubberDuck.Workflows.Workflow
+  use RubberDuck.Workflows.WorkflowBehavior
 
   workflow do
     # Step 1: Partition input data into batches
