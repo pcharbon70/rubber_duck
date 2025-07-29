@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
+	
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -37,32 +38,37 @@ type Chat struct {
 	width    int
 	height   int
 	focused  bool
-	theme    *Theme
+	renderer *glamour.TermRenderer
 }
 
 // NewChat creates a new chat component
 func NewChat() *Chat {
-	// Initialize viewport
-	vp := viewport.New(80, 20)
-	vp.SetContent("")
-
-	// Initialize input textarea
+	// Initialize viewport for message history
+	vp := viewport.New(0, 0)
+	
+	// Initialize textarea for input
 	ta := textarea.New()
 	ta.Placeholder = "Type a message... (Enter to send, Ctrl+Enter for newline)"
 	ta.ShowLineNumbers = false
 	ta.SetHeight(3)
-	ta.SetWidth(80)
-	ta.CharLimit = 0 // No limit
 	ta.Focus()
-
-	return &Chat{
-		messages: make([]ChatMessage, 0),
+	
+	chat := &Chat{
+		messages: []ChatMessage{},
 		viewport: vp,
 		input:    ta,
 		width:    80,
 		height:   24,
-		focused:  false,
+		focused:  true,
+		renderer: nil, // Defer renderer creation
 	}
+	
+	// No welcome message - keep chat clean on startup
+	
+	// Set initial viewport content
+	chat.viewport.SetContent(chat.buildViewportContent())
+	
+	return chat
 }
 
 // Init initializes the chat component
@@ -90,8 +96,10 @@ func (c Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					c.input.SetValue("")
 					c.input.Reset()
 					
-					// Add user message to history
-					c.AddMessage(UserMessage, content, "user")
+					// Check for slash commands
+					if strings.HasPrefix(content, "/") {
+						return c, c.handleSlashCommand(content)
+					}
 					
 					// Return command to send message
 					return c, func() tea.Msg {
@@ -105,6 +113,12 @@ func (c Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case tea.KeyCtrlC:
 				// Let ctrl+c bubble up for quit handling
 				return c, nil
+				
+			case tea.KeyEsc:
+				// Return cancel request message to be handled by main update
+				return c, func() tea.Msg {
+					return CancelRequestMsg{}
+				}
 				
 			default:
 				// Handle multiline with Ctrl+Enter (represented as Ctrl+J in some terminals)
@@ -123,7 +137,7 @@ func (c Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, inputCmd)
 	}
 
-	// Always update viewport for scrolling
+	// Update viewport
 	c.viewport, vpCmd = c.viewport.Update(msg)
 	cmds = append(cmds, vpCmd)
 
@@ -132,73 +146,63 @@ func (c Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the chat component
 func (c Chat) View() string {
-	if c.width == 0 || c.height == 0 {
-		return ""
-	}
-
-	// Update viewport content
-	c.viewport.SetContent(c.buildViewportContent())
-
-	// Get styles
-	theme := c.getTheme()
-	
-	// Chat container style
-	chatStyle := lipgloss.NewStyle().
+	// Add a title/label at the top
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("62")).
 		Width(c.width).
-		Height(c.height).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(theme.Border)
-
-	if c.focused {
-		chatStyle = chatStyle.BorderForeground(theme.Selection)
-	}
-
-	// Build the view
+		Align(lipgloss.Center).
+		MarginBottom(1)
+	
+	title := titleStyle.Render("◆ Conversation History ◆")
+	
+	// Build the view with title
+	// Add a separator line between viewport and input
+	separator := lipgloss.NewStyle().
+		Width(c.width-2).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderTop(true).
+		BorderForeground(lipgloss.Color("240")).
+		Render("")
+	
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
+		title,
 		c.viewport.View(),
+		separator,
 		lipgloss.NewStyle().
 			Width(c.width-2).
-			Border(lipgloss.NormalBorder(), true, false, false, false).
-			BorderForeground(theme.Border).
 			Render(c.input.View()),
 	)
 
-	return chatStyle.Render(content)
+	return content
 }
 
-// SetSize updates the chat dimensions
+// SetSize updates the chat component dimensions
 func (c *Chat) SetSize(width, height int) {
 	c.width = width
 	c.height = height
+	// Update viewport size (leaving room for input and title)
+	c.viewport.Width = width
+	c.viewport.Height = height - 7 // Leave room for input area and title
+	c.input.SetWidth(width)
 	
-	// Update viewport size (leave room for input and borders)
-	viewportHeight := height - 5 // 3 for input + 2 for borders
-	if viewportHeight < 1 {
-		viewportHeight = 1
+	// Clear renderer to force recreation with new width
+	if c.renderer != nil && c.width != width {
+		c.renderer = nil
 	}
-	c.viewport.Width = width - 2  // Account for borders
-	c.viewport.Height = viewportHeight
-	
-	// Update input width
-	c.input.SetWidth(width - 2)
 }
 
-// Focus sets focus on the chat input
+// Focus sets the focus state
 func (c *Chat) Focus() {
 	c.focused = true
 	c.input.Focus()
 }
 
-// Blur removes focus from the chat input
+// Blur removes focus
 func (c *Chat) Blur() {
 	c.focused = false
 	c.input.Blur()
-}
-
-// IsFocused returns whether the chat is focused
-func (c Chat) IsFocused() bool {
-	return c.focused
 }
 
 // AddMessage adds a message to the chat history
@@ -209,117 +213,443 @@ func (c *Chat) AddMessage(msgType MessageType, content, author string) {
 		Author:    author,
 		Timestamp: time.Now(),
 	}
-	
 	c.messages = append(c.messages, msg)
 	
-	// Update viewport content and scroll to bottom
+	// Update viewport content
 	c.viewport.SetContent(c.buildViewportContent())
+	
+	// Auto-scroll to bottom
 	c.viewport.GotoBottom()
+}
+
+// GetMessages returns all messages
+func (c *Chat) GetMessages() []ChatMessage {
+	return c.messages
 }
 
 // ClearMessages clears all messages from the chat
 func (c *Chat) ClearMessages() {
 	c.messages = []ChatMessage{}
-	c.viewport.SetContent("")
+	c.viewport.SetContent(c.buildViewportContent())
+	c.viewport.GotoTop()
 }
 
-// SetTheme sets the theme for styling
-func (c *Chat) SetTheme(theme *Theme) {
-	c.theme = theme
+// GetMessageCount returns the number of messages
+func (c *Chat) GetMessageCount() int {
+	return len(c.messages)
+}
+
+// GetAllMessagesPlainText returns all messages as plain text for copying
+func (c *Chat) GetAllMessagesPlainText() string {
+	if len(c.messages) == 0 {
+		return ""
+	}
+	
+	var content strings.Builder
+	for i, msg := range c.messages {
+		if i > 0 {
+			content.WriteString("\n\n")
+		}
+		
+		// Format timestamp
+		timestamp := msg.Timestamp.Format("15:04:05")
+		
+		// Format author
+		var prefix string
+		switch msg.Type {
+		case UserMessage:
+			prefix = "You"
+		case AssistantMessage:
+			prefix = "Assistant"
+		case SystemMessage:
+			prefix = "System"
+		case ErrorMessage:
+			prefix = "Error"
+		}
+		
+		// Write header and content
+		content.WriteString(fmt.Sprintf("%s [%s]\n%s", prefix, timestamp, msg.Content))
+	}
+	
+	return content.String()
+}
+
+// GetLastAssistantMessage returns the last assistant message as plain text
+func (c *Chat) GetLastAssistantMessage() string {
+	// Iterate backwards to find the last assistant message
+	for i := len(c.messages) - 1; i >= 0; i-- {
+		if c.messages[i].Type == AssistantMessage {
+			return c.messages[i].Content
+		}
+	}
+	return ""
+}
+
+// ensureRenderer lazily initializes the glamour renderer
+func (c *Chat) ensureRenderer() {
+	if c.renderer == nil && c.width > 4 {
+		// Use "dark" style as default for faster initialization
+		// This avoids the slow auto-detection on startup
+		c.renderer, _ = glamour.NewTermRenderer(
+			glamour.WithStylePath("dark"),
+			glamour.WithWordWrap(c.width - 4),
+		)
+	}
 }
 
 // buildViewportContent builds the formatted message history
-func (c Chat) buildViewportContent() string {
+func (c *Chat) buildViewportContent() string {
 	if len(c.messages) == 0 {
 		return lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240")).
 			Italic(true).
-			Render("No messages yet. Type a message and press Enter to send.")
+			Render("No messages yet. Type something to start the conversation!")
 	}
 
-	theme := c.getTheme()
-	var lines []string
+	var content strings.Builder
 	
-	for _, msg := range c.messages {
-		lines = append(lines, c.formatMessage(msg, theme))
+	// Define message styles
+	userStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("33")).
+		Bold(true)
+		
+	assistantStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("213")).
+		Bold(true)
+		
+	systemStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Italic(true)
+		
+	errorStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("196")).
+		Bold(true)
+		
+	timeStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240"))
+	
+	// Message content style with word wrapping
+	// Account for viewport width minus some padding
+	wrapWidth := c.viewport.Width
+	if wrapWidth <= 0 {
+		wrapWidth = c.width
+	}
+	if wrapWidth > 4 {
+		wrapWidth -= 4 // Leave some padding
 	}
 	
-	return strings.Join(lines, "\n\n")
+	messageStyle := lipgloss.NewStyle().
+		Width(wrapWidth)
+
+	for i, msg := range c.messages {
+		if i > 0 {
+			content.WriteString("\n\n")
+		}
+		
+		// Format timestamp
+		timestamp := msg.Timestamp.Format("15:04:05")
+		
+		// Format author and message based on type
+		var authorStyle lipgloss.Style
+		var prefix string
+		
+		switch msg.Type {
+		case UserMessage:
+			authorStyle = userStyle
+			prefix = "You"
+		case AssistantMessage:
+			authorStyle = assistantStyle
+			prefix = "Assistant"
+		case SystemMessage:
+			authorStyle = systemStyle
+			prefix = "System"
+		case ErrorMessage:
+			authorStyle = errorStyle
+			prefix = "Error"
+		}
+		
+		// Build message header
+		header := fmt.Sprintf("%s %s", 
+			authorStyle.Render(prefix),
+			timeStyle.Render(timestamp))
+		
+		content.WriteString(header)
+		content.WriteString("\n")
+		
+		// Render message content
+		var renderedContent string
+		
+		// Use markdown rendering for assistant messages
+		if msg.Type == AssistantMessage {
+			// Ensure renderer is initialized
+			c.ensureRenderer()
+			if c.renderer != nil {
+				// Try to render as markdown
+				markdownContent, err := c.renderer.Render(msg.Content)
+				if err == nil {
+					// Remove trailing newlines from glamour output
+					renderedContent = strings.TrimRight(markdownContent, "\n")
+				} else {
+					// Fallback to plain text with wrapping
+					renderedContent = messageStyle.Render(msg.Content)
+				}
+			} else {
+				// No renderer available, use plain text
+				renderedContent = messageStyle.Render(msg.Content)
+			}
+		} else {
+			// For user, system, and error messages, use plain text with wrapping
+			renderedContent = messageStyle.Render(msg.Content)
+		}
+		
+		content.WriteString(renderedContent)
+	}
+	
+	return content.String()
 }
 
-// formatMessage formats a single message based on its type
-func (c Chat) formatMessage(msg ChatMessage, theme *Theme) string {
-	timestamp := msg.Timestamp.Format("15:04:05")
+// handleSlashCommand processes slash commands
+func (c Chat) handleSlashCommand(command string) tea.Cmd {
+	// Remove the leading slash and convert to lowercase
+	cmd := strings.ToLower(strings.TrimPrefix(command, "/"))
+	parts := strings.Fields(cmd)
 	
-	// Style based on message type
-	var (
-		authorStyle  lipgloss.Style
-		contentStyle lipgloss.Style
-		prefix       string
-	)
-	
-	switch msg.Type {
-	case UserMessage:
-		prefix = "You"
-		authorStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(theme.KeywordType)
-		contentStyle = lipgloss.NewStyle().
-			Foreground(theme.Text)
-			
-	case AssistantMessage:
-		prefix = "Assistant"
-		authorStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(theme.Function)
-		contentStyle = lipgloss.NewStyle().
-			Foreground(theme.Text)
-			
-	case SystemMessage:
-		prefix = "System"
-		authorStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(theme.Comment)
-		contentStyle = lipgloss.NewStyle().
-			Foreground(theme.Comment).
-			Italic(true)
-			
-	case ErrorMessage:
-		prefix = "Error"
-		authorStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(theme.ErrorText)
-		contentStyle = lipgloss.NewStyle().
-			Foreground(theme.ErrorText)
+	if len(parts) == 0 {
+		return nil
 	}
 	
-	// Build the message
-	header := fmt.Sprintf("%s %s [%s]", 
-		authorStyle.Render(prefix),
-		lipgloss.NewStyle().Foreground(theme.Comment).Render("•"),
-		lipgloss.NewStyle().Foreground(theme.Comment).Render(timestamp),
-	)
-	
-	// Format content with proper indentation for multiline
-	lines := strings.Split(msg.Content, "\n")
-	formattedLines := make([]string, len(lines))
-	for i, line := range lines {
-		formattedLines[i] = contentStyle.Render(line)
+	// Handle different slash commands
+	switch parts[0] {
+	case "help", "h", "?":
+		return func() tea.Msg {
+			return ExecuteCommandMsg{Command: "help"}
+		}
+		
+	case "model", "m":
+		if len(parts) > 1 {
+			// Handle model selection with optional provider
+			modelName := strings.Join(parts[1:], " ")
+			
+			// Check if provider is included (format: "model provider")
+			modelParts := strings.Fields(modelName)
+			if len(modelParts) > 1 {
+				// Model and provider specified
+				model := modelParts[0]
+				provider := strings.Join(modelParts[1:], " ")
+				return func() tea.Msg {
+					return ExecuteCommandMsg{
+						Command: "set_model_with_provider",
+						Args: map[string]string{
+							"model":    model,
+							"provider": provider,
+						},
+					}
+				}
+			} else {
+				// Just model specified
+				return func() tea.Msg {
+					return ExecuteCommandMsg{
+						Command: "set_model",
+						Args: map[string]string{
+							"model": modelName,
+						},
+					}
+				}
+			}
+		} else {
+			// Show usage - add to chat
+			c.AddMessage(SystemMessage, "Usage: /model <name> [provider]\nExample: /model gpt-4\nExample: /model claude-3-opus anthropic", "system")
+		}
+		
+	case "provider", "p":
+		if len(parts) > 1 {
+			providerName := strings.Join(parts[1:], " ")
+			return func() tea.Msg {
+				return ExecuteCommandMsg{
+					Command: "set_provider",
+					Args:    map[string]string{"provider": providerName},
+				}
+			}
+		} else {
+			c.AddMessage(SystemMessage, "Usage: /provider <name>\nExample: /provider openai\nExample: /provider azure\nSets the provider for the current model", "system")
+		}
+		
+	case "clear", "cls", "new":
+		// Clear conversation
+		return func() tea.Msg {
+			return ExecuteCommandMsg{Command: "new_conversation"}
+		}
+		
+	case "tree", "files":
+		// Toggle file tree
+		return func() tea.Msg {
+			return ExecuteCommandMsg{Command: "toggle_tree"}
+		}
+		
+	case "editor", "edit":
+		// Toggle editor
+		return func() tea.Msg {
+			return ExecuteCommandMsg{Command: "toggle_editor"}
+		}
+		
+	case "commands", "cmds", "palette":
+		// Show command palette
+		return func() tea.Msg {
+			return tea.KeyMsg{Type: tea.KeyCtrlP}
+		}
+		
+	case "login":
+		// Login command
+		if len(parts) >= 3 {
+			username := parts[1]
+			password := strings.Join(parts[2:], " ")
+			return func() tea.Msg {
+				return ExecuteCommandMsg{
+					Command: "auth_login",
+					Args:    map[string]string{"username": username, "password": password},
+				}
+			}
+		} else {
+			c.AddMessage(SystemMessage, "Usage: /login <username> <password>", "system")
+		}
+		
+	case "logout":
+		// Logout command
+		return func() tea.Msg {
+			return ExecuteCommandMsg{Command: "auth_logout"}
+		}
+		
+	case "apikey", "api-key":
+		if len(parts) > 1 {
+			switch parts[1] {
+			case "generate", "gen", "new":
+				return func() tea.Msg {
+					return ExecuteCommandMsg{Command: "auth_apikey_generate"}
+				}
+			case "list", "ls":
+				return func() tea.Msg {
+					return ExecuteCommandMsg{Command: "auth_apikey_list"}
+				}
+			case "revoke", "rm", "delete":
+				if len(parts) > 2 {
+					return func() tea.Msg {
+						return ExecuteCommandMsg{
+							Command: "auth_apikey_revoke",
+							Args:    map[string]string{"id": parts[2]},
+						}
+					}
+				} else {
+					c.AddMessage(SystemMessage, "Usage: /apikey revoke <key-id>", "system")
+				}
+			case "save":
+				if len(parts) > 2 {
+					// Get the API key
+					apiKey := strings.Join(parts[2:], " ")
+					return func() tea.Msg {
+						return ExecuteCommandMsg{
+							Command: "auth_apikey_save",
+							Args:    map[string]string{
+								"apikey": apiKey,
+							},
+						}
+					}
+				} else {
+					c.AddMessage(SystemMessage, "Usage: /apikey save <api-key>\nSaves the server API key to ~/.rubber_duck/config.json", "system")
+				}
+			default:
+				c.AddMessage(SystemMessage, "Usage: /apikey <generate|list|revoke|save>", "system")
+			}
+		} else {
+			c.AddMessage(SystemMessage, "Usage: /apikey <generate|list|revoke|save>", "system")
+		}
+		
+	case "status", "auth":
+		// Check auth status
+		return func() tea.Msg {
+			return ExecuteCommandMsg{Command: "auth_status"}
+		}
+		
+	case "timestamps", "ts":
+		if len(parts) > 1 {
+			switch parts[1] {
+			case "on", "enable", "show":
+				return func() tea.Msg {
+					return ExecuteCommandMsg{Command: "timestamps_on"}
+				}
+			case "off", "disable", "hide":
+				return func() tea.Msg {
+					return ExecuteCommandMsg{Command: "timestamps_off"}
+				}
+			case "toggle":
+				return func() tea.Msg {
+					return ExecuteCommandMsg{Command: "timestamps_toggle"}
+				}
+			default:
+				c.AddMessage(SystemMessage, "Usage: /timestamps <on|off|toggle>\n  on    - Show timestamps in status messages\n  off   - Hide timestamps in status messages\n  toggle - Toggle timestamp display", "system")
+			}
+		} else {
+			// No subcommand, show current state and usage
+			return func() tea.Msg {
+				return ExecuteCommandMsg{Command: "timestamps_status"}
+			}
+		}
+		
+	case "config":
+		if len(parts) > 1 {
+			switch parts[1] {
+			case "save":
+				return func() tea.Msg {
+					return ExecuteCommandMsg{Command: "config_save"}
+				}
+			case "load", "reload":
+				return func() tea.Msg {
+					return ExecuteCommandMsg{Command: "config_load"}
+				}
+			default:
+				c.AddMessage(SystemMessage, "Usage: /config <save|load>\n  save - Save current provider/model as defaults\n  load - Load provider/model from config", "system")
+			}
+		} else {
+			c.AddMessage(SystemMessage, "Usage: /config <save|load>\n  save - Save current provider/model as defaults\n  load - Load provider/model from config", "system")
+		}
+		
+	case "plan":
+		// Start planning session with remaining input as query
+		if len(parts) > 1 {
+			query := strings.Join(parts[1:], " ")
+			return func() tea.Msg {
+				return ExecuteCommandMsg{
+					Command: "start_planning",
+					Args:    map[string]string{"query": query},
+				}
+			}
+		} else {
+			c.AddMessage(SystemMessage, "Usage: /plan <query>\nExample: /plan create a REST API for user management", "system")
+		}
+		
+	case "quit", "exit", "q":
+		// Quit application
+		return tea.Quit
+		
+	default:
+		// Unknown command - show help in chat
+		helpText := fmt.Sprintf("Unknown command: /%s\n\nAvailable commands:\n", parts[0])
+		helpText += "/help, /h, /?     - Show help\n"
+		helpText += "/model <name>      - Set AI model\n"
+		helpText += "/clear, /new       - New conversation\n"
+		helpText += "/tree, /files      - Toggle file tree\n"
+		helpText += "/editor, /edit     - Toggle editor\n"
+		helpText += "/commands, /cmds   - Show command palette\n"
+		helpText += "/provider <name>   - Set provider for current model\n"
+		helpText += "/config <save|load>- Save/load default provider and model\n"
+		helpText += "/timestamps <cmd>  - Control timestamp display\n"
+		helpText += "/plan <query>      - Start AI planning session\n"
+		helpText += "/login <user> <pw> - Login to server\n"
+		helpText += "/logout            - Logout from server\n"
+		helpText += "/apikey <cmd>      - API key management\n"
+		helpText += "/status, /auth     - Show auth status\n"
+		helpText += "/quit, /exit, /q   - Quit application"
+		c.AddMessage(SystemMessage, helpText, "system")
 	}
 	
-	return header + "\n" + strings.Join(formattedLines, "\n")
-}
-
-// getTheme returns the current theme or a default
-func (c Chat) getTheme() *Theme {
-	if c.theme != nil {
-		return c.theme
-	}
-	// Return default dark theme
-	return GetTheme("dark")
-}
-
-// GetMessages returns the chat messages (for testing or external access)
-func (c Chat) GetMessages() []ChatMessage {
-	return c.messages
+	return nil
 }

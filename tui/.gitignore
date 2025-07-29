@@ -26,3 +26,11 @@ vendor/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Debug files
+debug_wrapper.sh
+full_output.txt
+debug.log
+
+# TUI binary
+tui

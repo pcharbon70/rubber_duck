@@ -12,14 +12,23 @@ defmodule RubberDuck.Jido.Actions.Increment do
   
   @impl true
   def run(params, context) do
-    amount = Map.get(params, :amount, 1)
-    current_value = Map.get(context.agent.state, :counter, 0)
+    # Get amount from context first (user-provided), then params (schema default)
+    amount = Map.get(context, :amount, Map.get(params, :amount, 1))
+    
+    # Context might have state directly or within agent
+    state = case context do
+      %{agent: %{state: state}} -> state
+      %{state: state} -> state
+      _ -> %{}
+    end
+    
+    current_value = Map.get(state, :counter, 0)
     new_value = current_value + amount
     
-    # Update the agent's state
-    updated_state = Map.put(context.agent.state, :counter, new_value)
-    updated_agent = Map.put(context.agent, :state, updated_state)
+    # Update the state
+    updated_state = Map.put(state, :counter, new_value)
     
-    {:ok, %{value: new_value, increased_by: amount}, %{agent: updated_agent}}
+    # Return as a directive to update agent state
+    {:ok, {:set, updated_state}}
   end
 end

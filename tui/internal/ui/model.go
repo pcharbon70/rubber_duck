@@ -2,7 +2,7 @@ package ui
 
 import (
 	"time"
-
+	
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -14,230 +14,309 @@ import (
 type Pane int
 
 const (
-	ChatPane Pane = iota  // Chat is now the primary pane
+	ChatPane Pane = iota
 	FileTreePane
 	EditorPane
-	OutputPane  // Deprecated - output now shows in chat
+	OutputPane
 )
 
 // Model represents the application state
 type Model struct {
 	// Application state
-	files      []FileNode
-	editor     textarea.Model
-	output     viewport.Model
-	statusBar  string
+	activePane   Pane
+	width        int
+	height       int
+	err          error
 	
-	// WebSocket state
-	socket     *phx.Socket
-	channel    *phx.Channel
-	connected  bool
-	phoenixClient phoenix.PhoenixClient
-	phoenixConfig phoenix.Config
+	// Chat state
+	chat         *Chat
+	chatHeader   *ChatHeader
 	
-	// UI state
-	width      int
-	height     int
-	activePane Pane
+	// Status messages state
+	statusMessages *StatusMessages
 	
-	// Components
-	chat           *Chat
-	fileTree       FileTree
+	// File tree state (optional)
+	fileTree     *FileTree
+	showFileTree bool
+	
+	// Editor state (optional)
+	editor       textarea.Model
+	showEditor   bool
+	currentFile  string
+	
+	// Output pane state
+	output       viewport.Model
+	
+	// Phoenix WebSocket state
+	phoenixClient interface{} // Will be *phoenix.Client
+	authClient   interface{} // Will be *phoenix.AuthClient
+	statusClient interface{} // Will be *phoenix.StatusClient
+	apiKeyClient interface{} // Will be *phoenix.ApiKeyClient
+	planningClient interface{} // Will be *phoenix.PlanningClient
+	socket       *phx.Socket
+	authSocket   *phx.Socket // Separate socket for auth operations
+	channel      *phx.Channel
+	connected    bool
+	phoenixURL   string
+	authSocketURL string
+	apiKey       string
+	jwtToken     string // JWT token received after authentication
+	
+	// Auth state
+	authenticated bool
+	username      string
+	userID        string // User ID for api_keys channel
+	switchingSocket bool // True when switching from auth to user socket
+	
+	// Status bar
+	statusBar    string
+	systemMessage string // System message to display in status bar
+	
+	// Error handling
+	errorHandler *ErrorHandler
+	reconnectAttempts int
+	lastReconnectTime time.Time
+	totalConnectionAttempts int
+	connectionBlocked bool
+	
+	// Modal states
+	modal        Modal
 	commandPalette CommandPalette
-	modal          Modal
-	settingsModal  SettingsModal
-	themeManager   *ThemeManager
 	
-	// Panel visibility
-	showFileTree   bool
-	showEditor     bool
+	// LLM configuration
+	currentModel    string
+	currentProvider string
+	temperature     float64
 	
-	// Settings
-	settings       Settings
+	// Conversation metadata
+	conversationID string
+	messageCount   int
+	tokenUsage     int
+	tokenLimit     int
 	
-	// Performance components
-	viewCache          *ViewCache
-	performanceMonitor *PerformanceMonitor
-	saveDebouncer      *Debouncer
+	// Status category metadata
+	categoryMetadata map[string]CategoryInfo
 	
-	// File state
-	currentFile string
-	modified    bool
+	// Configuration
+	config *Config
 	
-	// Analysis state
-	analyzing    bool
-	lastAnalysis string
+	// Mouse mode toggle
+	mouseEnabled bool
 	
-	// Error state
-	err error
+	// Processing state
+	isProcessing bool // True when waiting for response from server
 	
-	// Program reference for Phoenix client
-	program *tea.Program
+	// Response handlers
+	responseHandlers *ResponseHandlerRegistry
 }
 
-// FileNode represents a file or directory in the tree
-type FileNode struct {
-	Name     string
-	Path     string
-	IsDir    bool
-	Children []FileNode
-	depth    int
+// CategoryInfo stores metadata about a status category
+type CategoryInfo struct {
+	Name        string
+	Description string
+	Color       string // Terminal color code/name
 }
 
-// PhoenixConfig holds the configuration for the Phoenix connection
-type PhoenixConfig struct {
-	URL       string
-	APIKey    string
-	ChannelID string
-}
-
-// NewModel creates a new application model
-func NewModel() Model {
-	// Initialize editor
-	ta := textarea.New()
-	ta.Placeholder = "Select a file to start editing..."
-	ta.ShowLineNumbers = true
-	ta.SetWidth(80)
-	ta.SetHeight(20)
-	
-	// Initialize viewport for output (deprecated, kept for compatibility)
-	vp := viewport.New(40, 20)
-	vp.SetContent("")
-	
-	// Initialize components
+// NewModel creates a new TUI model with default state
+func NewModel() *Model {
+	// Create chat component (primary interface)
 	chat := NewChat()
-	fileTree := NewFileTree()
-	commandPalette := NewCommandPalette()
-	modal := NewModal()
-	themeManager := NewThemeManager()
 	
-	// Initialize performance components
-	viewCache := NewViewCache()
-	performanceMonitor := NewPerformanceMonitor(100) // Keep 100 samples
-	saveDebouncer := NewDebouncer(500 * time.Millisecond) // 500ms debounce
+	// Create editor
+	editor := textarea.New()
+	editor.Placeholder = "Select a file to start editing..."
+	editor.ShowLineNumbers = true
 	
-	// Default settings
-	settings := Settings{
-		Theme:           "dark",
-		ShowLineNumbers: true,
-		AutoSave:        false,
-		TabSize:         4,
-		FontSize:        14,
-		ServerURL:       "ws://localhost:5555/socket",
-		UsesMockClient:  phoenix.IsRunningInMockMode(),
-		
-		// Syntax highlighting defaults
-		UseSyntaxHighlighting: true,
-		UseChromaHighlighting: true,
-		ChromaStyle:          "monokai",
-		FallbackToCustom:     true,
-	}
-	settingsModal := NewSettingsModal(settings)
+	// Create output viewport
+	output := viewport.New(0, 0)
 	
-	return Model{
-		editor:             ta,
-		output:             vp,
-		statusBar:          "Disconnected | Press Ctrl+C to quit | Ctrl+F: Toggle Files | Ctrl+E: Toggle Editor",
-		activePane:         ChatPane,  // Start with chat focused
-		chat:               chat,
-		fileTree:           fileTree,
-		commandPalette:     commandPalette,
-		modal:              modal,
-		settingsModal:      settingsModal,
-		themeManager:       themeManager,
-		settings:           settings,
-		viewCache:          viewCache,
-		performanceMonitor: performanceMonitor,
-		saveDebouncer:      saveDebouncer,
-		files:              []FileNode{}, // Will be populated when connected
-		showFileTree:       false,  // Start with panels hidden
-		showEditor:         false,
-	}
-}
-
-// GetTheme returns the current theme
-func (m Model) GetTheme() *Theme {
-	return m.themeManager.GetTheme()
-}
-
-// SetTheme changes the current theme
-func (m *Model) SetTheme(themeName string) bool {
-	return m.themeManager.SetTheme(themeName)
-}
-
-// GetAvailableThemes returns all available theme names
-func (m Model) GetAvailableThemes() []string {
-	return m.themeManager.GetThemeNames()
-}
-
-// UpdateSettings updates the model settings and applies them
-func (m *Model) UpdateSettings(newSettings Settings) {
-	m.settings = newSettings
+	// Create Phoenix client
+	phoenixClient := phoenix.NewClient()
+	authClient := phoenix.NewAuthClient()
+	statusClient := phoenix.NewStatusClient()
+	apiKeyClient := phoenix.NewApiKeyClient()
+	planningClient := phoenix.NewPlanningClient()
 	
-	// Apply theme if changed
-	if m.themeManager.GetCurrentThemeName() != newSettings.Theme {
-		m.SetTheme(newSettings.Theme)
-	}
-}
-
-// GetSettings returns the current settings
-func (m Model) GetSettings() Settings {
-	return m.settings
-}
-
-// CreateSyntaxHighlighter creates a syntax highlighter configured with current settings
-func (m Model) CreateSyntaxHighlighter() *SyntaxHighlighter {
-	highlighter := NewSyntaxHighlighter(m.GetTheme())
+	// Create chat header
+	chatHeader := NewChatHeader()
 	
-	// Apply settings
-	highlighter.SetChromaEnabled(m.settings.UseChromaHighlighting)
-	highlighter.SetChromaStyle(m.settings.ChromaStyle)
-	highlighter.SetFallbackEnabled(m.settings.FallbackToCustom)
+	// Create status messages component
+	statusMessages := NewStatusMessages()
 	
-	return highlighter
-}
-
-// triggerDebouncedSave triggers a debounced auto-save operation
-func (m Model) triggerDebouncedSave() {
-	if m.saveDebouncer != nil && m.currentFile != "" {
-		m.saveDebouncer.Debounce(func() {
-			// Auto-save logic would go here
-			// For now, just update status to show file is being saved
-			if prog := GetProgram(); prog != nil {
-				prog.Send(AutoSaveMsg{File: m.currentFile})
-			}
-		})
+	// Create error handler
+	errorHandler := NewErrorHandler()
+	
+	// Load configuration
+	config, err := LoadConfig()
+	if err != nil {
+		// If config fails to load, use empty config with defaults
+		config = &Config{
+			Providers: make(map[string]ProviderConfig),
+			TUI: TUIConfig{
+				StatusCategoryColors: make(map[string]string),
+			},
+		}
 	}
-}
-
-// GetPerformanceStats returns current performance statistics
-func (m Model) GetPerformanceStats() map[string]interface{} {
-	if m.performanceMonitor != nil {
-		return m.performanceMonitor.GetStats()
+	
+	model := &Model{
+		activePane:   ChatPane, // Chat is primary
+		width:        80,       // Default width
+		height:       24,       // Default height
+		chat:         chat,
+		chatHeader:   chatHeader,
+		statusMessages: statusMessages,
+		fileTree:     NewFileTree(),
+		editor:       editor,
+		output:       output,
+		showFileTree: false,    // Hidden by default
+		showEditor:   false,    // Hidden by default
+		statusBar:    "Welcome to RubberDuck TUI | Connecting to auth server...",
+		systemMessage: "", // Start with empty system message
+		errorHandler: errorHandler,
+		modal:        NewModal(),
+		commandPalette: NewCommandPalette(),
+		phoenixURL:   "ws://localhost:5555/socket",
+		authSocketURL: "ws://localhost:5555/auth_socket",
+		apiKey:       config.APIKey, // Load API key from config
+		jwtToken:     "",
+		phoenixClient: phoenixClient,
+		authClient:   authClient,
+		statusClient: statusClient,
+		apiKeyClient: apiKeyClient,
+		planningClient: planningClient,
+		currentModel:    config.DefaultModel,    // Load from config or empty for default
+		currentProvider: config.DefaultProvider, // Load from config or empty for unknown
+		temperature:     0.7,
+		authenticated:   false,
+		username:     "",
+		userID:       "",
+		conversationID: "lobby",
+		messageCount:  0,
+		tokenUsage:    0,
+		tokenLimit:    4096,
+		categoryMetadata: make(map[string]CategoryInfo),
+		config:        config,
+		mouseEnabled:  false, // Mouse disabled by default for text selection
+		responseHandlers: NewResponseHandlerRegistry(),
 	}
-	return nil
+	
+	// Initialize component sizes with defaults
+	model.updateComponentSizes()
+	
+	return model
 }
 
-// ClearViewCache clears the view cache
-func (m *Model) ClearViewCache() {
-	if m.viewCache != nil {
-		m.viewCache.Clear()
-	}
-}
-
-// Init initializes the model and starts the Phoenix connection
+// Init implements tea.Model
 func (m Model) Init() tea.Cmd {
-	// Start with a window size request and initiate connection
+	// Initialize with window size detection
 	return tea.Batch(
-		tea.EnterAltScreen,
-		startPhoenixConnection(),
+		tea.WindowSize(),
+		func() tea.Msg {
+			return InitiateConnectionMsg{} // Connect to Phoenix on startup
+		},
 	)
 }
 
-// startPhoenixConnection creates a command to initiate the Phoenix connection
-func startPhoenixConnection() tea.Cmd {
-	return func() tea.Msg {
-		// Return a message to trigger connection setup
-		return InitiateConnectionMsg{}
+// SetDimensions updates the model dimensions
+func (m *Model) SetDimensions(width, height int) {
+	m.width = width
+	m.height = height
+	m.updateComponentSizes()
+}
+
+// SetMouseEnabled sets the mouse mode state
+func (m *Model) SetMouseEnabled(enabled bool) {
+	m.mouseEnabled = enabled
+}
+
+// updateComponentSizes recalculates component sizes based on current layout
+func (m *Model) updateComponentSizes() {
+	if m.width == 0 || m.height == 0 {
+		return
 	}
+	
+	// Layout calculation for chat-focused interface
+	statusBarHeight := 1
+	contentHeight := m.height - statusBarHeight
+	
+	// Calculate widths based on visible panels
+	chatWidth := m.width
+	
+	if m.showFileTree {
+		fileTreeWidth := 30 // Fixed width for file tree
+		chatWidth -= fileTreeWidth + 2 // 2 for borders
+		m.fileTree.width = fileTreeWidth
+		m.fileTree.height = contentHeight
+	}
+	
+	if m.showEditor {
+		editorWidth := 40 // Fixed width for editor
+		chatWidth -= editorWidth + 2 // 2 for borders
+		m.editor.SetWidth(editorWidth)
+		m.editor.SetHeight(contentHeight)
+	}
+	
+	// Update chat header size
+	m.chatHeader.SetSize(chatWidth-2) // -2 for borders
+	
+	// Calculate heights for chat and status sections
+	headerHeight := 3 // chat header takes 3 lines
+	availableHeight := contentHeight - headerHeight - 2 // -2 for main borders
+	
+	// Status messages take 10% of available conversation area
+	statusHeight := int(float64(availableHeight) * 0.1)
+	if statusHeight < 3 {
+		statusHeight = 3 // Minimum height
+	}
+	chatHeight := availableHeight - statusHeight - 2 // -2 for spacing between sections
+	
+	// Update chat and status message sizes (account for borders)
+	m.chat.SetSize(chatWidth-4, chatHeight-2) // -4 for borders, -2 for height borders
+	m.statusMessages.SetSize(chatWidth-4, statusHeight-2) // -4 for borders, -2 for height borders
+	
+	// Update output viewport size
+	m.output.Width = 40
+	m.output.Height = contentHeight
+}
+
+// SetPhoenixConfig updates the Phoenix connection configuration
+func (m *Model) SetPhoenixConfig(url, authURL, apiKey string) {
+	m.phoenixURL = url
+	m.authSocketURL = authURL
+	m.apiKey = apiKey
+}
+
+// GetPhoenixClient returns the Phoenix client interface
+func (m *Model) GetPhoenixClient() interface{} {
+	return m.phoenixClient
+}
+
+// GetAuthClient returns the Auth client interface
+func (m *Model) GetAuthClient() interface{} {
+	return m.authClient
+}
+
+// GetStatusClient returns the Status client interface
+func (m *Model) GetStatusClient() interface{} {
+	return m.statusClient
+}
+
+// GetApiKeyClient returns the ApiKey client interface
+func (m *Model) GetApiKeyClient() interface{} {
+	return m.apiKeyClient
+}
+
+// GetPlanningClient returns the Planning client interface
+func (m *Model) GetPlanningClient() interface{} {
+	return m.planningClient
+}
+
+// SetSystemMessage sets the system message to display in the status bar
+func (m *Model) SetSystemMessage(message string) {
+	m.systemMessage = message
+}
+
+// ClearSystemMessage clears the system message from the status bar
+func (m *Model) ClearSystemMessage() {
+	m.systemMessage = ""
 }

@@ -15,8 +15,11 @@ defmodule RubberDuck.Jido.Agents.ExampleAgent do
     schema: [
       counter: [type: :integer, default: 0],
       messages: [type: {:list, :string}, default: []],
-      status: [type: :atom, default: :idle, values: [:idle, :busy, :error]],
-      last_action: [type: :string, default: nil]
+      status: [type: {:in, [:idle, :busy, :error]}, default: :idle],
+      last_action: [type: {:or, [:string, nil]}, default: nil]
+    ],
+    actions: [
+      RubberDuck.Jido.Actions.Increment
     ]
   
   require Logger
@@ -33,7 +36,7 @@ defmodule RubberDuck.Jido.Agents.ExampleAgent do
   end
   
   @impl true
-  def on_after_run(agent, result, metadata) do
+  def on_after_run(agent, _result, metadata) do
     Logger.debug("ExampleAgent #{agent.id} completed action")
     
     # Update status and last action

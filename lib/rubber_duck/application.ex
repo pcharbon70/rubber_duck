@@ -93,6 +93,8 @@ defmodule RubberDuck.Application do
       RubberDuck.Instructions.SecurityPipeline,
       # Analysis and metrics system
       RubberDuck.Analysis.MetricsCollector,
+      # Jido Agent ProcessRegistry
+      {Registry, keys: :unique, name: RubberDuck.Jido.Agents.ProcessRegistry},
       # Collaboration system components
       {Registry, keys: :unique, name: RubberDuckWeb.Collaboration.EditorRegistry},
       RubberDuckWeb.Collaboration.EditorSupervisor,

@@ -9,7 +9,7 @@ defmodule RubberDuck.Jido.Agents.CounterAgent do
   - Signal handling
   """
   
-  use RubberDuck.Jido.BaseAgentV2,
+  use RubberDuck.Agents.BaseAgent,
     name: "counter_agent",
     description: "An agent that maintains and manipulates a counter",
     schema: [
@@ -44,20 +44,18 @@ defmodule RubberDuck.Jido.Agents.CounterAgent do
   
   # Signal handling
   
-  @impl RubberDuck.Jido.BaseAgentV2
+  @impl true
   def handle_signal(agent, %{"type" => "increment"} = signal) do
-    # Create an increment instruction
-    instruction = %{
-      action: RubberDuck.Jido.Actions.Increment,
-      params: %{amount: signal["amount"] || 1}
-    }
+    amount = signal["amount"] || 1
     
-    # Queue the instruction for execution
-    {:ok, agent} = Jido.Agent.Runtime.enqueue(agent, instruction)
+    # TODO: Replace with proper Jido action enqueueing when Runtime is available
+    # For now, execute directly
+    {:ok, agent} = agent.__struct__.plan(agent, RubberDuck.Jido.Actions.Increment, %{amount: amount})
+    {:ok, agent} = agent.__struct__.run(agent)
     {:ok, agent}
   end
   
-  def handle_signal(agent, %{"type" => "get_status"} = signal) do
+  def handle_signal(agent, %{"type" => "get_status"} = _signal) do
     # Emit status signal
     status_signal = %{
       "type" => "status_response",

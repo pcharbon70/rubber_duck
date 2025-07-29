@@ -5,150 +5,208 @@ import (
 	"fmt"
 	"net/url"
 	"time"
-
+	
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/nshafer/phx"
 )
 
-// Client manages the Phoenix WebSocket connection
+// Client represents a Phoenix WebSocket client
 type Client struct {
-	socket  *phx.Socket
-	channel *phx.Channel
-	program *tea.Program
+	socket   *phx.Socket
+	channel  *phx.Channel
+	program  *tea.Program
+	apiKey   string
 }
 
-// Config holds the configuration for the Phoenix client
+// Config represents the Phoenix client configuration
 type Config struct {
-	URL       string
-	APIKey    string
-	ChannelID string
+	URL      string
+	APIKey   string
+	JWTToken string
+	Channel  string
+	IsAuth   bool // true if connecting to auth socket
 }
 
 // NewClient creates a new Phoenix client
-func NewClient(config Config) *Client {
+func NewClient() *Client {
 	return &Client{}
 }
 
-// Connect establishes the WebSocket connection
-func (c *Client) Connect(config Config, program *tea.Program) tea.Cmd {
+// SetProgram sets the tea.Program for sending messages
+func (c *Client) SetProgram(program *tea.Program) {
 	c.program = program
+}
 
+// Connect establishes a WebSocket connection to Phoenix
+func (c *Client) Connect(config Config) tea.Cmd {
+	c.apiKey = config.APIKey
+	
 	return func() tea.Msg {
 		// Parse the WebSocket URL
 		endPoint, err := url.Parse(config.URL)
 		if err != nil {
 			return DisconnectedMsg{Error: err}
 		}
-
-		// Add API key as query parameter if provided
-		if config.APIKey != "" {
-			q := endPoint.Query()
-			q.Set("api_key", config.APIKey)
-			endPoint.RawQuery = q.Encode()
+		
+		// For auth socket, no credentials needed
+		if !config.IsAuth {
+			// For user socket, add credentials
+			if config.APIKey != "" {
+				q := endPoint.Query()
+				q.Set("api_key", config.APIKey)
+				endPoint.RawQuery = q.Encode()
+			} else if config.JWTToken != "" {
+				q := endPoint.Query()
+				q.Set("token", config.JWTToken)
+				endPoint.RawQuery = q.Encode()
+			}
 		}
-
+		
 		// Create the socket
 		socket := phx.NewSocket(endPoint)
-		socket.Logger = phx.NewSimpleLogger(phx.LoggerLevel(phx.LogWarning))
-
+		// Use silent logger to prevent console spam
+		socket.Logger = NewSilentLogger()
+		
+		// Disable automatic reconnection to prevent spam
+		socket.ReconnectAfterFunc = func(tries int) time.Duration {
+			// Return a very large duration to effectively disable auto-reconnect
+			return time.Hour * 24 // 24 hours - effectively disabled
+		}
+		
 		// Set up event handlers
+		socketType := UserSocketType
+		if config.IsAuth {
+			socketType = AuthSocketType
+		}
+		
 		socket.OnOpen(func() {
-			program.Send(ConnectedMsg{})
+			if c.program != nil {
+				c.program.Send(ConnectedMsg{SocketType: socketType})
+			}
 		})
-
-		socket.OnError(func(err error) {
-			program.Send(DisconnectedMsg{Error: err})
-		})
-
+		
 		socket.OnClose(func() {
-			program.Send(DisconnectedMsg{Error: fmt.Errorf("connection closed")})
+			if c.program != nil {
+				c.program.Send(DisconnectedMsg{Error: nil, SocketType: socketType})
+			}
 		})
-
+		
+		socket.OnError(func(err error) {
+			if c.program != nil {
+				c.program.Send(DisconnectedMsg{Error: err, SocketType: socketType})
+			}
+		})
+		
 		// Connect to the socket
 		if err := socket.Connect(); err != nil {
-			return DisconnectedMsg{Error: err}
+			return DisconnectedMsg{Error: err, SocketType: socketType}
 		}
-
+		
 		c.socket = socket
-
 		return SocketCreatedMsg{Socket: socket}
 	}
 }
 
-// JoinChannel joins the specified channel
-func (c *Client) JoinChannel(socket *phx.Socket, channelTopic string) tea.Cmd {
+// JoinChannel joins a Phoenix channel
+func (c *Client) JoinChannel(topic string) tea.Cmd {
 	return func() tea.Msg {
-		// Create and join channel
-		channel := socket.Channel(channelTopic, nil)
-		c.channel = channel
-
+		if c.socket == nil {
+			return ErrorMsg{
+				Err:       fmt.Errorf("socket not connected"),
+				Component: "Phoenix Client",
+			}
+		}
+		
+		// Create channel with proper params
+		// Note: nshafer/phx expects map[string]string, so we need to serialize complex data
+		params := map[string]string{}
+		channel := c.socket.Channel(topic, params)
+		
+		// Join the channel
 		join, err := channel.Join()
 		if err != nil {
 			return ErrorMsg{
 				Err:       err,
-				Component: "Phoenix Channel",
+				Component: "Phoenix Channel Join",
 			}
 		}
-
-		// Set up join handlers
+		
+		// Handle join response
 		join.Receive("ok", func(response any) {
-			c.program.Send(ChannelJoinedMsg{Channel: channel})
-			c.setupChannelHandlers(channel)
+			c.program.Send(ChannelJoinedMsg{
+				Channel:  channel,
+				Response: response,
+			})
 		})
-
+		
 		join.Receive("error", func(response any) {
 			c.program.Send(ErrorMsg{
 				Err:       fmt.Errorf("failed to join channel: %v", response),
-				Component: "Phoenix Channel",
+				Component: "Phoenix Channel Join",
 			})
 		})
-
-		join.Receive("timeout", func(response any) {
-			c.program.Send(ErrorMsg{
-				Err:       fmt.Errorf("timeout joining channel"),
-				Component: "Phoenix Channel",
-			})
-		})
-
+		
+		// Set up channel event handlers
+		c.setupChannelHandlers(channel)
+		
+		c.channel = channel
 		return ChannelJoiningMsg{}
 	}
 }
 
-// setupChannelHandlers sets up all channel event handlers
+// setupChannelHandlers sets up event handlers for the channel
 func (c *Client) setupChannelHandlers(channel *phx.Channel) {
-	// File operations
-	channel.On("file:list", func(payload any) {
+	// Handle conversation responses
+	channel.On("response", func(payload any) {
 		data, _ := json.Marshal(payload)
-		c.program.Send(ChannelResponseMsg{
-			Event:   "file_list",
-			Payload: data,
+		c.program.Send(ConversationResponseMsg{
+			Response: data,
 		})
 	})
-
-	// Analysis results
-	channel.On("analyze:result", func(payload any) {
+	
+	// Handle thinking indicator
+	channel.On("thinking", func(payload any) {
+		c.program.Send(ConversationThinkingMsg{})
+	})
+	
+	// Handle context updates
+	channel.On("context_updated", func(payload any) {
 		data, _ := json.Marshal(payload)
-		c.program.Send(ChannelResponseMsg{
-			Event:   "analyze_result",
-			Payload: data,
+		c.program.Send(ConversationContextUpdatedMsg{
+			Context: data,
 		})
 	})
-
-	// Code generation
-	channel.On("generate:result", func(payload any) {
+	
+	// Handle conversation reset
+	channel.On("conversation_reset", func(payload any) {
 		data, _ := json.Marshal(payload)
-		c.program.Send(ChannelResponseMsg{
-			Event:   "generate_result",
-			Payload: data,
+		c.program.Send(ConversationResetMsg{
+			SessionInfo: data,
 		})
 	})
-
-	// Streaming support
+	
+	// Handle processing cancelled
+	channel.On("processing_cancelled", func(payload any) {
+		c.program.Send(ProcessingCancelledMsg{})
+	})
+	
+	// Handle conversation history
+	channel.On("history", func(payload any) {
+		if data, ok := payload.(map[string]any); ok {
+			c.program.Send(ConversationHistoryMsg{
+				ConversationID: data["conversation_id"],
+				Messages:       data["messages"],
+				Count:          data["count"],
+			})
+		}
+	})
+	
+	// Handle streaming responses
 	channel.On("stream:start", func(payload any) {
 		data := payload.(map[string]any)
 		c.program.Send(StreamStartMsg{ID: data["id"].(string)})
 	})
-
+	
 	channel.On("stream:data", func(payload any) {
 		data := payload.(map[string]any)
 		c.program.Send(StreamDataMsg{
@@ -156,12 +214,12 @@ func (c *Client) setupChannelHandlers(channel *phx.Channel) {
 			Data: data["chunk"].(string),
 		})
 	})
-
+	
 	channel.On("stream:end", func(payload any) {
 		data := payload.(map[string]any)
 		c.program.Send(StreamEndMsg{ID: data["id"].(string)})
 	})
-
+	
 	// Error handling
 	channel.On("error", func(payload any) {
 		c.program.Send(ErrorMsg{
@@ -176,11 +234,11 @@ func (c *Client) Push(event string, payload map[string]any) tea.Cmd {
 	return func() tea.Msg {
 		if c.channel == nil {
 			return ErrorMsg{
-				Err:       fmt.Errorf("channel not connected"),
+				Err:       fmt.Errorf("channel not joined"),
 				Component: "Phoenix Push",
 			}
 		}
-
+		
 		push, err := c.channel.Push(event, payload)
 		if err != nil {
 			return ErrorMsg{
@@ -188,32 +246,121 @@ func (c *Client) Push(event string, payload map[string]any) tea.Cmd {
 				Component: "Phoenix Push",
 			}
 		}
-
-		// Set up response handlers
+		
 		push.Receive("ok", func(response any) {
-			data, _ := json.Marshal(response)
-			c.program.Send(ChannelResponseMsg{
-				Event:   event + "_response",
-				Payload: data,
-			})
+			// Success - nothing to do for now
 		})
-
+		
 		push.Receive("error", func(response any) {
 			c.program.Send(ErrorMsg{
-				Err:       fmt.Errorf("push error: %v", response),
+				Err:       fmt.Errorf("push failed: %v", response),
 				Component: "Phoenix Push",
 			})
 		})
-
+		
 		push.Receive("timeout", func(response any) {
+			// For certain events, we handle the response through channel events, not push replies
+			if event == "get_history" || event == "message" || event == "cancel_processing" {
+				// These are handled by channel events, ignore push timeout
+				return
+			}
+			
 			c.program.Send(ErrorMsg{
-				Err:       fmt.Errorf("push timeout"),
+				Err:       fmt.Errorf("Connection timeout for event: %s", event),
 				Component: "Phoenix Push",
 			})
 		})
-
+		
 		return nil
 	}
+}
+
+// PushAsync sends a message to the Phoenix channel without waiting for responses
+// Use this for events where responses come through channel events, not push replies
+func (c *Client) PushAsync(event string, payload map[string]any) tea.Cmd {
+	return func() tea.Msg {
+		if c.channel == nil {
+			return ErrorMsg{
+				Err:       fmt.Errorf("channel not joined"),
+				Component: "Phoenix Push",
+			}
+		}
+		
+		// Just push without setting up response handlers
+		_, err := c.channel.Push(event, payload)
+		if err != nil {
+			return ErrorMsg{
+				Err:       err,
+				Component: "Phoenix Push",
+			}
+		}
+		
+		// Don't wait for any responses - they'll come through channel events
+		return nil
+	}
+}
+
+// SendMessage sends a message to the conversation channel
+func (c *Client) SendMessage(content string) tea.Cmd {
+	payload := map[string]any{
+		"content": content,
+	}
+	return c.PushAsync("message", payload)
+}
+
+// SendMessageWithConfig sends a message with LLM configuration
+func (c *Client) SendMessageWithConfig(content string, model string, provider string, temperature float64) tea.Cmd {
+	payload := map[string]any{
+		"content": content,
+	}
+	
+	// Add llm_config with both provider and model
+	if model != "" && provider != "" {
+		llmConfig := map[string]any{
+			"provider":    provider,
+			"model":       model,
+			"temperature": temperature,
+		}
+		payload["llm_config"] = llmConfig
+	}
+	
+	return c.PushAsync("message", payload)
+}
+
+// CancelProcessing sends a cancel request to stop current processing
+func (c *Client) CancelProcessing() tea.Cmd {
+	return c.PushAsync("cancel_processing", map[string]any{})
+}
+
+// StartNewConversation starts a new conversation
+func (c *Client) StartNewConversation() tea.Cmd {
+	return c.Push("new_conversation", map[string]any{})
+}
+
+// GetConversationHistory requests the conversation history
+func (c *Client) GetConversationHistory(limit int) tea.Cmd {
+	return c.PushAsync("get_history", map[string]any{
+		"limit": limit,
+	})
+}
+
+// SetConversationContext updates the conversation context
+func (c *Client) SetConversationContext(context map[string]any) tea.Cmd {
+	payload := map[string]any{
+		"context": context,
+	}
+	return c.Push("set_context", payload)
+}
+
+// SetConversationModel sets the preferred model for the current conversation
+func (c *Client) SetConversationModel(model string, provider string) tea.Cmd {
+	context := map[string]any{
+		"preferred_model": model,
+	}
+	if provider != "" {
+		context["preferred_provider"] = provider
+	}
+	return c.SetConversationContext(context)
 }
 
 // Disconnect closes the WebSocket connection
@@ -221,10 +368,14 @@ func (c *Client) Disconnect() tea.Cmd {
 	return func() tea.Msg {
 		if c.channel != nil {
 			c.channel.Leave()
+			c.channel = nil
 		}
+		
 		if c.socket != nil {
 			c.socket.Disconnect()
+			c.socket = nil
 		}
+		
 		return DisconnectedMsg{Error: nil}
 	}
 }
@@ -232,37 +383,6 @@ func (c *Client) Disconnect() tea.Cmd {
 // Reconnect attempts to reconnect after a delay
 func (c *Client) Reconnect(config Config, delay time.Duration) tea.Cmd {
 	return tea.Tick(delay, func(t time.Time) tea.Msg {
-		return RetryMsg{Cmd: c.Connect(config, c.program)}
+		return RetryMsg{Cmd: c.Connect(config)}
 	})
 }
-
-// Message types used by Phoenix client
-type (
-	ConnectedMsg      struct{}
-	DisconnectedMsg   struct{ Error error }
-	SocketCreatedMsg  struct{ Socket *phx.Socket }
-	ChannelJoinedMsg  struct{ Channel *phx.Channel }
-	ChannelJoiningMsg struct{}
-	
-	ChannelResponseMsg struct {
-		Event   string
-		Payload json.RawMessage
-	}
-	
-	StreamStartMsg struct{ ID string }
-	StreamDataMsg  struct {
-		ID   string
-		Data string
-	}
-	StreamEndMsg struct{ ID string }
-	
-	ErrorMsg struct {
-		Err       error
-		Component string
-		Retry     tea.Cmd
-	}
-	
-	RetryMsg struct {
-		Cmd tea.Cmd
-	}
-)

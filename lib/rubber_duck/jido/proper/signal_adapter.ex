@@ -14,7 +14,7 @@ defmodule RubberDuck.Jido.Proper.SignalAdapter do
   def process_signal(agent_id, signal) do
     with {:ok, agent} <- Core.get_agent(agent_id),
          {:ok, action, params} <- signal_to_action(signal),
-         {:ok, result, updated_agent} <- Core.execute_action(agent, action, params) do
+         {:ok, _result, updated_agent} <- Core.execute_action(agent, action, params) do
       {:ok, updated_agent}
     end
   end
