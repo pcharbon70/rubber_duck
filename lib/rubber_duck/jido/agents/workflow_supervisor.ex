@@ -22,7 +22,16 @@ defmodule RubberDuck.Jido.Agents.WorkflowSupervisor do
           persist: true,
           telemetry: true,
           cleanup_interval: 300_000  # 5 minutes
-        ], opts)}
+        ], opts)},
+      
+      # Telemetry and Monitoring
+      {RubberDuck.Jido.Agents.TelemetrySupervisor, []},
+      
+      # Workflow Recovery Service
+      {RubberDuck.Jido.Agents.WorkflowRecovery, [
+        auto_recovery: true,
+        recovery_interval: 300_000  # 5 minutes
+      ]}
     ]
     
     Supervisor.init(children, strategy: :one_for_one)
