@@ -6,7 +6,7 @@ defmodule RubberDuck.Workflows.ASTParsingWorkflow do
   and progress tracking.
   """
 
-  use RubberDuck.Workflows.Workflow
+  use RubberDuck.Workflows.WorkflowBehavior
 
   alias RubberDuck.Workspace.CodeFile
 

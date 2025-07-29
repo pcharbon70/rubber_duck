@@ -231,7 +231,7 @@ defmodule RubberDuck.Jido.Agents.WorkflowMiddleware do
   end
   
   @impl true
-  def complete(result, context, _) do
+  def complete(result, context) do
     state = context.middleware_state
     duration = System.monotonic_time(:microsecond) - state.start_time
     
@@ -256,7 +256,7 @@ defmodule RubberDuck.Jido.Agents.WorkflowMiddleware do
   end
   
   @impl true
-  def error(errors, context, _) do
+  def error(errors, context) do
     state = context.middleware_state
     duration = System.monotonic_time(:microsecond) - state.start_time
     

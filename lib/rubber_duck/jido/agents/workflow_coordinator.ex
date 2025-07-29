@@ -33,6 +33,8 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
   use GenServer
   require Logger
   
+  alias RubberDuck.Jido.Agents.WorkflowPersistenceAsh, as: WorkflowPersistence
+  
   
   @type workflow_id :: String.t()
   @type workflow_state :: %{
@@ -114,8 +116,7 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
   
   @impl true
   def init(opts) do
-    # Create ETS table for workflow state
-    :ets.new(:workflow_states, [:set, :protected, :named_table])
+    # Persistence is now handled by Ash resources, no need to start a service
     
     # Start periodic cleanup
     if opts[:cleanup_interval] do
@@ -168,7 +169,13 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
         
         # Store halted state if persistence is enabled
         if state.persist_enabled do
-          store_workflow_state(workflow_id, module, :halted, reactor_state, context)
+          WorkflowPersistence.save_workflow_state(
+            workflow_id, 
+            module, 
+            reactor_state, 
+            context,
+            %{status: :halted}
+          )
         end
         
         if state.telemetry_enabled do
@@ -222,9 +229,13 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
     status = case Map.get(state.workflows, workflow_id) do
       nil ->
         # Check persisted state
-        case get_workflow_state(workflow_id) do
-          nil -> {:error, :not_found}
-          workflow_state -> {:ok, workflow_state}
+        if state.persist_enabled do
+          case WorkflowPersistence.load_workflow_state(workflow_id) do
+            {:ok, workflow_state} -> {:ok, workflow_state}
+            {:error, _} -> {:error, :not_found}
+          end
+        else
+          {:error, :not_found}
         end
         
       workflow ->
@@ -236,26 +247,30 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
   
   @impl true
   def handle_call({:resume_workflow, workflow_id, additional_inputs}, _from, state) do
-    case get_workflow_state(workflow_id) do
-      nil ->
-        {:reply, {:error, :not_found}, state}
-        
-      %{status: :halted, reactor_state: reactor_state, context: context} ->
-        # Resume execution
-        Task.start_link(fn ->
-          resume_workflow_async(workflow_id, reactor_state, additional_inputs, context, state)
-        end)
-        
-        # Update tracking
-        new_workflows = Map.put(state.workflows, workflow_id, %{
-          status: :running,
-          resumed_at: DateTime.utc_now()
-        })
-        
-        {:reply, :ok, %{state | workflows: new_workflows}}
-        
-      %{status: status} ->
-        {:reply, {:error, {:invalid_status, status}}, state}
+    if state.persist_enabled do
+      case WorkflowPersistence.load_workflow_state(workflow_id) do
+        {:ok, %{metadata: %{status: :halted}, reactor_state: reactor_state, context: context}} ->
+          # Resume execution
+          Task.start_link(fn ->
+            resume_workflow_async(workflow_id, reactor_state, additional_inputs, context, state)
+          end)
+          
+          # Update tracking
+          new_workflows = Map.put(state.workflows, workflow_id, %{
+            status: :running,
+            resumed_at: DateTime.utc_now()
+          })
+          
+          {:reply, :ok, %{state | workflows: new_workflows}}
+          
+        {:ok, %{metadata: %{status: status}}} ->
+          {:reply, {:error, {:invalid_status, status}}, state}
+          
+        {:error, _} ->
+          {:reply, {:error, :not_found}, state}
+      end
+    else
+      {:reply, {:error, :persistence_not_enabled}, state}
     end
   end
   
@@ -342,27 +357,6 @@ defmodule RubberDuck.Jido.Agents.WorkflowCoordinator do
     send(state.coordinator_pid || self(), {:workflow_completed, workflow_id, result})
   end
   
-  defp store_workflow_state(workflow_id, module, status, reactor_state, context) do
-    workflow_state = %{
-      id: workflow_id,
-      module: module,
-      status: status,
-      reactor_state: reactor_state,
-      context: context,
-      started_at: DateTime.from_unix!(context.started_at, :microsecond),
-      completed_at: nil,
-      error: nil
-    }
-    
-    :ets.insert(:workflow_states, {workflow_id, workflow_state})
-  end
-  
-  defp get_workflow_state(workflow_id) do
-    case :ets.lookup(:workflow_states, workflow_id) do
-      [{^workflow_id, state}] -> state
-      [] -> nil
-    end
-  end
   
   # Telemetry helpers
 end
