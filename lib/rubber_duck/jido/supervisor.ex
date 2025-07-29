@@ -23,6 +23,12 @@ defmodule RubberDuck.Jido.Supervisor do
       # Agent registry for storing agent data
       {RubberDuck.Jido.AgentRegistry, []},
       
+      # Signal router configuration
+      {RubberDuck.Jido.SignalRouter.Config, []},
+      
+      # Dead letter queue for failed signals
+      {RubberDuck.Jido.SignalRouter.DeadLetterQueue, []},
+      
       # Signal router for CloudEvents
       {RubberDuck.Jido.SignalRouter, []},
       
