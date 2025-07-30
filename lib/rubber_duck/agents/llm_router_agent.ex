@@ -53,7 +53,7 @@ defmodule RubberDuck.Agents.LLMRouterAgent do
   
   require Logger
   
-  alias RubberDuck.LLM.{ServiceV2, ProviderConfig, ConfigLoader}
+  alias RubberDuck.LLM.{ServiceV2, ProviderConfig}
   
   # Signal Handlers
   
@@ -230,7 +230,7 @@ defmodule RubberDuck.Agents.LLMRouterAgent do
     }
   end
   
-  defp select_provider(agent, requirements, preferences) do
+  defp select_provider(agent, requirements, _preferences) do
     # Get available providers
     available_providers = get_available_providers(agent, requirements)
     
@@ -318,7 +318,7 @@ defmodule RubberDuck.Agents.LLMRouterAgent do
     {:ok, provider, hd(models)}
   end
   
-  defp select_cost_optimized(agent, available_providers, _requirements) do
+  defp select_cost_optimized(_agent, available_providers, _requirements) do
     # Select cheapest provider
     # In real implementation, would use actual cost data
     {provider, models} = 
@@ -400,7 +400,7 @@ defmodule RubberDuck.Agents.LLMRouterAgent do
     end
   end
   
-  defp handle_request_failure(agent_id, request_id, failed_provider, _model, messages, data, error) do
+  defp handle_request_failure(agent_id, request_id, failed_provider, _model, _messages, _data, error) do
     # Send failure metric
     send_metric_update(agent_id, request_id, failed_provider, nil, :failure, 0)
     
