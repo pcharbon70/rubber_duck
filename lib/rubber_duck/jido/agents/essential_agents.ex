@@ -11,6 +11,7 @@ defmodule RubberDuck.Jido.Agents.EssentialAgents do
   alias RubberDuck.Agents.PlanningConversationAgent
   alias RubberDuck.Agents.CodeAnalysisAgent
   alias RubberDuck.Agents.EnhancementConversationAgent
+  alias RubberDuck.Agents.GeneralConversationAgent
   alias RubberDuck.Jido.Agents.Supervisor
   
   @doc """
@@ -79,6 +80,22 @@ defmodule RubberDuck.Jido.Agents.EssentialAgents do
           capabilities: [:enhancement_coordination, :technique_selection, :suggestion_generation],
           metadata: %{
             description: "Main enhancement conversation agent",
+            critical: true
+          }
+        ]
+      },
+      
+      # General Conversation Agent - handles general conversations
+      {
+        GeneralConversationAgent,
+        %{},  # Initial state
+        [
+          id: "general_conversation_main",
+          restart: :permanent,
+          tags: ["essential", "conversation", "general"],
+          capabilities: [:general_conversation, :context_switching, :topic_management],
+          metadata: %{
+            description: "Main general conversation agent",
             critical: true
           }
         ]
