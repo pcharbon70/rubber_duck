@@ -1,0 +1,549 @@
+defmodule RubberDuck.Agents.ProviderAgent do
+  @moduledoc """
+  Base module for provider-specific LLM agents.
+  
+  This module provides common functionality for all provider agents including:
+  - Rate limiting
+  - Circuit breaking
+  - Metrics collection
+  - Request tracking
+  - Error handling
+  
+  Provider-specific agents should use this module and implement
+  provider-specific configuration and behavior.
+  """
+  
+  alias RubberDuck.Agents.BaseAgent
+  alias RubberDuck.LLM.{Request, Response, ProviderConfig}
+  require Logger
+  
+  defmacro __using__(opts) do
+    quote do
+      use RubberDuck.Agents.BaseAgent,
+        name: unquote(opts[:name]) || "provider",
+        description: unquote(opts[:description]) || "Provider-specific LLM agent",
+        category: "llm",
+        schema: [
+          provider_module: [type: :atom, required: true],
+          provider_config: [type: :map, required: true],
+          active_requests: [type: :map, default: %{}],
+          metrics: [type: :map, default: %{
+            total_requests: 0,
+            successful_requests: 0,
+            failed_requests: 0,
+            total_tokens: 0,
+            avg_latency: 0.0,
+            last_request_time: nil
+          }],
+          rate_limiter: [type: :map, default: %{
+            limit: nil,          # requests per window
+            window: nil,         # window in milliseconds
+            current_count: 0,
+            window_start: nil
+          }],
+          circuit_breaker: [type: :map, default: %{
+            state: :closed,      # :closed, :open, :half_open
+            failure_count: 0,
+            consecutive_failures: 0,
+            last_failure_time: nil,
+            last_success_time: nil,
+            failure_threshold: 5,
+            success_threshold: 2,  # successes needed to close from half_open
+            timeout: 60_000,       # time before trying half_open
+            half_open_requests: 0
+          }],
+          capabilities: [type: {:list, :atom}, default: []],
+          max_concurrent_requests: [type: :integer, default: 10]
+        ]
+      
+      require Logger
+      alias RubberDuck.LLM.{Request, Response, ProviderConfig}
+      import RubberDuck.Agents.ProviderAgent
+      
+      # Signal Handlers
+      
+      @impl true
+      def handle_signal(agent, %{"type" => "provider_request"} = signal) do
+        RubberDuck.Agents.ProviderAgent.handle_provider_request(agent, signal, self(), &emit_signal/2)
+      end
+      
+      def handle_signal(agent, %{"type" => "feature_check"} = signal) do
+        handle_feature_check(agent, signal, &emit_signal/2)
+      end
+      
+      def handle_signal(agent, %{"type" => "token_estimate"} = signal) do
+        handle_token_estimate(agent, signal, &emit_signal/2)
+      end
+      
+      def handle_signal(agent, %{"type" => "get_provider_status"} = signal) do
+        handle_get_status(agent, signal, &emit_signal/2)
+      end
+      
+      def handle_signal(agent, %{"type" => "reset_circuit_breaker"} = signal) do
+        handle_reset_circuit_breaker(agent, signal, &emit_signal/2)
+      end
+      
+      def handle_signal(agent, signal) do
+        Logger.warning("#{agent.name} received unknown signal: #{inspect(signal["type"])}")
+        {:ok, agent}
+      end
+      
+      # Allow provider-specific agents to override
+      defoverridable [handle_signal: 2]
+      
+      # GenServer callbacks for internal state updates
+      @impl true
+      def handle_cast({:request_completed, request_id, status, latency, usage}, agent) do
+        agent = RubberDuck.Agents.ProviderAgent.handle_request_completed(agent, request_id, status, latency, usage)
+        {:noreply, agent}
+      end
+    end
+  end
+  
+  # Common functionality available to all provider agents
+  
+  def handle_provider_request(agent, signal, agent_pid, emit_signal_fn) do
+    %{
+      "data" => %{
+        "request_id" => request_id,
+        "messages" => messages,
+        "model" => model
+      } = data
+    } = signal
+    
+    # Check rate limits
+    case check_rate_limit(agent) do
+      {:ok, agent} ->
+        # Check circuit breaker
+        case check_circuit_breaker(agent) do
+          {:ok, agent} ->
+            # Check concurrent request limit
+            active_count = map_size(agent.state.active_requests)
+            if active_count >= agent.state.max_concurrent_requests do
+              emit_error_response(request_id, :too_many_requests, 
+                "Provider at maximum concurrent requests (#{active_count}/#{agent.state.max_concurrent_requests})")
+              {:ok, agent}
+            else
+              # Track request
+              agent = track_request_start(agent, request_id, model)
+              
+              # Execute asynchronously
+              Task.start(fn ->
+                execute_provider_request(agent.id, request_id, messages, model, data)
+              end)
+              
+              {:ok, agent}
+            end
+            
+          {:error, :circuit_open} ->
+            emit_error_response(request_id, :circuit_breaker_open, 
+              "Provider circuit breaker is open due to repeated failures")
+            {:ok, agent}
+        end
+        
+      {:error, :rate_limited} ->
+        emit_error_response(request_id, :rate_limited, 
+          "Provider rate limit exceeded")
+        {:ok, agent}
+    end
+  end
+  
+  def handle_feature_check(agent, signal, emit_signal_fn) do
+    %{"data" => %{"feature" => feature}} = signal
+    
+    supported = check_provider_feature(agent.state.provider_module, String.to_atom(feature))
+    
+    # Note: emit_signal is imported from BaseAgent in the using module
+    emit_signal("feature_check_response", %{
+      "feature" => feature,
+      "supported" => supported,
+      "provider" => agent.name
+    })
+    
+    {:ok, agent}
+  end
+  
+  def handle_token_estimate(agent, signal, emit_signal_fn) do
+    %{"data" => %{"messages" => messages, "model" => model}} = signal
+    
+    # Estimate tokens using provider module
+    case estimate_tokens(agent.state.provider_module, messages, model) do
+      {:ok, estimate} ->
+        emit_signal_fn.("token_estimate_response", %{
+          "estimate" => estimate,
+          "provider" => agent.name,
+          "model" => model
+        })
+        
+      {:error, reason} ->
+        emit_signal_fn.("token_estimate_response", %{
+          "error" => "Failed to estimate tokens: #{inspect(reason)}",
+          "provider" => agent.name
+        })
+    end
+    
+    {:ok, agent}
+  end
+  
+  def handle_get_status(agent, _signal, emit_signal_fn) do
+    status = build_status_report(agent)
+    
+    emit_signal("provider_status", status)
+    
+    {:ok, agent}
+  end
+  
+  def handle_reset_circuit_breaker(agent, _signal, emit_signal_fn) do
+    updated_breaker = %{agent.state.circuit_breaker |
+      state: :closed,
+      failure_count: 0,
+      consecutive_failures: 0,
+      half_open_requests: 0
+    }
+    
+    agent = put_in(agent.state.circuit_breaker, updated_breaker)
+    
+    Logger.info("Circuit breaker reset for provider #{agent.name}")
+    
+    emit_signal("provider_status", build_status_report(agent))
+    
+    {:ok, agent}
+  end
+  
+  # Helper functions available to provider agents
+  
+  def check_rate_limit(agent) do
+    case agent.state.rate_limiter do
+      %{limit: nil} ->
+        # No rate limit configured
+        {:ok, agent}
+        
+      %{limit: limit, window: window} = limiter ->
+        now = System.monotonic_time(:millisecond)
+        window_start = limiter.window_start || now
+        
+        cond do
+          now - window_start > window ->
+            # New window
+            updated_limiter = %{limiter |
+              current_count: 1,
+              window_start: now
+            }
+            {:ok, put_in(agent.state.rate_limiter, updated_limiter)}
+            
+          limiter.current_count < limit ->
+            # Within limit
+            updated_limiter = %{limiter |
+              current_count: limiter.current_count + 1
+            }
+            {:ok, put_in(agent.state.rate_limiter, updated_limiter)}
+            
+          true ->
+            # Rate limited
+            {:error, :rate_limited}
+        end
+    end
+  end
+  
+  def check_circuit_breaker(agent) do
+    breaker = agent.state.circuit_breaker
+    now = System.monotonic_time(:millisecond)
+    
+    case breaker.state do
+      :closed ->
+        {:ok, agent}
+        
+      :open ->
+        # Check if we should try half-open
+        if breaker.last_failure_time && now - breaker.last_failure_time > breaker.timeout do
+          updated_breaker = %{breaker | state: :half_open, half_open_requests: 0}
+          {:ok, put_in(agent.state.circuit_breaker, updated_breaker)}
+        else
+          {:error, :circuit_open}
+        end
+        
+      :half_open ->
+        # Allow limited requests in half-open state
+        if breaker.half_open_requests < breaker.success_threshold do
+          updated_breaker = %{breaker | half_open_requests: breaker.half_open_requests + 1}
+          {:ok, put_in(agent.state.circuit_breaker, updated_breaker)}
+        else
+          {:error, :circuit_open}
+        end
+    end
+  end
+  
+  def track_request_start(agent, request_id, model) do
+    request_info = %{
+      started_at: System.monotonic_time(:millisecond),
+      model: model,
+      status: :active
+    }
+    
+    put_in(agent.state.active_requests[request_id], request_info)
+  end
+  
+  defp execute_provider_request(agent_id, request_id, messages, model, data) do
+    # Get current agent state
+    agent = GenServer.call(agent_id, :get_state)
+    
+    # Build request
+    request = build_request(request_id, messages, model, data)
+    
+    # Execute through provider
+    start_time = System.monotonic_time(:millisecond)
+    
+    result = try do
+      agent.state.provider_module.execute(request, agent.state.provider_config)
+    rescue
+      error ->
+        {:error, {:provider_error, Exception.format(:error, error)}}
+    end
+    
+    end_time = System.monotonic_time(:millisecond)
+    latency = end_time - start_time
+    
+    # Handle result
+    case result do
+      {:ok, response} ->
+        # Update metrics
+        GenServer.cast(agent_id, {:request_completed, request_id, :success, latency, response.usage})
+        
+        # Emit response
+        emit_signal("provider_response", %{
+          "request_id" => request_id,
+          "response" => response,
+          "provider" => agent.name,
+          "model" => model,
+          "latency_ms" => latency
+        })
+        
+      {:error, error} ->
+        # Update metrics
+        GenServer.cast(agent_id, {:request_completed, request_id, :failure, latency, nil})
+        
+        # Emit error
+        emit_signal("provider_error", %{
+          "request_id" => request_id,
+          "error" => format_error(error),
+          "provider" => agent.name,
+          "model" => model
+        })
+    end
+  end
+  
+  def build_request(request_id, messages, model, data) do
+    %Request{
+      id: request_id,
+      provider: String.to_atom(data["provider"] || "unknown"),
+      model: model,
+      messages: messages,
+      options: %{
+        temperature: data["temperature"] || 0.7,
+        max_tokens: data["max_tokens"],
+        top_p: data["top_p"],
+        frequency_penalty: data["frequency_penalty"],
+        presence_penalty: data["presence_penalty"],
+        stop: data["stop"],
+        stream: data["stream"] || false
+      },
+      timestamp: DateTime.utc_now(),
+      status: :pending
+    }
+  end
+  
+  defp check_provider_feature(provider_module, feature) do
+    if function_exported?(provider_module, :supports_feature?, 1) do
+      provider_module.supports_feature?(feature)
+    else
+      false
+    end
+  end
+  
+  defp estimate_tokens(provider_module, messages, model) do
+    if function_exported?(provider_module, :estimate_tokens, 2) do
+      provider_module.estimate_tokens(messages, model)
+    else
+      # Simple estimation fallback
+      char_count = messages
+      |> Enum.map(fn msg -> String.length(msg["content"] || "") end)
+      |> Enum.sum()
+      
+      # Rough estimate: ~4 chars per token
+      {:ok, %{prompt_tokens: div(char_count, 4)}}
+    end
+  end
+  
+  def build_status_report(agent) do
+    %{
+      "provider" => agent.name,
+      "status" => circuit_breaker_status(agent.state.circuit_breaker),
+      "circuit_breaker" => %{
+        "state" => Atom.to_string(agent.state.circuit_breaker.state),
+        "failure_count" => agent.state.circuit_breaker.failure_count,
+        "consecutive_failures" => agent.state.circuit_breaker.consecutive_failures
+      },
+      "rate_limiter" => %{
+        "limit" => agent.state.rate_limiter.limit,
+        "window_ms" => agent.state.rate_limiter.window,
+        "current_count" => agent.state.rate_limiter.current_count
+      },
+      "metrics" => %{
+        "total_requests" => agent.state.metrics.total_requests,
+        "successful_requests" => agent.state.metrics.successful_requests,
+        "failed_requests" => agent.state.metrics.failed_requests,
+        "total_tokens" => agent.state.metrics.total_tokens,
+        "avg_latency_ms" => agent.state.metrics.avg_latency,
+        "success_rate" => calculate_success_rate(agent.state.metrics)
+      },
+      "active_requests" => map_size(agent.state.active_requests),
+      "capabilities" => agent.state.capabilities
+    }
+  end
+  
+  defp circuit_breaker_status(breaker) do
+    case breaker.state do
+      :closed -> "healthy"
+      :open -> "unhealthy"
+      :half_open -> "recovering"
+    end
+  end
+  
+  defp calculate_success_rate(%{total_requests: 0}), do: 100.0
+  defp calculate_success_rate(%{total_requests: total, successful_requests: successful}) do
+    Float.round(successful / total * 100, 2)
+  end
+  
+  def emit_error_response(request_id, error_type, message) do
+    emit_signal("provider_error", %{
+      "request_id" => request_id,
+      "error_type" => Atom.to_string(error_type),
+      "error" => message
+    })
+  end
+  
+  def format_error({:provider_error, message}), do: message
+  def format_error(error), do: inspect(error)
+  
+  # Helper for handling request completion
+  def handle_request_completed(agent, request_id, status, latency, usage) do
+    # Remove from active requests
+    {_request_info, agent} = pop_in(agent.state.active_requests[request_id])
+    
+    # Update metrics
+    agent = update_metrics(agent, status, latency, usage)
+    
+    # Update circuit breaker
+    agent = update_circuit_breaker(agent, status)
+    
+    agent
+  end
+  
+  defp update_metrics(agent, status, latency, usage) do
+    metrics = agent.state.metrics
+    
+    total_requests = metrics.total_requests + 1
+    successful = if status == :success, do: metrics.successful_requests + 1, else: metrics.successful_requests
+    failed = if status == :failure, do: metrics.failed_requests + 1, else: metrics.failed_requests
+    
+    # Update average latency
+    avg_latency = if metrics.avg_latency == 0 do
+      latency
+    else
+      (metrics.avg_latency * metrics.total_requests + latency) / total_requests
+    end
+    
+    # Update token count
+    total_tokens = if usage do
+      metrics.total_tokens + (usage[:total_tokens] || 0)
+    else
+      metrics.total_tokens
+    end
+    
+    updated_metrics = %{metrics |
+      total_requests: total_requests,
+      successful_requests: successful,
+      failed_requests: failed,
+      avg_latency: avg_latency,
+      total_tokens: total_tokens,
+      last_request_time: System.monotonic_time(:millisecond)
+    }
+    
+    put_in(agent.state.metrics, updated_metrics)
+  end
+  
+  defp update_circuit_breaker(agent, status) do
+    breaker = agent.state.circuit_breaker
+    now = System.monotonic_time(:millisecond)
+    
+    case {breaker.state, status} do
+      {_, :success} ->
+        # Success in any state
+        updated_breaker = case breaker.state do
+          :half_open ->
+            if breaker.half_open_requests >= breaker.success_threshold do
+              # Close the circuit
+              %{breaker |
+                state: :closed,
+                failure_count: 0,
+                consecutive_failures: 0,
+                last_success_time: now,
+                half_open_requests: 0
+              }
+            else
+              %{breaker |
+                consecutive_failures: 0,
+                last_success_time: now
+              }
+            end
+            
+          _ ->
+            %{breaker |
+              consecutive_failures: 0,
+              last_success_time: now
+            }
+        end
+        
+        put_in(agent.state.circuit_breaker, updated_breaker)
+        
+      {:closed, :failure} ->
+        # Failure in closed state
+        consecutive = breaker.consecutive_failures + 1
+        failure_count = breaker.failure_count + 1
+        
+        updated_breaker = if consecutive >= breaker.failure_threshold do
+          # Open the circuit
+          %{breaker |
+            state: :open,
+            failure_count: failure_count,
+            consecutive_failures: consecutive,
+            last_failure_time: now
+          }
+        else
+          %{breaker |
+            failure_count: failure_count,
+            consecutive_failures: consecutive,
+            last_failure_time: now
+          }
+        end
+        
+        put_in(agent.state.circuit_breaker, updated_breaker)
+        
+      {:half_open, :failure} ->
+        # Failure in half-open state - reopen immediately
+        updated_breaker = %{breaker |
+          state: :open,
+          failure_count: breaker.failure_count + 1,
+          consecutive_failures: breaker.consecutive_failures + 1,
+          last_failure_time: now,
+          half_open_requests: 0
+        }
+        
+        put_in(agent.state.circuit_breaker, updated_breaker)
+        
+      _ ->
+        # No change needed
+        agent
+    end
+  end
+end
