@@ -12,6 +12,7 @@ defmodule RubberDuck.Jido.Agents.EssentialAgents do
   alias RubberDuck.Agents.CodeAnalysisAgent
   alias RubberDuck.Agents.EnhancementConversationAgent
   alias RubberDuck.Agents.GeneralConversationAgent
+  alias RubberDuck.Agents.LLMRouterAgent
   alias RubberDuck.Jido.Agents.Supervisor
   
   @doc """
@@ -96,6 +97,22 @@ defmodule RubberDuck.Jido.Agents.EssentialAgents do
           capabilities: [:general_conversation, :context_switching, :topic_management],
           metadata: %{
             description: "Main general conversation agent",
+            critical: true
+          }
+        ]
+      },
+      
+      # LLM Router Agent - handles LLM provider routing and load balancing
+      {
+        LLMRouterAgent,
+        %{},  # Initial state
+        [
+          id: "llm_router_main",
+          restart: :permanent,
+          tags: ["essential", "infrastructure", "routing"],
+          capabilities: [:provider_routing, :load_balancing, :failover, :cost_optimization],
+          metadata: %{
+            description: "Main LLM provider routing agent",
             critical: true
           }
         ]
