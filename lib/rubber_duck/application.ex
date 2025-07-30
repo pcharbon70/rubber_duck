@@ -41,6 +41,8 @@ defmodule RubberDuck.Application do
       RubberDuck.Agents.Supervisor,
       # Jido agent framework integration
       RubberDuck.Jido.Supervisor,
+      # Jido Agents Supervisor for managing agent processes
+      RubberDuck.Jido.Agents.Supervisor,
       # Context building components
       RubberDuck.Context.Cache,
       RubberDuck.Context.AdaptiveSelector,
@@ -130,6 +132,19 @@ defmodule RubberDuck.Application do
 
     # Log WebSocket endpoint information after startup
     log_websocket_info()
+    
+    # Start essential Jido agents after supervisor tree is up
+    Task.start(fn ->
+      Process.sleep(1000)  # Give supervisors time to fully start
+      Logger.info("Starting essential Jido agents...")
+      
+      case RubberDuck.Jido.Agents.EssentialAgents.start_all() do
+        {:ok, _agents} ->
+          Logger.info("Essential agents started successfully")
+        {:error, reason} ->
+          Logger.error("Failed to start some essential agents: #{inspect(reason)}")
+      end
+    end)
 
     result
   end
