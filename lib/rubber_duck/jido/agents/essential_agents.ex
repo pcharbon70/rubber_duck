@@ -8,6 +8,8 @@ defmodule RubberDuck.Jido.Agents.EssentialAgents do
   require Logger
   
   alias RubberDuck.Agents.ConversationRouterAgent
+  alias RubberDuck.Agents.PlanningConversationAgent
+  alias RubberDuck.Agents.CodeAnalysisAgent
   alias RubberDuck.Jido.Agents.Supervisor
   
   @doc """
@@ -31,8 +33,39 @@ defmodule RubberDuck.Jido.Agents.EssentialAgents do
             critical: true
           }
         ]
+      },
+      
+      # Planning Conversation Agent - handles planning discussions
+      {
+        PlanningConversationAgent,
+        %{},  # Initial state
+        [
+          id: "planning_conversation_main",
+          restart: :permanent,
+          tags: ["essential", "planning", "conversation"],
+          capabilities: [:planning_creation, :planning_discussion, :critics_integration],
+          metadata: %{
+            description: "Main planning conversation agent",
+            critical: true
+          }
+        ]
+      },
+      
+      # Code Analysis Agent - handles code analysis operations
+      {
+        CodeAnalysisAgent,
+        %{},  # Initial state
+        [
+          id: "code_analysis_main",
+          restart: :permanent,
+          tags: ["essential", "analysis"],
+          capabilities: [:static_analysis, :llm_enhancement, :cot_analysis],
+          metadata: %{
+            description: "Main code analysis agent",
+            critical: true
+          }
+        ]
       }
-      # Add more essential agents here as needed
     ]
     
     results = Enum.map(agents, fn {module, initial_state, opts} ->
