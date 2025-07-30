@@ -10,6 +10,7 @@ defmodule RubberDuck.Jido.Agents.EssentialAgents do
   alias RubberDuck.Agents.ConversationRouterAgent
   alias RubberDuck.Agents.PlanningConversationAgent
   alias RubberDuck.Agents.CodeAnalysisAgent
+  alias RubberDuck.Agents.EnhancementConversationAgent
   alias RubberDuck.Jido.Agents.Supervisor
   
   @doc """
@@ -62,6 +63,22 @@ defmodule RubberDuck.Jido.Agents.EssentialAgents do
           capabilities: [:static_analysis, :llm_enhancement, :cot_analysis],
           metadata: %{
             description: "Main code analysis agent",
+            critical: true
+          }
+        ]
+      },
+      
+      # Enhancement Conversation Agent - handles enhancement discussions
+      {
+        EnhancementConversationAgent,
+        %{},  # Initial state
+        [
+          id: "enhancement_conversation_main",
+          restart: :permanent,
+          tags: ["essential", "enhancement", "conversation"],
+          capabilities: [:enhancement_coordination, :technique_selection, :suggestion_generation],
+          metadata: %{
+            description: "Main enhancement conversation agent",
             critical: true
           }
         ]
