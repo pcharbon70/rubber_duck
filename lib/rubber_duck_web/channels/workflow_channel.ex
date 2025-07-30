@@ -76,7 +76,6 @@ defmodule RubberDuckWeb.WorkflowChannel do
   
   alias RubberDuck.Jido.Agents.{WorkflowCoordinator, Registry}
   alias RubberDuck.Jido.Workflows.Library
-  alias RubberDuck.Workflows
   
   @impl true
   def join("workflows:api", _params, socket) do
@@ -571,11 +570,6 @@ defmodule RubberDuckWeb.WorkflowChannel do
     end
   end
   
-  defp handle_agent_telemetry_event(event_name, measurements, metadata, %{socket: socket}) do
-    event_type = format_event_name(event_name)
-    payload = format_event_payload(event_type, measurements, metadata)
-    push(socket, event_type, payload)
-  end
   
   # Helper functions
   
