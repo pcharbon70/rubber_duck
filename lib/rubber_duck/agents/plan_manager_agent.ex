@@ -93,16 +93,19 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
     # Schedule cleanup task
     schedule_cleanup()
     
-    # Subscribe to relevant signals
-    agent = agent
-    |> subscribe_to_signals(%{"type" => "plan_request"})
-    |> subscribe_to_signals(%{"type" => "plan_update"})
-    |> subscribe_to_signals(%{"type" => "plan_query"})
-    
-    # Recover any persisted state
-    agent = recover_state(agent)
-    
-    {:ok, agent}
+    # Subscribe to relevant signals with error handling
+    with {:ok, agent} <- safe_subscribe_to_signals(agent, [
+           %{"type" => "plan_request"},
+           %{"type" => "plan_update"},
+           %{"type" => "plan_query"}
+         ]),
+         {:ok, agent} <- safe_recover_state(agent) do
+      {:ok, agent}
+    else
+      {:error, reason} = error ->
+        Logger.error("Failed to initialize PlanManagerAgent: #{inspect(reason)}")
+        error
+    end
   end
   
   @impl true
@@ -606,5 +609,33 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
     |> Enum.into(%{})
     
     update_state(agent, %{query_cache: updated_cache})
+  end
+  
+  ## Helper Functions for Error Handling
+  
+  defp safe_subscribe_to_signals(agent, filter_list) do
+    try do
+      updated_agent = Enum.reduce(filter_list, agent, fn filters, acc ->
+        subscribe_to_signals(acc, filters)
+      end)
+      {:ok, updated_agent}
+    rescue
+      error -> {:error, {:subscription_failed, error}}
+    end
+  end
+  
+  defp safe_recover_state(agent) do
+    try do
+      recovered_agent = recover_state(agent)
+      
+      # Validate recovered state
+      if is_map(recovered_agent) and Map.has_key?(recovered_agent, :state) do
+        {:ok, recovered_agent}
+      else
+        {:error, :invalid_recovered_state}
+      end
+    rescue
+      error -> {:error, {:state_recovery_failed, error}}
+    end
   end
 end
