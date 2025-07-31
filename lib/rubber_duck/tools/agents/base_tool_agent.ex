@@ -105,12 +105,17 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
             case get_cached_result(agent, cache_key) do
               {:ok, cached_result} ->
                 # Send cached result
-                emit_signal("tool_result", %{
-                  "request_id" => request_id,
-                  "result" => cached_result,
-                  "from_cache" => true,
-                  "tool" => unquote(tool_name)
+                signal = Jido.Signal.new!(%{
+                  type: "tool.result",
+                  source: "agent:#{agent.id}",
+                  data: %{
+                    request_id: request_id,
+                    result: cached_result,
+                    from_cache: true,
+                    tool: unquote(tool_name)
+                  }
                 })
+                emit_signal(agent, signal)
                 
                 # Update metrics
                 agent = update_metrics(agent, :cache_hit)
@@ -137,11 +142,16 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
             end
             
           {:error, :rate_limited} ->
-            emit_signal("tool_error", %{
-              "request_id" => request_id,
-              "error" => "Rate limit exceeded",
-              "retry_after" => calculate_retry_after(agent)
+            signal = Jido.Signal.new!(%{
+              type: "tool.error",
+              source: "agent:#{agent.id}",
+              data: %{
+                request_id: request_id,
+                error: "Rate limit exceeded",
+                retry_after: calculate_retry_after(agent)
+              }
             })
+            emit_signal(agent, signal)
             {:ok, agent}
         end
       end
@@ -161,20 +171,30 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
           agent
         end
         
-        emit_signal("request_cancelled", %{
-          "request_id" => request_id
+        signal = Jido.Signal.new!(%{
+          type: "tool.request.cancelled",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id
+          }
         })
+        emit_signal(agent, signal)
         
         {:ok, agent}
       end
       
       def handle_signal(agent, %{"type" => "get_metrics"} = _signal) do
-        emit_signal("metrics_report", %{
-          "metrics" => agent.state.metrics,
-          "cache_size" => map_size(agent.state.results_cache),
-          "queue_length" => length(agent.state.request_queue),
-          "active_requests" => map_size(agent.state.active_requests)
+        signal = Jido.Signal.new!(%{
+          type: "tool.metrics.report",
+          source: "agent:#{agent.id}",
+          data: %{
+            metrics: agent.state.metrics,
+            cache_size: map_size(agent.state.results_cache),
+            queue_length: length(agent.state.request_queue),
+            active_requests: map_size(agent.state.active_requests)
+          }
         })
+        emit_signal(agent, signal)
         
         {:ok, agent}
       end
@@ -182,9 +202,14 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
       def handle_signal(agent, %{"type" => "clear_cache"} = _signal) do
         agent = put_in(agent.state.results_cache, %{})
         
-        emit_signal("cache_cleared", %{
-          "tool" => unquote(tool_name)
+        signal = Jido.Signal.new!(%{
+          type: "tool.cache.cleared",
+          source: "agent:#{agent.id}",
+          data: %{
+            tool: unquote(tool_name)
+          }
         })
+        emit_signal(agent, signal)
         
         {:ok, agent}
       end
@@ -282,11 +307,16 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
             |> put_in([:state, :active_requests, request.id], request)
             
             # Emit progress signal
-            emit_signal("tool_progress", %{
-              "request_id" => request.id,
-              "status" => "started",
-              "tool" => unquote(tool_name)
+            signal = Jido.Signal.new!(%{
+              type: "tool.progress",
+              source: "agent:#{agent.id}",
+              data: %{
+                request_id: request.id,
+                status: "started",
+                tool: unquote(tool_name)
+              }
             })
+            emit_signal(agent, signal)
             
             # Start async execution
             Task.start(fn ->
@@ -325,58 +355,98 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
               execution_time = System.monotonic_time(:millisecond) - start_time
               
               # Emit success signal
-              emit_signal("tool_result", %{
-                "request_id" => request.id,
-                "result" => processed_result,
-                "execution_time" => execution_time,
-                "tool" => tool_name
+              signal = Jido.Signal.new!(%{
+                type: "tool.result",
+                source: "agent:#{Process.self()}",
+                data: %{
+                  request_id: request.id,
+                  result: processed_result,
+                  execution_time: execution_time,
+                  tool: tool_name
+                }
               })
+              emit_signal(nil, signal)
               
               # Update metrics (agent will handle in signal)
-              emit_signal("_internal_tool_complete", %{
-                "request_id" => request.id,
-                "cache_key" => request.cache_key,
-                "result" => processed_result,
-                "execution_time" => execution_time,
-                "success" => true
+              signal = Jido.Signal.new!(%{
+                type: "tool.internal.complete",
+                source: "agent:#{Process.self()}",
+                data: %{
+                  request_id: request.id,
+                  cache_key: request.cache_key,
+                  result: processed_result,
+                  execution_time: execution_time,
+                  success: true
+                }
               })
+              emit_signal(nil, signal)
               
             {:error, reason} ->
-              emit_signal("tool_error", %{
-                "request_id" => request.id,
-                "error" => format_error(reason),
-                "tool" => tool_name
+              signal = Jido.Signal.new!(%{
+                type: "tool.error",
+                source: "agent:#{Process.self()}",
+                data: %{
+                  request_id: request.id,
+                  error: format_error(reason),
+                  tool: tool_name
+                }
               })
+              emit_signal(nil, signal)
               
-              emit_signal("_internal_tool_complete", %{
-                "request_id" => request.id,
-                "success" => false
+              signal = Jido.Signal.new!(%{
+                type: "tool.internal.complete",
+                source: "agent:#{Process.self()}",
+                data: %{
+                  request_id: request.id,
+                  success: false
+                }
               })
+              emit_signal(nil, signal)
           end
         catch
           {:validation_error, reason} ->
-            emit_signal("tool_error", %{
-              "request_id" => request.id,
-              "error" => "Validation failed: #{inspect(reason)}",
-              "tool" => tool_name
+            signal = Jido.Signal.new!(%{
+              type: "tool.error",
+              source: "agent:#{Process.self()}",
+              data: %{
+                request_id: request.id,
+                error: "Validation failed: #{inspect(reason)}",
+                tool: tool_name
+              }
             })
+            emit_signal(nil, signal)
             
-            emit_signal("_internal_tool_complete", %{
-              "request_id" => request.id,
-              "success" => false
+            signal = Jido.Signal.new!(%{
+              type: "tool.internal.complete",
+              source: "agent:#{Process.self()}",
+              data: %{
+                request_id: request.id,
+                success: false
+              }
             })
+            emit_signal(nil, signal)
         rescue
           error ->
-            emit_signal("tool_error", %{
-              "request_id" => request.id,
-              "error" => Exception.message(error),
-              "tool" => tool_name
+            signal = Jido.Signal.new!(%{
+              type: "tool.error",
+              source: "agent:#{Process.self()}",
+              data: %{
+                request_id: request.id,
+                error: Exception.message(error),
+                tool: tool_name
+              }
             })
+            emit_signal(nil, signal)
             
-            emit_signal("_internal_tool_complete", %{
-              "request_id" => request.id,
-              "success" => false
+            signal = Jido.Signal.new!(%{
+              type: "tool.internal.complete",
+              source: "agent:#{Process.self()}",
+              data: %{
+                request_id: request.id,
+                success: false
+              }
             })
+            emit_signal(nil, signal)
         end
       end
       
@@ -408,27 +478,27 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
       end
       
       # Override handle_signal to include internal completion handling
-      def handle_signal(agent, %{"type" => "_internal_tool_complete"} = signal) do
-        %{"data" => data} = signal
-        request_id = data["request_id"]
+      def handle_signal(agent, %Jido.Signal{type: "tool.internal.complete"} = signal) do
+        data = signal.data
+        request_id = data.request_id
         
         # Remove from active requests
         agent = update_in(agent.state.active_requests, &Map.delete(&1, request_id))
         
         # Cache result if successful
-        agent = if data["success"] && data["result"] do
+        agent = if data.success && data[:result] do
           cache_entry = %{
-            result: data["result"],
+            result: data.result,
             cached_at: System.monotonic_time(:millisecond)
           }
-          put_in(agent.state.results_cache[data["cache_key"]], cache_entry)
+          put_in(agent.state.results_cache[data.cache_key], cache_entry)
         else
           agent
         end
         
         # Update metrics
-        agent = if data["execution_time"] do
-          update_metrics(agent, {:execution_complete, data["execution_time"], data["success"]})
+        agent = if data[:execution_time] do
+          update_metrics(agent, {:execution_complete, data.execution_time, data.success})
         else
           agent
         end

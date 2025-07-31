@@ -89,11 +89,16 @@ defmodule RubberDuck.Tools.Agents.TestGeneratorAgent do
     }
     
     # Emit progress
-    emit_signal("test_generation_progress", %{
-      "request_id" => tool_request["data"]["request_id"],
-      "status" => "analyzing_code",
-      "module" => data["module"]
+    signal = Jido.Signal.new!(%{
+      type: "test.generation.progress",
+      source: "agent:#{agent.id}",
+      data: %{
+        request_id: tool_request["data"]["request_id"],
+        status: "analyzing_code",
+        module: data["module"]
+      }
     })
+    emit_signal(agent, signal)
     
     # Forward to base handler
     {:ok, agent} = handle_signal(agent, tool_request)
@@ -147,10 +152,15 @@ defmodule RubberDuck.Tools.Agents.TestGeneratorAgent do
       end
     end)
     
-    emit_signal("test_suite_started", %{
-      "suite_id" => suite_id,
-      "module_count" => length(modules)
+    signal = Jido.Signal.new!(%{
+      type: "test.suite.started",
+      source: "agent:#{agent.id}",
+      data: %{
+        suite_id: suite_id,
+        module_count: length(modules)
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -222,7 +232,12 @@ defmodule RubberDuck.Tools.Agents.TestGeneratorAgent do
       }
     }
     
-    emit_signal("coverage_analyzed", report)
+    signal = Jido.Signal.new!(%{
+      type: "test.coverage.analyzed",
+      source: "agent:#{agent.id}",
+      data: report
+    })
+    emit_signal(agent, signal)
     
     # Update coverage data
     agent = put_in(agent.state.coverage_data[module], report)
@@ -257,10 +272,15 @@ defmodule RubberDuck.Tools.Agents.TestGeneratorAgent do
       }
     }
     
-    emit_signal("property_generation_started", %{
-      "request_id" => tool_request["data"]["request_id"],
-      "properties" => data["properties"]
+    signal = Jido.Signal.new!(%{
+      type: "test.property.generation.started",
+      source: "agent:#{agent.id}",
+      data: %{
+        request_id: tool_request["data"]["request_id"],
+        properties: data["properties"]
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent} = handle_signal(agent, tool_request)
     
@@ -282,11 +302,16 @@ defmodule RubberDuck.Tools.Agents.TestGeneratorAgent do
       "property_test_candidates" => identify_property_test_candidates(analysis)
     }
     
-    emit_signal("test_suggestions", %{
-      "module" => data["module"],
-      "suggestions" => suggestions,
-      "quality_score" => calculate_test_quality_score(analysis)
+    signal = Jido.Signal.new!(%{
+      type: "test.suggestions",
+      source: "agent:#{agent.id}",
+      data: %{
+        module: data["module"],
+        suggestions: suggestions,
+        quality_score: calculate_test_quality_score(analysis)
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -331,14 +356,19 @@ defmodule RubberDuck.Tools.Agents.TestGeneratorAgent do
       agent = check_suite_completion(agent, data["result"])
       
       # Emit specialized signal
-      emit_signal("tests_generated", %{
-        "request_id" => data["request_id"],
-        "tests" => data["result"]["tests"],
-        "test_count" => data["result"]["test_count"],
-        "coverage_estimate" => data["result"]["coverage_estimate"],
-        "module" => data["result"][:module],
-        "suggestions" => data["result"]["suggestions"]
+      signal = Jido.Signal.new!(%{
+        type: "test.generated",
+        source: "agent:#{agent.id}",
+        data: %{
+          request_id: data["request_id"],
+          tests: data["result"]["tests"],
+          test_count: data["result"]["test_count"],
+          coverage_estimate: data["result"]["coverage_estimate"],
+          module: data["result"][:module],
+          suggestions: data["result"]["suggestions"]
+        }
       })
+      emit_signal(agent, signal)
     end
     
     {:ok, agent}
@@ -547,14 +577,19 @@ defmodule RubberDuck.Tools.Agents.TestGeneratorAgent do
       
       if suite && map_size(suite.tests) >= length(suite.modules) do
         # Suite is complete
-        emit_signal("test_suite_generated", %{
-          "suite_id" => suite_id,
-          "module_count" => length(suite.modules),
-          "total_tests" => Enum.sum(Enum.map(suite.tests, fn {_, tests} -> 
-            count_tests_in_code(tests) 
-          end)),
-          "average_coverage" => calculate_average_coverage(suite.coverage)
+        signal = Jido.Signal.new!(%{
+          type: "test.suite.generated",
+          source: "agent:#{agent.id}",
+          data: %{
+            suite_id: suite_id,
+            module_count: length(suite.modules),
+            total_tests: Enum.sum(Enum.map(suite.tests, fn {_, tests} -> 
+              count_tests_in_code(tests) 
+            end)),
+            average_coverage: calculate_average_coverage(suite.coverage)
+          }
         })
+        emit_signal(agent, signal)
         
         # Update suite status
         put_in(agent.state.test_suites[suite_id][:status], "complete")

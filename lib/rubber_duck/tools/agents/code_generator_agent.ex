@@ -85,11 +85,16 @@ defmodule RubberDuck.Tools.Agents.CodeGeneratorAgent do
     }
     
     # Emit progress
-    emit_signal("generation_progress", %{
-      "request_id" => tool_request["data"]["request_id"],
-      "status" => "started",
-      "description" => params.description
+    signal = Jido.Signal.new!(%{
+      type: "code.generation.progress",
+      source: "agent:#{agent.id}",
+      data: %{
+        request_id: tool_request["data"]["request_id"],
+        status: "started",
+        description: params.description
+      }
     })
+    emit_signal(agent, signal)
     
     # Forward to base handler
     {:ok, agent} = handle_signal(agent, tool_request)
@@ -113,10 +118,15 @@ defmodule RubberDuck.Tools.Agents.CodeGeneratorAgent do
     
     case Map.get(agent.state.templates, template_name) do
       nil ->
-        emit_signal("generation_error", %{
-          "request_id" => data["request_id"],
-          "error" => "Template not found: #{template_name}"
+        signal = Jido.Signal.new!(%{
+          type: "code.generation.error",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: data["request_id"],
+            error: "Template not found: #{template_name}"
+          }
         })
+        emit_signal(agent, signal)
         {:ok, agent}
         
       template ->
@@ -133,10 +143,15 @@ defmodule RubberDuck.Tools.Agents.CodeGeneratorAgent do
           })
         }
         
-        emit_signal("template_applied", %{
-          "template" => template_name,
-          "request_id" => data["request_id"]
+        signal = Jido.Signal.new!(%{
+          type: "code.template.applied",
+          source: "agent:#{agent.id}",
+          data: %{
+            template: template_name,
+            request_id: data["request_id"]
+          }
         })
+        emit_signal(agent, signal)
         
         handle_tool_signal(agent, generate_signal)
     end
@@ -173,10 +188,15 @@ defmodule RubberDuck.Tools.Agents.CodeGeneratorAgent do
       end
     end)
     
-    emit_signal("batch_started", %{
-      "batch_id" => batch_id,
-      "total_requests" => length(requests)
+    signal = Jido.Signal.new!(%{
+      type: "code.generation.batch.started",
+      source: "agent:#{agent.id}",
+      data: %{
+        batch_id: batch_id,
+        total_requests: length(requests)
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -220,11 +240,16 @@ defmodule RubberDuck.Tools.Agents.CodeGeneratorAgent do
       data["page_size"] || 20
     )
     
-    emit_signal("history_retrieved", %{
-      "history" => history,
-      "pagination" => pagination,
-      "total_generated" => agent.state.generation_stats.total_generated
+    signal = Jido.Signal.new!(%{
+      type: "code.generation.history.retrieved",
+      source: "agent:#{agent.id}",
+      data: %{
+        history: history,
+        pagination: pagination,
+        total_generated: agent.state.generation_stats.total_generated
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -243,10 +268,15 @@ defmodule RubberDuck.Tools.Agents.CodeGeneratorAgent do
     
     agent = put_in(agent.state.templates[template_name], template)
     
-    emit_signal("template_saved", %{
-      "name" => template_name,
-      "template" => template
+    signal = Jido.Signal.new!(%{
+      type: "code.template.saved",
+      source: "agent:#{agent.id}",
+      data: %{
+        name: template_name,
+        template: template
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -286,16 +316,21 @@ defmodule RubberDuck.Tools.Agents.CodeGeneratorAgent do
       end
       
       # Emit specialized signal
-      emit_signal("code_generated", %{
-        "request_id" => data["request_id"],
-        "code" => data["result"]["code"],
-        "tests" => data["result"]["tests"],
-        "metadata" => %{
-          "style" => data["result"]["style"],
-          "has_tests" => not is_nil(data["result"]["tests"]),
-          "length" => String.length(data["result"]["code"] || "")
+      signal = Jido.Signal.new!(%{
+        type: "code.generated",
+        source: "agent:#{agent.id}",
+        data: %{
+          request_id: data["request_id"],
+          code: data["result"]["code"],
+          tests: data["result"]["tests"],
+          metadata: %{
+            style: data["result"]["style"],
+            has_tests: not is_nil(data["result"]["tests"]),
+            length: String.length(data["result"]["code"] || "")
+          }
         }
       })
+      emit_signal(agent, signal)
     end
     
     {:ok, agent}
@@ -390,12 +425,17 @@ defmodule RubberDuck.Tools.Agents.CodeGeneratorAgent do
         
         # Check if batch is complete
         if updated_batch.completed >= updated_batch.total do
-          emit_signal("batch_completed", %{
-            "batch_id" => batch_id,
-            "total" => updated_batch.total,
-            "results" => Enum.reverse(updated_batch.results),
-            "duration" => DateTime.diff(DateTime.utc_now(), updated_batch.started_at)
+          signal = Jido.Signal.new!(%{
+            type: "code.generation.batch.completed",
+            source: "agent:#{agent.id}",
+            data: %{
+              batch_id: batch_id,
+              total: updated_batch.total,
+              results: Enum.reverse(updated_batch.results),
+              duration: DateTime.diff(DateTime.utc_now(), updated_batch.started_at)
+            }
           })
+          emit_signal(agent, signal)
         end
         
         updated_batch

@@ -98,11 +98,16 @@ defmodule RubberDuck.Tools.Agents.DebugAssistantAgent do
     }
     
     # Emit progress
-    emit_signal("debug_progress", %{
-      "request_id" => tool_request["data"]["request_id"],
-      "status" => "analyzing_error",
-      "error_type" => extract_error_type(data["error_message"])
+    signal = Jido.Signal.new!(%{
+      type: "debug.progress",
+      source: "agent:#{agent.id}",
+      data: %{
+        request_id: tool_request["data"]["request_id"],
+        status: "analyzing_error",
+        error_type: extract_error_type(data["error_message"])
+      }
     })
+    emit_signal(agent, signal)
     
     # Forward to base handler
     {:ok, agent} = handle_signal(agent, tool_request)
@@ -157,11 +162,16 @@ defmodule RubberDuck.Tools.Agents.DebugAssistantAgent do
       agent
     end
     
-    emit_signal("debug_session_started", %{
-      "session_id" => session_id,
-      "name" => session.name,
-      "strategy" => session.resolution_strategy
+    signal = Jido.Signal.new!(%{
+      type: "debug.session.started",
+      source: "agent:#{agent.id}",
+      data: %{
+        session_id: session_id,
+        name: session.name,
+        strategy: session.resolution_strategy
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -197,16 +207,26 @@ defmodule RubberDuck.Tools.Agents.DebugAssistantAgent do
         agent
       end
       
-      emit_signal("debug_context_added", %{
-        "session_id" => session_id,
-        "context_keys" => Map.keys(data["context"] || %{})
+      signal = Jido.Signal.new!(%{
+        type: "debug.context.added",
+        source: "agent:#{agent.id}",
+        data: %{
+          session_id: session_id,
+          context_keys: Map.keys(data["context"] || %{})
+        }
       })
+      emit_signal(agent, signal)
       
       {:ok, agent}
     else
-      emit_signal("debug_error", %{
-        "error" => "Invalid session ID or no active session"
+      signal = Jido.Signal.new!(%{
+        type: "debug.error",
+        source: "agent:#{agent.id}",
+        data: %{
+          error: "Invalid session ID or no active session"
+        }
       })
+      emit_signal(agent, signal)
       {:ok, agent}
     end
   end
@@ -221,12 +241,17 @@ defmodule RubberDuck.Tools.Agents.DebugAssistantAgent do
       agent.state.successful_solutions
     )
     
-    emit_signal("debugging_steps", %{
-      "error_type" => data["error_type"],
-      "steps" => steps,
-      "estimated_time" => estimate_debugging_time(data["error_type"], length(steps)),
-      "difficulty" => assess_debugging_difficulty(data["error_type"])
+    signal = Jido.Signal.new!(%{
+      type: "debug.steps",
+      source: "agent:#{agent.id}",
+      data: %{
+        error_type: data["error_type"],
+        steps: steps,
+        estimated_time: estimate_debugging_time(data["error_type"], length(steps)),
+        difficulty: assess_debugging_difficulty(data["error_type"])
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -262,11 +287,16 @@ defmodule RubberDuck.Tools.Agents.DebugAssistantAgent do
         agent
     end
     
-    emit_signal("debug_attempt_tracked", %{
-      "attempt_id" => attempt.id,
-      "outcome" => data["outcome"],
-      "learning_updated" => data["outcome"] in ["success", "failure"]
+    signal = Jido.Signal.new!(%{
+      type: "debug.attempt.tracked",
+      source: "agent:#{agent.id}",
+      data: %{
+        attempt_id: attempt.id,
+        outcome: data["outcome"],
+        learning_updated: data["outcome"] in ["success", "failure"]
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -287,12 +317,17 @@ defmodule RubberDuck.Tools.Agents.DebugAssistantAgent do
       extract_error_type(data["error_message"])
     )
     
-    emit_signal("similar_errors_found", %{
-      "query_error" => data["error_message"],
-      "similar_errors" => similar_errors,
-      "successful_solutions" => relevant_solutions,
-      "total_found" => length(similar_errors)
+    signal = Jido.Signal.new!(%{
+      type: "debug.similar_errors.found",
+      source: "agent:#{agent.id}",
+      data: %{
+        query_error: data["error_message"],
+        similar_errors: similar_errors,
+        successful_solutions: relevant_solutions,
+        total_found: length(similar_errors)
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -320,13 +355,23 @@ defmodule RubberDuck.Tools.Agents.DebugAssistantAgent do
       # Mark session as completed
       agent = put_in(agent.state.debug_sessions[session_id][:status], "completed")
       
-      emit_signal("debug_report_generated", report)
+      signal = Jido.Signal.new!(%{
+        type: "debug.report.generated",
+        source: "agent:#{agent.id}",
+        data: report
+      })
+      emit_signal(agent, signal)
       
       {:ok, agent}
     else
-      emit_signal("debug_error", %{
-        "error" => "No session found for report generation"
+      signal = Jido.Signal.new!(%{
+        type: "debug.error",
+        source: "agent:#{agent.id}",
+        data: %{
+          error: "No session found for report generation"
+        }
       })
+      emit_signal(agent, signal)
       {:ok, agent}
     end
   end
@@ -371,15 +416,20 @@ defmodule RubberDuck.Tools.Agents.DebugAssistantAgent do
       agent = update_error_patterns(agent, data["result"])
       
       # Emit specialized signal
-      emit_signal("error_analyzed", %{
-        "request_id" => data["request_id"],
-        "error_type" => data["result"]["error_type"],
-        "likely_causes" => data["result"]["likely_causes"],
-        "debugging_steps" => data["result"]["debugging_steps"],
-        "suggested_fixes" => data["result"]["suggested_fixes"],
-        "confidence" => data["result"]["confidence"],
-        "severity" => assess_severity_from_type(data["result"]["error_type"])
+      signal = Jido.Signal.new!(%{
+        type: "debug.error.analyzed",
+        source: "agent:#{agent.id}",
+        data: %{
+          request_id: data["request_id"],
+          error_type: data["result"]["error_type"],
+          likely_causes: data["result"]["likely_causes"],
+          debugging_steps: data["result"]["debugging_steps"],
+          suggested_fixes: data["result"]["suggested_fixes"],
+          confidence: data["result"]["confidence"],
+          severity: assess_severity_from_type(data["result"]["error_type"])
+        }
       })
+      emit_signal(agent, signal)
     end
     
     {:ok, agent}
