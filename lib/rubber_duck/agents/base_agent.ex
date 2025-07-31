@@ -153,18 +153,21 @@ defmodule RubberDuck.Agents.BaseAgent do
       # RubberDuck-specific functions
       
       @doc """
-      Emits a signal through the RubberDuck signal dispatcher.
+      Emits a Jido signal through the signal bus.
       """
-      def emit_signal(agent, signal) do
-        enhanced_signal = Map.merge(signal, %{
-          "source" => "agent:#{agent.id}",
-          "agent_type" => to_string(__MODULE__)
-        })
+      def emit_signal(agent, %Jido.Signal{} = signal) do
+        # Ensure the signal has proper source attribution
+        enhanced_signal = %{signal | 
+          source: signal.source || "agent:#{agent.id}",
+          subject: signal.subject || "agent:#{agent.id}"
+        }
         
-        # TODO: Implement SignalDispatcher in a future phase
-        # SignalDispatcher.emit(:broadcast, enhanced_signal)
-        Logger.debug("Signal emission placeholder: #{inspect(enhanced_signal)}")
-        :ok
+        case Jido.Signal.Bus.publish(RubberDuck.SignalBus, [enhanced_signal]) do
+          {:ok, _recorded_signals} -> :ok
+          {:error, reason} ->
+            Logger.error("Failed to emit signal: #{inspect(reason)}")
+            {:error, reason}
+        end
       end
       
       @doc """
@@ -256,6 +259,7 @@ defmodule RubberDuck.Agents.BaseAgent do
           {:error, _} -> agent
         end
       end
+      
       
       # Allow overriding all callbacks
       defoverridable [
