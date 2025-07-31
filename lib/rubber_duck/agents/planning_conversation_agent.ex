@@ -73,14 +73,17 @@ defmodule RubberDuck.Agents.PlanningConversationAgent do
          {:ok, agent} <- update_conversation(agent, conversation) do
       
       # Emit conversation started signal
-      emit_signal(agent, %{
-        "type" => "plan_creation_started",
-        "data" => %{
-          "conversation_id" => conversation.id,
-          "query" => data["query"],
-          "user_id" => data["user_id"]
+      signal = Jido.Signal.new!(%{
+        type: "conversation.plan.creation_started",
+        source: "agent:#{agent.id}",
+        data: %{
+          conversation_id: conversation.id,
+          query: data["query"],
+          user_id: data["user_id"],
+          timestamp: DateTime.utc_now()
         }
       })
+      emit_signal(agent, signal)
       
       # Start plan extraction asynchronously
       Task.start(fn ->
@@ -166,14 +169,17 @@ defmodule RubberDuck.Agents.PlanningConversationAgent do
         })
         
         # Emit completion signal
-        emit_signal(agent, %{
-          "type" => "plan_creation_completed",
-          "data" => %{
-            "conversation_id" => conversation_id,
-            "plan_id" => data["plan_id"],
-            "duration" => calculate_duration(conversation)
+        signal = Jido.Signal.new!(%{
+          type: "conversation.plan.creation_completed",
+          source: "agent:#{agent.id}",
+          data: %{
+            conversation_id: conversation_id,
+            plan_id: data["plan_id"],
+            duration: calculate_duration(conversation),
+            timestamp: DateTime.utc_now()
           }
         })
+        emit_signal(agent, signal)
         
         {:ok, agent}
         
@@ -183,13 +189,14 @@ defmodule RubberDuck.Agents.PlanningConversationAgent do
   end
   
   def handle_signal(agent, %{"type" => "get_planning_metrics"} = _signal) do
-    metrics_signal = %{
-      "type" => "planning_metrics_response",
-      "source" => "agent:#{agent.id}",
-      "data" => agent.state.metrics
-    }
-    
-    emit_signal(agent, metrics_signal)
+    signal = Jido.Signal.new!(%{
+      type: "conversation.planning.metrics",
+      source: "agent:#{agent.id}",
+      data: Map.merge(agent.state.metrics, %{
+        timestamp: DateTime.utc_now()
+      })
+    })
+    emit_signal(agent, signal)
     {:ok, agent}
   end
   
@@ -519,15 +526,18 @@ defmodule RubberDuck.Agents.PlanningConversationAgent do
     summary = validation_results["summary"] || validation_results[:summary]
     
     # Emit validation result signal
-    emit_signal(agent, %{
-      "type" => "plan_validation_result",
-      "data" => %{
-        "conversation_id" => conversation.id,
-        "plan_id" => conversation.plan_id,
-        "validation_summary" => summary,
-        "validation_results" => validation_results
+    signal = Jido.Signal.new!(%{
+      type: "conversation.plan.validation_result",
+      source: "agent:#{agent.id}",
+      data: %{
+        conversation_id: conversation.id,
+        plan_id: conversation.plan_id,
+        validation_summary: summary,
+        validation_results: validation_results,
+        timestamp: DateTime.utc_now()
       }
     })
+    emit_signal(agent, signal)
     
     # Check if improvement or fixing is needed
     cond do
@@ -621,16 +631,16 @@ defmodule RubberDuck.Agents.PlanningConversationAgent do
   defp handle_plan_error(agent, signal, reason) do
     Logger.error("Plan creation error: #{inspect(reason)}")
     
-    error_signal = %{
-      "type" => "plan_creation_error",
-      "source" => "agent:#{agent.id}",
-      "data" => %{
-        "conversation_id" => get_in(signal, ["data", "conversation_id"]),
-        "error" => inspect(reason)
+    signal = Jido.Signal.new!(%{
+      type: "conversation.plan.creation_error",
+      source: "agent:#{agent.id}",
+      data: %{
+        conversation_id: get_in(signal, ["data", "conversation_id"]),
+        error: inspect(reason),
+        timestamp: DateTime.utc_now()
       }
-    }
-    
-    emit_signal(agent, error_signal)
+    })
+    emit_signal(agent, signal)
     
     # Update failure metrics
     metrics = update_in(agent.state.metrics.failed_conversations, &(&1 + 1))

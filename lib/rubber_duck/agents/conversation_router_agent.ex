@@ -100,24 +100,24 @@ defmodule RubberDuck.Agents.ConversationRouterAgent do
          {:ok, agent} <- update_metrics(agent, route, start_time) do
       
       # Emit routing decision
-      response_signal = %{
-        "type" => "conversation_route_response",
-        "source" => "agent:#{agent.id}",
-        "data" => %{
-          "request_id" => data["request_id"],
-          "route" => agent.state.routing_table[route],
-          "classification" => %{
-            "complexity" => classification.complexity,
-            "question_type" => classification.question_type,
-            "intent" => to_string(route),
-            "confidence" => classification.confidence || 0.9,
-            "explanation" => classification.explanation
+      signal = Jido.Signal.new!(%{
+        type: "conversation.route.response",
+        source: "agent:#{agent.id}",
+        data: %{
+          request_id: data["request_id"],
+          route: agent.state.routing_table[route],
+          classification: %{
+            complexity: classification.complexity,
+            question_type: classification.question_type,
+            intent: to_string(route),
+            confidence: classification.confidence || 0.9,
+            explanation: classification.explanation
           },
-          "context_id" => generate_context_id(data)
+          context_id: generate_context_id(data),
+          timestamp: DateTime.utc_now()
         }
-      }
-      
-      emit_signal(agent, response_signal)
+      })
+      emit_signal(agent, signal)
       {:ok, agent}
     else
       {:error, reason} ->
@@ -138,13 +138,14 @@ defmodule RubberDuck.Agents.ConversationRouterAgent do
   end
   
   def handle_signal(agent, %{"type" => "get_routing_metrics"} = _signal) do
-    metrics_signal = %{
-      "type" => "routing_metrics_response",
-      "source" => "agent:#{agent.id}",
-      "data" => agent.state.metrics
-    }
-    
-    emit_signal(agent, metrics_signal)
+    signal = Jido.Signal.new!(%{
+      type: "conversation.routing.metrics",
+      source: "agent:#{agent.id}",
+      data: Map.merge(agent.state.metrics, %{
+        timestamp: DateTime.utc_now()
+      })
+    })
+    emit_signal(agent, signal)
     {:ok, agent}
   end
   
@@ -276,16 +277,16 @@ defmodule RubberDuck.Agents.ConversationRouterAgent do
   defp handle_routing_error(agent, signal, reason) do
     Logger.error("Routing error: #{inspect(reason)}")
     
-    error_signal = %{
-      "type" => "conversation_route_error",
-      "source" => "agent:#{agent.id}",
-      "data" => %{
-        "request_id" => get_in(signal, ["data", "request_id"]),
-        "error" => inspect(reason)
+    signal = Jido.Signal.new!(%{
+      type: "conversation.route.error",
+      source: "agent:#{agent.id}",
+      data: %{
+        request_id: get_in(signal, ["data", "request_id"]),
+        error: inspect(reason),
+        timestamp: DateTime.utc_now()
       }
-    }
-    
-    emit_signal(agent, error_signal)
+    })
+    emit_signal(agent, signal)
     
     # Update failure metrics
     failure_key = inspect(reason)
