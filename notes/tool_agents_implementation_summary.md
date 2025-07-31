@@ -215,11 +215,29 @@ This document tracks the implementation of tool-specific agents in the RubberDuc
 - **State**: Optimization history, performance metrics, strategies, templates, experiments, model profiles
 - **Status**: Implemented with Jido actions
 
-### Remaining Agents (To Be Implemented)
+#### 14. CodeMigrationAgent ✓
+- **Tool**: `:code_migration`
+- **Description**: Handles comprehensive code migration tasks including language translation, framework upgrades, and dependency management
+- **Signals**:
+  - `tool_request` → Standard tool execution (via BaseToolAgent)
+  - `analyze_migration` → Analyze migration complexity, risks, and effort estimation
+  - `plan_migration` → Create detailed migration plans with strategies and timelines
+  - `execute_migration` → Execute migration with progress tracking and safety checks
+  - `validate_migration` → Validate migrated code for correctness and completeness
+  - `create_rollback` → Generate rollback procedures and recovery plans
+  - `update_dependencies` → Manage dependency updates and compatibility checks
+- **Actions**:
+  - `ExecuteToolAction` → Execute code migration operations
+  - `AnalyzeMigrationAction` → Comprehensive migration analysis (complexity, risks, effort)
+  - `PlanMigrationAction` → Migration planning with multiple strategies (big_bang, gradual, parallel, pilot)
+  - `ExecuteMigrationAction` → Migration execution with progress tracking and backup creation
+  - `ValidateMigrationAction` → Multi-level validation (syntax, logic, completeness) with detailed reports
+  - `CreateRollbackAction` → Rollback planning with selective and full recovery procedures
+  - `UpdateDependenciesAction` → Dependency management with compatibility and security analysis
+- **State**: Migration history, active projects, strategies, language mappings, validation rules
+- **Status**: Implemented with Jido actions
 
-14. **CodeMigrationAgent**
-    - Tool: `:code_migration`
-    - Will handle code migration tasks
+### Remaining Agents (To Be Implemented)
 
 15. **SecurityAnalyzerAgent**
     - Tool: `:security_analyzer`
@@ -275,7 +293,7 @@ Each agent has comprehensive tests covering:
 ## Next Steps
 
 1. Complete migration of existing agents to use Jido actions
-2. Implement remaining 9 agents with action-based architecture
+2. Implement remaining 3 agents with action-based architecture
 3. Add integration tests for agent interactions
 4. Document agent communication patterns
 5. Create agent composition examples
