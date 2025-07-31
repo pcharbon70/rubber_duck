@@ -316,15 +316,17 @@ defmodule RubberDuck.Agents.TokenAnalyticsAgent do
     
     # Compare with historical average
     if should_alert_cost_spike?(agent, total_cost) do
-      emit_signal(agent, %{
-        "type" => "analytics_alert",
-        "data" => %{
-          "alert_type" => "cost_spike",
-          "current_cost" => total_cost,
-          "threshold" => agent.state.alert_thresholds.cost_spike,
-          "timestamp" => DateTime.utc_now()
+      signal = Jido.Signal.new!(%{
+        type: "token.analytics.alert",
+        source: "agent:#{agent.id}",
+        data: %{
+          alert_type: "cost_spike",
+          current_cost: total_cost,
+          threshold: agent.state.alert_thresholds.cost_spike,
+          timestamp: DateTime.utc_now()
         }
       })
+      emit_signal(agent, signal)
     end
   end
   
@@ -334,15 +336,17 @@ defmodule RubberDuck.Agents.TokenAnalyticsAgent do
     end)
     
     if should_alert_usage_spike?(agent, total_tokens) do
-      emit_signal(agent, %{
-        "type" => "analytics_alert",
-        "data" => %{
-          "alert_type" => "usage_spike",
-          "current_usage" => total_tokens,
-          "threshold" => agent.state.alert_thresholds.usage_spike,
-          "timestamp" => DateTime.utc_now()
+      signal = Jido.Signal.new!(%{
+        type: "token.analytics.alert",
+        source: "agent:#{agent.id}",
+        data: %{
+          alert_type: "usage_spike",
+          current_usage: total_tokens,
+          threshold: agent.state.alert_thresholds.usage_spike,
+          timestamp: DateTime.utc_now()
         }
       })
+      emit_signal(agent, signal)
     end
   end
   
@@ -378,14 +382,16 @@ defmodule RubberDuck.Agents.TokenAnalyticsAgent do
   end
   
   defp emit_analytics_result(agent, query_type, result) do
-    emit_signal(agent, %{
-      "type" => "analytics_result",
-      "data" => %{
-        "query_type" => query_type,
-        "result" => result,
-        "timestamp" => DateTime.utc_now()
+    signal = Jido.Signal.new!(%{
+      type: "token.analytics.result",
+      source: "agent:#{agent.id}",
+      data: %{
+        query_type: query_type,
+        result: result,
+        timestamp: DateTime.utc_now()
       }
     })
+    emit_signal(agent, signal)
   end
   
   defp parse_date(nil), do: nil
