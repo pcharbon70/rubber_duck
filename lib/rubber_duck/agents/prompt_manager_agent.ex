@@ -82,21 +82,33 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
       {:ok, template} ->
         agent = put_in(agent.state.templates[template.id], template)
         
-        emit_signal("template_created", %{
-          "template_id" => template.id,
-          "name" => template.name,
-          "category" => template.category,
-          "version" => template.version
+        signal = Jido.Signal.new!(%{
+          type: "prompt.template.created",
+          source: "agent:#{agent.id}",
+          data: %{
+            template_id: template.id,
+            name: template.name,
+            category: template.category,
+            version: template.version,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         Logger.info("Created template: #{template.name} (#{template.id})")
         {:ok, agent}
         
       {:error, reason} ->
-        emit_signal("template_creation_failed", %{
-          "error" => reason,
-          "data" => template_data
+        signal = Jido.Signal.new!(%{
+          type: "prompt.template.creation_failed",
+          source: "agent:#{agent.id}",
+          data: %{
+            error: reason,
+            template_data: template_data,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         Logger.warning("Failed to create template: #{reason}")
         {:ok, agent}
@@ -106,7 +118,15 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
   def handle_signal(agent, %{"type" => "update_template", "data" => %{"id" => template_id} = update_data}) do
     case Map.get(agent.state.templates, template_id) do
       nil ->
-        emit_signal("template_not_found", %{"template_id" => template_id})
+        signal = Jido.Signal.new!(%{
+          type: "prompt.template.not_found",
+          source: "agent:#{agent.id}",
+          data: %{
+            template_id: template_id,
+            timestamp: DateTime.utc_now()
+          }
+        })
+        emit_signal(agent, signal)
         {:ok, agent}
         
       template ->
@@ -117,20 +137,32 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
             # Invalidate cache entries for this template
             agent = invalidate_template_cache(agent, template_id)
             
-            emit_signal("template_updated", %{
-              "template_id" => template_id,
-              "name" => updated_template.name,
-              "version" => updated_template.version
+            signal = Jido.Signal.new!(%{
+              type: "prompt.template.updated",
+              source: "agent:#{agent.id}",
+              data: %{
+                template_id: template_id,
+                name: updated_template.name,
+                version: updated_template.version,
+                timestamp: DateTime.utc_now()
+              }
             })
+            emit_signal(agent, signal)
             
             Logger.info("Updated template: #{updated_template.name} (#{template_id})")
             {:ok, agent}
             
           {:error, reason} ->
-            emit_signal("template_update_failed", %{
-              "template_id" => template_id,
-              "error" => reason
+            signal = Jido.Signal.new!(%{
+              type: "prompt.template.update_failed",
+              source: "agent:#{agent.id}",
+              data: %{
+                template_id: template_id,
+                error: reason,
+                timestamp: DateTime.utc_now()
+              }
             })
+            emit_signal(agent, signal)
             
             {:ok, agent}
         end
@@ -140,7 +172,15 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
   def handle_signal(agent, %{"type" => "delete_template", "data" => %{"id" => template_id}}) do
     case Map.get(agent.state.templates, template_id) do
       nil ->
-        emit_signal("template_not_found", %{"template_id" => template_id})
+        signal = Jido.Signal.new!(%{
+          type: "prompt.template.not_found",
+          source: "agent:#{agent.id}",
+          data: %{
+            template_id: template_id,
+            timestamp: DateTime.utc_now()
+          }
+        })
+        emit_signal(agent, signal)
         {:ok, agent}
         
       template ->
@@ -151,10 +191,16 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
         |> invalidate_template_cache(template_id)
         |> cleanup_template_analytics(template_id)
         
-        emit_signal("template_deleted", %{
-          "template_id" => template_id,
-          "name" => template.name
+        signal = Jido.Signal.new!(%{
+          type: "prompt.template.deleted",
+          source: "agent:#{agent.id}",
+          data: %{
+            template_id: template_id,
+            name: template.name,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         Logger.info("Deleted template: #{template.name} (#{template_id})")
         {:ok, agent}
@@ -164,13 +210,27 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
   def handle_signal(agent, %{"type" => "get_template", "data" => %{"id" => template_id}}) do
     case Map.get(agent.state.templates, template_id) do
       nil ->
-        emit_signal("template_not_found", %{"template_id" => template_id})
+        signal = Jido.Signal.new!(%{
+          type: "prompt.template.not_found",
+          source: "agent:#{agent.id}",
+          data: %{
+            template_id: template_id,
+            timestamp: DateTime.utc_now()
+          }
+        })
+        emit_signal(agent, signal)
         
       template ->
-        emit_signal("template_response", %{
-          "template" => template,
-          "stats" => Template.get_stats(template)
+        signal = Jido.Signal.new!(%{
+          type: "prompt.template.response",
+          source: "agent:#{agent.id}",
+          data: %{
+            template: template,
+            stats: Template.get_stats(template),
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
     end
     
     {:ok, agent}
@@ -184,11 +244,17 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
       Map.take(template, [:id, :name, :description, :category, :tags, :version, :created_at, :access_level])
     end)
     
-    emit_signal("templates_list", %{
-      "templates" => templates,
-      "count" => length(templates),
-      "filters_applied" => filters
+    signal = Jido.Signal.new!(%{
+      type: "prompt.templates.list",
+      source: "agent:#{agent.id}",
+      data: %{
+        templates: templates,
+        count: length(templates),
+        filters_applied: filters,
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -198,7 +264,15 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
   def handle_signal(agent, %{"type" => "build_prompt", "data" => %{"template_id" => template_id} = build_data}) do
     case Map.get(agent.state.templates, template_id) do
       nil ->
-        emit_signal("template_not_found", %{"template_id" => template_id})
+        signal = Jido.Signal.new!(%{
+          type: "prompt.template.not_found",
+          source: "agent:#{agent.id}",
+          data: %{
+            template_id: template_id,
+            timestamp: DateTime.utc_now()
+          }
+        })
+        emit_signal(agent, signal)
         {:ok, agent}
         
       template ->
@@ -210,7 +284,15 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
         
         case get_from_cache(agent, cache_key) do
           {:hit, cached_result} ->
-            emit_signal("prompt_built", Map.put(cached_result, "cache_hit", true))
+            signal = Jido.Signal.new!(%{
+              type: "prompt.built",
+              source: "agent:#{agent.id}",
+              data: Map.merge(cached_result, %{
+                cache_hit: true,
+                timestamp: DateTime.utc_now()
+              })
+            })
+            emit_signal(agent, signal)
             {:ok, agent}
             
           :miss ->
@@ -232,17 +314,30 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
                 # Update usage statistics
                 agent = update_template_usage(agent, template_id, :success)
                 
-                emit_signal("prompt_built", result)
+                signal = Jido.Signal.new!(%{
+                  type: "prompt.built",
+                  source: "agent:#{agent.id}",
+                  data: Map.merge(result, %{
+                    timestamp: DateTime.utc_now()
+                  })
+                })
+                emit_signal(agent, signal)
                 {:ok, agent}
                 
               {:error, reason} ->
                 agent = update_template_usage(agent, template_id, :error)
                 
-                emit_signal("prompt_build_failed", %{
-                  "template_id" => template_id,
-                  "error" => reason,
-                  "context" => context
+                signal = Jido.Signal.new!(%{
+                  type: "prompt.build.failed",
+                  source: "agent:#{agent.id}",
+                  data: %{
+                    template_id: template_id,
+                    error: reason,
+                    context: context,
+                    timestamp: DateTime.utc_now()
+                  }
                 })
+                emit_signal(agent, signal)
                 
                 {:ok, agent}
             end
@@ -255,26 +350,44 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
       {:ok, template} ->
         case Template.validate(template) do
           {:ok, _validated_template} ->
-            emit_signal("template_valid", %{
-              "valid" => true,
-              "template_id" => template.id,
-              "variables_count" => length(template.variables)
+            signal = Jido.Signal.new!(%{
+              type: "prompt.template.valid",
+              source: "agent:#{agent.id}",
+              data: %{
+                valid: true,
+                template_id: template.id,
+                variables_count: length(template.variables),
+                timestamp: DateTime.utc_now()
+              }
             })
+            emit_signal(agent, signal)
             
           {:error, reason} ->
-            emit_signal("template_invalid", %{
-              "valid" => false,
-              "error" => reason,
-              "template_data" => template_data
+            signal = Jido.Signal.new!(%{
+              type: "prompt.template.invalid",
+              source: "agent:#{agent.id}",
+              data: %{
+                valid: false,
+                error: reason,
+                template_data: template_data,
+                timestamp: DateTime.utc_now()
+              }
             })
+            emit_signal(agent, signal)
         end
         
       {:error, reason} ->
-        emit_signal("template_invalid", %{
-          "valid" => false,
-          "error" => reason,
-          "template_data" => template_data
+        signal = Jido.Signal.new!(%{
+          type: "prompt.template.invalid",
+          source: "agent:#{agent.id}",
+          data: %{
+            valid: false,
+            error: reason,
+            template_data: template_data,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
     end
     
     {:ok, agent}
@@ -285,24 +398,45 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
   def handle_signal(agent, %{"type" => "get_analytics", "data" => filters}) do
     analytics = build_analytics_report(agent, filters)
     
-    emit_signal("analytics_report", analytics)
+    signal = Jido.Signal.new!(%{
+      type: "prompt.analytics.report",
+      source: "agent:#{agent.id}",
+      data: Map.merge(analytics, %{
+        timestamp: DateTime.utc_now()
+      })
+    })
+    emit_signal(agent, signal)
     {:ok, agent}
   end
 
   def handle_signal(agent, %{"type" => "get_usage_stats", "data" => %{"template_id" => template_id}}) do
     case Map.get(agent.state.templates, template_id) do
       nil ->
-        emit_signal("template_not_found", %{"template_id" => template_id})
+        signal = Jido.Signal.new!(%{
+          type: "prompt.template.not_found",
+          source: "agent:#{agent.id}",
+          data: %{
+            template_id: template_id,
+            timestamp: DateTime.utc_now()
+          }
+        })
+        emit_signal(agent, signal)
         
       template ->
         stats = Template.get_stats(template)
         analytics_data = Map.get(agent.state.analytics, template_id, %{})
         
-        emit_signal("usage_stats", %{
-          "template_id" => template_id,
-          "stats" => stats,
-          "detailed_analytics" => analytics_data
+        signal = Jido.Signal.new!(%{
+          type: "prompt.usage.stats",
+          source: "agent:#{agent.id}",
+          data: %{
+            template_id: template_id,
+            stats: stats,
+            detailed_analytics: analytics_data,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
     end
     
     {:ok, agent}
@@ -311,17 +445,31 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
   def handle_signal(agent, %{"type" => "optimize_template", "data" => %{"template_id" => template_id}}) do
     case Map.get(agent.state.templates, template_id) do
       nil ->
-        emit_signal("template_not_found", %{"template_id" => template_id})
+        signal = Jido.Signal.new!(%{
+          type: "prompt.template.not_found",
+          source: "agent:#{agent.id}",
+          data: %{
+            template_id: template_id,
+            timestamp: DateTime.utc_now()
+          }
+        })
+        emit_signal(agent, signal)
         {:ok, agent}
         
       template ->
         suggestions = generate_optimization_suggestions(template, agent)
         
-        emit_signal("optimization_suggestions", %{
-          "template_id" => template_id,
-          "suggestions" => suggestions,
-          "confidence_score" => calculate_confidence_score(suggestions, template)
+        signal = Jido.Signal.new!(%{
+          type: "prompt.optimization.suggestions",
+          source: "agent:#{agent.id}",
+          data: %{
+            template_id: template_id,
+            suggestions: suggestions,
+            confidence_score: calculate_confidence_score(suggestions, template),
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         {:ok, agent}
     end
@@ -339,16 +487,28 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
       "health" => "healthy"
     }
     
-    emit_signal("status_report", status)
+    signal = Jido.Signal.new!(%{
+      type: "prompt.status.report",
+      source: "agent:#{agent.id}",
+      data: Map.merge(status, %{
+        timestamp: DateTime.utc_now()
+      })
+    })
+    emit_signal(agent, signal)
     {:ok, agent}
   end
 
   def handle_signal(agent, %{"type" => "clear_cache"}) do
     agent = put_in(agent.state.cache, %{})
     
-    emit_signal("cache_cleared", %{
-      "timestamp" => DateTime.utc_now()
+    signal = Jido.Signal.new!(%{
+      type: "prompt.cache.cleared",
+      source: "agent:#{agent.id}",
+      data: %{
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     Logger.info("PromptManagerAgent cache cleared")
     {:ok, agent}
