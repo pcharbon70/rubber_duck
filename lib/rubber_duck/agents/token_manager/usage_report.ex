@@ -247,7 +247,7 @@ defmodule RubberDuck.Agents.TokenManager.UsageReport do
     }
   end
 
-  defp calculate_growth_rate(usage_list) do
+  defp calculate_growth_rate(_usage_list) do
     # Simplified - in production would calculate actual growth rate
     0.0
   end
@@ -324,7 +324,7 @@ defmodule RubberDuck.Agents.TokenManager.UsageReport do
     end
   end
 
-  defp usage_pattern_recommendations(_report, usage_list) do
+  defp usage_pattern_recommendations(_report, _usage_list) do
     # Check for repeated similar requests
     # In production, would analyze actual request content
     []
@@ -351,7 +351,7 @@ defmodule RubberDuck.Agents.TokenManager.UsageReport do
     recommendations
   end
 
-  defp detect_usage_spikes(usage_list) do
+  defp detect_usage_spikes(_usage_list) do
     # Simplified spike detection
     []
   end

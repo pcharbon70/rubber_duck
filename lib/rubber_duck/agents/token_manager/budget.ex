@@ -148,6 +148,26 @@ defmodule RubberDuck.Agents.TokenManager.Budget do
   end
 
   @doc """
+  Adds usage to the budget. Similar to spend/2 but always succeeds.
+  
+  This is used for tracking actual usage after it has occurred.
+  Returns the updated budget.
+  """
+  def add_usage(%__MODULE__{} = budget, amount) when is_struct(amount, Decimal) do
+    new_spent = Decimal.add(budget.spent, amount)
+    new_remaining = Decimal.sub(budget.limit, new_spent)
+    
+    updated_budget = %{budget | 
+      spent: new_spent,
+      remaining: new_remaining,
+      updated_at: DateTime.utc_now()
+    }
+    
+    # Check for alerts even if budget is exceeded
+    check_and_send_alerts(updated_budget)
+  end
+
+  @doc """
   Checks if spending an amount would exceed the budget.
   """
   def would_exceed?(%__MODULE__{} = budget, amount) when is_struct(amount, Decimal) do
@@ -243,7 +263,7 @@ defmodule RubberDuck.Agents.TokenManager.Budget do
 
   ## Private Functions
 
-  defp calculate_period_bounds(:daily, reference_date) do
+  defp calculate_period_bounds(:daily, _reference_date) do
     start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
     end_date = DateTime.new!(Date.utc_today(), ~T[23:59:59], "Etc/UTC")
     {start, end_date}

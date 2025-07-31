@@ -42,7 +42,13 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     description: "Manages token usage tracking, budgets, and optimization",
     category: "infrastructure"
 
-  alias RubberDuck.Agents.TokenManager.{TokenUsage, Budget, UsageReport, CostCalculator}
+  alias RubberDuck.Agents.TokenManager.{
+    TokenUsage, 
+    Budget, 
+    UsageReport,
+    TokenProvenance,
+    ProvenanceRelationship
+  }
   require Logger
 
   @default_config %{
@@ -79,6 +85,8 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
       budgets: %{},
       active_requests: %{},
       usage_buffer: [],
+      provenance_buffer: [],
+      provenance_graph: [],  # List of ProvenanceRelationship
       pricing_models: @pricing_models,
       metrics: %{
         total_tokens: 0,
@@ -100,7 +108,6 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
 
   ## Signal Handlers
 
-  @impl true
   def handle_signal("track_usage", data, agent) do
     %{
       "request_id" => request_id,
@@ -110,7 +117,8 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
       "completion_tokens" => completion_tokens,
       "user_id" => user_id,
       "project_id" => project_id,
-      "metadata" => metadata
+      "metadata" => metadata,
+      "provenance" => provenance_data
     } = data
     
     usage = TokenUsage.new(%{
@@ -131,9 +139,34 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     cost = calculate_token_cost(usage, agent.pricing_models)
     usage = %{usage | cost: cost.amount, currency: cost.currency}
     
-    # Update state
-    agent = update_usage_buffer(agent, usage)
-    agent = update_metrics(agent, usage)
+    # Create provenance record
+    provenance = TokenProvenance.new(Map.merge(provenance_data, %{
+      usage_id: usage.id,
+      request_id: request_id,
+      root_request_id: Map.get(provenance_data, :root_request_id, 
+        get_root_request_id(agent, provenance_data[:parent_request_id], request_id)),
+      depth: calculate_request_depth(agent, provenance_data[:parent_request_id])
+    }))
+    
+    # Create relationship if this has a parent
+    agent = if provenance.parent_request_id do
+      relationship = ProvenanceRelationship.new(
+        provenance.parent_request_id,
+        request_id,
+        :triggered_by,
+        %{signal_type: provenance.signal_type}
+      )
+      update_in(agent.provenance_graph, &[relationship | &1])
+    else
+      agent
+    end
+    
+    # Update state with both usage and provenance
+    agent = agent
+    |> update_usage_buffer(usage)
+    |> update_provenance_buffer(provenance)
+    |> update_metrics(usage)
+    |> update_all_applicable_budgets(usage)
     
     # Check if buffer needs flushing
     agent = maybe_flush_buffer(agent)
@@ -142,13 +175,17 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
       "request_id" => request_id,
       "total_tokens" => usage.total_tokens,
       "cost" => usage.cost,
-      "currency" => usage.currency
+      "currency" => usage.currency,
+      "lineage" => %{
+        "parent" => provenance.parent_request_id,
+        "root" => provenance.root_request_id,
+        "depth" => provenance.depth
+      }
     })
     
-    {:ok, %{"tracked" => true, "usage" => usage}, agent}
+    {:ok, %{"tracked" => true, "usage" => usage, "provenance" => provenance}, agent}
   end
 
-  @impl true
   def handle_signal("check_budget", data, agent) do
     %{
       "user_id" => user_id,
@@ -186,7 +223,6 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     end
   end
 
-  @impl true
   def handle_signal("create_budget", data, agent) do
     budget_attrs = %{
       name: data["name"],
@@ -213,7 +249,6 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     {:ok, %{"budget_id" => budget.id, "budget" => budget}, agent}
   end
 
-  @impl true
   def handle_signal("update_budget", data, agent) do
     %{"budget_id" => budget_id, "updates" => updates} = data
     
@@ -234,7 +269,6 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     end
   end
 
-  @impl true
   def handle_signal("get_usage", data, agent) do
     filters = %{
       user_id: data["user_id"],
@@ -257,7 +291,6 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     {:ok, usage_summary, agent}
   end
 
-  @impl true
   def handle_signal("generate_report", data, agent) do
     report_type = data["type"] || "usage"
     period = parse_period(data["period"])
@@ -283,7 +316,6 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     end
   end
 
-  @impl true
   def handle_signal("get_recommendations", data, agent) do
     context = %{
       user_id: data["user_id"],
@@ -296,7 +328,6 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     {:ok, %{"recommendations" => recommendations}, agent}
   end
 
-  @impl true
   def handle_signal("update_pricing", data, agent) do
     %{"provider" => provider, "model" => model, "pricing" => pricing} = data
     
@@ -317,7 +348,6 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     {:ok, %{"updated" => true}, agent}
   end
 
-  @impl true
   def handle_signal("configure_manager", data, agent) do
     config_updates = Map.take(data, ["buffer_size", "flush_interval", "retention_days", "alert_channels"])
     agent = update_in(agent.config, &Map.merge(&1, config_updates))
@@ -325,13 +355,14 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     {:ok, %{"config" => agent.config}, agent}
   end
 
-  @impl true
   def handle_signal("get_status", _data, agent) do
     status = %{
       "healthy" => true,
       "budgets_active" => map_size(agent.budgets),
       "active_requests" => map_size(agent.active_requests),
       "buffer_size" => length(agent.usage_buffer),
+      "provenance_buffer_size" => length(agent.provenance_buffer),
+      "relationships_tracked" => length(agent.provenance_graph),
       "total_tracked" => agent.metrics.requests_tracked,
       "total_tokens" => agent.metrics.total_tokens,
       "total_cost" => Decimal.to_string(agent.metrics.total_cost),
@@ -341,12 +372,127 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     {:ok, status, agent}
   end
 
+  def handle_signal("get_provenance", %{"request_id" => request_id}, agent) do
+    provenance = find_provenance_by_request(agent.provenance_buffer, request_id)
+    
+    case provenance do
+      nil ->
+        {:error, "Provenance not found for request #{request_id}", agent}
+        
+      prov ->
+        relationships = ProvenanceRelationship.find_descendants(
+          agent.provenance_graph, 
+          request_id
+        )
+        
+        result = %{
+          "provenance" => prov,
+          "relationships" => relationships,
+          "lineage_depth" => prov.depth,
+          "is_root" => TokenProvenance.root?(prov)
+        }
+        
+        {:ok, result, agent}
+    end
+  end
+
+  def handle_signal("get_lineage", %{"request_id" => request_id}, agent) do
+    lineage_tree = ProvenanceRelationship.build_lineage_tree(
+      agent.provenance_graph,
+      request_id
+    )
+    
+    # Get provenance for all requests in lineage
+    all_request_ids = extract_all_request_ids(lineage_tree)
+    provenances = Enum.map(all_request_ids, fn id ->
+      find_provenance_by_request(agent.provenance_buffer, id)
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Map.new(fn prov -> {prov.request_id, prov} end)
+    
+    result = %{
+      "lineage_tree" => lineage_tree,
+      "provenances" => provenances,
+      "root_requests" => ProvenanceRelationship.find_roots(agent.provenance_graph, request_id),
+      "total_descendants" => count_descendants(lineage_tree)
+    }
+    
+    {:ok, result, agent}
+  end
+
+  def handle_signal("get_workflow_usage", %{"workflow_id" => workflow_id}, agent) do
+    # Find all provenance records for this workflow
+    workflow_provenance = agent.provenance_buffer
+    |> Enum.filter(&(&1.workflow_id == workflow_id))
+    
+    # Get corresponding usage records
+    request_ids = Enum.map(workflow_provenance, & &1.request_id)
+    workflow_usage = agent.usage_buffer
+    |> Enum.filter(&(&1.request_id in request_ids))
+    
+    # Calculate totals
+    total_tokens = TokenUsage.total_tokens(workflow_usage)
+    total_cost = TokenUsage.total_cost(workflow_usage)
+    
+    # Group by task type
+    by_task = workflow_provenance
+    |> TokenProvenance.group_by(:task_type)
+    |> Enum.map(fn {task_type, provs} ->
+      task_request_ids = Enum.map(provs, & &1.request_id)
+      task_usage = Enum.filter(workflow_usage, &(&1.request_id in task_request_ids))
+      
+      {task_type, %{
+        count: length(provs),
+        tokens: TokenUsage.total_tokens(task_usage),
+        cost: TokenUsage.total_cost(task_usage)
+      }}
+    end)
+    |> Map.new()
+    
+    result = %{
+      "workflow_id" => workflow_id,
+      "total_requests" => length(workflow_usage),
+      "total_tokens" => total_tokens,
+      "total_cost" => Decimal.to_string(total_cost),
+      "by_task_type" => by_task,
+      "request_ids" => request_ids
+    }
+    
+    {:ok, result, agent}
+  end
+
+  def handle_signal("analyze_task_costs", %{"task_type" => task_type}, agent) do
+    # Find all provenance for this task type
+    task_provenance = agent.provenance_buffer
+    |> TokenProvenance.filter_by_task_type(task_type)
+    
+    # Get usage for these requests
+    request_ids = Enum.map(task_provenance, & &1.request_id)
+    task_usage = agent.usage_buffer
+    |> Enum.filter(&(&1.request_id in request_ids))
+    
+    # Analyze patterns
+    analysis = %{
+      "task_type" => task_type,
+      "total_requests" => length(task_usage),
+      "total_tokens" => TokenUsage.total_tokens(task_usage),
+      "total_cost" => TokenUsage.total_cost(task_usage),
+      "avg_tokens_per_request" => avg_tokens_per_request(task_usage),
+      "avg_cost_per_request" => avg_cost_per_request(task_usage),
+      "by_model" => analyze_by_model(task_usage),
+      "by_intent" => analyze_by_intent(task_provenance, task_usage),
+      "duplicate_patterns" => find_duplicate_patterns(task_provenance)
+    }
+    
+    {:ok, analysis, agent}
+  end
+
   ## Private Functions
 
   defp calculate_token_cost(usage, pricing_models) do
     case get_in(pricing_models, [usage.provider, usage.model]) do
       nil ->
-        Logger.warn("No pricing model found for #{usage.provider}/#{usage.model}")
+        Logger.warning("No pricing model found for #{usage.provider}/#{usage.model}")
         %{amount: Decimal.new(0), currency: "USD"}
         
       pricing ->
@@ -477,7 +623,7 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     })
   end
 
-  defp record_budget_violation(agent, violations) do
+  defp record_budget_violation(agent, _violations) do
     update_in(agent.metrics.budget_violations, &(&1 + 1))
   end
 
@@ -521,7 +667,7 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     |> Map.new()
   end
 
-  defp generate_usage_report(agent, period, filters) do
+  defp generate_usage_report(agent, period, _filters) do
     report = UsageReport.new(%{
       period_start: period.start,
       period_end: period.end_date,
@@ -669,6 +815,186 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     Decimal.new(0)
   end
 
+  ## Provenance Helper Functions
+
+  defp update_provenance_buffer(agent, provenance) do
+    buffer = [provenance | agent.provenance_buffer]
+    
+    # Trim buffer if too large
+    buffer = if length(buffer) > agent.config.buffer_size do
+      Enum.take(buffer, agent.config.buffer_size)
+    else
+      buffer
+    end
+    
+    put_in(agent.provenance_buffer, buffer)
+  end
+
+  defp update_all_applicable_budgets(agent, usage) do
+    # Find all budgets that apply to this usage
+    applicable_budgets = find_all_applicable_budgets(agent.budgets, usage)
+    
+    # Update each budget with the usage
+    updated_budgets = Enum.reduce(applicable_budgets, agent.budgets, fn budget, acc ->
+      updated_budget = Budget.add_usage(budget, usage.cost)
+      Map.put(acc, budget.id, updated_budget)
+    end)
+    
+    %{agent | budgets: updated_budgets}
+  end
+
+  defp find_all_applicable_budgets(budgets, usage) do
+    budgets
+    |> Map.values()
+    |> Enum.filter(fn budget ->
+      budget.active and budget_applies_to_usage?(budget, usage)
+    end)
+  end
+
+  defp budget_applies_to_usage?(budget, usage) do
+    case budget.type do
+      :global -> true
+      :user -> budget.entity_id == usage.user_id
+      :project -> budget.entity_id == usage.project_id
+      :team -> budget.entity_id == usage.team_id
+      _ -> false
+    end
+  end
+
+  defp get_root_request_id(_agent, nil, request_id), do: request_id
+  defp get_root_request_id(agent, parent_request_id, _request_id) do
+    # Find parent's provenance to get its root
+    case find_provenance_by_request(agent.provenance_buffer, parent_request_id) do
+      nil -> parent_request_id  # Parent not found, use parent as root
+      parent_prov -> parent_prov.root_request_id
+    end
+  end
+
+  defp calculate_request_depth(_agent, nil), do: 0
+  defp calculate_request_depth(agent, parent_request_id) do
+    # Find parent's provenance to get its depth
+    case find_provenance_by_request(agent.provenance_buffer, parent_request_id) do
+      nil -> 1  # Parent not found, assume depth 1
+      parent_prov -> parent_prov.depth + 1
+    end
+  end
+
+  defp find_provenance_by_request(provenance_buffer, request_id) do
+    Enum.find(provenance_buffer, fn prov -> 
+      prov.request_id == request_id 
+    end)
+  end
+
+  defp extract_all_request_ids(lineage_tree) do
+    extract_request_ids_recursive(lineage_tree, [])
+  end
+
+  defp extract_request_ids_recursive(nil, acc), do: acc
+  defp extract_request_ids_recursive(%{id: id} = node, acc) do
+    acc = [id | acc]
+    
+    # Extract from ancestors
+    acc = case Map.get(node, :ancestors, []) do
+      ancestors when is_list(ancestors) ->
+        Enum.reduce(ancestors, acc, &extract_request_ids_recursive/2)
+      _ -> acc
+    end
+    
+    # Extract from descendants
+    case Map.get(node, :descendants, []) do
+      descendants when is_list(descendants) ->
+        Enum.reduce(descendants, acc, &extract_request_ids_recursive/2)
+      _ -> acc
+    end
+  end
+  defp extract_request_ids_recursive(_, acc), do: acc
+
+  defp count_descendants(lineage_tree) do
+    count_descendants_recursive(Map.get(lineage_tree, :descendants, []))
+  end
+
+  defp count_descendants_recursive([]), do: 0
+  defp count_descendants_recursive(descendants) when is_list(descendants) do
+    Enum.reduce(descendants, 0, fn desc, acc ->
+      acc + 1 + count_descendants_recursive(Map.get(desc, :descendants, []))
+    end)
+  end
+
+  defp avg_tokens_per_request([]), do: 0
+  defp avg_tokens_per_request(usage_list) do
+    total = TokenUsage.total_tokens(usage_list)
+    count = length(usage_list)
+    div(total, count)
+  end
+
+  defp avg_cost_per_request([]), do: Decimal.new(0)
+  defp avg_cost_per_request(usage_list) do
+    total = TokenUsage.total_cost(usage_list)
+    count = length(usage_list)
+    Decimal.div(total, Decimal.new(count))
+  end
+
+  defp analyze_by_model(usage_list) do
+    usage_list
+    |> TokenUsage.group_by(:model)
+    |> Enum.map(fn {model, usages} ->
+      {model, %{
+        count: length(usages),
+        total_tokens: TokenUsage.total_tokens(usages),
+        total_cost: TokenUsage.total_cost(usages),
+        avg_tokens: avg_tokens_per_request(usages),
+        avg_cost: avg_cost_per_request(usages)
+      }}
+    end)
+    |> Map.new()
+  end
+
+  defp analyze_by_intent(provenance_list, usage_list) do
+    # Group provenance by intent
+    provenance_by_intent = TokenProvenance.group_by(provenance_list, :intent)
+    
+    # Build usage map for quick lookup
+    usage_map = Map.new(usage_list, fn u -> {u.request_id, u} end)
+    
+    # Analyze each intent group
+    Enum.map(provenance_by_intent, fn {intent, provs} ->
+      # Get usage for these provenances
+      intent_usage = provs
+      |> Enum.map(& &1.request_id)
+      |> Enum.map(&Map.get(usage_map, &1))
+      |> Enum.reject(&is_nil/1)
+      
+      {intent, %{
+        count: length(provs),
+        total_tokens: TokenUsage.total_tokens(intent_usage),
+        total_cost: TokenUsage.total_cost(intent_usage),
+        avg_tokens: avg_tokens_per_request(intent_usage),
+        avg_cost: avg_cost_per_request(intent_usage)
+      }}
+    end)
+    |> Map.new()
+  end
+
+  defp find_duplicate_patterns(provenance_list) do
+    # Group by content hash to find duplicates
+    by_input_hash = provenance_list
+    |> Enum.reject(&is_nil(&1.input_hash))
+    |> Enum.group_by(& &1.input_hash)
+    |> Enum.filter(fn {_hash, provs} -> length(provs) > 1 end)
+    
+    # Create duplicate pattern summary
+    Enum.map(by_input_hash, fn {hash, provs} ->
+      %{
+        input_hash: hash,
+        duplicate_count: length(provs),
+        request_ids: Enum.map(provs, & &1.request_id),
+        agents: Enum.map(provs, & &1.agent_type) |> Enum.uniq(),
+        first_seen: Enum.min_by(provs, & &1.timestamp).timestamp,
+        last_seen: Enum.max_by(provs, & &1.timestamp).timestamp
+      }
+    end)
+  end
+
   defp parse_date_range(nil), do: nil
   defp parse_date_range(range) when is_map(range) do
     %{
@@ -729,7 +1055,9 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
 
   defp last_month_period do
     today = Date.utc_today()
-    last_month = Date.add(today, -Date.day_of_month(today))
+    # Go back to first day of current month, then subtract one day to get last month
+    first_of_month = Date.beginning_of_month(today)
+    last_month = Date.add(first_of_month, -1)
     start = Date.beginning_of_month(last_month)
     end_date = Date.end_of_month(last_month)
     %{

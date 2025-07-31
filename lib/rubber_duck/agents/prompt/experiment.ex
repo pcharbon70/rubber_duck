@@ -138,7 +138,9 @@ defmodule RubberDuck.Agents.Prompt.Experiment do
   @doc """
   Selects a variant for a user based on the traffic split and targeting rules.
   """
-  def select_variant(%__MODULE__{status: :running} = experiment, user_context \\ %{}) do
+  def select_variant(experiment, user_context \\ %{})
+  
+  def select_variant(%__MODULE__{status: :running} = experiment, user_context) do
     if matches_target_audience?(experiment, user_context) do
       variant = weighted_random_selection(experiment.variants, experiment.traffic_split)
       {:ok, variant}
@@ -312,7 +314,7 @@ defmodule RubberDuck.Agents.Prompt.Experiment do
     {:error, "Invalid metric format: #{inspect(metric)}"}
   end
 
-  defp validate_traffic_split(variants, nil) do
+  defp validate_traffic_split(_variants, nil) do
     # Auto-generate equal split
     :ok
   end
@@ -342,7 +344,7 @@ defmodule RubberDuck.Agents.Prompt.Experiment do
     variants = Map.fetch!(attrs, :variants)
     
     experiment = %__MODULE__{
-      id: Map.get(attrs, :id, UUID.uuid4()),
+      id: Map.get(attrs, :id, Uniq.UUID.uuid4()),
       name: Map.fetch!(attrs, :name),
       description: Map.get(attrs, :description, ""),
       variants: variants,
@@ -385,7 +387,7 @@ defmodule RubberDuck.Agents.Prompt.Experiment do
     }
   end
 
-  defp matches_target_audience?(%{target_audience: target_audience}, user_context) 
+  defp matches_target_audience?(%{target_audience: target_audience}, _user_context) 
        when map_size(target_audience) == 0 do
     # No targeting rules, everyone matches
     true

@@ -655,7 +655,7 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
 
   defp cleanup_old_analytics(agent) do
     # Remove analytics older than retention period
-    cutoff_date = DateTime.add(DateTime.utc_now(), -agent.state.config.analytics_retention_days, :day)
+    _cutoff_date = DateTime.add(DateTime.utc_now(), -agent.state.config.analytics_retention_days, :day)
     
     # Simplified cleanup - in production would be more sophisticated
     agent

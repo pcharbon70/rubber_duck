@@ -13,7 +13,6 @@ defmodule RubberDuck.Agents.ProviderAgent do
   provider-specific configuration and behavior.
   """
   
-  alias RubberDuck.Agents.BaseAgent
   alias RubberDuck.LLM.{Request, Response, ProviderConfig}
   require Logger
   
@@ -227,7 +226,7 @@ defmodule RubberDuck.Agents.ProviderAgent do
     %{
       "data" => %{
         "request_id" => request_id,
-        "messages" => messages,
+        "messages" => _messages,
         "model" => model
       } = data
     } = signal
