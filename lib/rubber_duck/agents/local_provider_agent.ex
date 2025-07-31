@@ -72,11 +72,17 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
     %{"data" => %{"model" => model_name}} = signal
     
     if Map.has_key?(agent.state.loaded_models, model_name) do
-      emit_signal("model_loaded", %{
-        "model" => model_name,
-        "status" => "already_loaded",
-        "provider" => "local"
+      signal = Jido.Signal.new!(%{
+        type: "provider.model.loaded",
+        source: "agent:#{agent.id}",
+        data: %{
+          model: model_name,
+          status: "already_loaded",
+          provider: "local",
+          timestamp: DateTime.utc_now()
+        }
       })
+      emit_signal(agent, signal)
       {:ok, agent}
     else
       # Check resources before loading
@@ -87,11 +93,17 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
         
         {:ok, agent}
       else
-        emit_signal("model_load_failed", %{
-          "model" => model_name,
-          "error" => "Insufficient resources",
-          "provider" => "local"
+        signal = Jido.Signal.new!(%{
+          type: "provider.model.load_failed",
+          source: "agent:#{agent.id}",
+          data: %{
+            model: model_name,
+            error: "Insufficient resources",
+            provider: "local",
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         {:ok, agent}
       end
     end
@@ -110,11 +122,17 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
       
       {:ok, agent}
     else
-      emit_signal("model_unloaded", %{
-        "model" => model_name,
-        "status" => "not_loaded",
-        "provider" => "local"
+      signal = Jido.Signal.new!(%{
+        type: "provider.model.unloaded",
+        source: "agent:#{agent.id}",
+        data: %{
+          model: model_name,
+          status: "not_loaded",
+          provider: "local",
+          timestamp: DateTime.utc_now()
+        }
       })
+      emit_signal(agent, signal)
       {:ok, agent}
     end
   end
@@ -127,7 +145,14 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
       "provider" => "local"
     })
     
-    emit_signal("resource_status", resources)
+    signal = Jido.Signal.new!(%{
+      type: "provider.resource.status",
+      source: "agent:#{agent.id}",
+      data: Map.merge(resources, %{
+        timestamp: DateTime.utc_now()
+      })
+    })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -136,11 +161,17 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
     # Get available models from Ollama or local directory
     models = list_local_models()
     
-    emit_signal("available_models", %{
-      "models" => models,
-      "loaded" => Map.keys(agent.state.loaded_models),
-      "provider" => "local"
+    signal = Jido.Signal.new!(%{
+      type: "provider.models.available",
+      source: "agent:#{agent.id}",
+      data: %{
+        models: models,
+        loaded: Map.keys(agent.state.loaded_models),
+        provider: "local",
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -155,20 +186,34 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
         super(agent, signal)
       else
         %{"data" => %{"request_id" => request_id}} = signal
-        emit_signal("provider_error", %{
-          "request_id" => request_id,
-          "error_type" => "resource_constrained",
-          "error" => "Local resources are constrained, please retry later"
+        signal = Jido.Signal.new!(%{
+          type: "provider.error",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id,
+            error_type: "resource_constrained",
+            error: "Local resources are constrained, please retry later",
+            provider: "local",
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         {:ok, agent}
       end
     else
       %{"data" => %{"request_id" => request_id}} = signal
-      emit_signal("provider_error", %{
-        "request_id" => request_id,
-        "error_type" => "model_not_loaded",
-        "error" => "Model #{model} is not loaded. Please load it first."
+      signal = Jido.Signal.new!(%{
+        type: "provider.error",
+        source: "agent:#{agent.id}",
+        data: %{
+          request_id: request_id,
+          error_type: "model_not_loaded",
+          error: "Model #{model} is not loaded. Please load it first.",
+          provider: "local",
+          timestamp: DateTime.utc_now()
+        }
       })
+      emit_signal(agent, signal)
       {:ok, agent}
     end
   end
@@ -194,12 +239,18 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
     
     # Emit warning if resources are low
     if resources.cpu_usage > 90.0 or resources.memory_usage > 90.0 do
-      emit_signal("resource_warning", %{
-        "provider" => "local",
-        "cpu_usage" => resources.cpu_usage,
-        "memory_usage" => resources.memory_usage,
-        "severity" => "high"
+      signal = Jido.Signal.new!(%{
+        type: "provider.resource.warning",
+        source: "agent:#{agent.id}",
+        data: %{
+          provider: "local",
+          cpu_usage: resources.cpu_usage,
+          memory_usage: resources.memory_usage,
+          severity: "high",
+          timestamp: DateTime.utc_now()
+        }
       })
+      emit_signal(agent, signal)
     end
     
     {:noreply, agent}
@@ -292,19 +343,33 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
         # Update agent state
         GenServer.cast(agent_id, {:model_loaded, model_name, load_time})
         
-        emit_signal("model_loaded", %{
-          "model" => model_name,
-          "status" => "success",
-          "load_time_ms" => load_time,
-          "provider" => "local"
+        signal = Jido.Signal.new!(%{
+          type: "provider.model.loaded",
+          source: "agent:local_provider",
+          data: %{
+            model: model_name,
+            status: "success",
+            load_time_ms: load_time,
+            provider: "local",
+            timestamp: DateTime.utc_now()
+          }
         })
+        # In async context, publish directly to signal bus
+        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
         
       {:error, reason} ->
-        emit_signal("model_load_failed", %{
-          "model" => model_name,
-          "error" => inspect(reason),
-          "provider" => "local"
+        signal = Jido.Signal.new!(%{
+          type: "provider.model.load_failed",
+          source: "agent:local_provider",
+          data: %{
+            model: model_name,
+            error: inspect(reason),
+            provider: "local",
+            timestamp: DateTime.utc_now()
+          }
         })
+        # In async context, publish directly to signal bus
+        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
     end
   end
   
@@ -313,18 +378,32 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
     # This function should handle unloading models from Ollama
     case Ollama.unload_model(model_name) do
       :ok ->
-        emit_signal("model_unloaded", %{
-          "model" => model_name,
-          "status" => "success",
-          "provider" => "local"
+        signal = Jido.Signal.new!(%{
+          type: "provider.model.unloaded",
+          source: "agent:local_provider",
+          data: %{
+            model: model_name,
+            status: "success",
+            provider: "local",
+            timestamp: DateTime.utc_now()
+          }
         })
+        # In async context, publish directly to signal bus
+        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
         
       {:error, reason} ->
-        emit_signal("model_unload_failed", %{
-          "model" => model_name,
-          "error" => inspect(reason),
-          "provider" => "local"
+        signal = Jido.Signal.new!(%{
+          type: "provider.model.unload_failed",
+          source: "agent:local_provider",
+          data: %{
+            model: model_name,
+            error: inspect(reason),
+            provider: "local",
+            timestamp: DateTime.utc_now()
+          }
         })
+        # In async context, publish directly to signal bus
+        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
     end
   end
   
