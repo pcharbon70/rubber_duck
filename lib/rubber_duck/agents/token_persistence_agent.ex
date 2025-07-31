@@ -132,13 +132,15 @@ defmodule RubberDuck.Agents.TokenPersistenceAgent do
           |> Map.put(:stats, new_stats)
           
           # Emit success signal
-          emit_signal(agent, %{
-            "type" => "token_persistence_success",
-            "data" => %{
-              "count" => persisted_count,
-              "timestamp" => DateTime.utc_now()
+          signal = Jido.Signal.new!(%{
+            type: "token.persistence.success",
+            source: "agent:#{agent.id}",
+            data: %{
+              count: persisted_count,
+              timestamp: DateTime.utc_now()
             }
           })
+          emit_signal(agent, signal)
           
           # Schedule next flush
           schedule_flush(agent.state.flush_interval)
@@ -153,14 +155,16 @@ defmodule RubberDuck.Agents.TokenPersistenceAgent do
           new_state = Map.put(agent.state, :stats, new_stats)
           
           # Emit failure signal
-          emit_signal(agent, %{
-            "type" => "token_persistence_failure",
-            "data" => %{
-              "count" => length(buffer),
-              "reason" => inspect(reason),
-              "timestamp" => DateTime.utc_now()
+          signal = Jido.Signal.new!(%{
+            type: "token.persistence.failure",
+            source: "agent:#{agent.id}",
+            data: %{
+              count: length(buffer),
+              reason: inspect(reason),
+              timestamp: DateTime.utc_now()
             }
           })
+          emit_signal(agent, signal)
           
           {:ok, %{agent | state: new_state}}
       end

@@ -67,11 +67,17 @@ defmodule RubberDuck.Agents.CodeAnalysisAgent do
         Logger.info("Cache hit for analysis of #{file_path}")
         
         # Emit cached result
-        emit_signal("analysis_result", %{
-          "request_id" => request_id,
-          "result" => cached_result,
-          "from_cache" => true
+        signal = Jido.Signal.new!(%{
+          type: "analysis.result",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id,
+            result: cached_result,
+            from_cache: true,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         # Update metrics
         update_metrics(agent, :cache_hit)
@@ -98,11 +104,17 @@ defmodule RubberDuck.Agents.CodeAnalysisAgent do
         end)
         
         # Emit progress signal
-        emit_signal("analysis_progress", %{
-          "request_id" => request_id,
-          "status" => "started",
-          "file_path" => file_path
+        signal = Jido.Signal.new!(%{
+          type: "analysis.progress",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id,
+            status: "started",
+            file_path: file_path,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         {:ok, agent}
     end
@@ -141,22 +153,34 @@ defmodule RubberDuck.Agents.CodeAnalysisAgent do
     end)
     
     # Emit progress signal
-    emit_signal("analysis_progress", %{
-      "request_id" => request_id,
-      "status" => "started",
-      "analysis_type" => detect_analysis_type(query)
+    signal = Jido.Signal.new!(%{
+      type: "analysis.progress",
+      source: "agent:#{agent.id}",
+      data: %{
+        request_id: request_id,
+        status: "started",
+        analysis_type: detect_analysis_type(query),
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
   
   def handle_signal(agent, %{"type" => "get_analysis_metrics"} = _signal) do
-    emit_signal("analysis_metrics", %{
-      "metrics" => agent.state.metrics,
-      "queue_length" => length(agent.state.analysis_queue),
-      "active_analyses" => map_size(agent.state.active_analyses),
-      "cache_size" => map_size(agent.state.analysis_cache)
+    signal = Jido.Signal.new!(%{
+      type: "analysis.metrics",
+      source: "agent:#{agent.id}",
+      data: %{
+        metrics: agent.state.metrics,
+        queue_length: length(agent.state.analysis_queue),
+        active_analyses: map_size(agent.state.active_analyses),
+        cache_size: map_size(agent.state.analysis_cache),
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -215,20 +239,34 @@ defmodule RubberDuck.Agents.CodeAnalysisAgent do
       )
       
       # Emit result
-      emit_signal("analysis_result", %{
-        "request_id" => request.request_id,
-        "result" => final_result
+      signal = Jido.Signal.new!(%{
+        type: "analysis.result",
+        source: "agent:code_analysis",
+        data: %{
+          request_id: request.request_id,
+          result: final_result,
+          timestamp: DateTime.utc_now()
+        }
       })
+      # In async context, publish directly to signal bus
+      Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
       
       # Analysis complete - metrics will be tracked by the agent
       
     rescue
       error ->
         Logger.error("Analysis failed: #{inspect(error)}")
-        emit_signal("analysis_result", %{
-          "request_id" => request.request_id,
-          "error" => Exception.message(error)
+        signal = Jido.Signal.new!(%{
+          type: "analysis.result",
+          source: "agent:code_analysis",
+          data: %{
+            request_id: request.request_id,
+            error: Exception.message(error),
+            timestamp: DateTime.utc_now()
+          }
         })
+        # In async context, publish directly to signal bus
+        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
     end
   end
   
@@ -256,28 +294,49 @@ defmodule RubberDuck.Agents.CodeAnalysisAgent do
           # Extract and emit result
           result = extract_conversation_result(cot_session, request)
           
-          emit_signal("analysis_result", %{
-            "request_id" => request.request_id,
-            "result" => result
+          signal = Jido.Signal.new!(%{
+            type: "analysis.result",
+            source: "agent:code_analysis",
+            data: %{
+              request_id: request.request_id,
+              result: result,
+              timestamp: DateTime.utc_now()
+            }
           })
+          # In async context, publish directly to signal bus
+          Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
           
           # Analysis complete - metrics will be tracked by the agent
           
         {:error, reason} ->
           Logger.error("Conversation analysis failed: #{inspect(reason)}")
-          emit_signal("analysis_result", %{
-            "request_id" => request.request_id,
-            "error" => "Analysis failed: #{inspect(reason)}"
+          signal = Jido.Signal.new!(%{
+            type: "analysis.result",
+            source: "agent:code_analysis",
+            data: %{
+              request_id: request.request_id,
+              error: "Analysis failed: #{inspect(reason)}",
+              timestamp: DateTime.utc_now()
+            }
           })
+          # In async context, publish directly to signal bus
+          Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
       end
       
     rescue
       error ->
         Logger.error("Conversation analysis error: #{inspect(error)}")
-        emit_signal("analysis_result", %{
-          "request_id" => request.request_id,
-          "error" => Exception.message(error)
+        signal = Jido.Signal.new!(%{
+          type: "analysis.result",
+          source: "agent:code_analysis",
+          data: %{
+            request_id: request.request_id,
+            error: Exception.message(error),
+            timestamp: DateTime.utc_now()
+          }
         })
+        # In async context, publish directly to signal bus
+        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
     end
   end
   
