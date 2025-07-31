@@ -26,6 +26,9 @@ defmodule RubberDuck.Jido.Supervisor do
       # Jido native signal bus for CloudEvents
       {Jido.Signal.Bus, name: RubberDuck.SignalBus},
       
+      # Registry supervisor for signal-to-action mappings
+      {RubberDuck.Jido.Registries.Supervisor, []},
+      
       # Future: Worker pool for action execution
       # {RubberDuck.Jido.WorkerPool, [size: 10]}
     ]

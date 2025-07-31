@@ -18,7 +18,11 @@ defmodule RubberDuck.Agents.AnthropicProviderAgent do
   
   use RubberDuck.Agents.ProviderAgent,
     name: "anthropic_provider",
-    description: "Anthropic Claude models provider agent"
+    description: "Anthropic Claude models provider agent",
+    actions: [
+      RubberDuck.Jido.Actions.Provider.Anthropic.ConfigureSafetyAction,
+      RubberDuck.Jido.Actions.Provider.Anthropic.VisionRequestAction
+    ]
   
   alias RubberDuck.LLM.Providers.Anthropic
   alias RubberDuck.LLM.{ProviderConfig, ConfigLoader}
@@ -57,92 +61,11 @@ defmodule RubberDuck.Agents.AnthropicProviderAgent do
     {:ok, state}
   end
   
+  # Anthropic-specific provider request handling with safety filtering
   @impl true
-  def handle_signal(agent, %{"type" => "configure_safety"} = signal) do
-    %{"data" => safety_settings} = signal
-    
-    # Update safety configuration
-    agent = update_in(agent.state.safety_config, fn config ->
-      Map.merge(config, atomize_keys(safety_settings))
-    end)
-    
-    signal = Jido.Signal.new!(%{
-      type: "provider.safety.configured",
-      source: "agent:#{agent.id}",
-      data: %{
-        provider: "anthropic",
-        settings: agent.state.safety_config,
-        timestamp: DateTime.utc_now()
-      }
-    })
-    emit_signal(agent, signal)
-    
+  def on_before_run(agent) do
+    # This could be used for pre-run validation if needed
     {:ok, agent}
-  end
-  
-  def handle_signal(agent, %{"type" => "vision_request"} = signal) do
-    %{
-      "data" => %{
-        "request_id" => request_id,
-        "messages" => messages,
-        "model" => model,
-        "images" => images
-      } = data
-    } = signal
-    
-    # Validate model supports vision
-    if model in ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"] do
-      # Process messages with images
-      enhanced_messages = add_images_to_messages(messages, images)
-      
-      # Use regular request handling with enhanced messages
-      super(agent, %{signal | 
-        "data" => Map.put(data, "messages", enhanced_messages)
-      })
-    else
-      signal = Jido.Signal.new!(%{
-        type: "provider.error",
-        source: "agent:#{agent.id}",
-        data: %{
-          request_id: request_id,
-          error_type: "unsupported_feature",
-          error: "Model #{model} does not support vision",
-          provider: "anthropic",
-          timestamp: DateTime.utc_now()
-        }
-      })
-      emit_signal(agent, signal)
-      {:ok, agent}
-    end
-  end
-  
-  def handle_signal(agent, %{"type" => "provider_request"} = signal) do
-    # Add safety checks before processing
-    %{"data" => %{"messages" => messages}} = signal
-    
-    if should_block_content?(messages, agent.state.safety_config) do
-      %{"data" => %{"request_id" => request_id}} = signal
-      signal = Jido.Signal.new!(%{
-        type: "provider.error",
-        source: "agent:#{agent.id}",
-        data: %{
-          request_id: request_id,
-          error_type: "content_blocked",
-          error: "Request blocked by safety filters",
-          provider: "anthropic",
-          timestamp: DateTime.utc_now()
-        }
-      })
-      emit_signal(agent, signal)
-      {:ok, agent}
-    else
-      super(agent, signal)
-    end
-  end
-  
-  # Delegate other signals to base implementation
-  def handle_signal(agent, signal) do
-    super(agent, signal)
   end
   
   # Private functions
@@ -193,37 +116,6 @@ defmodule RubberDuck.Agents.AnthropicProviderAgent do
     end
   end
   
-  defp add_images_to_messages(messages, images) do
-    # Convert images to Claude's expected format
-    Enum.map(messages, fn message ->
-      case message do
-        %{"role" => "user", "content" => content} = msg ->
-          # Add images to user messages
-          if images && length(images) > 0 do
-            image_content = Enum.map(images, fn image ->
-              %{
-                "type" => "image",
-                "source" => %{
-                  "type" => "base64",
-                  "media_type" => image["media_type"] || "image/jpeg",
-                  "data" => image["data"]
-                }
-              }
-            end)
-            
-            # Combine text and image content
-            %{msg | "content" => [
-              %{"type" => "text", "text" => content}
-              | image_content
-            ]}
-          else
-            msg
-          end
-          
-        other -> other
-      end
-    end)
-  end
   
   defp should_block_content?(messages, safety_config) do
     if safety_config.block_flagged_content do
@@ -251,11 +143,6 @@ defmodule RubberDuck.Agents.AnthropicProviderAgent do
   
   defp get_blocked_terms(_), do: []
   
-  defp atomize_keys(map) do
-    Map.new(map, fn {k, v} -> 
-      {String.to_atom(k), v}
-    end)
-  end
   
   # Note: Anthropic-specific handling would be done via configuration and signal processing
   

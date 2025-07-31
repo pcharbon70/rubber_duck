@@ -11,17 +11,29 @@ defmodule RubberDuck.Agents.ProviderAgent do
   
   Provider-specific agents should use this module and implement
   provider-specific configuration and behavior.
+  
+  This version uses the Jido actions pattern instead of handle_signal callbacks.
   """
   
   alias RubberDuck.LLM.{Request, Response, ProviderConfig}
   require Logger
   
   defmacro __using__(opts) do
+    base_actions = [
+      RubberDuck.Jido.Actions.Provider.ProviderRequestAction,
+      RubberDuck.Jido.Actions.Provider.FeatureCheckAction,
+      RubberDuck.Jido.Actions.Provider.TokenEstimateAction,
+      RubberDuck.Jido.Actions.Provider.GetStatusAction,
+      RubberDuck.Jido.Actions.Provider.ResetCircuitBreakerAction
+    ]
+    
+    additional_actions = opts[:actions] || []
+    all_actions = base_actions ++ additional_actions
+    
     quote do
-      use RubberDuck.Agents.BaseAgent,
+      use Jido.Agent,
         name: unquote(opts[:name]) || "provider",
         description: unquote(opts[:description]) || "Provider-specific LLM agent",
-        category: "llm",
         schema: [
           provider_module: [type: :atom, required: true],
           provider_config: [type: :map, required: true],
@@ -53,383 +65,25 @@ defmodule RubberDuck.Agents.ProviderAgent do
           }],
           capabilities: [type: {:list, :atom}, default: []],
           max_concurrent_requests: [type: :integer, default: 10]
-        ]
+        ],
+        actions: unquote(all_actions)
       
       require Logger
       alias RubberDuck.LLM.{Request, Response, ProviderConfig}
       
-      # Signal Handlers
+      # GenServer callbacks for handling internal state updates from actions
       
+      # GenServer callbacks for handling async updates from actions
       @impl true
-      def handle_signal(agent, %{"type" => "provider_request"} = signal) do
-        RubberDuck.Agents.ProviderAgent.handle_provider_request(
-          agent, signal, 
-          &emit_error_response_internal/3,
-          &track_request_and_execute/4
-        )
-      end
-      
-      def handle_signal(agent, %{"type" => "feature_check"} = signal) do
-        %{"data" => %{"feature" => feature}} = signal
-        
-        supported = RubberDuck.Agents.ProviderAgent.check_provider_feature(
-          agent.state.provider_module, 
-          String.to_atom(feature)
-        )
-        
-        signal = Jido.Signal.new!(%{
-          type: "provider.feature.check_response",
-          source: "agent:#{agent.id}",
-          data: %{
-            feature: feature,
-            supported: supported,
-            provider: agent.name,
-            timestamp: DateTime.utc_now()
-          }
-        })
-        emit_signal(agent, signal)
-        
-        {:ok, agent}
-      end
-      
-      def handle_signal(agent, %{"type" => "token_estimate"} = signal) do
-        %{"data" => %{"messages" => messages, "model" => model}} = signal
-        
-        # Estimate tokens using provider module
-        case RubberDuck.Agents.ProviderAgent.estimate_tokens(agent.state.provider_module, messages, model) do
-          {:ok, estimate} ->
-            signal = Jido.Signal.new!(%{
-              type: "provider.token.estimate_response",
-              source: "agent:#{agent.id}",
-              data: %{
-                estimate: estimate,
-                provider: agent.name,
-                model: model,
-                timestamp: DateTime.utc_now()
-              }
-            })
-            emit_signal(agent, signal)
-            
-          {:error, reason} ->
-            signal = Jido.Signal.new!(%{
-              type: "provider.token.estimate_failed",
-              source: "agent:#{agent.id}",
-              data: %{
-                error: "Failed to estimate tokens: #{inspect(reason)}",
-                provider: agent.name,
-                timestamp: DateTime.utc_now()
-              }
-            })
-            emit_signal(agent, signal)
-        end
-        
-        {:ok, agent}
-      end
-      
-      def handle_signal(agent, %{"type" => "get_provider_status"} = _signal) do
-        status = RubberDuck.Agents.ProviderAgent.build_status_report(agent)
-        signal = Jido.Signal.new!(%{
-          type: "provider.status",
-          source: "agent:#{agent.id}",
-          data: Map.merge(status, %{
-            timestamp: DateTime.utc_now()
-          })
-        })
-        emit_signal(agent, signal)
-        {:ok, agent}
-      end
-      
-      def handle_signal(agent, %{"type" => "reset_circuit_breaker"} = _signal) do
-        updated_breaker = %{agent.state.circuit_breaker |
-          state: :closed,
-          failure_count: 0,
-          consecutive_failures: 0,
-          half_open_requests: 0
-        }
-        
-        agent = put_in(agent.state.circuit_breaker, updated_breaker)
-        
-        Logger.info("Circuit breaker reset for provider #{agent.name}")
-        
-        status = RubberDuck.Agents.ProviderAgent.build_status_report(agent)
-        signal = Jido.Signal.new!(%{
-          type: "provider.status",
-          source: "agent:#{agent.id}",
-          data: Map.merge(status, %{
-            timestamp: DateTime.utc_now()
-          })
-        })
-        emit_signal(agent, signal)
-        
-        {:ok, agent}
-      end
-      
-      def handle_signal(agent, signal) do
-        Logger.warning("#{agent.name} received unknown signal: #{inspect(signal["type"])}")
-        {:ok, agent}
-      end
-      
-      # Private helper functions for the macro context
-      
-      defp emit_error_response_internal(request_id, error_type, message) do
-        signal = Jido.Signal.new!(%{
-          type: "provider.error",
-          source: "agent:provider",
-          data: %{
-            request_id: request_id,
-            error_type: Atom.to_string(error_type),
-            error: message,
-            timestamp: DateTime.utc_now()
-          }
-        })
-        # In macro context, publish directly to signal bus
-        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
-      end
-      
-      defp track_request_and_execute(agent, request_id, model, data) do
-        # Track request
-        agent = RubberDuck.Agents.ProviderAgent.track_request_start(agent, request_id, model)
-        
-        # Execute asynchronously
-        Task.start(fn ->
-          %{"messages" => messages} = data
-          execute_provider_request_internal(agent.id, request_id, messages, model, data)
-        end)
-        
-        agent
-      end
-      
-      defp execute_provider_request_internal(agent_id, request_id, messages, model, data) do
-        # Get current agent state
-        agent = GenServer.call(agent_id, :get_state)
-        
-        # Build request
-        request = RubberDuck.Agents.ProviderAgent.build_request(request_id, messages, model, data)
-        
-        # Execute through provider
-        start_time = System.monotonic_time(:millisecond)
-        
-        result = try do
-          agent.state.provider_module.execute(request, agent.state.provider_config)
-        rescue
-          error ->
-            {:error, {:provider_error, Exception.format(:error, error)}}
-        end
-        
-        end_time = System.monotonic_time(:millisecond)
-        latency = end_time - start_time
-        
-        # Handle result
-        case result do
-          {:ok, response} ->
-            # Update metrics
-            GenServer.cast(agent_id, {:request_completed, request_id, :success, latency, response.usage})
-            
-            # Emit response
-            signal = Jido.Signal.new!(%{
-              type: "provider.response",
-              source: "agent:provider",
-              data: %{
-                request_id: request_id,
-                response: response,
-                provider: agent.name,
-                model: model,
-                latency_ms: latency,
-                timestamp: DateTime.utc_now()
-              }
-            })
-            # In async context, publish directly to signal bus
-            Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
-            
-          {:error, error} ->
-            # Update metrics
-            GenServer.cast(agent_id, {:request_completed, request_id, :failure, latency, nil})
-            
-            # Emit error
-            signal = Jido.Signal.new!(%{
-              type: "provider.error",
-              source: "agent:provider",
-              data: %{
-                request_id: request_id,
-                error: RubberDuck.Agents.ProviderAgent.format_error(error),
-                provider: agent.name,
-                model: model,
-                timestamp: DateTime.utc_now()
-              }
-            })
-            # In async context, publish directly to signal bus
-            Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
-        end
-      end
-      
-      # GenServer callbacks for internal state updates
-      @impl true
-      def handle_cast({:request_completed, request_id, status, latency, usage}, agent) do
+      def handle_info({:request_completed, request_id, status, latency, usage}, agent) do
         agent = RubberDuck.Agents.ProviderAgent.handle_request_completed(agent, request_id, status, latency, usage)
         {:noreply, agent}
       end
-      
-      # Allow provider-specific agents to override
-      defoverridable [handle_signal: 2]
     end
   end
   
-  # Common functionality available to all provider agents
-  
-  def handle_provider_request(agent, signal, emit_error_fn, track_and_execute_fn) do
-    %{
-      "data" => %{
-        "request_id" => request_id,
-        "messages" => _messages,
-        "model" => model
-      } = data
-    } = signal
-    
-    # Check rate limits
-    case check_rate_limit(agent) do
-      {:ok, agent} ->
-        # Check circuit breaker
-        case check_circuit_breaker(agent) do
-          {:ok, agent} ->
-            # Check concurrent request limit
-            active_count = map_size(agent.state.active_requests)
-            if active_count >= agent.state.max_concurrent_requests do
-              emit_error_fn.(request_id, :too_many_requests, 
-                "Provider at maximum concurrent requests (#{active_count}/#{agent.state.max_concurrent_requests})")
-              {:ok, agent}
-            else
-              # Track and execute
-              agent = track_and_execute_fn.(agent, request_id, model, data)
-              {:ok, agent}
-            end
-            
-          {:error, :circuit_open} ->
-            emit_error_fn.(request_id, :circuit_breaker_open, 
-              "Provider circuit breaker is open due to repeated failures")
-            {:ok, agent}
-        end
-        
-      {:error, :rate_limited} ->
-        emit_error_fn.(request_id, :rate_limited, 
-          "Provider rate limit exceeded")
-        {:ok, agent}
-    end
-  end
-  
-  # Helper functions
-  
-  def check_rate_limit(agent) do
-    case agent.state.rate_limiter do
-      %{limit: nil} ->
-        # No rate limit configured
-        {:ok, agent}
-        
-      %{limit: limit, window: window} = limiter ->
-        now = System.monotonic_time(:millisecond)
-        window_start = limiter.window_start || now
-        
-        cond do
-          now - window_start > window ->
-            # New window
-            updated_limiter = %{limiter |
-              current_count: 1,
-              window_start: now
-            }
-            {:ok, put_in(agent.state.rate_limiter, updated_limiter)}
-            
-          limiter.current_count < limit ->
-            # Within limit
-            updated_limiter = %{limiter |
-              current_count: limiter.current_count + 1
-            }
-            {:ok, put_in(agent.state.rate_limiter, updated_limiter)}
-            
-          true ->
-            # Rate limited
-            {:error, :rate_limited}
-        end
-    end
-  end
-  
-  def check_circuit_breaker(agent) do
-    breaker = agent.state.circuit_breaker
-    now = System.monotonic_time(:millisecond)
-    
-    case breaker.state do
-      :closed ->
-        {:ok, agent}
-        
-      :open ->
-        # Check if we should try half-open
-        if breaker.last_failure_time && now - breaker.last_failure_time > breaker.timeout do
-          updated_breaker = %{breaker | state: :half_open, half_open_requests: 0}
-          {:ok, put_in(agent.state.circuit_breaker, updated_breaker)}
-        else
-          {:error, :circuit_open}
-        end
-        
-      :half_open ->
-        # Allow limited requests in half-open state
-        if breaker.half_open_requests < breaker.success_threshold do
-          updated_breaker = %{breaker | half_open_requests: breaker.half_open_requests + 1}
-          {:ok, put_in(agent.state.circuit_breaker, updated_breaker)}
-        else
-          {:error, :circuit_open}
-        end
-    end
-  end
-  
-  def track_request_start(agent, request_id, model) do
-    request_info = %{
-      started_at: System.monotonic_time(:millisecond),
-      model: model,
-      status: :active
-    }
-    
-    put_in(agent.state.active_requests[request_id], request_info)
-  end
-  
-  def build_request(request_id, messages, model, data) do
-    %Request{
-      id: request_id,
-      provider: String.to_atom(data["provider"] || "unknown"),
-      model: model,
-      messages: messages,
-      options: %{
-        temperature: data["temperature"] || 0.7,
-        max_tokens: data["max_tokens"],
-        top_p: data["top_p"],
-        frequency_penalty: data["frequency_penalty"],
-        presence_penalty: data["presence_penalty"],
-        stop: data["stop"],
-        stream: data["stream"] || false
-      },
-      timestamp: DateTime.utc_now(),
-      status: :pending
-    }
-  end
-  
-  def check_provider_feature(provider_module, feature) do
-    if function_exported?(provider_module, :supports_feature?, 1) do
-      provider_module.supports_feature?(feature)
-    else
-      false
-    end
-  end
-  
-  def estimate_tokens(provider_module, messages, model) do
-    if function_exported?(provider_module, :estimate_tokens, 2) do
-      provider_module.estimate_tokens(messages, model)
-    else
-      # Simple estimation fallback
-      char_count = messages
-      |> Enum.map(fn msg -> String.length(msg["content"] || "") end)
-      |> Enum.sum()
-      
-      # Rough estimate: ~4 chars per token
-      {:ok, %{prompt_tokens: div(char_count, 4)}}
-    end
-  end
+  # Helper functions for metrics and state management
+  # These are still used by the async GenServer callbacks
   
   def build_status_report(agent) do
     %{
@@ -470,9 +124,6 @@ defmodule RubberDuck.Agents.ProviderAgent do
   defp calculate_success_rate(%{total_requests: total, successful_requests: successful}) do
     Float.round(successful / total * 100, 2)
   end
-  
-  def format_error({:provider_error, message}), do: message
-  def format_error(error), do: inspect(error)
   
   # Helper for handling request completion
   def handle_request_completed(agent, request_id, status, latency, usage) do
