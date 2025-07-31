@@ -193,11 +193,29 @@ This document tracks the implementation of tool-specific agents in the RubberDuc
 - **State**: Signal tracking, routing rules, delivery confirmations, templates, retry config
 - **Status**: Implemented with Jido actions
 
-### Remaining Agents (To Be Implemented)
+#### 13. PromptOptimizerAgent ✓
+- **Tool**: `:prompt_optimizer`
+- **Description**: Optimizes prompts for better AI model performance through analysis and iterative refinement
+- **Signals**:
+  - `tool_request` → Standard tool execution (via BaseToolAgent)
+  - `analyze_prompt` → Analyze prompt quality and identify improvement opportunities
+  - `optimize_prompt` → Apply optimizations to improve prompt effectiveness
+  - `ab_test_prompts` → Set up A/B testing for prompt variations
+  - `generate_variations` → Generate multiple variations of a prompt for testing
+  - `evaluate_effectiveness` → Evaluate prompt effectiveness based on response quality metrics
+  - `apply_template` → Apply a template to generate a structured prompt
+- **Actions**:
+  - `ExecuteToolAction` → Execute prompt optimization
+  - `AnalyzePromptAction` → Multi-aspect analysis (clarity, specificity, structure, completeness, bias)
+  - `OptimizePromptAction` → Apply optimization strategies with model-specific enhancements
+  - `ABTestPromptsAction` → Statistical A/B testing setup with confidence intervals
+  - `GenerateVariationsAction` → Generate variations by tone, length, structure, specificity
+  - `EvaluateEffectivenessAction` → Response quality evaluation with baseline comparison
+  - `ApplyTemplateAction` → Template-based prompt generation with customizations
+- **State**: Optimization history, performance metrics, strategies, templates, experiments, model profiles
+- **Status**: Implemented with Jido actions
 
-13. **PromptOptimizerAgent**
-    - Tool: `:prompt_optimizer`
-    - Will optimize prompts for better results
+### Remaining Agents (To Be Implemented)
 
 14. **CodeMigrationAgent**
     - Tool: `:code_migration`
