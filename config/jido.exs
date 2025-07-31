@@ -10,21 +10,13 @@ config :rubber_duck, :jido,
     max_seconds: 5
   ],
 
-  # Signal routing configuration
-  signal_router: [
-    name: RubberDuck.Jido.SignalRouter,
-    dispatcher: RubberDuck.Jido.SignalDispatcher,
-    # CloudEvents configuration
-    cloudevents: [
-      spec_version: "1.0",
-      default_source: "rubber_duck.jido",
-      content_type: "application/json"
-    ],
-    # Signal persistence (optional, for replay capability)
-    persistence: [
-      enabled: false,
-      adapter: :memory,
-      ttl: :timer.hours(24)
+  # Jido native signal bus configuration
+  signal_bus: [
+    name: RubberDuck.SignalBus,
+    # CloudEvents are handled natively by Jido.Signal
+    # Middleware for signal processing
+    middleware: [
+      # Add middleware here if needed
     ]
   ],
 
@@ -110,12 +102,9 @@ end
 
 if config_env() == :prod do
   config :rubber_duck, :jido,
-    signal_router: [
-      persistence: [
-        enabled: true,
-        adapter: :postgres,
-        ttl: :timer.hours(7 * 24)  # 1 week
-      ]
+    signal_bus: [
+      # Production signal bus configuration
+      # Persistence is handled by Jido.Signal.Bus natively
     ],
     workflow_engine: [
       persistence: [
