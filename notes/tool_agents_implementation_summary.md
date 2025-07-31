@@ -171,11 +171,29 @@ This document tracks the implementation of tool-specific agents in the RubberDuc
 - **State**: Templates, themes, doc cache, generation history, presets
 - **Status**: Implemented with Jido actions
 
-### Remaining Agents (To Be Implemented)
+#### 12. SignalEmitterAgent ✓
+- **Tool**: `:signal_emitter`
+- **Description**: Manages signal emission, routing, and orchestration throughout the system
+- **Signals**:
+  - `tool_request` → Standard tool execution (via BaseToolAgent)
+  - `broadcast_signal` → Broadcast signals to multiple recipients
+  - `route_signal` → Route signals based on routing rules
+  - `filter_signals` → Filter signals based on criteria
+  - `transform_signal` → Transform signal data and structure
+  - `confirm_delivery` → Handle delivery confirmations and track status
+  - `manage_templates` → Manage signal templates for common patterns
+- **Actions**:
+  - `ExecuteToolAction` → Execute signal emission
+  - `BroadcastSignalAction` → Multi-recipient broadcasting (fanout, round-robin, priority)
+  - `RouteSignalAction` → Rule-based signal routing with pattern matching
+  - `FilterSignalsAction` → Signal filtering with include/exclude modes
+  - `TransformSignalAction` → Signal transformation pipeline
+  - `ConfirmDeliveryAction` → Delivery tracking and retry management
+  - `ManageSignalTemplatesAction` → CRUD operations for signal templates
+- **State**: Signal tracking, routing rules, delivery confirmations, templates, retry config
+- **Status**: Implemented with Jido actions
 
-12. **SignalEmitterAgent**
-    - Tool: `:signal_emitter`
-    - Will emit and manage signals
+### Remaining Agents (To Be Implemented)
 
 13. **PromptOptimizerAgent**
     - Tool: `:prompt_optimizer`
