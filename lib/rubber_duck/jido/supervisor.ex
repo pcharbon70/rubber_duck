@@ -4,7 +4,7 @@ defmodule RubberDuck.Jido.Supervisor do
   
   Manages the core Jido infrastructure:
   - AgentRegistry: Stores agents as data
-  - SignalRouter: Routes signals to actions
+  - Jido.Signal.Bus: Native Jido signal routing
   - Runtime workers: Execute actions (future)
   
   Note: Agents are NOT supervised processes in proper Jido architecture.
@@ -23,20 +23,14 @@ defmodule RubberDuck.Jido.Supervisor do
       # Agent registry for storing agent data
       {RubberDuck.Jido.AgentRegistry, []},
       
-      # Signal router configuration
-      {RubberDuck.Jido.SignalRouter.Config, []},
-      
-      # Dead letter queue for failed signals
-      {RubberDuck.Jido.SignalRouter.DeadLetterQueue, []},
-      
-      # Signal router for CloudEvents
-      {RubberDuck.Jido.SignalRouter, []},
+      # Jido native signal bus for CloudEvents
+      {Jido.Signal.Bus, name: RubberDuck.SignalBus},
       
       # Future: Worker pool for action execution
       # {RubberDuck.Jido.WorkerPool, [size: 10]}
     ]
     
-    Logger.info("Starting Jido supervisor with proper architecture")
+    Logger.info("Starting Jido supervisor with native signal bus")
     
     Supervisor.init(children, strategy: :rest_for_one)
   end

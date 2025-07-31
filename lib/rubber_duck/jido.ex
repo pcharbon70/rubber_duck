@@ -53,7 +53,7 @@ defmodule RubberDuck.Jido do
   See `lib/rubber_duck/jido/refactoring_docs.md` for migration guide.
   """
   
-  alias RubberDuck.Jido.{AgentRegistry, Runtime, SignalRouter}
+  alias RubberDuck.Jido.{AgentRegistry, Runtime}
   require Logger
   
   @doc """
@@ -124,23 +124,19 @@ defmodule RubberDuck.Jido do
   end
   
   @doc """
-  Sends a signal to an agent.
-  
-  Signals are converted to appropriate actions by the SignalRouter.
+  Sends a Jido signal to the signal bus.
   """
-  @spec send_signal(String.t() | map(), map()) :: :ok | {:error, term()}
-  def send_signal(agent_or_id, signal) do
-    with {:ok, agent} <- get_agent(agent_or_id) do
-      SignalRouter.route(agent, signal)
-    end
+  @spec send_signal(Jido.Signal.t()) :: {:ok, [term()]} | {:error, term()}
+  def send_signal(%Jido.Signal{} = signal) do
+    Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
   end
   
   @doc """
-  Broadcasts a signal to all agents matching a pattern.
+  Broadcasts a Jido signal to the signal bus.
   """
-  @spec broadcast_signal(map(), keyword()) :: :ok
-  def broadcast_signal(signal, opts \\ []) do
-    SignalRouter.broadcast(signal, opts)
+  @spec broadcast_signal(Jido.Signal.t()) :: {:ok, [term()]} | {:error, term()}
+  def broadcast_signal(%Jido.Signal{} = signal) do
+    Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
   end
   
   @doc """
@@ -190,7 +186,7 @@ defmodule RubberDuck.Jido do
         by_type: count_by_type()
       },
       runtime: Runtime.status(),
-      signals: SignalRouter.stats(),
+      signals: get_signal_bus_stats(),
       uptime: get_uptime()
     }
   end
@@ -199,6 +195,17 @@ defmodule RubberDuck.Jido do
   
   defp generate_agent_id do
     "agent_#{Uniq.UUID.uuid4()}"
+  end
+  
+  
+  defp get_signal_bus_stats do
+    # Basic stats from the signal bus - in a real implementation
+    # this would query the bus for actual statistics
+    %{
+      bus_status: :running,
+      subscriptions: 0,
+      signals_processed: 0
+    }
   end
   
   defp build_initial_state(agent_module, overrides) do
