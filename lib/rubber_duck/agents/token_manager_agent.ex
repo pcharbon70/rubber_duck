@@ -13,6 +13,13 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
   - Usage analytics and reporting
   - Optimization recommendations
   
+  ## Persistence Integration
+  
+  This agent integrates with the persistence layer through signals:
+  - Emits "token_usage_flush" signals for TokenPersistenceAgent
+  - Emits "budget_check" signals for BudgetEnforcementAgent
+  - Emits "analytics_request" signals for TokenAnalyticsAgent
+  
   ## State Structure
   
   ```elixir
@@ -171,7 +178,8 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     # Check if buffer needs flushing
     agent = maybe_flush_buffer(agent)
     
-    emit_signal("usage_tracked", %{
+    emit_signal(agent, %{
+      "type" => "usage_tracked",
       "request_id" => request_id,
       "total_tokens" => usage.total_tokens,
       "cost" => usage.cost,
@@ -204,7 +212,8 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
       # Track active request
       agent = track_active_request(agent, request_id, budgets)
       
-      emit_signal("budget_approved", %{
+      emit_signal(agent, %{
+        "type" => "budget_approved",
         "request_id" => request_id,
         "budgets_checked" => length(budgets)
       })
@@ -214,7 +223,8 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
       # Record violation
       agent = record_budget_violation(agent, violations)
       
-      emit_signal("budget_denied", %{
+      emit_signal(agent, %{
+        "type" => "budget_denied",
         "request_id" => request_id,
         "violations" => violations
       })
@@ -239,7 +249,8 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     budget = Budget.new(budget_attrs)
     agent = put_in(agent.budgets[budget.id], budget)
     
-    emit_signal("budget_created", %{
+    emit_signal(agent, %{
+      "type" => "budget_created",
       "budget_id" => budget.id,
       "name" => budget.name,
       "type" => budget.type,
@@ -260,7 +271,8 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
         updated_budget = Budget.update(budget, updates)
         agent = put_in(agent.budgets[budget_id], updated_budget)
         
-        emit_signal("budget_updated", %{
+        emit_signal(agent, %{
+          "type" => "budget_updated",
           "budget_id" => budget_id,
           "updates" => updates
         })
@@ -305,7 +317,8 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     
     case report do
       {:ok, report_data} ->
-        emit_signal("report_generated", %{
+        emit_signal(agent, %{
+          "type" => "report_generated",
           "report_id" => report_data.id,
           "type" => report_type
         })
@@ -340,7 +353,8 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
       }
     )
     
-    emit_signal("pricing_updated", %{
+    emit_signal(agent, %{
+      "type" => "pricing_updated",
       "provider" => provider,
       "model" => model
     })
@@ -544,10 +558,12 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
 
   defp flush_usage_buffer(agent) do
     if agent.usage_buffer != [] do
-      # In production, persist to database
+      # Emit signal for persistence agent to handle
       Logger.info("Flushing #{length(agent.usage_buffer)} usage records")
       
-      emit_signal("buffer_flushed", %{
+      emit_signal(agent, %{
+        "type" => "token_usage_flush",
+        "data" => agent.usage_buffer,
         "count" => length(agent.usage_buffer),
         "timestamp" => DateTime.utc_now()
       })
@@ -1098,7 +1114,8 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
   @impl true
   def handle_info(:update_metrics, agent) do
     # Update derived metrics
-    emit_signal("metrics_updated", %{
+    emit_signal(agent, %{
+      "type" => "metrics_updated",
       "total_tokens" => agent.metrics.total_tokens,
       "total_cost" => Decimal.to_string(agent.metrics.total_cost),
       "requests" => agent.metrics.requests_tracked
