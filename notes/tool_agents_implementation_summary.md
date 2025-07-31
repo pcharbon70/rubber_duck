@@ -151,11 +151,27 @@ This document tracks the implementation of tool-specific agents in the RubberDuc
 - **State**: Signature database, analysis cache, language configs
 - **Status**: Implemented with Jido actions
 
-### Remaining Agents (To Be Implemented)
+#### 11. APIDocGeneratorAgent ✓
+- **Tool**: `:api_doc_generator`
+- **Description**: Generates comprehensive API documentation from various sources
+- **Signals**:
+  - `tool_request` → Standard tool execution (via BaseToolAgent)
+  - `generate_from_openapi` → Generate docs from OpenAPI specification
+  - `generate_from_code` → Generate docs from source code analysis
+  - `validate_documentation` → Validate documentation completeness and accuracy  
+  - `merge_documentation` → Merge multiple documentation sources
+  - `publish_documentation` → Publish docs to various platforms
+- **Actions**:
+  - `ExecuteToolAction` → Execute documentation generation
+  - `GenerateFromOpenAPIAction` → OpenAPI spec to documentation conversion
+  - `GenerateFromCodeAction` → Source code to documentation generation
+  - `ValidateDocumentationAction` → Multi-rule validation (completeness, accuracy, consistency, examples)
+  - `MergeDocumentationAction` → Smart merging with conflict resolution strategies
+  - `PublishDocumentationAction` → Multi-platform publishing (file system, GitHub Pages, Confluence, static sites)
+- **State**: Templates, themes, doc cache, generation history, presets
+- **Status**: Implemented with Jido actions
 
-11. **APIDocGeneratorAgent**
-    - Tool: `:api_doc_generator`
-    - Will generate API documentation
+### Remaining Agents (To Be Implemented)
 
 12. **SignalEmitterAgent**
     - Tool: `:signal_emitter`
