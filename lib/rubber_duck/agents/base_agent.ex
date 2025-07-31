@@ -3,8 +3,8 @@ defmodule RubberDuck.Agents.BaseAgent do
   Base behavior and utilities for RubberDuck agents using Jido framework.
   
   This module provides:
-  - Common agent patterns and utilities
-  - Integration with RubberDuck's signal dispatcher
+  - Action-based agent patterns
+  - Signal-to-action routing
   - State management helpers
   - Lifecycle hooks
   - Testing utilities
@@ -20,23 +20,35 @@ defmodule RubberDuck.Agents.BaseAgent do
           schema: [
             status: [type: :atom, default: :idle],
             data: [type: :map, default: %{}]
-          ]
-          
-        # Implement custom signal handling
-        @impl true
-        def handle_signal(agent, signal) do
-          case signal["type"] do
-            "my_custom_signal" ->
-              # Process signal
-              {:ok, agent}
-            _ ->
-              # Let parent handle unknown signals
-              super(agent, signal)
-          end
-        end
+          ],
+          actions: [
+            MyApp.Actions.ProcessDataAction,
+            MyApp.Actions.UpdateStatusAction
+          ],
+          signal_mappings: %{
+            "data.process" => {MyApp.Actions.ProcessDataAction, :extract_params},
+            "status.update" => {MyApp.Actions.UpdateStatusAction, :extract_params}
+          }
       end
   """
   
+  
+  @doc """
+  Callback for registering agent actions.
+  Returns a list of action modules this agent supports.
+  """
+  @callback actions() :: [module()]
+  
+  @doc """
+  Callback for mapping signals to actions.
+  Returns a map of signal type patterns to {action_module, param_extractor} tuples.
+  """
+  @callback signal_mappings() :: %{String.t() => {module(), atom()}}
+  
+  @doc """
+  Callback for extracting action parameters from a signal.
+  """
+  @callback extract_params(signal :: map()) :: map()
   
   @doc """
   Callback for agent health checks.
@@ -69,6 +81,9 @@ defmodule RubberDuck.Agents.BaseAgent do
   @callback post_init(agent :: map()) :: {:ok, map()} | {:error, term()}
   
   @optional_callbacks [
+    actions: 0,
+    signal_mappings: 0,
+    extract_params: 1,
     health_check: 1,
     pre_init: 1,
     post_init: 1
@@ -82,6 +97,17 @@ defmodule RubberDuck.Agents.BaseAgent do
       @behaviour RubberDuck.Agents.BaseAgent
       
       require Logger
+      
+      alias RubberDuck.Jido.Actions.Base.{
+        UpdateStateAction,
+        EmitSignalAction,
+        InitializeAgentAction,
+        ComposeAction
+      }
+      
+      # Extract options
+      @agent_actions Keyword.get(unquote(opts), :actions, [])
+      @agent_signal_mappings Keyword.get(unquote(opts), :signal_mappings, %{})
       
       # Jido lifecycle callbacks with RubberDuck enhancements
       
@@ -151,6 +177,62 @@ defmodule RubberDuck.Agents.BaseAgent do
       end
       
       # RubberDuck-specific functions
+      
+      # Action support functions
+      
+      @doc """
+      Returns the list of actions supported by this agent.
+      """
+      def actions do
+        base_actions = [
+          UpdateStateAction,
+          EmitSignalAction,
+          InitializeAgentAction
+        ]
+        
+        base_actions ++ @agent_actions
+      end
+      
+      @doc """
+      Returns the signal-to-action mappings for this agent.
+      """
+      def signal_mappings do
+        @agent_signal_mappings
+      end
+      
+      @doc """
+      Default parameter extractor for signals.
+      """
+      def extract_params(signal) do
+        signal["data"] || %{}
+      end
+      
+      @doc """
+      Executes an action on the agent.
+      """
+      def execute_action(agent, action_module, params \\ %{}) do
+        context = %{
+          agent: agent,
+          timestamp: DateTime.utc_now()
+        }
+        
+        case action_module.run(params, context) do
+          {:ok, result, %{agent: updated_agent}} ->
+            {:ok, result, updated_agent}
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end
+      
+      @doc """
+      Composes multiple actions into a single execution.
+      """
+      def compose_actions(agent, action_definitions) do
+        ComposeAction.run(
+          %{actions: action_definitions},
+          %{agent: agent}
+        )
+      end
       
       @doc """
       Emits a Jido signal through the signal bus.
@@ -222,7 +304,14 @@ defmodule RubberDuck.Agents.BaseAgent do
         end
       end
       
-      defoverridable [health_check: 1, pre_init: 1, post_init: 1]
+      defoverridable [
+        actions: 0,
+        signal_mappings: 0,
+        extract_params: 1,
+        health_check: 1,
+        pre_init: 1,
+        post_init: 1
+      ]
       
       @doc """
       Gets the current agent state.
@@ -266,7 +355,9 @@ defmodule RubberDuck.Agents.BaseAgent do
         on_before_run: 1,
         on_after_run: 3,
         on_error: 2,
-        emit_signal: 2
+        emit_signal: 2,
+        execute_action: 3,
+        compose_actions: 2
       ]
     end
   end

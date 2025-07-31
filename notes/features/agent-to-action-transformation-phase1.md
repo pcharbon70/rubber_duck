@@ -29,9 +29,25 @@ Created foundational action modules in `/lib/rubber_duck/jido/actions/base/`:
    - Conditional execution
    - Error handling with stop_on_error option
 
-### Phase 1.2: Base Action Modules Complete ✅
+### Phase 1.2: BaseAgent Module Updated ✅
 
-The base action modules are ready for use in transforming agents to the action pattern.
+Updated the BaseAgent module to support action-based patterns:
+
+1. **New Callbacks**
+   - `actions/0` - Returns list of supported action modules
+   - `signal_mappings/0` - Returns signal pattern to action mappings
+   - `extract_params/1` - Extracts parameters from signals
+
+2. **Action Support Functions**
+   - `execute_action/3` - Execute actions on agents
+   - `compose_actions/2` - Compose multiple actions
+   - Automatic registration of base actions (UpdateState, EmitSignal, Initialize)
+
+3. **Server Updates**
+   - Modified signal handling to route through action system
+   - Added SignalActionRegistry integration
+   - Automatic mapping registration on first signal
+   - Fallback support for non-migrated agents
 
 ### Phase 1.3: Signal-to-Action Adapter Infrastructure ✅
 
@@ -146,6 +162,8 @@ end
 - `/lib/rubber_duck/jido/registries/supervisor.ex` - Registry supervisor
 
 ### Modified Files
+- `/lib/rubber_duck/agents/base_agent.ex` - Added action support
+- `/lib/rubber_duck/jido/agents/server.ex` - Added action-based signal routing
 - `/lib/rubber_duck/jido/supervisor.ex` - Added registry supervisor
 
 ## Compilation Status

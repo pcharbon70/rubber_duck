@@ -15,6 +15,7 @@ defmodule RubberDuck.Jido.Agents.Server do
   require Logger
   
   alias RubberDuck.Jido
+  alias RubberDuck.Jido.Registries.SignalActionRegistry
   
   @type state :: %{
     agent: Jido.Agent.t(),
@@ -194,13 +195,21 @@ defmodule RubberDuck.Jido.Agents.Server do
       metadata
     )
     
-    # Plan and execute the action through the agent module
-    result = with {:ok, planned_agent} <- state.agent_module.plan(state.agent, action, params),
-                  run_result <- state.agent_module.run(planned_agent) do
-      case run_result do
-        {:ok, executed_agent, _metadata} -> {:ok, executed_agent}
-        {:ok, executed_agent} -> {:ok, executed_agent}
-        error -> error
+    # Execute the action through the agent module
+    result = if function_exported?(state.agent_module, :execute_action, 3) do
+      case state.agent_module.execute_action(state.agent, action, params) do
+        {:ok, _result, updated_agent} -> {:ok, updated_agent}
+        {:error, _} = error -> error
+      end
+    else
+      # Fallback to plan/run for agents not yet migrated
+      with {:ok, planned_agent} <- state.agent_module.plan(state.agent, action, params),
+           run_result <- state.agent_module.run(planned_agent) do
+        case run_result do
+          {:ok, executed_agent, _metadata} -> {:ok, executed_agent}
+          {:ok, executed_agent} -> {:ok, executed_agent}
+          error -> error
+        end
       end
     end
     
@@ -279,19 +288,15 @@ defmodule RubberDuck.Jido.Agents.Server do
     
     stats = Map.update!(state.stats, :signals_received, &(&1 + 1))
     
-    # Route signal if agent has signal routing
-    new_state = if function_exported?(state.agent_module, :route_signal, 2) do
-      case state.agent_module.route_signal(state.agent, signal) do
-        {:ok, updated_agent} ->
-          %{state | agent: updated_agent, stats: stats}
-          
-        {:error, reason} ->
-          Logger.error("Signal routing failed: #{inspect(reason)}")
-          stats = Map.update!(stats, :errors, &(&1 + 1))
-          %{state | stats: stats}
-      end
-    else
-      %{state | stats: stats}
+    # Route signal through action system
+    new_state = case route_signal_to_actions(state, signal) do
+      {:ok, %{agent: updated_agent}} ->
+        %{state | agent: updated_agent, stats: stats}
+        
+      {:error, reason} ->
+        Logger.error("Signal routing failed: #{inspect(reason)}")
+        stats = Map.update!(stats, :errors, &(&1 + 1))
+        %{state | stats: stats}
     end
     
     {:noreply, new_state}
@@ -451,5 +456,40 @@ defmodule RubberDuck.Jido.Agents.Server do
 
   defp perform_health_probe(unknown_probe, _state) do
     {:error, {:unknown_probe_type, unknown_probe}}
+  end
+  
+  defp route_signal_to_actions(state, signal) do
+    # Check if agent has signal mappings
+    if function_exported?(state.agent_module, :signal_mappings, 0) do
+      # Register mappings if not already done
+      ensure_mappings_registered(state.agent_module)
+      
+      # Route through action registry
+      SignalActionRegistry.route_signal(state.agent_id, state.agent_module, signal)
+    else
+      # No action support
+      {:error, :no_action_support}
+    end
+  end
+  
+  defp ensure_mappings_registered(agent_module) do
+    # Check if already registered (could use ETS for caching)
+    case SignalActionRegistry.get_adapter(agent_module) do
+      {:ok, _adapter} ->
+        :ok
+        
+      {:error, :not_found} ->
+        # Get mappings and register them
+        mappings = agent_module.signal_mappings()
+        |> Enum.map(fn {pattern, {action, extractor}} ->
+          %{
+            pattern: pattern,
+            action: action,
+            extractor: extractor
+          }
+        end)
+        
+        SignalActionRegistry.register_agent_mappings(agent_module, mappings)
+    end
   end
 end
