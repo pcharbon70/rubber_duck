@@ -190,7 +190,7 @@ defmodule RubberDuck.Agents.Prompt.Template do
     now = DateTime.utc_now()
     
     template = %__MODULE__{
-      id: Map.get(attrs, :id, UUID.uuid4()),
+      id: Map.get(attrs, :id, Uniq.UUID.uuid4()),
       name: Map.fetch!(attrs, :name),
       description: Map.get(attrs, :description, ""),
       content: Map.fetch!(attrs, :content),

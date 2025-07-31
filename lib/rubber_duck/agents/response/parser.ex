@@ -7,9 +7,10 @@ defmodule RubberDuck.Agents.Response.Parser do
   capabilities.
   """
 
+  # TODO: Define the ResponseParser behaviour module that parser implementations should follow
+  # The behaviour should define callbacks for parse/2 and supports_streaming?/0
+  
   require Logger
-
-  @behaviour ResponseParser
 
   @doc """
   Behavior that all format-specific parsers must implement.
@@ -223,10 +224,14 @@ defmodule RubberDuck.Agents.Response.Parser do
   defp get_parser_module(format) do
     case format do
       :json -> {:ok, __MODULE__.JSONParser}
+      # TODO: Implement XMLParser module with parse/2 and supports_streaming?/0
       :xml -> {:ok, __MODULE__.XMLParser}
       :markdown -> {:ok, __MODULE__.MarkdownParser}
+      # TODO: Implement HTMLParser module with parse/2 and supports_streaming?/0
       :html -> {:ok, __MODULE__.HTMLParser}
+      # TODO: Implement YAMLParser module with parse/2 and supports_streaming?/0
       :yaml -> {:ok, __MODULE__.YAMLParser}
+      # TODO: Implement CodeParser module with parse/2 and supports_streaming?/0
       :code -> {:ok, __MODULE__.CodeParser}
       :text -> {:ok, __MODULE__.TextParser}
       _ -> {:error, :unsupported}

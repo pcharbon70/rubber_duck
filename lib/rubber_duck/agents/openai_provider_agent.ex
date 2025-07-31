@@ -70,11 +70,11 @@ defmodule RubberDuck.Agents.OpenAIProviderAgent do
   def handle_signal(agent, %{"type" => "stream_request"} = signal) do
     %{
       "data" => %{
-        "request_id" => request_id,
+        "request_id" => _request_id,
         "messages" => messages,
-        "model" => model,
+        "model" => _model,
         "callback_signal" => callback_signal
-      } = data
+      } = _data
     } = signal
     
     # Use the base provider's rate limit and circuit breaker checks
@@ -98,16 +98,6 @@ defmodule RubberDuck.Agents.OpenAIProviderAgent do
   # Delegate other signals to base implementation
   def handle_signal(agent, signal) do
     super(agent, signal)
-  end
-  
-  # Private helper functions
-  
-  defp emit_error_response_internal(request_id, error_type, message) do
-    emit_signal("provider_error", %{
-      "request_id" => request_id,
-      "error_type" => Atom.to_string(error_type),
-      "error" => message
-    })
   end
   
   # Private functions
@@ -204,7 +194,7 @@ defmodule RubberDuck.Agents.OpenAIProviderAgent do
     case result do
       {:ok, _} ->
         # Get accumulated data
-        %{content: accumulated_content, tokens: token_count} = Elixir.Agent.get(accumulator)
+        %{content: accumulated_content, tokens: token_count} = Elixir.Agent.get(accumulator, fn state -> state end)
         Elixir.Agent.stop(accumulator)
         
         # Build complete response

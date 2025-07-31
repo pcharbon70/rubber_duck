@@ -205,7 +205,7 @@ defmodule RubberDuck.Agents.Response.Parser.JSONParser do
     if Map.get(options, :allow_partial, false) do
       # Extract key-value pairs even from malformed JSON
       case extract_key_value_pairs(content) do
-        {:ok, pairs} when length(pairs) > 0 -> {:ok, Map.new(pairs)}
+        {:ok, pairs} when pairs != [] -> {:ok, Map.new(pairs)}
         _ -> {:error, "No valid JSON content found"}
       end
     else

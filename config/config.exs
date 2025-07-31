@@ -11,7 +11,8 @@ config :rubber_duck,
     RubberDuck.Conversations,
     RubberDuck.Planning,
     RubberDuck.Prompts,
-    RubberDuck.Workflows
+    RubberDuck.Workflows,
+    RubberDuck.Tokens
   ]
 
 # Instructions system configuration

@@ -283,7 +283,8 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
   defp load_model_async(agent_id, model_name) do
     start_time = System.monotonic_time(:millisecond)
     
-    # Simulate model loading (in reality, would call Ollama API)
+    # TODO: Implement RubberDuck.LLM.Providers.Ollama.load_model/1
+    # This function should handle loading models into Ollama
     case Ollama.load_model(model_name) do
       :ok ->
         load_time = System.monotonic_time(:millisecond) - start_time
@@ -308,7 +309,8 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
   end
   
   defp unload_model_async(_agent_id, model_name) do
-    # Simulate model unloading
+    # TODO: Implement RubberDuck.LLM.Providers.Ollama.unload_model/1
+    # This function should handle unloading models from Ollama
     case Ollama.unload_model(model_name) do
       :ok ->
         emit_signal("model_unloaded", %{
@@ -327,7 +329,8 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
   end
   
   defp list_local_models do
-    # Would query Ollama or scan model directory
+    # TODO: Implement RubberDuck.LLM.Providers.Ollama.list_models/0
+    # This function should return a list of available models in Ollama
     case Ollama.list_models() do
       {:ok, models} -> models
       {:error, _} -> []
