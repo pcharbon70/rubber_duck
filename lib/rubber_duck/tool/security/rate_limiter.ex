@@ -104,10 +104,10 @@ defmodule RubberDuck.Tool.Security.RateLimiter do
 
   @impl true
   def init(opts) do
-    # Create ETS tables
-    :ets.new(:rate_limiter_buckets, [:set, :public, :named_table, {:read_concurrency, true}])
-    :ets.new(:circuit_breakers, [:set, :public, :named_table])
-    :ets.new(:user_priorities, [:set, :public, :named_table])
+    # Create ETS tables if they don't exist
+    ensure_table(:rate_limiter_buckets, [:set, :public, :named_table, {:read_concurrency, true}])
+    ensure_table(:circuit_breakers, [:set, :public, :named_table])
+    ensure_table(:user_priorities, [:set, :public, :named_table])
 
     state = %{
       default_config: Keyword.get(opts, :default_config, @default_bucket_config),
@@ -258,6 +258,16 @@ defmodule RubberDuck.Tool.Security.RateLimiter do
   end
 
   # Private functions
+
+  defp ensure_table(name, opts) do
+    case :ets.whereis(name) do
+      :undefined ->
+        :ets.new(name, opts)
+        
+      _ ->
+        name
+    end
+  end
 
   defp get_or_create_bucket(key, user_id, state) do
     case :ets.lookup(:rate_limiter_buckets, key) do
