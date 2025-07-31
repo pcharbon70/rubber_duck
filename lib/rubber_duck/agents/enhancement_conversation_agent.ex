@@ -92,11 +92,17 @@ defmodule RubberDuck.Agents.EnhancementConversationAgent do
     end)
     
     # Emit initial progress
-    emit_signal("enhancement_progress", %{
-      "request_id" => request_id,
-      "status" => "started",
-      "message" => "Analyzing content for enhancement opportunities"
+    signal = Jido.Signal.new!(%{
+      type: "conversation.enhancement.progress",
+      source: "agent:#{agent.id}",
+      data: %{
+        request_id: request_id,
+        status: "started",
+        message: "Analyzing content for enhancement opportunities",
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -157,13 +163,19 @@ defmodule RubberDuck.Agents.EnhancementConversationAgent do
   end
   
   def handle_signal(agent, %{"type" => "get_enhancement_metrics"} = _signal) do
-    emit_signal("enhancement_metrics", %{
-      "metrics" => agent.state.metrics,
-      "active_enhancements" => map_size(agent.state.active_enhancements),
-      "history_size" => length(agent.state.enhancement_history),
-      "cache_size" => map_size(agent.state.suggestion_cache),
-      "config" => agent.state.enhancement_config
+    signal = Jido.Signal.new!(%{
+      type: "conversation.enhancement.metrics",
+      source: "agent:#{agent.id}",
+      data: %{
+        metrics: agent.state.metrics,
+        active_enhancements: map_size(agent.state.active_enhancements),
+        history_size: length(agent.state.enhancement_history),
+        cache_size: map_size(agent.state.suggestion_cache),
+        config: agent.state.enhancement_config,
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -234,18 +246,32 @@ defmodule RubberDuck.Agents.EnhancementConversationAgent do
       techniques = select_techniques(task, preferences)
       
       # Emit technique selection
-      emit_signal("technique_selection", %{
-        "request_id" => request_id,
-        "techniques" => Enum.map(techniques, &Atom.to_string/1),
-        "reason" => "Selected based on content type and preferences"
+      signal = Jido.Signal.new!(%{
+        type: "conversation.enhancement.technique_selection",
+        source: "agent:enhancement_conversation",
+        data: %{
+          request_id: request_id,
+          techniques: Enum.map(techniques, &Atom.to_string/1),
+          reason: "Selected based on content type and preferences",
+          timestamp: DateTime.utc_now()
+        }
       })
+      # In async context, publish directly to signal bus
+      Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
       
       # Update progress
-      emit_signal("enhancement_progress", %{
-        "request_id" => request_id,
-        "status" => "enhancing",
-        "message" => "Applying #{length(techniques)} enhancement techniques"
+      signal = Jido.Signal.new!(%{
+        type: "conversation.enhancement.progress",
+        source: "agent:enhancement_conversation",
+        data: %{
+          request_id: request_id,
+          status: "enhancing",
+          message: "Applying #{length(techniques)} enhancement techniques",
+          timestamp: DateTime.utc_now()
+        }
       })
+      # In async context, publish directly to signal bus
+      Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
       
       # Apply enhancements through coordinator
       enhancement_result = apply_enhancements(task, techniques, preferences)
@@ -255,10 +281,17 @@ defmodule RubberDuck.Agents.EnhancementConversationAgent do
       
       # Emit individual suggestions
       Enum.each(suggestions, fn suggestion ->
-        emit_signal("suggestion_generated", %{
-          "request_id" => request_id,
-          "suggestion" => suggestion
+        signal = Jido.Signal.new!(%{
+          type: "conversation.enhancement.suggestion_generated",
+          source: "agent:enhancement_conversation",
+          data: %{
+            request_id: request_id,
+            suggestion: suggestion,
+            timestamp: DateTime.utc_now()
+          }
         })
+        # In async context, publish directly to signal bus
+        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
       end)
       
       # Validate if enabled
@@ -282,7 +315,15 @@ defmodule RubberDuck.Agents.EnhancementConversationAgent do
       
       # If no validation needed, emit result immediately
       unless result["validation_pending"] do
-        emit_signal("enhancement_result", result)
+        signal = Jido.Signal.new!(%{
+          type: "conversation.enhancement.result",
+          source: "agent:enhancement_conversation",
+          data: Map.merge(result, %{
+            timestamp: DateTime.utc_now()
+          })
+        })
+        # In async context, publish directly to signal bus
+        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
       end
       
     rescue
@@ -292,10 +333,17 @@ defmodule RubberDuck.Agents.EnhancementConversationAgent do
           error: Exception.message(error)
         )
         
-        emit_signal("enhancement_result", %{
-          "request_id" => request_id,
-          "error" => Exception.message(error)
+        signal = Jido.Signal.new!(%{
+          type: "conversation.enhancement.result",
+          source: "agent:enhancement_conversation",
+          data: %{
+            request_id: request_id,
+            error: Exception.message(error),
+            timestamp: DateTime.utc_now()
+          }
         })
+        # In async context, publish directly to signal bus
+        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
     end
   end
   
@@ -455,14 +503,21 @@ defmodule RubberDuck.Agents.EnhancementConversationAgent do
         Enum.map(suggestions, fn suggestion ->
           validation_id = generate_validation_id()
           
-          emit_signal("validation_request", %{
-            "request_id" => request_id,
-            "validation_id" => validation_id,
-            "suggestion_id" => suggestion["id"],
-            "content" => task.content,
-            "suggestion" => suggestion,
-            "validation_type" => "syntax_and_tests"
+          signal = Jido.Signal.new!(%{
+            type: "conversation.enhancement.validation_request",
+            source: "agent:enhancement_conversation",
+            data: %{
+              request_id: request_id,
+              validation_id: validation_id,
+              suggestion_id: suggestion["id"],
+              content: task.content,
+              suggestion: suggestion,
+              validation_type: "syntax_and_tests",
+              timestamp: DateTime.utc_now()
+            }
           })
+          # In async context, publish directly to signal bus
+          Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
           
           validation_id
         end)
@@ -490,11 +545,17 @@ defmodule RubberDuck.Agents.EnhancementConversationAgent do
         
         # Update suggestions with validation results
         # Emit final result
-        emit_signal("enhancement_result", %{
-          "request_id" => request_id,
-          "status" => "completed_with_validation",
-          "validations" => validations
+        signal = Jido.Signal.new!(%{
+          type: "conversation.enhancement.result",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id,
+            status: "completed_with_validation",
+            validations: validations,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         # Clean up and update metrics
         agent = agent

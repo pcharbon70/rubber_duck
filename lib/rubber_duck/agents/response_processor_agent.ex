@@ -106,10 +106,16 @@ defmodule RubberDuck.Agents.ResponseProcessorAgent do
       {:hit, cached_response} ->
         agent = update_cache_metrics(agent, :hit)
         
-        emit_signal("response_processed", Map.merge(cached_response, %{
-          "cache_hit" => true,
-          "processing_time" => 0
-        }))
+        signal = Jido.Signal.new!(%{
+          type: "response.processed",
+          source: "agent:#{agent.id}",
+          data: Map.merge(cached_response, %{
+            cache_hit: true,
+            processing_time: 0,
+            timestamp: DateTime.utc_now()
+          })
+        })
+        emit_signal(agent, signal)
         
         {:ok, agent}
         
@@ -131,18 +137,32 @@ defmodule RubberDuck.Agents.ResponseProcessorAgent do
             
             # Emit the processed response
             client_response = ProcessedResponse.to_client_response(processed_response)
-            emit_signal("response_processed", Map.put(client_response, "cache_hit", false))
+            signal = Jido.Signal.new!(%{
+              type: "response.processed",
+              source: "agent:#{agent.id}",
+              data: Map.merge(client_response, %{
+                cache_hit: false,
+                timestamp: DateTime.utc_now()
+              })
+            })
+            emit_signal(agent, signal)
             
             {:ok, updated_agent}
             
           {:error, reason, updated_agent} ->
             updated_agent = update_error_metrics(updated_agent, reason)
             
-            emit_signal("response_processing_failed", %{
-              "request_id" => request_id,
-              "error" => reason,
-              "original_content" => content
+            signal = Jido.Signal.new!(%{
+              type: "response.processing.failed",
+              source: "agent:#{agent.id}",
+              data: %{
+                request_id: request_id,
+                error: reason,
+                original_content: content,
+                timestamp: DateTime.utc_now()
+              }
             })
+            emit_signal(agent, signal)
             
             {:ok, updated_agent}
         end
@@ -160,19 +180,31 @@ defmodule RubberDuck.Agents.ResponseProcessorAgent do
     
     case parse_content(content, format, options) do
       {:ok, parsed_content, detected_format, metadata} ->
-        emit_signal("response_parsed", %{
-          "request_id" => request_id,
-          "parsed_content" => parsed_content,
-          "format" => detected_format,
-          "metadata" => metadata
+        signal = Jido.Signal.new!(%{
+          type: "response.parsed",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id,
+            parsed_content: parsed_content,
+            format: detected_format,
+            metadata: metadata,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
       {:error, reason} ->
-        emit_signal("response_parsing_failed", %{
-          "request_id" => request_id,
-          "error" => reason,
-          "content" => content
+        signal = Jido.Signal.new!(%{
+          type: "response.parsing.failed",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id,
+            error: reason,
+            content: content,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
     end
     
     {:ok, agent}
@@ -188,18 +220,30 @@ defmodule RubberDuck.Agents.ResponseProcessorAgent do
     
     case validate_content(content, validation_rules, agent) do
       {:ok, quality_score, validation_results} ->
-        emit_signal("response_validated", %{
-          "request_id" => request_id,
-          "quality_score" => quality_score,
-          "validation_results" => validation_results,
-          "is_valid" => validation_results.is_valid
+        signal = Jido.Signal.new!(%{
+          type: "response.validated",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id,
+            quality_score: quality_score,
+            validation_results: validation_results,
+            is_valid: validation_results.is_valid,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
       {:error, reason} ->
-        emit_signal("response_validation_failed", %{
-          "request_id" => request_id,
-          "error" => reason
+        signal = Jido.Signal.new!(%{
+          type: "response.validation.failed",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id,
+            error: reason,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
     end
     
     {:ok, agent}
@@ -215,17 +259,29 @@ defmodule RubberDuck.Agents.ResponseProcessorAgent do
     
     case enhance_content(content, enhancement_options, agent) do
       {:ok, enhanced_content, enhancement_log} ->
-        emit_signal("response_enhanced", %{
-          "request_id" => request_id,
-          "enhanced_content" => enhanced_content,
-          "enhancement_log" => enhancement_log
+        signal = Jido.Signal.new!(%{
+          type: "response.enhanced",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id,
+            enhanced_content: enhanced_content,
+            enhancement_log: enhancement_log,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
       {:error, reason} ->
-        emit_signal("response_enhancement_failed", %{
-          "request_id" => request_id,
-          "error" => reason
+        signal = Jido.Signal.new!(%{
+          type: "response.enhancement.failed",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id,
+            error: reason,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
     end
     
     {:ok, agent}
@@ -238,10 +294,25 @@ defmodule RubberDuck.Agents.ResponseProcessorAgent do
     
     case get_from_cache(agent, cache_key) do
       {:hit, cached_response} ->
-        emit_signal("cached_response_found", cached_response)
+        signal = Jido.Signal.new!(%{
+          type: "response.cache.hit",
+          source: "agent:#{agent.id}",
+          data: Map.merge(cached_response, %{
+            timestamp: DateTime.utc_now()
+          })
+        })
+        emit_signal(agent, signal)
         
       :miss ->
-        emit_signal("cached_response_not_found", %{"cache_key" => cache_key})
+        signal = Jido.Signal.new!(%{
+          type: "response.cache.miss",
+          source: "agent:#{agent.id}",
+          data: %{
+            cache_key: cache_key,
+            timestamp: DateTime.utc_now()
+          }
+        })
+        emit_signal(agent, signal)
     end
     
     {:ok, agent}
@@ -260,10 +331,16 @@ defmodule RubberDuck.Agents.ResponseProcessorAgent do
       end)
     end
     
-    emit_signal("cache_invalidated", %{
-      "invalidated_keys" => cache_keys,
-      "pattern" => pattern
+    signal = Jido.Signal.new!(%{
+      type: "response.cache.invalidated",
+      source: "agent:#{agent.id}",
+      data: %{
+        invalidated_keys: cache_keys,
+        pattern: pattern,
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -272,10 +349,15 @@ defmodule RubberDuck.Agents.ResponseProcessorAgent do
     cache_size = map_size(agent.cache)
     agent = put_in(agent.cache, %{})
     
-    emit_signal("cache_cleared", %{
-      "cleared_entries" => cache_size,
-      "timestamp" => DateTime.utc_now()
+    signal = Jido.Signal.new!(%{
+      type: "response.cache.cleared",
+      source: "agent:#{agent.id}",
+      data: %{
+        cleared_entries: cache_size,
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     Logger.info("ResponseProcessorAgent cache cleared (#{cache_size} entries)")
     {:ok, agent}
@@ -285,13 +367,27 @@ defmodule RubberDuck.Agents.ResponseProcessorAgent do
 
   def handle_signal(agent, %{"type" => "get_metrics"}) do
     metrics = build_metrics_report(agent)
-    emit_signal("processing_metrics", metrics)
+    signal = Jido.Signal.new!(%{
+      type: "response.metrics",
+      source: "agent:#{agent.id}",
+      data: Map.merge(metrics, %{
+        timestamp: DateTime.utc_now()
+      })
+    })
+    emit_signal(agent, signal)
     {:ok, agent}
   end
 
   def handle_signal(agent, %{"type" => "get_status"}) do
     status = build_status_report(agent)
-    emit_signal("processor_status", status)
+    signal = Jido.Signal.new!(%{
+      type: "response.status",
+      source: "agent:#{agent.id}",
+      data: Map.merge(status, %{
+        timestamp: DateTime.utc_now()
+      })
+    })
+    emit_signal(agent, signal)
     {:ok, agent}
   end
 
@@ -301,10 +397,16 @@ defmodule RubberDuck.Agents.ResponseProcessorAgent do
     
     agent = put_in(agent.config, updated_config)
     
-    emit_signal("processor_configured", %{
-      "updated_config" => updated_config,
-      "changes" => Map.keys(config_updates)
+    signal = Jido.Signal.new!(%{
+      type: "response.configured",
+      source: "agent:#{agent.id}",
+      data: %{
+        updated_config: updated_config,
+        changes: Map.keys(config_updates),
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     Logger.info("ResponseProcessorAgent configuration updated: #{inspect(Map.keys(config_updates))}")
     {:ok, agent}

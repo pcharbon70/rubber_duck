@@ -74,32 +74,38 @@ defmodule RubberDuck.Agents.BudgetEnforcementAgent do
     
     case check_budget_limits(agent, user_id, project_id, estimated_cost) do
       {:ok, :within_budget} ->
-        emit_signal(agent, %{
-          "type" => "budget_check_passed",
-          "data" => %{
-            "request_id" => request["request_id"],
-            "user_id" => user_id,
-            "project_id" => project_id
+        signal = Jido.Signal.new!(%{
+          type: "token.budget.check_passed",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request["request_id"],
+            user_id: user_id,
+            project_id: project_id,
+            timestamp: DateTime.utc_now()
           }
         })
+        emit_signal(agent, signal)
         {:ok, agent}
         
       {:error, {:budget_exceeded, budget_info}} ->
         agent = increment_stat(agent, :requests_blocked)
         
-        emit_signal(agent, %{
-          "type" => "budget_check_failed",
-          "data" => %{
-            "request_id" => request["request_id"],
-            "user_id" => user_id,
-            "project_id" => project_id,
-            "budget_id" => budget_info.id,
-            "budget_name" => budget_info.name,
-            "current_spending" => budget_info.current_spending,
-            "limit" => budget_info.limit_amount,
-            "reason" => "Budget limit exceeded"
+        signal = Jido.Signal.new!(%{
+          type: "token.budget.check_failed",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request["request_id"],
+            user_id: user_id,
+            project_id: project_id,
+            budget_id: budget_info.id,
+            budget_name: budget_info.name,
+            current_spending: budget_info.current_spending,
+            limit: budget_info.limit_amount,
+            reason: "Budget limit exceeded",
+            timestamp: DateTime.utc_now()
           }
         })
+        emit_signal(agent, signal)
         {:ok, agent}
     end
   end
@@ -112,14 +118,16 @@ defmodule RubberDuck.Agents.BudgetEnforcementAgent do
       {:ok, _budget} ->
         agent = increment_stat(agent, :overrides_granted)
         
-        emit_signal(agent, %{
-          "type" => "budget_override_granted",
-          "data" => %{
-            "budget_id" => budget_id,
-            "approved_by" => approval_data["approved_by"],
-            "timestamp" => DateTime.utc_now()
+        signal = Jido.Signal.new!(%{
+          type: "token.budget.override_granted",
+          source: "agent:#{agent.id}",
+          data: %{
+            budget_id: budget_id,
+            approved_by: approval_data["approved_by"],
+            timestamp: DateTime.utc_now()
           }
         })
+        emit_signal(agent, signal)
         
         # Reload budget cache
         agent = reload_budget(agent, budget_id)
@@ -289,15 +297,18 @@ defmodule RubberDuck.Agents.BudgetEnforcementAgent do
         new_budgets = Map.put(agent.state.active_budgets, budget.id, reset_budget)
         new_state = Map.put(agent.state, :active_budgets, new_budgets)
         
-        emit_signal(agent, %{
-          "type" => "budget_reset",
-          "data" => %{
-            "budget_id" => budget.id,
-            "budget_name" => budget.name,
-            "new_period_start" => reset_budget.period_start,
-            "new_period_end" => reset_budget.period_end
+        signal = Jido.Signal.new!(%{
+          type: "token.budget.reset",
+          source: "agent:#{agent.id}",
+          data: %{
+            budget_id: budget.id,
+            budget_name: budget.name,
+            new_period_start: reset_budget.period_start,
+            new_period_end: reset_budget.period_end,
+            timestamp: DateTime.utc_now()
           }
         })
+        emit_signal(agent, signal)
         
         %{agent | state: new_state}
         
@@ -344,18 +355,20 @@ defmodule RubberDuck.Agents.BudgetEnforcementAgent do
   end
   
   defp emit_budget_alert(agent, budget, threshold, utilization) do
-    emit_signal(agent, %{
-      "type" => "budget_alert",
-      "data" => %{
-        "budget_id" => budget.id,
-        "budget_name" => budget.name,
-        "threshold" => threshold,
-        "utilization" => utilization,
-        "current_spending" => budget.current_spending,
-        "limit" => budget.limit_amount,
-        "timestamp" => DateTime.utc_now()
+    signal = Jido.Signal.new!(%{
+      type: "token.budget.alert",
+      source: "agent:#{agent.id}",
+      data: %{
+        budget_id: budget.id,
+        budget_name: budget.name,
+        threshold: threshold,
+        utilization: utilization,
+        current_spending: budget.current_spending,
+        limit: budget.limit_amount,
+        timestamp: DateTime.utc_now()
       }
     })
+    emit_signal(agent, signal)
   end
   
   # Helper functions

@@ -178,18 +178,23 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     # Check if buffer needs flushing
     agent = maybe_flush_buffer(agent)
     
-    emit_signal(agent, %{
-      "type" => "usage_tracked",
-      "request_id" => request_id,
-      "total_tokens" => usage.total_tokens,
-      "cost" => usage.cost,
-      "currency" => usage.currency,
-      "lineage" => %{
-        "parent" => provenance.parent_request_id,
-        "root" => provenance.root_request_id,
-        "depth" => provenance.depth
+    signal = Jido.Signal.new!(%{
+      type: "token.usage.tracked",
+      source: "agent:#{agent.id}",
+      data: %{
+        request_id: request_id,
+        total_tokens: usage.total_tokens,
+        cost: usage.cost,
+        currency: usage.currency,
+        lineage: %{
+          parent: provenance.parent_request_id,
+          root: provenance.root_request_id,
+          depth: provenance.depth
+        },
+        timestamp: DateTime.utc_now()
       }
     })
+    emit_signal(agent, signal)
     
     {:ok, %{"tracked" => true, "usage" => usage, "provenance" => provenance}, agent}
   end
@@ -212,22 +217,32 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
       # Track active request
       agent = track_active_request(agent, request_id, budgets)
       
-      emit_signal(agent, %{
-        "type" => "budget_approved",
-        "request_id" => request_id,
-        "budgets_checked" => length(budgets)
+      signal = Jido.Signal.new!(%{
+        type: "token.budget.approved",
+        source: "agent:#{agent.id}",
+        data: %{
+          request_id: request_id,
+          budgets_checked: length(budgets),
+          timestamp: DateTime.utc_now()
+        }
       })
+      emit_signal(agent, signal)
       
       {:ok, %{"allowed" => true}, agent}
     else
       # Record violation
       agent = record_budget_violation(agent, violations)
       
-      emit_signal(agent, %{
-        "type" => "budget_denied",
-        "request_id" => request_id,
-        "violations" => violations
+      signal = Jido.Signal.new!(%{
+        type: "token.budget.denied",
+        source: "agent:#{agent.id}",
+        data: %{
+          request_id: request_id,
+          violations: violations,
+          timestamp: DateTime.utc_now()
+        }
       })
+      emit_signal(agent, signal)
       
       {:ok, %{"allowed" => false, "violations" => violations}, agent}
     end
@@ -249,13 +264,18 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     budget = Budget.new(budget_attrs)
     agent = put_in(agent.budgets[budget.id], budget)
     
-    emit_signal(agent, %{
-      "type" => "budget_created",
-      "budget_id" => budget.id,
-      "name" => budget.name,
-      "type" => budget.type,
-      "limit" => budget.limit
+    signal = Jido.Signal.new!(%{
+      type: "token.budget.created",
+      source: "agent:#{agent.id}",
+      data: %{
+        budget_id: budget.id,
+        name: budget.name,
+        budget_type: budget.type,
+        limit: budget.limit,
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, %{"budget_id" => budget.id, "budget" => budget}, agent}
   end
@@ -271,11 +291,16 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
         updated_budget = Budget.update(budget, updates)
         agent = put_in(agent.budgets[budget_id], updated_budget)
         
-        emit_signal(agent, %{
-          "type" => "budget_updated",
-          "budget_id" => budget_id,
-          "updates" => updates
+        signal = Jido.Signal.new!(%{
+          type: "token.budget.updated",
+          source: "agent:#{agent.id}",
+          data: %{
+            budget_id: budget_id,
+            updates: updates,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         {:ok, %{"budget" => updated_budget}, agent}
     end
@@ -317,11 +342,16 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
     
     case report do
       {:ok, report_data} ->
-        emit_signal(agent, %{
-          "type" => "report_generated",
-          "report_id" => report_data.id,
-          "type" => report_type
+        signal = Jido.Signal.new!(%{
+          type: "token.report.generated",
+          source: "agent:#{agent.id}",
+          data: %{
+            report_id: report_data.id,
+            report_type: report_type,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         {:ok, report_data, agent}
         
       {:error, reason} ->
@@ -353,11 +383,16 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
       }
     )
     
-    emit_signal(agent, %{
-      "type" => "pricing_updated",
-      "provider" => provider,
-      "model" => model
+    signal = Jido.Signal.new!(%{
+      type: "token.pricing.updated",
+      source: "agent:#{agent.id}",
+      data: %{
+        provider: provider,
+        model: model,
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, %{"updated" => true}, agent}
   end
@@ -561,12 +596,16 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
       # Emit signal for persistence agent to handle
       Logger.info("Flushing #{length(agent.usage_buffer)} usage records")
       
-      emit_signal(agent, %{
-        "type" => "token_usage_flush",
-        "data" => agent.usage_buffer,
-        "count" => length(agent.usage_buffer),
-        "timestamp" => DateTime.utc_now()
+      signal = Jido.Signal.new!(%{
+        type: "token.usage.flush",
+        source: "agent:#{agent.id}",
+        data: %{
+          usage_records: agent.usage_buffer,
+          count: length(agent.usage_buffer),
+          timestamp: DateTime.utc_now()
+        }
       })
+      emit_signal(agent, signal)
       
       %{agent | 
         usage_buffer: [],
@@ -1114,12 +1153,17 @@ defmodule RubberDuck.Agents.TokenManagerAgent do
   @impl true
   def handle_info(:update_metrics, agent) do
     # Update derived metrics
-    emit_signal(agent, %{
-      "type" => "metrics_updated",
-      "total_tokens" => agent.metrics.total_tokens,
-      "total_cost" => Decimal.to_string(agent.metrics.total_cost),
-      "requests" => agent.metrics.requests_tracked
+    signal = Jido.Signal.new!(%{
+      type: "token.metrics.updated",
+      source: "agent:#{agent.id}",
+      data: %{
+        total_tokens: agent.metrics.total_tokens,
+        total_cost: Decimal.to_string(agent.metrics.total_cost),
+        requests: agent.metrics.requests_tracked,
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     schedule_metrics_update()
     {:noreply, agent}

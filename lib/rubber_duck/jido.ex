@@ -20,7 +20,7 @@ defmodule RubberDuck.Jido do
   
   - **AgentRegistry**: ETS-based storage for agent data
   - **Runtime**: Executes actions with lifecycle management
-  - **SignalRouter**: Maps CloudEvents to actions
+  - **Signal.Bus**: CloudEvents-compliant signal distribution
   - **Actions**: Discrete, composable work units
   
   ## Usage Examples
@@ -31,7 +31,7 @@ defmodule RubberDuck.Jido do
       # Execute an action directly
       {:ok, result, agent} = RubberDuck.Jido.execute_action(agent, MyAction, %{param: "value"})
       
-      # Send a signal (converts to action via SignalRouter)
+      # Send a signal via Jido.Signal.Bus
       :ok = RubberDuck.Jido.send_signal(agent.id, %{
         "type" => "my_signal", 
         "data" => %{"param" => "value"}

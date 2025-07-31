@@ -77,11 +77,17 @@ defmodule RubberDuck.Agents.ProviderAgent do
           String.to_atom(feature)
         )
         
-        emit_signal("feature_check_response", %{
-          "feature" => feature,
-          "supported" => supported,
-          "provider" => agent.name
+        signal = Jido.Signal.new!(%{
+          type: "provider.feature.check_response",
+          source: "agent:#{agent.id}",
+          data: %{
+            feature: feature,
+            supported: supported,
+            provider: agent.name,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         {:ok, agent}
       end
@@ -92,17 +98,29 @@ defmodule RubberDuck.Agents.ProviderAgent do
         # Estimate tokens using provider module
         case RubberDuck.Agents.ProviderAgent.estimate_tokens(agent.state.provider_module, messages, model) do
           {:ok, estimate} ->
-            emit_signal("token_estimate_response", %{
-              "estimate" => estimate,
-              "provider" => agent.name,
-              "model" => model
+            signal = Jido.Signal.new!(%{
+              type: "provider.token.estimate_response",
+              source: "agent:#{agent.id}",
+              data: %{
+                estimate: estimate,
+                provider: agent.name,
+                model: model,
+                timestamp: DateTime.utc_now()
+              }
             })
+            emit_signal(agent, signal)
             
           {:error, reason} ->
-            emit_signal("token_estimate_response", %{
-              "error" => "Failed to estimate tokens: #{inspect(reason)}",
-              "provider" => agent.name
+            signal = Jido.Signal.new!(%{
+              type: "provider.token.estimate_failed",
+              source: "agent:#{agent.id}",
+              data: %{
+                error: "Failed to estimate tokens: #{inspect(reason)}",
+                provider: agent.name,
+                timestamp: DateTime.utc_now()
+              }
             })
+            emit_signal(agent, signal)
         end
         
         {:ok, agent}
@@ -110,7 +128,14 @@ defmodule RubberDuck.Agents.ProviderAgent do
       
       def handle_signal(agent, %{"type" => "get_provider_status"} = _signal) do
         status = RubberDuck.Agents.ProviderAgent.build_status_report(agent)
-        emit_signal("provider_status", status)
+        signal = Jido.Signal.new!(%{
+          type: "provider.status",
+          source: "agent:#{agent.id}",
+          data: Map.merge(status, %{
+            timestamp: DateTime.utc_now()
+          })
+        })
+        emit_signal(agent, signal)
         {:ok, agent}
       end
       
@@ -126,7 +151,15 @@ defmodule RubberDuck.Agents.ProviderAgent do
         
         Logger.info("Circuit breaker reset for provider #{agent.name}")
         
-        emit_signal("provider_status", RubberDuck.Agents.ProviderAgent.build_status_report(agent))
+        status = RubberDuck.Agents.ProviderAgent.build_status_report(agent)
+        signal = Jido.Signal.new!(%{
+          type: "provider.status",
+          source: "agent:#{agent.id}",
+          data: Map.merge(status, %{
+            timestamp: DateTime.utc_now()
+          })
+        })
+        emit_signal(agent, signal)
         
         {:ok, agent}
       end
@@ -139,11 +172,18 @@ defmodule RubberDuck.Agents.ProviderAgent do
       # Private helper functions for the macro context
       
       defp emit_error_response_internal(request_id, error_type, message) do
-        emit_signal("provider_error", %{
-          "request_id" => request_id,
-          "error_type" => Atom.to_string(error_type),
-          "error" => message
+        signal = Jido.Signal.new!(%{
+          type: "provider.error",
+          source: "agent:provider",
+          data: %{
+            request_id: request_id,
+            error_type: Atom.to_string(error_type),
+            error: message,
+            timestamp: DateTime.utc_now()
+          }
         })
+        # In macro context, publish directly to signal bus
+        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
       end
       
       defp track_request_and_execute(agent, request_id, model, data) do
@@ -186,25 +226,39 @@ defmodule RubberDuck.Agents.ProviderAgent do
             GenServer.cast(agent_id, {:request_completed, request_id, :success, latency, response.usage})
             
             # Emit response
-            emit_signal("provider_response", %{
-              "request_id" => request_id,
-              "response" => response,
-              "provider" => agent.name,
-              "model" => model,
-              "latency_ms" => latency
+            signal = Jido.Signal.new!(%{
+              type: "provider.response",
+              source: "agent:provider",
+              data: %{
+                request_id: request_id,
+                response: response,
+                provider: agent.name,
+                model: model,
+                latency_ms: latency,
+                timestamp: DateTime.utc_now()
+              }
             })
+            # In async context, publish directly to signal bus
+            Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
             
           {:error, error} ->
             # Update metrics
             GenServer.cast(agent_id, {:request_completed, request_id, :failure, latency, nil})
             
             # Emit error
-            emit_signal("provider_error", %{
-              "request_id" => request_id,
-              "error" => RubberDuck.Agents.ProviderAgent.format_error(error),
-              "provider" => agent.name,
-              "model" => model
+            signal = Jido.Signal.new!(%{
+              type: "provider.error",
+              source: "agent:provider",
+              data: %{
+                request_id: request_id,
+                error: RubberDuck.Agents.ProviderAgent.format_error(error),
+                provider: agent.name,
+                model: model,
+                timestamp: DateTime.utc_now()
+              }
             })
+            # In async context, publish directly to signal bus
+            Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
         end
       end
       

@@ -126,11 +126,17 @@ defmodule RubberDuck.Agents.GeneralConversationAgent do
         agent = update_in(agent.state.metrics.context_switches, &(&1 + 1))
         
         # Emit context switch notification
-        emit_signal("context_switch", %{
-          "conversation_id" => conversation_id,
-          "previous_context" => conversation.context,
-          "new_context" => new_context
+        signal = Jido.Signal.new!(%{
+          type: "conversation.context.switch",
+          source: "agent:#{agent.id}",
+          data: %{
+            conversation_id: conversation_id,
+            previous_context: conversation.context,
+            new_context: new_context,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         {:ok, agent}
     end
@@ -161,14 +167,20 @@ defmodule RubberDuck.Agents.GeneralConversationAgent do
       acc + length(conv[:messages] || [])
     end)
     
-    emit_signal("conversation_metrics", %{
-      "metrics" => agent.state.metrics,
-      "active_conversations" => active_count,
-      "total_messages" => total_messages,
-      "history_size" => length(agent.state.conversation_history),
-      "context_stack_depth" => length(agent.state.context_stack),
-      "config" => agent.state.conversation_config
+    signal = Jido.Signal.new!(%{
+      type: "conversation.metrics",
+      source: "agent:#{agent.id}",
+      data: %{
+        metrics: agent.state.metrics,
+        active_conversations: active_count,
+        total_messages: total_messages,
+        history_size: length(agent.state.conversation_history),
+        context_stack_depth: length(agent.state.context_stack),
+        config: agent.state.conversation_config,
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -218,16 +230,22 @@ defmodule RubberDuck.Agents.GeneralConversationAgent do
   
   defp handle_clarification_needed(agent, conversation_id, query) do
     # Request clarification
-    emit_signal("clarification_request", %{
-      "conversation_id" => conversation_id,
-      "original_query" => query,
-      "reason" => "Query is ambiguous",
-      "suggestions" => [
-        "Could you provide more context?",
-        "What specifically are you referring to?",
-        "Can you elaborate on your question?"
-      ]
+    signal = Jido.Signal.new!(%{
+      type: "conversation.clarification.request",
+      source: "agent:#{agent.id}",
+      data: %{
+        conversation_id: conversation_id,
+        original_query: query,
+        reason: "Query is ambiguous",
+        suggestions: [
+          "Could you provide more context?",
+          "What specifically are you referring to?",
+          "Can you elaborate on your question?"
+        ],
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     # Update metrics
     agent = update_in(agent.state.metrics.clarifications_requested, &(&1 + 1))
@@ -253,20 +271,34 @@ defmodule RubberDuck.Agents.GeneralConversationAgent do
         duration = System.monotonic_time(:millisecond) - start_time
         
         # Emit result
-        emit_signal("conversation_result", %{
-          "conversation_id" => conversation_id,
-          "query" => query,
-          "response" => response,
-          "classification" => Atom.to_string(classification),
-          "processing_time_ms" => duration
+        signal = Jido.Signal.new!(%{
+          type: "conversation.result",
+          source: "agent:general_conversation",
+          data: %{
+            conversation_id: conversation_id,
+            query: query,
+            response: response,
+            classification: Atom.to_string(classification),
+            processing_time_ms: duration,
+            timestamp: DateTime.utc_now()
+          }
         })
+        # In async context, publish directly to signal bus
+        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
         
         # Check for topic change
         if topic_changed?(query, data) do
-          emit_signal("topic_change", %{
-            "conversation_id" => conversation_id,
-            "new_topic" => extract_topic(query)
+          signal = Jido.Signal.new!(%{
+            type: "conversation.topic.change",
+            source: "agent:general_conversation",
+            data: %{
+              conversation_id: conversation_id,
+              new_topic: extract_topic(query),
+              timestamp: DateTime.utc_now()
+            }
           })
+          # In async context, publish directly to signal bus
+          Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
         end
       end
       
@@ -277,10 +309,17 @@ defmodule RubberDuck.Agents.GeneralConversationAgent do
           error: Exception.message(error)
         )
         
-        emit_signal("conversation_result", %{
-          "conversation_id" => conversation_id,
-          "error" => Exception.message(error)
+        signal = Jido.Signal.new!(%{
+          type: "conversation.result",
+          source: "agent:general_conversation",
+          data: %{
+            conversation_id: conversation_id,
+            error: Exception.message(error),
+            timestamp: DateTime.utc_now()
+          }
         })
+        # In async context, publish directly to signal bus
+        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
     end
   end
   
@@ -314,12 +353,19 @@ defmodule RubberDuck.Agents.GeneralConversationAgent do
       "history" => data["messages"] || []
     }
     
-    emit_signal("handoff_request", %{
-      "conversation_id" => conversation_id,
-      "target_agent" => target_agent,
-      "context" => handoff_context,
-      "reason" => "Query requires specialized handling"
+    signal = Jido.Signal.new!(%{
+      type: "conversation.handoff.request",
+      source: "agent:general_conversation",
+      data: %{
+        conversation_id: conversation_id,
+        target_agent: target_agent,
+        context: handoff_context,
+        reason: "Query requires specialized handling",
+        timestamp: DateTime.utc_now()
+      }
     })
+    # In async context, publish directly to signal bus
+    Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
   end
   
   defp determine_target_agent(classification, query) do

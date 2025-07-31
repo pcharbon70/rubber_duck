@@ -59,10 +59,16 @@ defmodule RubberDuck.Agents.OpenAIProviderAgent do
     # Store functions in agent state for use in requests
     agent = put_in(agent.state[:functions], functions)
     
-    emit_signal("functions_configured", %{
-      "provider" => "openai",
-      "function_count" => length(functions)
+    signal = Jido.Signal.new!(%{
+      type: "provider.functions.configured",
+      source: "agent:#{agent.id}",
+      data: %{
+        provider: "openai",
+        function_count: length(functions),
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -172,11 +178,17 @@ defmodule RubberDuck.Agents.OpenAIProviderAgent do
       end)
       
       # Emit chunk signal
-      emit_signal(callback_signal, %{
-        "request_id" => request_id,
-        "chunk" => chunk,
-        "provider" => "openai"
+      signal = Jido.Signal.new!(%{
+        type: callback_signal,
+        source: "agent:openai_provider",
+        data: %{
+          request_id: request_id,
+          chunk: chunk,
+          provider: "openai",
+          timestamp: DateTime.utc_now()
+        }
       })
+      emit_signal(agent_id, signal)
     end
     
     # Execute streaming request
@@ -213,14 +225,20 @@ defmodule RubberDuck.Agents.OpenAIProviderAgent do
         GenServer.cast(agent_id, {:request_completed, request_id, :success, latency, usage})
         
         # Emit completion signal
-        emit_signal("stream_complete", %{
-          "request_id" => request_id,
-          "content" => complete_content,
-          "usage" => usage,
-          "provider" => "openai",
-          "model" => model,
-          "latency_ms" => latency
+        signal = Jido.Signal.new!(%{
+          type: "provider.stream.complete",
+          source: "agent:openai_provider",
+          data: %{
+            request_id: request_id,
+            content: complete_content,
+            usage: usage,
+            provider: "openai",
+            model: model,
+            latency_ms: latency,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent_id, signal)
         
       {:error, error} ->
         # Clean up accumulator
@@ -230,12 +248,18 @@ defmodule RubberDuck.Agents.OpenAIProviderAgent do
         GenServer.cast(agent_id, {:request_completed, request_id, :failure, latency, nil})
         
         # Emit error
-        emit_signal("provider_error", %{
-          "request_id" => request_id,
-          "error" => RubberDuck.Agents.ProviderAgent.format_error(error),
-          "provider" => "openai",
-          "model" => model
+        signal = Jido.Signal.new!(%{
+          type: "provider.error",
+          source: "agent:openai_provider",
+          data: %{
+            request_id: request_id,
+            error: RubberDuck.Agents.ProviderAgent.format_error(error),
+            provider: "openai",
+            model: model,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent_id, signal)
     end
   end
   

@@ -76,13 +76,19 @@ defmodule RubberDuck.Agents.LLMRouterAgent do
         agent = track_request(agent, request_id, provider, model)
         
         # Emit routing decision
-        emit_signal("routing_decision", %{
-          "request_id" => request_id,
-          "provider" => Atom.to_string(provider),
-          "model" => model,
-          "strategy" => agent.state.load_balancing.strategy,
-          "reason" => "Selected based on #{agent.state.load_balancing.strategy} strategy"
+        signal = Jido.Signal.new!(%{
+          type: "llm.routing.decision",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id,
+            provider: Atom.to_string(provider),
+            model: model,
+            strategy: agent.state.load_balancing.strategy,
+            reason: "Selected based on #{agent.state.load_balancing.strategy} strategy",
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         # Process request asynchronously
         Task.start(fn ->
@@ -93,10 +99,16 @@ defmodule RubberDuck.Agents.LLMRouterAgent do
       
       {:error, reason} ->
         # No available provider
-        emit_signal("llm_response", %{
-          "request_id" => request_id,
-          "error" => "No available provider: #{reason}"
+        signal = Jido.Signal.new!(%{
+          type: "llm.response.error",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id,
+            error: "No available provider: #{reason}",
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         {:ok, agent}
     end
@@ -135,19 +147,31 @@ defmodule RubberDuck.Agents.LLMRouterAgent do
         |> put_in([:state, :metrics, :avg_latency_by_provider, provider_name], 0)
         |> put_in([:state, :metrics, :error_rates, provider_name], 0.0)
         
-        emit_signal("provider_registered", %{
-          "provider" => name,
-          "models" => validated_config.models,
-          "status" => "registered"
+        signal = Jido.Signal.new!(%{
+          type: "llm.provider.registered",
+          source: "agent:#{agent.id}",
+          data: %{
+            provider: name,
+            models: validated_config.models,
+            status: "registered",
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         {:ok, agent}
       
       {:error, reason} ->
-        emit_signal("provider_registered", %{
-          "provider" => name,
-          "error" => "Registration failed: #{inspect(reason)}"
+        signal = Jido.Signal.new!(%{
+          type: "llm.provider.registration_failed",
+          source: "agent:#{agent.id}",
+          data: %{
+            provider: name,
+            error: "Registration failed: #{inspect(reason)}",
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         {:ok, agent}
     end
@@ -165,10 +189,16 @@ defmodule RubberDuck.Agents.LLMRouterAgent do
     
     case agent.state.providers[provider_name] do
       nil ->
-        emit_signal("provider_updated", %{
-          "provider" => name,
-          "error" => "Provider not found"
+        signal = Jido.Signal.new!(%{
+          type: "llm.provider.update_failed",
+          source: "agent:#{agent.id}",
+          data: %{
+            provider: name,
+            error: "Provider not found",
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         {:ok, agent}
       
       existing_config ->
@@ -179,10 +209,16 @@ defmodule RubberDuck.Agents.LLMRouterAgent do
         |> put_in([:state, :providers, provider_name], updated_config)
         |> update_model_capabilities(updated_config)
         
-        emit_signal("provider_updated", %{
-          "provider" => name,
-          "status" => "updated"
+        signal = Jido.Signal.new!(%{
+          type: "llm.provider.updated",
+          source: "agent:#{agent.id}",
+          data: %{
+            provider: name,
+            status: "updated",
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent, signal)
         
         {:ok, agent}
     end
@@ -208,7 +244,14 @@ defmodule RubberDuck.Agents.LLMRouterAgent do
   def handle_signal(agent, %{"type" => "get_routing_metrics"} = _signal) do
     metrics = build_metrics_report(agent)
     
-    emit_signal("provider_metrics", metrics)
+    signal = Jido.Signal.new!(%{
+      type: "llm.provider.metrics",
+      source: "agent:#{agent.id}",
+      data: Map.merge(metrics, %{
+        timestamp: DateTime.utc_now()
+      })
+    })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -383,13 +426,19 @@ defmodule RubberDuck.Agents.LLMRouterAgent do
     case result do
       {:ok, response} ->
         # Emit successful response
-        emit_signal("llm_response", %{
-          "request_id" => request_id,
-          "response" => response,
-          "provider" => Atom.to_string(provider),
-          "model" => model,
-          "latency_ms" => latency
+        signal = Jido.Signal.new!(%{
+          type: "llm.response.success",
+          source: "agent:llm_router",
+          data: %{
+            request_id: request_id,
+            response: response,
+            provider: Atom.to_string(provider),
+            model: model,
+            latency_ms: latency,
+            timestamp: DateTime.utc_now()
+          }
         })
+        emit_signal(agent_id, signal)
         
         # Update metrics
         send_metric_update(agent_id, request_id, provider, model, :success, latency)
@@ -405,11 +454,17 @@ defmodule RubberDuck.Agents.LLMRouterAgent do
     send_metric_update(agent_id, request_id, failed_provider, nil, :failure, 0)
     
     # Emit error response (in production, would implement failover)
-    emit_signal("llm_response", %{
-      "request_id" => request_id,
-      "error" => "Provider #{failed_provider} failed: #{inspect(error)}",
-      "provider" => Atom.to_string(failed_provider)
+    signal = Jido.Signal.new!(%{
+      type: "llm.response.error",
+      source: "agent:llm_router",
+      data: %{
+        request_id: request_id,
+        error: "Provider #{failed_provider} failed: #{inspect(error)}",
+        provider: Atom.to_string(failed_provider),
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent_id, signal)
   end
   
   defp send_metric_update(agent_id, request_id, provider, model, status, latency) do

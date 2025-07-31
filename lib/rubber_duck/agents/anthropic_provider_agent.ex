@@ -66,10 +66,16 @@ defmodule RubberDuck.Agents.AnthropicProviderAgent do
       Map.merge(config, atomize_keys(safety_settings))
     end)
     
-    emit_signal("safety_configured", %{
-      "provider" => "anthropic",
-      "settings" => agent.state.safety_config
+    signal = Jido.Signal.new!(%{
+      type: "provider.safety.configured",
+      source: "agent:#{agent.id}",
+      data: %{
+        provider: "anthropic",
+        settings: agent.state.safety_config,
+        timestamp: DateTime.utc_now()
+      }
     })
+    emit_signal(agent, signal)
     
     {:ok, agent}
   end
@@ -94,11 +100,18 @@ defmodule RubberDuck.Agents.AnthropicProviderAgent do
         "data" => Map.put(data, "messages", enhanced_messages)
       })
     else
-      emit_signal("provider_error", %{
-        "request_id" => request_id,
-        "error_type" => "unsupported_feature",
-        "error" => "Model #{model} does not support vision"
+      signal = Jido.Signal.new!(%{
+        type: "provider.error",
+        source: "agent:#{agent.id}",
+        data: %{
+          request_id: request_id,
+          error_type: "unsupported_feature",
+          error: "Model #{model} does not support vision",
+          provider: "anthropic",
+          timestamp: DateTime.utc_now()
+        }
       })
+      emit_signal(agent, signal)
       {:ok, agent}
     end
   end
@@ -109,11 +122,18 @@ defmodule RubberDuck.Agents.AnthropicProviderAgent do
     
     if should_block_content?(messages, agent.state.safety_config) do
       %{"data" => %{"request_id" => request_id}} = signal
-      emit_signal("provider_error", %{
-        "request_id" => request_id,
-        "error_type" => "content_blocked",
-        "error" => "Request blocked by safety filters"
+      signal = Jido.Signal.new!(%{
+        type: "provider.error",
+        source: "agent:#{agent.id}",
+        data: %{
+          request_id: request_id,
+          error_type: "content_blocked",
+          error: "Request blocked by safety filters",
+          provider: "anthropic",
+          timestamp: DateTime.utc_now()
+        }
       })
+      emit_signal(agent, signal)
       {:ok, agent}
     else
       super(agent, signal)
