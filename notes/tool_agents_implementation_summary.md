@@ -237,11 +237,29 @@ This document tracks the implementation of tool-specific agents in the RubberDuc
 - **State**: Migration history, active projects, strategies, language mappings, validation rules
 - **Status**: Implemented with Jido actions
 
-### Remaining Agents (To Be Implemented)
+#### 15. SecurityAnalyzerAgent ✓
+- **Tool**: `:security_analyzer`
+- **Description**: Comprehensive security vulnerability analysis and remediation guidance
+- **Signals**:
+  - `tool_request` → Standard tool execution (via BaseToolAgent)
+  - `scan_vulnerabilities` → Scan code for security vulnerabilities
+  - `analyze_dependencies` → Check dependencies for known vulnerabilities
+  - `validate_security_practices` → Validate against security best practices
+  - `generate_remediation` → Generate secure code fixes
+  - `perform_threat_modeling` → STRIDE/PASTA threat modeling
+  - `generate_security_report` → Create comprehensive security reports
+- **Actions**:
+  - `ExecuteToolAction` → Execute security analysis operations
+  - `ScanVulnerabilitiesAction` → Pattern-based vulnerability scanning (OWASP Top 10)
+  - `AnalyzeDependenciesAction` → Dependency vulnerability and license checking
+  - `ValidateSecurityPracticesAction` → Security coding standards validation
+  - `GenerateRemediationAction` → Language-specific remediation code generation
+  - `PerformThreatModelingAction` → STRIDE threat modeling with risk assessment
+  - `GenerateSecurityReportAction` → Multi-format security report generation
+- **State**: Scan history, vulnerability cache, security policies, threat intelligence, remediation templates
+- **Status**: Implemented with Jido actions
 
-15. **SecurityAnalyzerAgent**
-    - Tool: `:security_analyzer`
-    - Will analyze security vulnerabilities
+### Remaining Agents (To Be Implemented)
 
 16. **PerformanceAnalyzerAgent**
     - Tool: `:performance_analyzer`
@@ -293,7 +311,7 @@ Each agent has comprehensive tests covering:
 ## Next Steps
 
 1. Complete migration of existing agents to use Jido actions
-2. Implement remaining 3 agents with action-based architecture
+2. Implement remaining 2 agents with action-based architecture
 3. Add integration tests for agent interactions
 4. Document agent communication patterns
 5. Create agent composition examples
