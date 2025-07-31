@@ -133,11 +133,25 @@ This document tracks the implementation of tool-specific agents in the RubberDuc
 - **State**: Comparison history, pattern cache, common patterns
 - **Status**: Implemented with Jido actions
 
-### Remaining Agents (To Be Implemented)
+#### 10. FunctionSignatureExtractorAgent ✓
+- **Tool**: `:function_signature_extractor`
+- **Description**: Extracts and analyzes function signatures from source code
+- **Signals**:
+  - `tool_request` → Standard tool execution (via BaseToolAgent)
+  - `batch_extract` → Extract signatures from multiple files
+  - `analyze_signatures` → Analyze extracted signatures for patterns
+  - `generate_api_docs` → Generate API documentation from signatures
+  - `compare_signatures` → Compare signatures between versions
+- **Actions**:
+  - `ExecuteToolAction` → Execute signature extraction
+  - `BatchExtractAction` → Batch extraction with parallel processing
+  - `AnalyzeSignaturesAction` → Signature analysis (complexity, patterns, duplicates, coverage)
+  - `GenerateAPIDocsAction` → Multi-format API documentation generation
+  - `CompareSignaturesAction` → Version comparison and compatibility analysis
+- **State**: Signature database, analysis cache, language configs
+- **Status**: Implemented with Jido actions
 
-10. **FunctionSignatureExtractorAgent**
-    - Tool: `:function_signature_extractor`
-    - Will extract and analyze function signatures
+### Remaining Agents (To Be Implemented)
 
 11. **APIDocGeneratorAgent**
     - Tool: `:api_doc_generator`
