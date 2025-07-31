@@ -4,10 +4,11 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
   
   This module provides common functionality for agents that wrap individual tools,
   including:
-  - Standard signal patterns for tool execution
+  - Action-based tool execution with parameter validation
   - Integration with the Tool System Executor
   - Result caching and metrics tracking
   - Rate limiting and error handling
+  - Signal-based communication
   
   ## Usage
   
@@ -18,6 +19,11 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
           description: "Agent for MyTool",
           cache_ttl: 300_000  # 5 minutes
       end
+  
+  This will automatically create:
+  - MyToolAgent.ExecuteToolAction - Main tool execution action
+  - MyToolAgent.ClearCacheAction - Cache management action
+  - MyToolAgent.GetMetricsAction - Metrics reporting action
   """
   
   @doc """
@@ -28,17 +34,24 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
   @doc """
   Callback for processing tool results before sending signals.
   """
-  @callback process_result(result :: map(), request :: map()) :: map()
+  @callback process_result(result :: map(), context :: map()) :: map()
   
   @doc """
   Callback for handling tool-specific signals.
   """
   @callback handle_tool_signal(agent :: map(), signal :: map()) :: {:ok, map()} | {:error, term()}
   
+  @doc """
+  Callback for defining additional tool-specific actions.
+  Returns a list of action modules that the agent should register.
+  """
+  @callback additional_actions() :: [module()]
+  
   @optional_callbacks [
     validate_params: 1,
     process_result: 2,
-    handle_tool_signal: 2
+    handle_tool_signal: 2,
+    additional_actions: 0
   ]
   
   defmacro __using__(opts) do
@@ -78,18 +91,256 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
     user_schema = Keyword.get(opts, :schema, [])
     combined_schema = Keyword.merge(default_schema, user_schema)
     
-    # Update opts with combined schema
-    updated_opts = Keyword.put(opts, :schema, combined_schema)
-    
     quote do
-      use RubberDuck.Agents.BaseAgent, unquote(updated_opts)
+      # First define the action modules
+      defmodule ExecuteToolAction do
+        @moduledoc false
+        use Jido.Action,
+          name: "execute_tool",
+          description: "Execute the #{unquote(tool_name)} tool",
+          schema: [
+            params: [type: :map, default: %{}],
+            priority: [type: :atom, values: [:low, :normal, :high], default: :normal],
+            cache_key: [type: :string, required: false]
+          ]
+        
+        alias RubberDuck.ToolSystem.Executor
+        
+        @impl true
+        def run(params, context) do
+          tool_name = unquote(tool_name)
+          agent = context.agent
+          
+          # Check cache first if cache_key provided
+          cached_result = if params[:cache_key] && agent do
+            case get_cached_result(agent, params.cache_key) do
+              {:ok, result} -> result
+              :not_found -> nil
+            end
+          end
+          
+          if cached_result do
+            {:ok, %{result: cached_result, from_cache: true, tool: tool_name}}
+          else
+            # Validate params if parent module has validator
+            validated_params = if function_exported?(context.parent_module, :validate_params, 1) do
+              case context.parent_module.validate_params(params.params) do
+                {:ok, validated} -> validated
+                {:error, reason} -> {:error, {:validation_failed, reason}}
+              end
+            else
+              params.params
+            end
+            
+            case validated_params do
+              {:error, _} = error -> error
+              _ ->
+                # Execute tool
+                start_time = System.monotonic_time(:millisecond)
+                
+                case Executor.execute(tool_name, validated_params) do
+                  {:ok, result} ->
+                    execution_time = System.monotonic_time(:millisecond) - start_time
+                    
+                    # Process result if callback exists
+                    processed_result = if function_exported?(context.parent_module, :process_result, 2) do
+                      context.parent_module.process_result(result, context)
+                    else
+                      result
+                    end
+                    
+                    {:ok, %{
+                      result: processed_result,
+                      execution_time: execution_time,
+                      tool: tool_name,
+                      from_cache: false
+                    }}
+                    
+                  {:error, reason} ->
+                    {:error, reason}
+                end
+            end
+          end
+        end
+        
+        defp get_cached_result(agent, cache_key) do
+          case agent.state.results_cache[cache_key] do
+            nil -> 
+              :not_found
+              
+            %{result: result, cached_at: cached_at} ->
+              age = System.monotonic_time(:millisecond) - cached_at
+              if age < agent.state.cache_ttl do
+                {:ok, result}
+              else
+                :not_found
+              end
+          end
+        end
+      end
       
+      defmodule ClearCacheAction do
+        @moduledoc false
+        use Jido.Action,
+          name: "clear_cache",
+          description: "Clear the results cache",
+          schema: []
+        
+        @impl true
+        def run(_params, context) do
+          {:ok, %{cleared_at: DateTime.utc_now(), tool: unquote(tool_name)}}
+        end
+      end
+      
+      defmodule GetMetricsAction do
+        @moduledoc false
+        use Jido.Action,
+          name: "get_metrics",
+          description: "Get current agent metrics",
+          schema: []
+        
+        @impl true
+        def run(_params, context) do
+          agent = context.agent
+          metrics = Map.merge(agent.state.metrics, %{
+            cache_size: map_size(agent.state.results_cache),
+            queue_length: length(agent.state.request_queue),
+            active_requests: map_size(agent.state.active_requests)
+          })
+          
+          {:ok, metrics}
+        end
+      end
+      
+      # Now define the agent module
       @behaviour RubberDuck.Tools.Agents.BaseToolAgent
       
       alias RubberDuck.ToolSystem.Executor
       require Logger
       
-      # Standard signal handlers
+      # Build base actions list
+      @base_actions [__MODULE__.ExecuteToolAction, __MODULE__.ClearCacheAction, __MODULE__.GetMetricsAction]
+      
+      # Build complete options for use macro
+      def __base_tool_agent_opts__ do
+        # Get additional actions dynamically
+        additional = if function_exported?(__MODULE__, :additional_actions, 0) do
+          __MODULE__.additional_actions()
+        else
+          []
+        end
+        
+        unquote(opts)
+        |> Keyword.put(:schema, unquote(combined_schema))
+        |> Keyword.put(:actions, @base_actions ++ additional)
+      end
+      
+      use RubberDuck.Agents.BaseAgent, __base_tool_agent_opts__()
+      
+      # Handler for action results
+      @impl true
+      def handle_action_result(agent, action, result, metadata) do
+        case action do
+          ExecuteToolAction ->
+            handle_execute_tool_result(agent, result, metadata)
+            
+          ClearCacheAction ->
+            # Clear cache and emit signal
+            agent = put_in(agent.state.results_cache, %{})
+            signal = Jido.Signal.new!(%{
+              type: "tool.cache.cleared",
+              source: "agent:#{agent.id}",
+              data: result
+            })
+            emit_signal(agent, signal)
+            {:ok, agent}
+            
+          GetMetricsAction ->
+            # Emit metrics signal
+            signal = Jido.Signal.new!(%{
+              type: "tool.metrics.report",
+              source: "agent:#{agent.id}",
+              data: result
+            })
+            emit_signal(agent, signal)
+            {:ok, agent}
+            
+          _ ->
+            # Let parent handle unknown actions
+            super(agent, action, result, metadata)
+        end
+      end
+      
+      defp handle_execute_tool_result(agent, {:ok, result}, metadata) do
+        request_id = metadata[:request_id]
+        
+        # Update cache if not from cache
+        agent = if result[:from_cache] == false && metadata[:cache_key] do
+          cache_entry = %{
+            result: result.result,
+            cached_at: System.monotonic_time(:millisecond)
+          }
+          put_in(agent.state.results_cache[metadata[:cache_key]], cache_entry)
+        else
+          agent
+        end
+        
+        # Update metrics
+        agent = if result[:from_cache] do
+          update_metrics(agent, :cache_hit)
+        else
+          update_metrics(agent, {:execution_complete, result[:execution_time] || 0, true})
+        end
+        
+        # Remove from active requests
+        agent = if request_id do
+          update_in(agent.state.active_requests, &Map.delete(&1, request_id))
+        else
+          agent
+        end
+        
+        # Emit result signal
+        signal = Jido.Signal.new!(%{
+          type: "tool.result",
+          source: "agent:#{agent.id}",
+          data: Map.merge(result, %{request_id: request_id})
+        })
+        emit_signal(agent, signal)
+        
+        # Process next request
+        process_next_request(agent)
+      end
+      
+      defp handle_execute_tool_result(agent, {:error, reason}, metadata) do
+        request_id = metadata[:request_id]
+        
+        # Update metrics
+        agent = update_metrics(agent, {:execution_complete, 0, false})
+        
+        # Remove from active requests
+        agent = if request_id do
+          update_in(agent.state.active_requests, &Map.delete(&1, request_id))
+        else
+          agent
+        end
+        
+        # Emit error signal
+        signal = Jido.Signal.new!(%{
+          type: "tool.error",
+          source: "agent:#{agent.id}",
+          data: %{
+            request_id: request_id,
+            error: format_error(reason),
+            tool: unquote(tool_name)
+          }
+        })
+        emit_signal(agent, signal)
+        
+        # Process next request
+        process_next_request(agent)
+      end
+      
+      # Standard signal handlers for backwards compatibility and signal-based communication
       
       @impl true
       def handle_signal(agent, %{"type" => "tool_request"} = signal) do
@@ -99,46 +350,59 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
         # Check rate limit
         case check_rate_limit(agent) do
           {:ok, agent} ->
-            # Check cache first
+            # Build action params
             cache_key = generate_cache_key(data["params"] || %{})
+            params = %{
+              params: data["params"] || %{},
+              priority: data["priority"] || :normal,
+              cache_key: cache_key
+            }
             
-            case get_cached_result(agent, cache_key) do
-              {:ok, cached_result} ->
-                # Send cached result
-                signal = Jido.Signal.new!(%{
-                  type: "tool.result",
-                  source: "agent:#{agent.id}",
-                  data: %{
-                    request_id: request_id,
-                    result: cached_result,
-                    from_cache: true,
-                    tool: unquote(tool_name)
-                  }
-                })
-                emit_signal(agent, signal)
-                
-                # Update metrics
-                agent = update_metrics(agent, :cache_hit)
-                {:ok, agent}
-                
-              :not_found ->
-                # Add to queue and process
-                request = %{
-                  id: request_id,
-                  params: data["params"] || %{},
-                  priority: data["priority"] || :normal,
-                  created_at: System.monotonic_time(:millisecond),
-                  cache_key: cache_key
+            # Add request to active tracking
+            request = %{
+              id: request_id,
+              params: data["params"] || %{},
+              priority: data["priority"] || :normal,
+              created_at: System.monotonic_time(:millisecond),
+              cache_key: cache_key
+            }
+            
+            agent = add_request_to_queue(agent, request)
+            
+            # Process if no active requests
+            if map_size(agent.state.active_requests) == 0 do
+              agent = agent
+              |> update_in([:state, :request_queue], fn [_ | rest] -> rest end)
+              |> put_in([:state, :active_requests, request_id], request)
+              
+              # Execute action with context
+              context = %{
+                agent: agent,
+                parent_module: __MODULE__,
+                request_id: request_id
+              }
+              
+              # Use async execution
+              {:ok, _ref} = __MODULE__.cmd_async(agent, ExecuteToolAction, params, 
+                context: context,
+                metadata: %{request_id: request_id, cache_key: cache_key}
+              )
+              
+              # Emit progress signal
+              signal = Jido.Signal.new!(%{
+                type: "tool.progress",
+                source: "agent:#{agent.id}",
+                data: %{
+                  request_id: request_id,
+                  status: "started",
+                  tool: unquote(tool_name)
                 }
-                
-                agent = add_request_to_queue(agent, request)
-                
-                # Process immediately if no active requests
-                if map_size(agent.state.active_requests) == 0 do
-                  process_next_request(agent)
-                else
-                  {:ok, agent}
-                end
+              })
+              emit_signal(agent, signal)
+              
+              {:ok, agent}
+            else
+              {:ok, agent}
             end
             
           {:error, :rate_limited} ->
@@ -184,33 +448,18 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
       end
       
       def handle_signal(agent, %{"type" => "get_metrics"} = _signal) do
-        signal = Jido.Signal.new!(%{
-          type: "tool.metrics.report",
-          source: "agent:#{agent.id}",
-          data: %{
-            metrics: agent.state.metrics,
-            cache_size: map_size(agent.state.results_cache),
-            queue_length: length(agent.state.request_queue),
-            active_requests: map_size(agent.state.active_requests)
-          }
-        })
-        emit_signal(agent, signal)
-        
+        # Execute metrics action
+        {:ok, _ref} = __MODULE__.cmd_async(agent, GetMetricsAction, %{}, 
+          context: %{agent: agent}
+        )
         {:ok, agent}
       end
       
       def handle_signal(agent, %{"type" => "clear_cache"} = _signal) do
-        agent = put_in(agent.state.results_cache, %{})
-        
-        signal = Jido.Signal.new!(%{
-          type: "tool.cache.cleared",
-          source: "agent:#{agent.id}",
-          data: %{
-            tool: unquote(tool_name)
-          }
-        })
-        emit_signal(agent, signal)
-        
+        # Execute clear cache action
+        {:ok, _ref} = __MODULE__.cmd_async(agent, ClearCacheAction, %{},
+          context: %{agent: agent}
+        )
         {:ok, agent}
       end
       
@@ -306,6 +555,26 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
             |> put_in([:state, :request_queue], rest)
             |> put_in([:state, :active_requests, request.id], request)
             
+            # Build action params
+            params = %{
+              params: request.params,
+              priority: request.priority,
+              cache_key: request.cache_key
+            }
+            
+            # Execute action with context
+            context = %{
+              agent: agent,
+              parent_module: __MODULE__,
+              request_id: request.id
+            }
+            
+            # Use async execution
+            {:ok, _ref} = __MODULE__.cmd_async(agent, ExecuteToolAction, params,
+              context: context,
+              metadata: %{request_id: request.id, cache_key: request.cache_key}
+            )
+            
             # Emit progress signal
             signal = Jido.Signal.new!(%{
               type: "tool.progress",
@@ -318,135 +587,7 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
             })
             emit_signal(agent, signal)
             
-            # Start async execution
-            Task.start(fn ->
-              execute_tool_request(request, unquote(tool_name))
-            end)
-            
             {:ok, agent}
-        end
-      end
-      
-      defp execute_tool_request(request, tool_name) do
-        start_time = System.monotonic_time(:millisecond)
-        
-        try do
-          # Validate params if callback implemented
-          validated_params = if function_exported?(__MODULE__, :validate_params, 1) do
-            case __MODULE__.validate_params(request.params) do
-              {:ok, params} -> params
-              {:error, reason} -> throw({:validation_error, reason})
-            end
-          else
-            request.params
-          end
-          
-          # Execute tool
-          case Executor.execute(tool_name, validated_params) do
-            {:ok, result} ->
-              # Process result if callback implemented
-              processed_result = if function_exported?(__MODULE__, :process_result, 2) do
-                __MODULE__.process_result(result, request)
-              else
-                result
-              end
-              
-              # Calculate execution time
-              execution_time = System.monotonic_time(:millisecond) - start_time
-              
-              # Emit success signal
-              signal = Jido.Signal.new!(%{
-                type: "tool.result",
-                source: "agent:#{Process.self()}",
-                data: %{
-                  request_id: request.id,
-                  result: processed_result,
-                  execution_time: execution_time,
-                  tool: tool_name
-                }
-              })
-              emit_signal(nil, signal)
-              
-              # Update metrics (agent will handle in signal)
-              signal = Jido.Signal.new!(%{
-                type: "tool.internal.complete",
-                source: "agent:#{Process.self()}",
-                data: %{
-                  request_id: request.id,
-                  cache_key: request.cache_key,
-                  result: processed_result,
-                  execution_time: execution_time,
-                  success: true
-                }
-              })
-              emit_signal(nil, signal)
-              
-            {:error, reason} ->
-              signal = Jido.Signal.new!(%{
-                type: "tool.error",
-                source: "agent:#{Process.self()}",
-                data: %{
-                  request_id: request.id,
-                  error: format_error(reason),
-                  tool: tool_name
-                }
-              })
-              emit_signal(nil, signal)
-              
-              signal = Jido.Signal.new!(%{
-                type: "tool.internal.complete",
-                source: "agent:#{Process.self()}",
-                data: %{
-                  request_id: request.id,
-                  success: false
-                }
-              })
-              emit_signal(nil, signal)
-          end
-        catch
-          {:validation_error, reason} ->
-            signal = Jido.Signal.new!(%{
-              type: "tool.error",
-              source: "agent:#{Process.self()}",
-              data: %{
-                request_id: request.id,
-                error: "Validation failed: #{inspect(reason)}",
-                tool: tool_name
-              }
-            })
-            emit_signal(nil, signal)
-            
-            signal = Jido.Signal.new!(%{
-              type: "tool.internal.complete",
-              source: "agent:#{Process.self()}",
-              data: %{
-                request_id: request.id,
-                success: false
-              }
-            })
-            emit_signal(nil, signal)
-        rescue
-          error ->
-            signal = Jido.Signal.new!(%{
-              type: "tool.error",
-              source: "agent:#{Process.self()}",
-              data: %{
-                request_id: request.id,
-                error: Exception.message(error),
-                tool: tool_name
-              }
-            })
-            emit_signal(nil, signal)
-            
-            signal = Jido.Signal.new!(%{
-              type: "tool.internal.complete",
-              source: "agent:#{Process.self()}",
-              data: %{
-                request_id: request.id,
-                success: false
-              }
-            })
-            emit_signal(nil, signal)
         end
       end
       
@@ -477,47 +618,22 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
         end)
       end
       
-      # Override handle_signal to include internal completion handling
-      def handle_signal(agent, %Jido.Signal{type: "tool.internal.complete"} = signal) do
-        data = signal.data
-        request_id = data.request_id
-        
-        # Remove from active requests
-        agent = update_in(agent.state.active_requests, &Map.delete(&1, request_id))
-        
-        # Cache result if successful
-        agent = if data.success && data[:result] do
-          cache_entry = %{
-            result: data.result,
-            cached_at: System.monotonic_time(:millisecond)
-          }
-          put_in(agent.state.results_cache[data.cache_key], cache_entry)
-        else
-          agent
-        end
-        
-        # Update metrics
-        agent = if data[:execution_time] do
-          update_metrics(agent, {:execution_complete, data.execution_time, data.success})
-        else
-          agent
-        end
-        
-        # Process next request
-        process_next_request(agent)
-      end
+      # Add overridable flag for handle_action_result
+      defoverridable [handle_action_result: 4]
       
       # Default implementations for optional callbacks
       def validate_params(params), do: {:ok, params}
-      def process_result(result, _request), do: result
+      def process_result(result, _context), do: result
       def handle_tool_signal(_agent, _signal), do: {:error, :not_implemented}
+      def additional_actions(), do: []
       
       # Allow overriding these functions
       defoverridable [
         handle_signal: 2,
         validate_params: 1,
         process_result: 2,
-        handle_tool_signal: 2
+        handle_tool_signal: 2,
+        additional_actions: 0
       ]
     end
   end

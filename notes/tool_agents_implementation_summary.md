@@ -1,0 +1,215 @@
+# Tool Agents Implementation Summary
+
+## Overview
+This document tracks the implementation of tool-specific agents in the RubberDuck system. Each agent wraps a specific tool and provides advanced orchestration capabilities using the Jido.Agent framework with CloudEvents-compliant signals and action-based execution.
+
+## Architecture Changes
+
+### Migration to Jido Actions (Current)
+- Refactored BaseToolAgent to use Jido.Action modules instead of just signal handlers
+- Each agent now defines discrete actions that can be executed via `cmd/3` or `cmd_async/3`
+- Actions provide parameter validation, clear interfaces, and composability
+- Signal handlers now trigger actions for better separation of concerns
+
+### Key Components
+1. **BaseToolAgent**: Provides common functionality including:
+   - Automatic creation of ExecuteToolAction, ClearCacheAction, GetMetricsAction
+   - Action result handling with metrics and caching
+   - Signal-to-action bridge for backwards compatibility
+   - Rate limiting, request queuing, and metrics tracking
+
+2. **Action Modules**: Each agent can define:
+   - Base actions (automatically provided)
+   - Tool-specific actions via `additional_actions/0` callback
+   - Custom action result handlers
+
+3. **Signal System**: CloudEvents 1.0.2 compliant using Jido.Signal
+
+## Implementation Status
+
+### Completed Agents
+
+#### 1. CodeGeneratorAgent ✓
+- **Tool**: `:code_generator`
+- **Description**: Generates code based on specifications
+- **Signals**: 
+  - `generate_code` → Generates code with language/framework
+  - `generate_batch` → Batch code generation
+  - `validate_generated` → Validates generated code
+  - `template_library` → Manages code templates
+- **State**: Templates, generation history, validation rules
+- **Status**: Migrated to CloudEvents signals
+
+#### 2. TestGeneratorAgent ✓
+- **Tool**: `:test_generator`
+- **Description**: Generates comprehensive test suites
+- **Signals**:
+  - `generate_tests` → Generate tests for code
+  - `coverage_analysis` → Analyze test coverage  
+  - `generate_suite` → Generate full test suite
+  - `test_templates` → Manage test templates
+- **State**: Test patterns, coverage goals, framework configs
+- **Status**: Migrated to CloudEvents signals
+
+#### 3. DebugAssistantAgent ✓
+- **Tool**: `:debug_assistant`
+- **Description**: Assists with debugging and troubleshooting
+- **Signals**:
+  - `analyze_error` → Analyze error/stack trace
+  - `suggest_fixes` → Suggest fixes for issues
+  - `trace_execution` → Trace code execution
+  - `breakpoint_analysis` → Analyze breakpoints
+- **State**: Debug sessions, error patterns, fix history
+- **Status**: Migrated to CloudEvents signals
+
+#### 4. CodeFormatterAgent ✓
+- **Tool**: `:code_formatter`
+- **Description**: Formats and beautifies code
+- **Signals**:
+  - `format_code` → Format single file/snippet
+  - `batch_format` → Format multiple files
+  - `check_style` → Check style compliance
+  - `configure_rules` → Update formatting rules
+- **State**: Format rules, style guides, statistics
+- **Status**: Migrated to CloudEvents signals
+
+#### 5. CodeExplainerAgent ✓
+- **Tool**: `:code_explainer`
+- **Description**: Explains code functionality and concepts
+- **Signals**:
+  - `explain_code` → Explain code functionality
+  - `explain_concept` → Explain programming concept
+  - `generate_docs` → Generate documentation
+  - `complexity_analysis` → Analyze code complexity
+- **State**: Explanation cache, concept library, metrics
+- **Status**: Migrated to CloudEvents signals
+
+#### 6. CodeSummarizerAgent ✓
+- **Tool**: `:code_summarizer`
+- **Description**: Creates concise code summaries
+- **Signals**:
+  - `summarize_file` → Summarize single file
+  - `summarize_project` → Summarize entire project
+  - `extract_key_points` → Extract key points
+  - `generate_outline` → Generate code outline
+- **State**: Summary templates, project cache, outline formats
+- **Status**: Migrated to CloudEvents signals
+
+#### 7. CodeRefactorerAgent ✓
+- **Tool**: `:code_refactorer`
+- **Description**: Suggests and applies code refactorings
+- **Signals**:
+  - `analyze_refactoring` → Analyze refactoring opportunities
+  - `apply_refactoring` → Apply specific refactoring
+  - `batch_refactor` → Batch refactoring operations
+  - `preview_changes` → Preview refactoring changes
+- **State**: Refactoring patterns, safety rules, history
+- **Status**: Migrated to CloudEvents signals
+
+#### 8. CodeNavigatorAgent ✓
+- **Tool**: `:code_navigator`
+- **Description**: Navigates and explores codebases
+- **Signals**:
+  - `find_definition` → Find symbol definition
+  - `find_references` → Find all references
+  - `explore_structure` → Explore code structure
+  - `generate_map` → Generate code map
+- **State**: Navigation cache, symbol index, structure maps
+- **Status**: Migrated to CloudEvents signals
+
+#### 9. CodeComparerAgent ✓
+- **Tool**: `:code_comparer`
+- **Description**: Compares code implementations
+- **Signals**:
+  - `tool_request` → Standard tool execution (via BaseToolAgent)
+  - `batch_compare` → Compare multiple file pairs
+  - `analyze_patterns` → Analyze comparison patterns
+  - `generate_report` → Generate comparison report
+- **Actions**:
+  - `ExecuteToolAction` → Execute code comparison
+  - `BatchCompareAction` → Batch comparisons with parallel support
+  - `AnalyzePatternsAction` → Pattern detection and analysis
+  - `GenerateReportAction` → Multi-format report generation
+- **State**: Comparison history, pattern cache, common patterns
+- **Status**: Implemented with Jido actions
+
+### Remaining Agents (To Be Implemented)
+
+10. **FunctionSignatureExtractorAgent**
+    - Tool: `:function_signature_extractor`
+    - Will extract and analyze function signatures
+
+11. **APIDocGeneratorAgent**
+    - Tool: `:api_doc_generator`
+    - Will generate API documentation
+
+12. **SignalEmitterAgent**
+    - Tool: `:signal_emitter`
+    - Will emit and manage signals
+
+13. **PromptOptimizerAgent**
+    - Tool: `:prompt_optimizer`
+    - Will optimize prompts for better results
+
+14. **CodeMigrationAgent**
+    - Tool: `:code_migration`
+    - Will handle code migration tasks
+
+15. **SecurityAnalyzerAgent**
+    - Tool: `:security_analyzer`
+    - Will analyze security vulnerabilities
+
+16. **PerformanceAnalyzerAgent**
+    - Tool: `:performance_analyzer`
+    - Will analyze performance issues
+
+17. **DependencyAnalyzerAgent**
+    - Tool: `:dependency_analyzer`
+    - Will analyze project dependencies
+
+## Signal Patterns
+
+### Common Signal Types (CloudEvents format)
+- `tool_request` - Execute tool with parameters
+- `tool.result` - Tool execution result  
+- `tool.error` - Tool execution error
+- `tool.progress` - Progress updates
+- `tool.metrics.report` - Metrics report
+- `tool.cache.cleared` - Cache cleared
+- `cancel_request` - Cancel active request
+
+### Tool-Specific Signals
+Each agent can define custom signals handled via `handle_tool_signal/2` callback that typically trigger specific actions.
+
+## Action Patterns
+
+### Base Actions (Automatic)
+Every tool agent automatically gets:
+- `ExecuteToolAction` - Main tool execution with caching
+- `ClearCacheAction` - Clear results cache
+- `GetMetricsAction` - Get agent metrics
+
+### Custom Actions
+Agents define additional actions via `additional_actions/0` callback:
+```elixir
+def additional_actions do
+  [__MODULE__.CustomAction1, __MODULE__.CustomAction2]
+end
+```
+
+## Testing Strategy
+
+Each agent has comprehensive tests covering:
+1. Action execution and parameter validation
+2. Signal handling and action triggering
+3. Result processing and state updates
+4. Error handling and edge cases
+5. Metrics and caching behavior
+
+## Next Steps
+
+1. Complete migration of existing agents to use Jido actions
+2. Implement remaining 9 agents with action-based architecture
+3. Add integration tests for agent interactions
+4. Document agent communication patterns
+5. Create agent composition examples
