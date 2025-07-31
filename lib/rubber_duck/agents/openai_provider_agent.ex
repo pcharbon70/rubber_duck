@@ -18,7 +18,11 @@ defmodule RubberDuck.Agents.OpenAIProviderAgent do
   
   use RubberDuck.Agents.ProviderAgent,
     name: "openai_provider",
-    description: "OpenAI GPT models provider agent"
+    description: "OpenAI GPT models provider agent",
+    actions: [
+      RubberDuck.Jido.Actions.Provider.OpenAI.ConfigureFunctionsAction,
+      RubberDuck.Jido.Actions.Provider.OpenAI.StreamRequestAction
+    ]
   
   alias RubberDuck.LLM.Providers.OpenAI
   alias RubberDuck.LLM.{ProviderConfig, ConfigLoader}
@@ -52,59 +56,6 @@ defmodule RubberDuck.Agents.OpenAIProviderAgent do
     {:ok, state}
   end
   
-  @impl true
-  def handle_signal(agent, %{"type" => "configure_functions"} = signal) do
-    %{"data" => %{"functions" => functions}} = signal
-    
-    # Store functions in agent state for use in requests
-    agent = put_in(agent.state[:functions], functions)
-    
-    signal = Jido.Signal.new!(%{
-      type: "provider.functions.configured",
-      source: "agent:#{agent.id}",
-      data: %{
-        provider: "openai",
-        function_count: length(functions),
-        timestamp: DateTime.utc_now()
-      }
-    })
-    emit_signal(agent, signal)
-    
-    {:ok, agent}
-  end
-  
-  def handle_signal(agent, %{"type" => "stream_request"} = signal) do
-    %{
-      "data" => %{
-        "request_id" => _request_id,
-        "messages" => messages,
-        "model" => _model,
-        "callback_signal" => callback_signal
-      } = _data
-    } = signal
-    
-    # Use the base provider's rate limit and circuit breaker checks
-    RubberDuck.Agents.ProviderAgent.handle_provider_request(
-      agent, signal,
-      &emit_error_response_internal/3,
-      fn agent, req_id, mdl, dt ->
-        # Track request
-        agent = RubberDuck.Agents.ProviderAgent.track_request_start(agent, req_id, mdl)
-        
-        # Start streaming task
-        Task.start(fn ->
-          handle_streaming_request(agent.id, req_id, messages, mdl, dt, callback_signal)
-        end)
-        
-        agent
-      end
-    )
-  end
-  
-  # Delegate other signals to base implementation
-  def handle_signal(agent, signal) do
-    super(agent, signal)
-  end
   
   # Private functions
   
@@ -151,126 +102,6 @@ defmodule RubberDuck.Agents.OpenAIProviderAgent do
     end
   end
   
-  defp handle_streaming_request(agent_id, request_id, messages, model, data, callback_signal) do
-    # Get current agent state
-    agent = GenServer.call(agent_id, :get_state)
-    
-    # Build request with streaming enabled
-    request = RubberDuck.Agents.ProviderAgent.build_request(request_id, messages, model, Map.put(data, "stream", true))
-    
-    # Add functions if configured
-    request = if functions = agent.state[:functions] do
-      Map.put(request, :functions, functions)
-    else
-      request
-    end
-    
-    start_time = System.monotonic_time(:millisecond)
-    
-    # Use an Elixir Agent to accumulate content and count tokens
-    {:ok, accumulator} = Elixir.Agent.start_link(fn -> %{content: [], tokens: 0} end)
-    
-    # Define streaming callback
-    stream_callback = fn chunk ->
-      # Accumulate content
-      Elixir.Agent.update(accumulator, fn state ->
-        %{content: [chunk.content | state.content], tokens: state.tokens + 1}
-      end)
-      
-      # Emit chunk signal
-      signal = Jido.Signal.new!(%{
-        type: callback_signal,
-        source: "agent:openai_provider",
-        data: %{
-          request_id: request_id,
-          chunk: chunk,
-          provider: "openai",
-          timestamp: DateTime.utc_now()
-        }
-      })
-      emit_signal(agent_id, signal)
-    end
-    
-    # Execute streaming request
-    result = try do
-      OpenAI.stream_completion(request, agent.state.provider_config, stream_callback)
-    rescue
-      error ->
-        {:error, {:provider_error, Exception.format(:error, error)}}
-    end
-    
-    end_time = System.monotonic_time(:millisecond)
-    latency = end_time - start_time
-    
-    # Handle final result
-    case result do
-      {:ok, _} ->
-        # Get accumulated data
-        %{content: accumulated_content, tokens: token_count} = Elixir.Agent.get(accumulator, fn state -> state end)
-        Elixir.Agent.stop(accumulator)
-        
-        # Build complete response
-        complete_content = accumulated_content
-        |> Enum.reverse()
-        |> Enum.join("")
-        
-        # Estimate token usage
-        usage = %{
-          prompt_tokens: estimate_prompt_tokens(messages),
-          completion_tokens: token_count,
-          total_tokens: estimate_prompt_tokens(messages) + token_count
-        }
-        
-        # Update metrics
-        GenServer.cast(agent_id, {:request_completed, request_id, :success, latency, usage})
-        
-        # Emit completion signal
-        signal = Jido.Signal.new!(%{
-          type: "provider.stream.complete",
-          source: "agent:openai_provider",
-          data: %{
-            request_id: request_id,
-            content: complete_content,
-            usage: usage,
-            provider: "openai",
-            model: model,
-            latency_ms: latency,
-            timestamp: DateTime.utc_now()
-          }
-        })
-        emit_signal(agent_id, signal)
-        
-      {:error, error} ->
-        # Clean up accumulator
-        Elixir.Agent.stop(accumulator)
-        
-        # Update metrics
-        GenServer.cast(agent_id, {:request_completed, request_id, :failure, latency, nil})
-        
-        # Emit error
-        signal = Jido.Signal.new!(%{
-          type: "provider.error",
-          source: "agent:openai_provider",
-          data: %{
-            request_id: request_id,
-            error: RubberDuck.Agents.ProviderAgent.format_error(error),
-            provider: "openai",
-            model: model,
-            timestamp: DateTime.utc_now()
-          }
-        })
-        emit_signal(agent_id, signal)
-    end
-  end
-  
-  defp estimate_prompt_tokens(messages) do
-    # Simple estimation - OpenAI roughly uses ~4 chars per token
-    char_count = messages
-    |> Enum.map(fn msg -> String.length(msg["content"] || "") end)
-    |> Enum.sum()
-    
-    div(char_count, 4)
-  end
   
   # Build status report with OpenAI-specific info
   def build_status_report(agent) do

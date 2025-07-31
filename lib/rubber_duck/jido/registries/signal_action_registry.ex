@@ -142,8 +142,8 @@ defmodule RubberDuck.Jido.Registries.SignalActionRegistry do
         mapping.pattern || mapping[:pattern],
         mapping.action || mapping[:action],
         extractor: mapping.extractor || mapping[:extractor],
-        filter: mapping.filter || mapping[:filter],
-        priority: mapping.priority || mapping[:priority]
+        filter: mapping[:filter] || Map.get(mapping, :filter, nil),
+        priority: mapping[:priority] || Map.get(mapping, :priority, 1)
       )
     end)
     

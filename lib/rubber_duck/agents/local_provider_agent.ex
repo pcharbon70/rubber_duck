@@ -20,7 +20,13 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
   
   use RubberDuck.Agents.ProviderAgent,
     name: "local_provider",
-    description: "Local LLM models provider agent (Ollama, llama.cpp, etc.)"
+    description: "Local LLM models provider agent (Ollama, llama.cpp, etc.)",
+    actions: [
+      RubberDuck.Jido.Actions.Provider.Local.LoadModelAction,
+      RubberDuck.Jido.Actions.Provider.Local.UnloadModelAction,
+      RubberDuck.Jido.Actions.Provider.Local.GetResourceStatusAction,
+      RubberDuck.Jido.Actions.Provider.Local.ListAvailableModelsAction
+    ]
   
   alias RubberDuck.LLM.Providers.Ollama
   alias RubberDuck.LLM.{ProviderConfig, ConfigLoader}
@@ -67,160 +73,11 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
     {:ok, state}
   end
   
+  # Local provider specific validation
   @impl true
-  def handle_signal(agent, %{"type" => "load_model"} = signal) do
-    %{"data" => %{"model" => model_name}} = signal
-    
-    if Map.has_key?(agent.state.loaded_models, model_name) do
-      signal = Jido.Signal.new!(%{
-        type: "provider.model.loaded",
-        source: "agent:#{agent.id}",
-        data: %{
-          model: model_name,
-          status: "already_loaded",
-          provider: "local",
-          timestamp: DateTime.utc_now()
-        }
-      })
-      emit_signal(agent, signal)
-      {:ok, agent}
-    else
-      # Check resources before loading
-      if has_sufficient_resources?(agent, model_name) do
-        Task.start(fn ->
-          load_model_async(agent.id, model_name)
-        end)
-        
-        {:ok, agent}
-      else
-        signal = Jido.Signal.new!(%{
-          type: "provider.model.load_failed",
-          source: "agent:#{agent.id}",
-          data: %{
-            model: model_name,
-            error: "Insufficient resources",
-            provider: "local",
-            timestamp: DateTime.utc_now()
-          }
-        })
-        emit_signal(agent, signal)
-        {:ok, agent}
-      end
-    end
-  end
-  
-  def handle_signal(agent, %{"type" => "unload_model"} = signal) do
-    %{"data" => %{"model" => model_name}} = signal
-    
-    if Map.has_key?(agent.state.loaded_models, model_name) do
-      Task.start(fn ->
-        unload_model_async(agent.id, model_name)
-      end)
-      
-      # Remove from loaded models
-      agent = update_in(agent.state.loaded_models, &Map.delete(&1, model_name))
-      
-      {:ok, agent}
-    else
-      signal = Jido.Signal.new!(%{
-        type: "provider.model.unloaded",
-        source: "agent:#{agent.id}",
-        data: %{
-          model: model_name,
-          status: "not_loaded",
-          provider: "local",
-          timestamp: DateTime.utc_now()
-        }
-      })
-      emit_signal(agent, signal)
-      {:ok, agent}
-    end
-  end
-  
-  def handle_signal(agent, %{"type" => "get_resource_status"} = _signal) do
-    resources = Map.merge(agent.state.resource_monitor, %{
-      "loaded_models" => Map.keys(agent.state.loaded_models),
-      "model_count" => map_size(agent.state.loaded_models),
-      "active_requests" => map_size(agent.state.active_requests),
-      "provider" => "local"
-    })
-    
-    signal = Jido.Signal.new!(%{
-      type: "provider.resource.status",
-      source: "agent:#{agent.id}",
-      data: Map.merge(resources, %{
-        timestamp: DateTime.utc_now()
-      })
-    })
-    emit_signal(agent, signal)
-    
+  def on_before_run(agent) do
+    # This could be used for pre-run validation if needed
     {:ok, agent}
-  end
-  
-  def handle_signal(agent, %{"type" => "list_available_models"} = _signal) do
-    # Get available models from Ollama or local directory
-    models = list_local_models()
-    
-    signal = Jido.Signal.new!(%{
-      type: "provider.models.available",
-      source: "agent:#{agent.id}",
-      data: %{
-        models: models,
-        loaded: Map.keys(agent.state.loaded_models),
-        provider: "local",
-        timestamp: DateTime.utc_now()
-      }
-    })
-    emit_signal(agent, signal)
-    
-    {:ok, agent}
-  end
-  
-  def handle_signal(agent, %{"type" => "provider_request"} = signal) do
-    %{"data" => %{"model" => model}} = signal
-    
-    # Ensure model is loaded before processing
-    if Map.has_key?(agent.state.loaded_models, model) do
-      # Check resource availability
-      if can_handle_request?(agent) do
-        super(agent, signal)
-      else
-        %{"data" => %{"request_id" => request_id}} = signal
-        signal = Jido.Signal.new!(%{
-          type: "provider.error",
-          source: "agent:#{agent.id}",
-          data: %{
-            request_id: request_id,
-            error_type: "resource_constrained",
-            error: "Local resources are constrained, please retry later",
-            provider: "local",
-            timestamp: DateTime.utc_now()
-          }
-        })
-        emit_signal(agent, signal)
-        {:ok, agent}
-      end
-    else
-      %{"data" => %{"request_id" => request_id}} = signal
-      signal = Jido.Signal.new!(%{
-        type: "provider.error",
-        source: "agent:#{agent.id}",
-        data: %{
-          request_id: request_id,
-          error_type: "model_not_loaded",
-          error: "Model #{model} is not loaded. Please load it first.",
-          provider: "local",
-          timestamp: DateTime.utc_now()
-        }
-      })
-      emit_signal(agent, signal)
-      {:ok, agent}
-    end
-  end
-  
-  # Delegate other signals to base implementation
-  def handle_signal(agent, signal) do
-    super(agent, signal)
   end
   
   # GenServer callbacks
@@ -250,7 +107,7 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
           timestamp: DateTime.utc_now()
         }
       })
-      emit_signal(agent, signal)
+      Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
     end
     
     {:noreply, agent}
@@ -265,6 +122,19 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
         new_avg = (avg * count + tokens_per_sec) / (count + 1)
         {new_avg, count + 1}
     end)
+    
+    {:noreply, agent}
+  end
+
+  def handle_info({:model_loaded, model_name, load_time}, agent) do
+    agent = update_in(agent.state.loaded_models, &Map.put(&1, model_name, %{
+      loaded_at: System.monotonic_time(:millisecond),
+      load_time_ms: load_time
+    }))
+    
+    # Update available models in config
+    models = Map.keys(agent.state.loaded_models)
+    agent = put_in(agent.state.provider_config.models, models)
     
     {:noreply, agent}
   end
@@ -313,14 +183,6 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
     Process.send_after(self(), :check_resources, 5_000)  # Every 5 seconds
   end
   
-  defp has_sufficient_resources?(_agent, model_name) do
-    # Check if we have enough resources to load the model
-    model_size = estimate_model_size(model_name)
-    available_memory = get_available_memory_gb()
-    
-    # Need at least 2x model size in available memory
-    available_memory > model_size * 2
-  end
   
   defp can_handle_request?(agent) do
     # Check current resource usage
@@ -331,102 +193,6 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
     map_size(agent.state.active_requests) < agent.state.max_concurrent_requests
   end
   
-  defp load_model_async(agent_id, model_name) do
-    start_time = System.monotonic_time(:millisecond)
-    
-    # TODO: Implement RubberDuck.LLM.Providers.Ollama.load_model/1
-    # This function should handle loading models into Ollama
-    case Ollama.load_model(model_name) do
-      :ok ->
-        load_time = System.monotonic_time(:millisecond) - start_time
-        
-        # Update agent state
-        GenServer.cast(agent_id, {:model_loaded, model_name, load_time})
-        
-        signal = Jido.Signal.new!(%{
-          type: "provider.model.loaded",
-          source: "agent:local_provider",
-          data: %{
-            model: model_name,
-            status: "success",
-            load_time_ms: load_time,
-            provider: "local",
-            timestamp: DateTime.utc_now()
-          }
-        })
-        # In async context, publish directly to signal bus
-        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
-        
-      {:error, reason} ->
-        signal = Jido.Signal.new!(%{
-          type: "provider.model.load_failed",
-          source: "agent:local_provider",
-          data: %{
-            model: model_name,
-            error: inspect(reason),
-            provider: "local",
-            timestamp: DateTime.utc_now()
-          }
-        })
-        # In async context, publish directly to signal bus
-        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
-    end
-  end
-  
-  defp unload_model_async(_agent_id, model_name) do
-    # TODO: Implement RubberDuck.LLM.Providers.Ollama.unload_model/1
-    # This function should handle unloading models from Ollama
-    case Ollama.unload_model(model_name) do
-      :ok ->
-        signal = Jido.Signal.new!(%{
-          type: "provider.model.unloaded",
-          source: "agent:local_provider",
-          data: %{
-            model: model_name,
-            status: "success",
-            provider: "local",
-            timestamp: DateTime.utc_now()
-          }
-        })
-        # In async context, publish directly to signal bus
-        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
-        
-      {:error, reason} ->
-        signal = Jido.Signal.new!(%{
-          type: "provider.model.unload_failed",
-          source: "agent:local_provider",
-          data: %{
-            model: model_name,
-            error: inspect(reason),
-            provider: "local",
-            timestamp: DateTime.utc_now()
-          }
-        })
-        # In async context, publish directly to signal bus
-        Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
-    end
-  end
-  
-  defp list_local_models do
-    # TODO: Implement RubberDuck.LLM.Providers.Ollama.list_models/0
-    # This function should return a list of available models in Ollama
-    case Ollama.list_models() do
-      {:ok, models} -> models
-      {:error, _} -> []
-    end
-  end
-  
-  defp estimate_model_size(model_name) do
-    # Rough estimates in GB
-    cond do
-      String.contains?(model_name, "70b") -> 40
-      String.contains?(model_name, "34b") -> 20
-      String.contains?(model_name, "13b") -> 8
-      String.contains?(model_name, "7b") -> 4
-      String.contains?(model_name, "3b") -> 2
-      true -> 4  # Default 4GB
-    end
-  end
   
   defp get_system_resources do
     # In production, would use actual system monitoring
@@ -467,18 +233,4 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
     end)
   end
   
-  # GenServer cast handlers
-  
-  def handle_cast({:model_loaded, model_name, load_time}, agent) do
-    agent = update_in(agent.state.loaded_models, &Map.put(&1, model_name, %{
-      loaded_at: System.monotonic_time(:millisecond),
-      load_time_ms: load_time
-    }))
-    
-    # Update available models in config
-    models = Map.keys(agent.state.loaded_models)
-    agent = put_in(agent.state.provider_config.models, models)
-    
-    {:noreply, agent}
-  end
 end

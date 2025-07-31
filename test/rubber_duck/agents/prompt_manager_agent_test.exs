@@ -1,38 +1,36 @@
 defmodule RubberDuck.Agents.PromptManagerAgentTest do
   use ExUnit.Case, async: true
   alias RubberDuck.Agents.PromptManagerAgent
-  alias RubberDuck.Agents.Prompt.{Template, Builder, Experiment}
+  alias RubberDuck.Agents.Prompt.Template
+  alias RubberDuck.Jido.Actions.PromptManager.{
+    CreateTemplateAction,
+    GetTemplateAction,
+    ListTemplatesAction,
+    BuildPromptAction,
+    ValidateTemplateAction,
+    GetAnalyticsAction,
+    GetUsageStatsAction,
+    OptimizeTemplateAction,
+    GetStatusAction,
+    ClearCacheAction
+  }
   
   describe "agent initialization" do
     test "initializes with default templates" do
-      {:ok, agent} = PromptManagerAgent.mount(%{}, %{
-        templates: %{},
-        experiments: %{},
-        analytics: %{},
-        cache: %{},
-        config: %{
-          cache_ttl: 3600,
-          max_templates: 1000,
-          analytics_retention_days: 30
-        }
-      })
+      {:ok, agent} = PromptManagerAgent.start_link(id: "test-prompt-manager")
+      state = :sys.get_state(agent)
       
-      assert map_size(agent.templates) > 0
-      assert Map.has_key?(agent, :config)
-      assert agent.config.cache_ttl == 3600
+      assert map_size(state.templates) > 0
+      assert Map.has_key?(state, :config)
+      assert state.config.cache_ttl == 3600
+      
+      GenServer.stop(agent)
     end
   end
   
-  describe "template management signals" do
+  describe "template management actions" do
     setup do
-      {:ok, agent} = PromptManagerAgent.mount(%{}, %{
-        templates: %{},
-        experiments: %{},
-        analytics: %{},
-        cache: %{},
-        config: %{cache_ttl: 3600, max_templates: 1000, analytics_retention_days: 30}
-      })
-      
+      {:ok, agent} = PromptManagerAgent.start_link(id: "test-prompt-manager-#{System.unique_integer()}")
       %{agent: agent}
     end
     
@@ -48,29 +46,13 @@ defmodule RubberDuck.Agents.PromptManagerAgentTest do
         "tags" => ["test", "greeting"]
       }
       
-      signal = %{
-        "type" => "create_template",
-        "data" => template_data
-      }
+      params = %{template_data: template_data}
       
-      # Mock emit_signal to capture the response
-      test_pid = self()
+      assert {:ok, result} = PromptManagerAgent.cmd(agent, CreateTemplateAction, params)
+      assert Map.has_key?(result, :template)
+      assert result.template.name == "Test Template"
       
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
-      }
-      
-      {:ok, updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
-      
-      # Check that template was created
-      assert map_size(updated_agent.templates) > map_size(agent.templates)
-      
-      # Check signal was emitted
-      assert_receive {:signal_emitted, "template_created", response_data}
-      assert Map.has_key?(response_data, "template_id")
-      assert response_data["name"] == "Test Template"
+      GenServer.stop(agent)
     end
     
     test "handles template creation failure", %{agent: agent} do
@@ -79,489 +61,296 @@ defmodule RubberDuck.Agents.PromptManagerAgentTest do
         "description" => "Missing name and content"
       }
       
-      signal = %{
-        "type" => "create_template",
-        "data" => template_data
-      }
+      params = %{template_data: template_data}
       
-      test_pid = self()
+      assert {:error, _reason} = PromptManagerAgent.cmd(agent, CreateTemplateAction, params)
       
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
-      }
-      
-      {:ok, _updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
-      
-      # Check error signal was emitted
-      assert_receive {:signal_emitted, "template_creation_failed", error_data}
-      assert Map.has_key?(error_data, "error")
+      GenServer.stop(agent)
     end
     
     test "retrieves template by ID", %{agent: agent} do
       # First create a template
-      {:ok, template} = Template.new(%{
-        name: "Test Template",
-        content: "Hello {{name}}!",
-        variables: [%{name: "name", type: :string, required: true}]
-      })
-      
-      agent = put_in(agent.templates[template.id], template)
-      
-      signal = %{
-        "type" => "get_template",
-        "data" => %{"id" => template.id}
+      template_data = %{
+        "name" => "Test Template",
+        "description" => "A test template",
+        "content" => "Hello {{name}}!",
+        "variables" => [
+          %{"name" => "name", "type" => "string", "required" => true}
+        ]
       }
       
-      test_pid = self()
+      {:ok, create_result} = PromptManagerAgent.cmd(agent, CreateTemplateAction, %{template_data: template_data})
+      template_id = create_result.template.id
       
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
-      }
+      # Now retrieve it
+      params = %{id: template_id}
       
-      {:ok, _updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
+      assert {:ok, result} = PromptManagerAgent.cmd(agent, GetTemplateAction, params)
+      assert result.template.id == template_id
+      assert Map.has_key?(result, :stats)
       
-      assert_receive {:signal_emitted, "template_response", response_data}
-      assert response_data["template"].id == template.id
-      assert Map.has_key?(response_data, "stats")
+      GenServer.stop(agent)
     end
     
     test "handles template not found", %{agent: agent} do
-      signal = %{
-        "type" => "get_template",
-        "data" => %{"id" => "non-existent-id"}
-      }
+      params = %{id: "non-existent-id"}
       
-      test_pid = self()
+      assert {:error, :template_not_found} = PromptManagerAgent.cmd(agent, GetTemplateAction, params)
       
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
-      }
-      
-      {:ok, _updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
-      
-      assert_receive {:signal_emitted, "template_not_found", error_data}
-      assert error_data["template_id"] == "non-existent-id"
+      GenServer.stop(agent)
     end
     
     test "lists templates with filters", %{agent: agent} do
       # Create some test templates
-      {:ok, template1} = Template.new(%{
-        name: "Template 1",
-        content: "Content 1",
-        category: "coding",
-        tags: ["test"]
-      })
-      
-      {:ok, template2} = Template.new(%{
-        name: "Template 2", 
-        content: "Content 2",
-        category: "analysis",
-        tags: ["analysis"]
-      })
-      
-      agent = agent
-      |> put_in([:templates, template1.id], template1)
-      |> put_in([:templates, template2.id], template2)
-      
-      signal = %{
-        "type" => "list_templates",
-        "data" => %{"category" => "coding"}
+      template1_data = %{
+        "name" => "Template 1",
+        "description" => "First template",
+        "content" => "Content 1",
+        "category" => "coding",
+        "tags" => ["test"]
       }
       
-      test_pid = self()
-      
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
+      template2_data = %{
+        "name" => "Template 2",
+        "description" => "Second template", 
+        "content" => "Content 2",
+        "category" => "analysis",
+        "tags" => ["analysis"]
       }
       
-      {:ok, _updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
+      {:ok, _result1} = PromptManagerAgent.cmd(agent, CreateTemplateAction, %{template_data: template1_data})
+      {:ok, _result2} = PromptManagerAgent.cmd(agent, CreateTemplateAction, %{template_data: template2_data})
       
-      assert_receive {:signal_emitted, "templates_list", response_data}
-      assert response_data["count"] == 1
-      assert length(response_data["templates"]) == 1
+      # List with category filter
+      params = %{filters: %{"category" => "coding"}}
       
-      template = List.first(response_data["templates"])
-      assert template["category"] == "coding"
+      assert {:ok, result} = PromptManagerAgent.cmd(agent, ListTemplatesAction, params)
+      assert result.count == 1
+      assert length(result.templates) == 1
+      
+      template = List.first(result.templates)
+      assert template.category == "coding"
+      
+      GenServer.stop(agent)
     end
   end
   
-  describe "prompt building signals" do
+  describe "prompt building actions" do
     setup do
-      {:ok, template} = Template.new(%{
-        name: "Greeting Template",
-        content: "Hello {{name}}, welcome to {{platform}}!",
-        variables: [
-          %{name: "name", type: :string, required: true},
-          %{name: "platform", type: :string, required: true}
+      {:ok, agent} = PromptManagerAgent.start_link(id: "test-prompt-manager-#{System.unique_integer()}")
+      
+      template_data = %{
+        "name" => "Greeting Template",
+        "content" => "Hello {{name}}, welcome to {{platform}}!",
+        "variables" => [
+          %{"name" => "name", "type" => "string", "required" => true},
+          %{"name" => "platform", "type" => "string", "required" => true}
         ]
-      })
+      }
       
-      {:ok, agent} = PromptManagerAgent.mount(%{}, %{
-        templates: %{template.id => template},
-        experiments: %{},
-        analytics: %{},
-        cache: %{},
-        config: %{cache_ttl: 3600, max_templates: 1000, analytics_retention_days: 30}
-      })
+      {:ok, create_result} = PromptManagerAgent.cmd(agent, CreateTemplateAction, %{template_data: template_data})
       
-      %{agent: agent, template: template}
+      %{agent: agent, template: create_result.template}
     end
     
     test "builds prompt successfully", %{agent: agent, template: template} do
-      signal = %{
-        "type" => "build_prompt",
-        "data" => %{
-          "template_id" => template.id,
-          "context" => %{
-            "name" => "Alice",
-            "platform" => "RubberDuck"
-          }
-        }
+      params = %{
+        template_id: template.id,
+        context: %{
+          "name" => "Alice",
+          "platform" => "RubberDuck"
+        },
+        options: %{}
       }
       
-      test_pid = self()
+      assert {:ok, result} = PromptManagerAgent.cmd(agent, BuildPromptAction, params)
+      assert result["template_id"] == template.id
+      assert String.contains?(result["prompt"], "Hello Alice")
+      assert String.contains?(result["prompt"], "welcome to RubberDuck")
+      assert Map.has_key?(result, "metadata")
       
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
-      }
-      
-      {:ok, _updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
-      
-      assert_receive {:signal_emitted, "prompt_built", response_data}
-      assert response_data["template_id"] == template.id
-      assert String.contains?(response_data["prompt"], "Hello Alice")
-      assert String.contains?(response_data["prompt"], "welcome to RubberDuck")
-      assert Map.has_key?(response_data, "metadata")
+      GenServer.stop(agent)
     end
     
     test "handles prompt building failure due to missing variables", %{agent: agent, template: template} do
-      signal = %{
-        "type" => "build_prompt",
-        "data" => %{
-          "template_id" => template.id,
-          "context" => %{
-            "name" => "Alice"
-            # Missing "platform" variable
-          }
-        }
+      params = %{
+        template_id: template.id,
+        context: %{
+          "name" => "Alice"
+          # Missing "platform" variable
+        },
+        options: %{}
       }
       
-      test_pid = self()
+      assert {:error, _reason} = PromptManagerAgent.cmd(agent, BuildPromptAction, params)
       
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
-      }
-      
-      {:ok, _updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
-      
-      assert_receive {:signal_emitted, "prompt_build_failed", error_data}
-      assert error_data["template_id"] == template.id
-      assert String.contains?(error_data["error"], "platform")
+      GenServer.stop(agent)
     end
     
     test "validates template successfully", %{agent: agent} do
       template_data = %{
-        "template" => %{
-          "name" => "Valid Template",
-          "content" => "Hello {{name}}!",
-          "variables" => [
-            %{"name" => "name", "type" => "string", "required" => true}
-          ]
-        }
+        "name" => "Valid Template",
+        "content" => "Hello {{name}}!",
+        "variables" => [
+          %{"name" => "name", "type" => "string", "required" => true}
+        ]
       }
       
-      signal = %{
-        "type" => "validate_template",
-        "data" => template_data
-      }
+      params = %{template: template_data}
       
-      test_pid = self()
+      assert {:ok, result} = PromptManagerAgent.cmd(agent, ValidateTemplateAction, params)
+      assert result.valid == true
+      assert Map.has_key?(result, :template_id)
       
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
-      }
-      
-      {:ok, _updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
-      
-      assert_receive {:signal_emitted, "template_valid", response_data}
-      assert response_data["valid"] == true
-      assert Map.has_key?(response_data, "template_id")
+      GenServer.stop(agent)
     end
     
     test "validates template with errors", %{agent: agent} do
       template_data = %{
-        "template" => %{
-          "name" => "Invalid Template",
-          "content" => "Hello {{name}} and {{missing_var}}!",
-          "variables" => [
-            %{"name" => "name", "type" => "string", "required" => true}
-            # Missing definition for "missing_var"
-          ]
-        }
+        "name" => "Invalid Template",
+        "content" => "Hello {{name}} and {{missing_var}}!",
+        "variables" => [
+          %{"name" => "name", "type" => "string", "required" => true}
+          # Missing definition for "missing_var"
+        ]
       }
       
-      signal = %{
-        "type" => "validate_template",
-        "data" => template_data
-      }
+      params = %{template: template_data}
       
-      test_pid = self()
+      assert {:error, _reason} = PromptManagerAgent.cmd(agent, ValidateTemplateAction, params)
       
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
-      }
-      
-      {:ok, _updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
-      
-      assert_receive {:signal_emitted, "template_invalid", error_data}
-      assert error_data["valid"] == false
-      assert String.contains?(error_data["error"], "missing_var")
+      GenServer.stop(agent)
     end
   end
   
-  describe "analytics signals" do
+  describe "analytics actions" do
     setup do
-      {:ok, template} = Template.new(%{
-        name: "Analytics Template",
-        content: "Test content {{param}}",
-        variables: [%{name: "param", type: :string, required: true}],
-        metadata: %{usage_count: 10, error_count: 1}
-      })
+      {:ok, agent} = PromptManagerAgent.start_link(id: "test-prompt-manager-#{System.unique_integer()}")
       
-      {:ok, agent} = PromptManagerAgent.mount(%{}, %{
-        templates: %{template.id => template},
-        experiments: %{},
-        analytics: %{template.id => %{response_times: [100, 150, 200]}},
-        cache: %{},
-        config: %{cache_ttl: 3600, max_templates: 1000, analytics_retention_days: 30}
-      })
+      template_data = %{
+        "name" => "Analytics Template",
+        "content" => "Test content {{param}}",
+        "variables" => [%{"name" => "param", "type" => "string", "required" => true}]
+      }
       
-      %{agent: agent, template: template}
+      {:ok, create_result} = PromptManagerAgent.cmd(agent, CreateTemplateAction, %{template_data: template_data})
+      
+      %{agent: agent, template: create_result.template}
     end
     
     test "gets analytics report", %{agent: agent} do
-      signal = %{
-        "type" => "get_analytics",
-        "data" => %{}
-      }
+      params = %{filters: %{}}
       
-      test_pid = self()
+      assert {:ok, result} = PromptManagerAgent.cmd(agent, GetAnalyticsAction, params)
+      assert Map.has_key?(result, "total_templates")
+      assert Map.has_key?(result, "templates_by_category")
+      assert Map.has_key?(result, "most_used_templates")
+      assert Map.has_key?(result, "generated_at")
       
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
-      }
-      
-      {:ok, _updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
-      
-      assert_receive {:signal_emitted, "analytics_report", report_data}
-      assert Map.has_key?(report_data, "total_templates")
-      assert Map.has_key?(report_data, "templates_by_category")
-      assert Map.has_key?(report_data, "most_used_templates")
-      assert Map.has_key?(report_data, "generated_at")
+      GenServer.stop(agent)
     end
     
     test "gets usage stats for specific template", %{agent: agent, template: template} do
-      signal = %{
-        "type" => "get_usage_stats",
-        "data" => %{"template_id" => template.id}
-      }
+      params = %{template_id: template.id}
       
-      test_pid = self()
+      assert {:ok, result} = PromptManagerAgent.cmd(agent, GetUsageStatsAction, params)
+      assert result.template_id == template.id
+      assert Map.has_key?(result, :stats)
+      assert Map.has_key?(result, :detailed_analytics)
       
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
-      }
-      
-      {:ok, _updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
-      
-      assert_receive {:signal_emitted, "usage_stats", stats_data}
-      assert stats_data["template_id"] == template.id
-      assert Map.has_key?(stats_data, "stats")
-      assert Map.has_key?(stats_data, "detailed_analytics")
+      GenServer.stop(agent)
     end
     
     test "gets optimization suggestions", %{agent: agent, template: template} do
-      signal = %{
-        "type" => "optimize_template",
-        "data" => %{"template_id" => template.id}
-      }
+      params = %{template_id: template.id}
       
-      test_pid = self()
+      assert {:ok, result} = PromptManagerAgent.cmd(agent, OptimizeTemplateAction, params)
+      assert result.template_id == template.id
+      assert Map.has_key?(result, :suggestions)
+      assert Map.has_key?(result, :confidence_score)
+      assert is_list(result.suggestions)
       
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
-      }
-      
-      {:ok, _updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
-      
-      assert_receive {:signal_emitted, "optimization_suggestions", suggestions_data}
-      assert suggestions_data["template_id"] == template.id
-      assert Map.has_key?(suggestions_data, "suggestions")
-      assert Map.has_key?(suggestions_data, "confidence_score")
-      assert is_list(suggestions_data["suggestions"])
+      GenServer.stop(agent)
     end
   end
   
-  describe "system signals" do
+  describe "system actions" do
     setup do
-      {:ok, agent} = PromptManagerAgent.mount(%{}, %{
-        templates: %{},
-        experiments: %{},
-        analytics: %{},
-        cache: %{"cached_key" => %{data: "cached_data", expires_at: DateTime.add(DateTime.utc_now(), 3600)}},
-        config: %{cache_ttl: 3600, max_templates: 1000, analytics_retention_days: 30}
-      })
-      
+      {:ok, agent} = PromptManagerAgent.start_link(id: "test-prompt-manager-#{System.unique_integer()}")
       %{agent: agent}
     end
     
     test "gets status report", %{agent: agent} do
-      signal = %{
-        "type" => "get_status"
-      }
+      params = %{}
       
-      test_pid = self()
+      assert {:ok, result} = PromptManagerAgent.cmd(agent, GetStatusAction, params)
+      assert Map.has_key?(result, "templates_count")
+      assert Map.has_key?(result, "cache_size")
+      assert Map.has_key?(result, "memory_usage")
+      assert Map.has_key?(result, "uptime")
+      assert result["health"] == "healthy"
       
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
-      }
-      
-      {:ok, _updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
-      
-      assert_receive {:signal_emitted, "status_report", status_data}
-      assert Map.has_key?(status_data, "templates_count")
-      assert Map.has_key?(status_data, "cache_size")
-      assert Map.has_key?(status_data, "memory_usage")
-      assert Map.has_key?(status_data, "uptime")
-      assert status_data["health"] == "healthy"
+      GenServer.stop(agent)
     end
     
     test "clears cache", %{agent: agent} do
-      # Verify cache has content initially
-      assert map_size(agent.cache) > 0
-      
-      signal = %{
-        "type" => "clear_cache"
+      # First, add something to cache by building a prompt
+      template_data = %{
+        "name" => "Cache Test Template",
+        "content" => "Hello {{name}}!",
+        "variables" => [%{"name" => "name", "type" => "string", "required" => true}]
       }
       
-      test_pid = self()
+      {:ok, create_result} = PromptManagerAgent.cmd(agent, CreateTemplateAction, %{template_data: template_data})
       
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
-      }
+      # Build a prompt to populate cache
+      {:ok, _build_result} = PromptManagerAgent.cmd(agent, BuildPromptAction, %{
+        template_id: create_result.template.id,
+        context: %{"name" => "Alice"},
+        options: %{}
+      })
       
-      {:ok, updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
+      # Clear cache
+      params = %{}
       
-      # Verify cache was cleared
-      assert map_size(updated_agent.cache) == 0
+      assert {:ok, result} = PromptManagerAgent.cmd(agent, ClearCacheAction, params)
+      assert Map.has_key?(result, :timestamp)
       
-      assert_receive {:signal_emitted, "cache_cleared", clear_data}
-      assert Map.has_key?(clear_data, "timestamp")
+      GenServer.stop(agent)
     end
   end
   
   describe "caching functionality" do
     setup do
-      {:ok, template} = Template.new(%{
-        name: "Cached Template",
-        content: "Hello {{name}}!",
-        variables: [%{name: "name", type: :string, required: true}]
-      })
+      {:ok, agent} = PromptManagerAgent.start_link(id: "test-prompt-manager-#{System.unique_integer()}")
       
-      {:ok, agent} = PromptManagerAgent.mount(%{}, %{
-        templates: %{template.id => template},
-        experiments: %{},
-        analytics: %{},
-        cache: %{},
-        config: %{cache_ttl: 3600, max_templates: 1000, analytics_retention_days: 30}
-      })
+      template_data = %{
+        "name" => "Cached Template",
+        "content" => "Hello {{name}}!",
+        "variables" => [%{"name" => "name", "type" => "string", "required" => true}]
+      }
       
-      %{agent: agent, template: template}
+      {:ok, create_result} = PromptManagerAgent.cmd(agent, CreateTemplateAction, %{template_data: template_data})
+      
+      %{agent: agent, template: create_result.template}
     end
     
     test "caches built prompts", %{agent: agent, template: template} do
-      context = %{"name" => "Alice"}
-      
-      signal = %{
-        "type" => "build_prompt",
-        "data" => %{
-          "template_id" => template.id,
-          "context" => context
-        }
-      }
-      
-      test_pid = self()
-      
-      agent_with_mock = %{agent | 
-        emit_signal: fn type, data ->
-          send(test_pid, {:signal_emitted, type, data})
-        end
+      params = %{
+        template_id: template.id,
+        context: %{"name" => "Alice"},
+        options: %{}
       }
       
       # First request should build and cache
-      {:ok, updated_agent} = PromptManagerAgent.handle_signal(agent_with_mock, signal)
-      
-      assert_receive {:signal_emitted, "prompt_built", response_data}
-      refute Map.get(response_data, "cache_hit", false)
-      
-      # Verify something was cached
-      assert map_size(updated_agent.cache) > 0
+      {:ok, result1} = PromptManagerAgent.cmd(agent, BuildPromptAction, params)
+      refute Map.get(result1, "cache_hit", false)
       
       # Second request should hit cache
-      {:ok, _final_agent} = PromptManagerAgent.handle_signal(updated_agent, signal)
+      {:ok, result2} = PromptManagerAgent.cmd(agent, BuildPromptAction, params)
+      assert result2["cache_hit"] == true
       
-      assert_receive {:signal_emitted, "prompt_built", cached_response_data}
-      assert cached_response_data["cache_hit"] == true
-    end
-  end
-  
-  describe "unknown signals" do
-    setup do
-      {:ok, agent} = PromptManagerAgent.mount(%{}, %{
-        templates: %{},
-        experiments: %{},
-        analytics: %{},
-        cache: %{},
-        config: %{cache_ttl: 3600, max_templates: 1000, analytics_retention_days: 30}
-      })
-      
-      %{agent: agent}
-    end
-    
-    test "handles unknown signal gracefully", %{agent: agent} do
-      signal = %{
-        "type" => "unknown_signal",
-        "data" => %{"some" => "data"}
-      }
-      
-      # Should not crash
-      {:ok, _updated_agent} = PromptManagerAgent.handle_signal(agent, signal)
+      GenServer.stop(agent)
     end
   end
 end
