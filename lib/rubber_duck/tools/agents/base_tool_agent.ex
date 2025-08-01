@@ -221,21 +221,24 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
       # Build base actions list
       @base_actions [__MODULE__.ExecuteToolAction, __MODULE__.ClearCacheAction, __MODULE__.GetMetricsAction]
       
-      # Build complete options for use macro
-      def __base_tool_agent_opts__ do
-        # Get additional actions dynamically
+      # Use the BaseAgent with base actions
+      # Additional actions will be registered via the actions/0 callback
+      use RubberDuck.Agents.BaseAgent,
+        Keyword.merge(unquote(opts), [
+          schema: unquote(combined_schema)
+        ])
+      
+      # Override the actions callback to include both base and additional actions
+      @impl true
+      def actions do
+        base = @base_actions
         additional = if function_exported?(__MODULE__, :additional_actions, 0) do
-          __MODULE__.additional_actions()
+          additional_actions()
         else
           []
         end
-        
-        unquote(opts)
-        |> Keyword.put(:schema, unquote(combined_schema))
-        |> Keyword.put(:actions, @base_actions ++ additional)
+        base ++ additional
       end
-      
-      use RubberDuck.Agents.BaseAgent, __base_tool_agent_opts__()
       
       # Handler for action results
       @impl true

@@ -517,7 +517,7 @@ defmodule RubberDuck.Tools.DebugAssistant do
   
   defp extract_resources(response) do
     # Extract URLs and resource mentions
-    urls = Regex.scan(~r/https?://[^\s]+/, response) |> List.flatten()
+    urls = Regex.scan(~r/https?:\/\/[^\s]+/, response) |> List.flatten()
     
     # Common Elixir resources
     resources = []

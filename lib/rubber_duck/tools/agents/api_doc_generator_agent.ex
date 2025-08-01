@@ -791,7 +791,7 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
       format: result[:format],
       doc_type: result[:doc_type] || result[:type],
       pages_generated: result[:metadata][:functions_documented] || result[:metadata][:endpoints_count] || 0,
-      size_estimate: String.length(inspect(result[:documentation] || "")) div 100 # Rough size in KB
+      size_estimate: div(String.length(inspect(result[:documentation] || "")), 100) # Rough size in KB
     }
   end
   

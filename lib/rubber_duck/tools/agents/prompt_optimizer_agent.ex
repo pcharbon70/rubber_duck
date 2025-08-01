@@ -1472,7 +1472,7 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
       |> String.replace(~r/[^\w\s]/, "")
       |> String.split()
       |> Enum.filter(&(String.length(&1) > 3))
-      |> Enum.filter(&(!&1 in ["this", "that", "with", "have", "will", "from", "they", "been", "said", "each", "which", "their"]))
+      |> Enum.filter(&(&1 not in ["this", "that", "with", "have", "will", "from", "they", "been", "said", "each", "which", "their"]))
       |> MapSet.new()
     end
     
