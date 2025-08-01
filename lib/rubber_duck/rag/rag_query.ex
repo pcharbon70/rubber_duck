@@ -166,9 +166,9 @@ defmodule RubberDuck.RAG.RAGQuery do
     "rag_" <> :crypto.strong_rand_bytes(12) |> Base.url_encode64(padding: false)
   end
 
-  defp validate_query(nil), do: raise ArgumentError, "Query text is required"
+  defp validate_query(nil), do: raise(ArgumentError, "Query text is required")
   defp validate_query(query) when is_binary(query) and byte_size(query) > 0, do: query
-  defp validate_query(_), do: raise ArgumentError, "Query must be a non-empty string"
+  defp validate_query(_), do: raise(ArgumentError, "Query must be a non-empty string")
 
   defp validate_priority(nil), do: :normal
   defp validate_priority(priority) when priority in [:low, :normal, :high, :critical], do: priority
