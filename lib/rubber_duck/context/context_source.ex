@@ -254,12 +254,12 @@ defmodule RubberDuck.Context.ContextSource do
       raise ArgumentError, "Invalid source type: #{type}"
     end
   end
-  defp validate_type(_), do: raise ArgumentError, "Source type must be one of: #{inspect(@valid_types)}"
+  defp validate_type(_), do: raise(ArgumentError, "Source type must be one of: #{inspect(@valid_types)}")
 
   defp validate_weight(weight) when is_number(weight) and weight >= 0 and weight <= 10 do
     weight / 1  # Convert to float
   end
-  defp validate_weight(_), do: raise ArgumentError, "Weight must be a number between 0 and 10"
+  defp validate_weight(_), do: raise(ArgumentError, "Weight must be a number between 0 and 10")
 
   defp validate_status(status) when status in [:active, :inactive, :failing, :disabled], do: status
   defp validate_status(status) when is_binary(status) do

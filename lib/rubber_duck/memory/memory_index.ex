@@ -338,12 +338,12 @@ defmodule RubberDuck.Memory.MemoryIndex do
     "idx_" <> :crypto.strong_rand_bytes(8) |> Base.url_encode64(padding: false)
   end
 
-  defp validate_name(nil), do: raise ArgumentError, "Index name is required"
+  defp validate_name(nil), do: raise(ArgumentError, "Index name is required")
   defp validate_name(name) when is_binary(name), do: name
-  defp validate_name(_), do: raise ArgumentError, "Index name must be a string"
+  defp validate_name(_), do: raise(ArgumentError, "Index name must be a string")
 
   defp validate_type(type) when type in @valid_types, do: type
-  defp validate_type(type), do: raise ArgumentError, "Invalid index type: #{inspect(type)}"
+  defp validate_type(type), do: raise(ArgumentError, "Invalid index type: #{inspect(type)}")
 
   defp build_config(:fulltext, config) do
     Map.merge(%{

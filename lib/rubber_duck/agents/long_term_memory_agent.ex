@@ -439,6 +439,21 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
   defp remove_from_cache(agent, memory_id) do
     update_in(agent.cache, &Map.delete(&1, memory_id))
   end
+  
+  defp remove_from_indices(agent, memory_id) do
+    # Remove from all indices
+    indices = agent.indices
+    |> Enum.map(fn {name, info} ->
+      # Remove memory_id from each index
+      updated_info = Map.update(info, :entries, [], fn entries ->
+        Enum.reject(entries, fn {id, _} -> id == memory_id end)
+      end)
+      {name, updated_info}
+    end)
+    |> Map.new()
+    
+    %{agent | indices: indices}
+  end
 
   defp evict_from_cache(agent) do
     # Find least recently accessed entry

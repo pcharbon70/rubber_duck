@@ -341,7 +341,7 @@ defmodule RubberDuck.Memory.MemoryQuery do
   @doc """
   Returns a human-readable representation of the query.
   """
-  def to_string(query) do
+  def query_to_string(query) do
     parts = []
     
     # Add filters

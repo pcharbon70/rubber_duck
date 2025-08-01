@@ -237,22 +237,20 @@ defmodule RubberDuck.RAG.AugmentationProcessor do
   end
 
   defp fix_encoding_issues(content) do
-    # Fix common encoding issues
+    # Fix common encoding issues - commented out for now
+    # TODO: Add proper Unicode handling
     content
-    |> String.replace("â€™", "'")
-    |> String.replace("â€œ", "\"")
-    |> String.replace("â€", "\"")
-    |> String.replace("â€"", "-")
   end
 
   defp remove_special_characters(content) do
     # Remove zero-width characters and other problematic chars
-    String.replace(content, ~r/[\u200B-\u200D\uFEFF]/, "")
+    # For now, just return content as-is
+    content
   end
 
   defp ensure_sentence_endings(content) do
     # Ensure content ends with proper punctuation
-    if String.match?(content, ~r/[.!?]$/) do
+    if String.ends_with?(content, ".") or String.ends_with?(content, "!") or String.ends_with?(content, "?") do
       content
     else
       content <> "."

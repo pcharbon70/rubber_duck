@@ -271,7 +271,7 @@ defmodule RubberDuck.Memory.MemoryEntry do
       raise ArgumentError, "Invalid memory type: #{type}"
     end
   end
-  defp validate_type(_), do: raise ArgumentError, "Memory type is required"
+  defp validate_type(_), do: raise(ArgumentError, "Memory type is required")
 
   defp calculate_expiration(_now, nil), do: nil
   defp calculate_expiration(now, ttl_seconds) when is_integer(ttl_seconds) do
