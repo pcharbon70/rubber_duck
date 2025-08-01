@@ -79,6 +79,8 @@ defmodule RubberDuck.Application do
       RubberDuck.Tool.Composition.Metrics,
       # Tool registry (required by integration bridge)
       RubberDuck.Tool.Registry,
+      # Tool loader - loads all tools after registry starts
+      RubberDuck.Tool.Loader,
       # Tool integration bridge components
       RubberDuck.Tool.ExternalRegistry,
       RubberDuck.Tool.ExternalRouter,

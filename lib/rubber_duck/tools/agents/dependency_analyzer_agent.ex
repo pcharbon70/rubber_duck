@@ -720,22 +720,111 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     end
     
     @impl true
-    def run(params, _context) do
-      vulnerabilities = check_vulnerabilities(
-        params.dependencies,
-        params.vulnerability_db,
-        params.severity_threshold,
-        params.include_dev
-      )
+    def run(params, context) do
+      vulnerabilities = if cve_checker_available?() do
+        # Use CVE checker tool for more comprehensive scanning
+        check_vulnerabilities_with_cve_tool(
+          params.dependencies,
+          params.severity_threshold,
+          params.include_dev,
+          context
+        )
+      else
+        # Fall back to built-in vulnerability database
+        check_vulnerabilities(
+          params.dependencies,
+          params.vulnerability_db,
+          params.severity_threshold,
+          params.include_dev
+        )
+      end
+      
+      # Create unified result structure
+      security_summary = %{
+        total_vulnerabilities: length(vulnerabilities),
+        by_severity: analyze_severity_breakdown(vulnerabilities),
+        dependencies_affected: length(get_affected_dependencies(vulnerabilities)),
+        risk_level: calculate_risk_level(vulnerabilities)
+      }
       
       {:ok, %{
         vulnerabilities: vulnerabilities,
-        vulnerability_count: length(vulnerabilities),
-        severity_breakdown: analyze_severity_breakdown(vulnerabilities),
-        affected_dependencies: get_affected_dependencies(vulnerabilities),
+        security_summary: security_summary,
         remediation_plan: generate_remediation_plan(vulnerabilities),
-        risk_score: calculate_risk_score(vulnerabilities)
+        security_score: calculate_security_score(vulnerabilities)
       }}
+    end
+    
+    defp cve_checker_available?() do
+      # Check if CVE checker tool is registered
+      case RubberDuck.Tool.Registry.get(:cve_checker) do
+        {:ok, _} -> true
+        _ -> false
+      end
+    rescue
+      _ -> false
+    end
+    
+    defp check_vulnerabilities_with_cve_tool(dependencies, threshold, include_dev, context) do
+      # Convert dependencies to CVE checker format
+      dep_list = dependencies
+      |> Map.values()
+      |> Enum.map(fn dep ->
+        %{
+          name: dep.name,
+          version: dep.version,
+          registry: Map.get(dep, :registry, guess_registry(dep.name))
+        }
+      end)
+      
+      # Use CVE checker tool
+      tool_call = %RubberDuck.Types.ToolCall{
+        name: :cve_checker,
+        arguments: %{
+          dependencies: dep_list,
+          check_transitive: true,
+          severity_threshold: threshold,
+          include_patched: true,
+          sources: Map.get(context, :cve_sources, ["nvd", "osv", "ghsa"])
+        }
+      }
+      
+      case RubberDuck.Tools.CVEChecker.execute(tool_call) do
+        {:ok, %{result: cve_result}} ->
+          # Convert CVE checker results to our format
+          cve_result.vulnerabilities
+          |> Enum.map(fn vuln ->
+            %{
+              dependency: vuln.package,
+              severity: String.to_atom(vuln.severity),
+              cve_ids: [vuln.cve_id],
+              description: vuln.description,
+              patched_versions: vuln.patched_versions,
+              current_version: vuln.version,
+              exploitability: vuln.exploitability,
+              cvss_score: vuln.cvss_score,
+              published_date: vuln.published_date,
+              references: vuln.references
+            }
+          end)
+        
+        {:error, _reason} ->
+          # Fall back to built-in database
+          check_vulnerabilities(dependencies, "built-in", threshold, include_dev)
+      end
+    rescue
+      _ ->
+        # Fall back to built-in database
+        check_vulnerabilities(dependencies, "built-in", threshold, include_dev)
+    end
+    
+    defp guess_registry(package_name) do
+      cond do
+        String.contains?(package_name, "/") -> "npm"  # Scoped packages
+        String.starts_with?(package_name, "py") -> "pypi"
+        String.ends_with?(package_name, "_ex") -> "hex"
+        true -> "npm"  # Default
+      end
     end
     
     defp check_vulnerabilities(dependencies, db_type, threshold, include_dev) do
@@ -940,6 +1029,25 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
         
         (total_score / max_possible) * 100
       end
+    end
+    
+    defp calculate_risk_level(vulnerabilities) do
+      critical_count = Enum.count(vulnerabilities, &(&1.severity == :critical))
+      high_count = Enum.count(vulnerabilities, &(&1.severity == :high))
+      
+      cond do
+        critical_count > 0 -> :critical
+        high_count > 2 -> :high
+        high_count > 0 -> :medium
+        length(vulnerabilities) > 5 -> :medium
+        length(vulnerabilities) > 0 -> :low
+        true -> :none
+      end
+    end
+    
+    defp calculate_security_score(vulnerabilities) do
+      # Security score (inverse of risk score)
+      calculate_risk_score(vulnerabilities)
     end
   end
   
