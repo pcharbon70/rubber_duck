@@ -307,6 +307,30 @@ This document tracks the implementation of tool-specific agents in the RubberDuc
 - **State**: Analysis cache, vulnerability history, known conflicts, update tracking, license registry
 - **Status**: Implemented with Jido actions
 
+#### 18. CVEAnalyzerAgent ✓
+- **Tool**: `:cve_checker`
+- **Description**: Advanced CVE vulnerability analysis and management across multiple package registries
+- **Signals**:
+  - `tool_request` → Standard tool execution (via BaseToolAgent)
+  - `batch_scan` → Scan multiple projects in batch
+  - `analyze_trends` → Analyze vulnerability trends over time
+  - `generate_advisory` → Generate security advisories
+  - `compare_scans` → Compare scan results to identify changes
+  - `generate_compliance` → Generate compliance reports
+  - `monitor_vulnerabilities` → Set up continuous monitoring
+  - `generate_patch_plan` → Create phased patching plans
+- **Actions**:
+  - `ExecuteToolAction` → Execute CVE analysis
+  - `BatchScanAction` → Parallel scanning of multiple projects with aggregation
+  - `AnalyzeTrendsAction` → Time-based vulnerability trend analysis
+  - `GenerateAdvisoryAction` → Security advisory generation in multiple formats
+  - `CompareScansAction` → Delta analysis between vulnerability scans
+  - `GenerateComplianceReportAction` → Policy-based compliance evaluation
+  - `MonitorVulnerabilitiesAction` → Continuous vulnerability monitoring setup
+  - `GeneratePatchPlanAction` → Phased patch planning with risk assessment
+- **State**: Scan history, vulnerability trends, monitoring config, patch history, compliance policies
+- **Status**: Implemented with Jido actions
+
 ## Signal Patterns
 
 ### Common Signal Types (CloudEvents format)
@@ -348,11 +372,12 @@ Each agent has comprehensive tests covering:
 
 ## Implementation Summary
 
-All 17 tool agents have been successfully implemented with the Jido actions architecture:
+All 18 tool agents have been successfully implemented with the Jido actions architecture:
 - 8 agents migrated from signal-only to action-based architecture
-- 9 agents implemented directly with Jido actions
+- 10 agents implemented directly with Jido actions (including CVEAnalyzerAgent)
 - Each agent has comprehensive test coverage
 - All agents follow consistent patterns for state management, error handling, and metrics
+- DependencyAnalyzerAgent integrates with CVE checker tool for enhanced vulnerability scanning
 
 ## Next Steps
 
