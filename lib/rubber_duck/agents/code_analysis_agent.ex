@@ -49,8 +49,7 @@ defmodule RubberDuck.Agents.CodeAnalysisAgent do
   
   # Signal Handlers
   
-  @impl true
-  def handle_signal(agent, %{"type" => "code_analysis_request"} = signal) do
+    def handle_signal(agent, %{"type" => "code_analysis_request"} = signal) do
     %{
       "data" => %{
         "file_path" => file_path,

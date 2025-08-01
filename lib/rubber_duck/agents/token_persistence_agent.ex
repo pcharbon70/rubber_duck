@@ -184,7 +184,7 @@ defmodule RubberDuck.Agents.TokenPersistenceAgent do
       {:ok, results} ->
         {:ok, length(results)}
         
-      {:error, reason} when attempts_left > 1 ->
+      {:error, _reason} when attempts_left > 1 ->
         Logger.warning("Token persistence failed, retrying. Attempts left: #{attempts_left - 1}")
         # Exponential backoff
         Process.sleep(:math.pow(2, 4 - attempts_left) * 100 |> round())
@@ -229,7 +229,7 @@ defmodule RubberDuck.Agents.TokenPersistenceAgent do
     end
   end
   
-  defp schedule_flush(interval) do
+  defp schedule_flush(_interval) do
     # In a real implementation, this would schedule a timer
     # For now, we'll rely on external signals
     :ok

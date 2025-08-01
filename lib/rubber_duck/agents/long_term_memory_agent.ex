@@ -97,8 +97,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
 
   ## Signal Handlers - Storage Operations
 
-  @impl true
-  def handle_signal("store_memory", data, agent) do
+    def handle_signal("store_memory", data, agent) do
     %{
       "type" => type,
       "content" => content,
@@ -145,8 +144,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
     end
   end
 
-  @impl true
-  def handle_signal("update_memory", data, agent) do
+    def handle_signal("update_memory", data, agent) do
     %{
       "memory_id" => memory_id,
       "updates" => updates,
@@ -181,8 +179,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
     end
   end
 
-  @impl true
-  def handle_signal("delete_memory", %{"memory_id" => memory_id} = data, agent) do
+    def handle_signal("delete_memory", %{"memory_id" => memory_id} = data, agent) do
     soft_delete = Map.get(data, "soft_delete", true)
     
     if soft_delete do
@@ -209,8 +206,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
     end
   end
 
-  @impl true
-  def handle_signal("bulk_store", %{"memories" => memories_data}, agent) do
+    def handle_signal("bulk_store", %{"memories" => memories_data}, agent) do
     memories = Enum.map(memories_data, fn data ->
       MemoryEntry.new(%{
         type: String.to_atom(data["type"]),
@@ -234,8 +230,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
 
   ## Signal Handlers - Retrieval Operations
 
-  @impl true
-  def handle_signal("search_memories", data, agent) do
+    def handle_signal("search_memories", data, agent) do
     %{
       "query" => query_text,
       "types" => types,
@@ -260,8 +255,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
     {:ok, %{"results" => results, "count" => length(results)}, agent}
   end
 
-  @impl true
-  def handle_signal("query_memories", data, agent) do
+    def handle_signal("query_memories", data, agent) do
     query = MemoryQuery.build(data)
     
     # Execute query
@@ -283,8 +277,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
     }, agent}
   end
 
-  @impl true
-  def handle_signal("get_memory", %{"memory_id" => memory_id}, agent) do
+    def handle_signal("get_memory", %{"memory_id" => memory_id}, agent) do
     case get_memory_entry(agent, memory_id) do
       {:ok, memory} ->
         # Update access metadata
@@ -298,8 +291,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
     end
   end
 
-  @impl true
-  def handle_signal("get_related", data, agent) do
+    def handle_signal("get_related", data, agent) do
     %{
       "memory_id" => memory_id,
       "relationship_types" => rel_types,
@@ -318,8 +310,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
 
   ## Signal Handlers - Management Operations
 
-  @impl true
-  def handle_signal("optimize_storage", _data, agent) do
+    def handle_signal("optimize_storage", _data, agent) do
     Task.start(fn -> 
       run_storage_optimization(agent)
     end)
@@ -329,8 +320,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
     {:ok, %{"optimization_started" => true}, agent}
   end
 
-  @impl true
-  def handle_signal("reindex_memory", %{"memory_id" => memory_id}, agent) do
+    def handle_signal("reindex_memory", %{"memory_id" => memory_id}, agent) do
     case get_memory_entry(agent, memory_id) do
       {:ok, memory} ->
         agent = update_indices(agent, memory)
@@ -341,8 +331,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
     end
   end
 
-  @impl true
-  def handle_signal("get_memory_stats", _data, agent) do
+    def handle_signal("get_memory_stats", _data, agent) do
     stats = %{
       "total_memories" => agent.metrics.total_memories,
       "storage_size_mb" => agent.metrics.storage_size_bytes / 1_048_576,
@@ -359,15 +348,13 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
     {:ok, stats, agent}
   end
 
-  @impl true
-  def handle_signal("get_memory_versions", %{"memory_id" => memory_id}, agent) do
+    def handle_signal("get_memory_versions", %{"memory_id" => memory_id}, agent) do
     versions = Map.get(agent.versions, memory_id, [])
     
     {:ok, %{"versions" => versions}, agent}
   end
 
-  @impl true
-  def handle_signal("rollback_memory", data, agent) do
+    def handle_signal("rollback_memory", data, agent) do
     %{
       "memory_id" => memory_id,
       "version" => target_version

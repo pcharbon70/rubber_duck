@@ -73,7 +73,7 @@ defmodule RubberDuck.Agents.ShortTermMemoryAgent do
   
   require Logger
   
-  alias RubberDuck.Memory
+  # alias RubberDuck.Memory  # Commented out as not currently used
   
   # Lifecycle callbacks
   
@@ -159,11 +159,13 @@ defmodule RubberDuck.Agents.ShortTermMemoryAgent do
   end
   
   # Support for get_state call
+  @impl GenServer
   def handle_call(:get_state, _from, state) do
     {:reply, state.agent.state, state}
   end
   
   # Timer-based cleanup
+  @impl GenServer
   def handle_info(:cleanup_expired, state) do
     case Jido.Agent.cmd(self(), RubberDuck.Jido.Actions.ShortTermMemory.CleanupExpiredAction, %{}) do
       {:ok, _result} ->

@@ -311,18 +311,18 @@ defmodule RubberDuck.Memory.MemoryIndex do
 
   # Composite index operations
 
-  defp add_composite_entry(index, memory_id, data) do
+  defp add_composite_entry(index, _memory_id, _data) do
     # Composite indexes combine multiple index types
     # Implementation depends on specific requirements
     index
   end
 
-  defp remove_composite_entry(index_data, memory_id) do
+  defp remove_composite_entry(index_data, _memory_id) do
     # Remove from all sub-indexes
     index_data
   end
 
-  defp search_composite(index, query, options) do
+  defp search_composite(_index, _query, _options) do
     # Search across multiple index types and combine results
     []
   end
@@ -422,7 +422,7 @@ defmodule RubberDuck.Memory.MemoryIndex do
     |> Enum.with_index()
   end
 
-  defp build_posting_list(memory_id, tokens) do
+  defp build_posting_list(_memory_id, tokens) do
     Enum.reduce(tokens, %{}, fn {token, position}, acc ->
       Map.update(acc, token, [position], &[position | &1])
     end)
