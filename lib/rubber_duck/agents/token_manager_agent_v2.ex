@@ -64,13 +64,14 @@ defmodule RubberDuck.Agents.TokenManagerAgentV2 do
     ],
     actions: RubberDuck.Jido.Actions.Token.all_actions()
 
-  alias RubberDuck.Agents.TokenManager.{
-    TokenUsage, 
-    Budget, 
-    UsageReport,
-    TokenProvenance,
-    ProvenanceRelationship
-  }
+  # These modules are planned for future implementation
+  # alias RubberDuck.Agents.TokenManager.{
+  #   TokenUsage, 
+  #   Budget, 
+  #   UsageReport,
+  #   TokenProvenance,
+  #   ProvenanceRelationship
+  # }
   alias RubberDuck.Jido.Actions.Token
   
   require Logger
@@ -103,7 +104,6 @@ defmodule RubberDuck.Agents.TokenManagerAgentV2 do
 
   ## Initialization
 
-  @impl true
   def on_init(context) do
     state = %{
       budgets: %{},

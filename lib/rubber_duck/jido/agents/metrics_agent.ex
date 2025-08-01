@@ -68,7 +68,6 @@ defmodule RubberDuck.Jido.Agents.MetricsAgent do
 
   require Logger
 
-  @impl true
   def mount(agent) do
     # Attach telemetry handlers
     attach_telemetry_handlers(agent.id)
@@ -80,7 +79,6 @@ defmodule RubberDuck.Jido.Agents.MetricsAgent do
     {:ok, agent}
   end
 
-  @impl true
   def unmount(agent) do
     # Detach telemetry handlers
     :telemetry.detach("metrics-collector")

@@ -97,8 +97,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
 
   ## Signal Handlers - Context Operations
 
-  @impl true
-  def handle_signal("build_context", data, agent) do
+    def handle_signal("build_context", data, agent) do
     request = build_context_request(data)
     
     # Check cache first
@@ -113,8 +112,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     end
   end
 
-  @impl true
-  def handle_signal("update_context", data, agent) do
+    def handle_signal("update_context", data, agent) do
     %{
       "request_id" => request_id,
       "updates" => updates
@@ -132,8 +130,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     end
   end
 
-  @impl true
-  def handle_signal("stream_context", data, agent) do
+    def handle_signal("stream_context", data, agent) do
     request = build_context_request(data)
     chunk_size = data["chunk_size"] || 1000
     
@@ -149,8 +146,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     {:ok, %{"build_id" => request.id, "streaming" => true}, agent}
   end
 
-  @impl true
-  def handle_signal("invalidate_context", %{"pattern" => pattern}, agent) do
+    def handle_signal("invalidate_context", %{"pattern" => pattern}, agent) do
     invalidated = invalidate_cache_entries(agent, pattern)
     
     {:ok, %{"invalidated" => length(invalidated)}, agent}
@@ -158,8 +154,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
 
   ## Signal Handlers - Source Management
 
-  @impl true
-  def handle_signal("register_source", data, agent) do
+    def handle_signal("register_source", data, agent) do
     source = ContextSource.new(%{
       id: data["id"] || generate_source_id(),
       name: data["name"],
@@ -183,8 +178,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     end
   end
 
-  @impl true
-  def handle_signal("update_source", data, agent) do
+    def handle_signal("update_source", data, agent) do
     %{"source_id" => source_id, "updates" => updates} = data
     
     case Map.get(agent.sources, source_id) do
@@ -199,8 +193,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     end
   end
 
-  @impl true
-  def handle_signal("remove_source", %{"source_id" => source_id}, agent) do
+    def handle_signal("remove_source", %{"source_id" => source_id}, agent) do
     agent = update_in(agent.sources, &Map.delete(&1, source_id))
     
     # Invalidate cache entries using this source
@@ -209,8 +202,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     {:ok, %{"removed" => true}, agent}
   end
 
-  @impl true
-  def handle_signal("get_source_status", %{"source_id" => source_id}, agent) do
+    def handle_signal("get_source_status", %{"source_id" => source_id}, agent) do
     case Map.get(agent.sources, source_id) do
       nil ->
         {:error, "Source not found", agent}
@@ -232,8 +224,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
 
   ## Signal Handlers - Configuration
 
-  @impl true
-  def handle_signal("set_priorities", data, agent) do
+    def handle_signal("set_priorities", data, agent) do
     priorities = %{
       relevance_weight: data["relevance_weight"] || agent.priorities.relevance_weight,
       recency_weight: data["recency_weight"] || agent.priorities.recency_weight,
@@ -249,8 +240,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     {:ok, normalized, agent}
   end
 
-  @impl true
-  def handle_signal("configure_limits", data, agent) do
+    def handle_signal("configure_limits", data, agent) do
     config_updates = %{
       max_cache_size: data["max_cache_size"] || agent.config.max_cache_size,
       default_max_tokens: data["default_max_tokens"] || agent.config.default_max_tokens,
@@ -263,8 +253,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     {:ok, agent.config, agent}
   end
 
-  @impl true
-  def handle_signal("get_metrics", _data, agent) do
+    def handle_signal("get_metrics", _data, agent) do
     metrics = Map.merge(agent.metrics, %{
       "cache_size" => map_size(agent.cache),
       "active_builds" => map_size(agent.active_builds),

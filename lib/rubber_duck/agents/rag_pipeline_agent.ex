@@ -95,8 +95,7 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
 
   ## Signal Handlers - Pipeline Operations
 
-  @impl true
-  def handle_signal("execute_rag_pipeline", data, agent) do
+    def handle_signal("execute_rag_pipeline", data, agent) do
     query = build_rag_query(data)
     
     # Check cache first
@@ -111,8 +110,7 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
     end
   end
 
-  @impl true
-  def handle_signal("retrieve_documents", data, agent) do
+    def handle_signal("retrieve_documents", data, agent) do
     query = build_rag_query(data)
     start_time = System.monotonic_time(:millisecond)
     
@@ -137,8 +135,7 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
     end
   end
 
-  @impl true
-  def handle_signal("augment_context", data, agent) do
+    def handle_signal("augment_context", data, agent) do
     %{
       "query_id" => query_id,
       "documents" => doc_data
@@ -156,8 +153,7 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
     {:ok, augmented_to_map(augmented), agent}
   end
 
-  @impl true
-  def handle_signal("generate_response", data, agent) do
+    def handle_signal("generate_response", data, agent) do
     %{
       "query_id" => query_id,
       "context" => context_data,
@@ -178,8 +174,7 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
 
   ## Signal Handlers - Configuration
 
-  @impl true
-  def handle_signal("configure_retrieval", data, agent) do
+    def handle_signal("configure_retrieval", data, agent) do
     config_updates = %{
       max_documents: data["max_documents"] || agent.config.max_documents,
       min_relevance_score: data["min_relevance_score"] || agent.config.min_relevance_score,
@@ -195,8 +190,7 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
     {:ok, %{"updated" => true, "config" => config_updates}, agent}
   end
 
-  @impl true
-  def handle_signal("configure_augmentation", data, agent) do
+    def handle_signal("configure_augmentation", data, agent) do
     aug_config = %{
       dedup_threshold: data["dedup_threshold"] || agent.augmentation_config.dedup_threshold,
       summarization_enabled: data["summarization_enabled"] || agent.augmentation_config.summarization_enabled,
@@ -209,8 +203,7 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
     {:ok, %{"updated" => true, "config" => aug_config}, agent}
   end
 
-  @impl true
-  def handle_signal("configure_generation", data, agent) do
+    def handle_signal("configure_generation", data, agent) do
     gen_config = %{
       max_context_tokens: data["max_context_tokens"] || agent.config.max_context_tokens,
       streaming_enabled: data["streaming_enabled"] || agent.config.streaming_enabled,
@@ -227,8 +220,7 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
 
   ## Signal Handlers - Analytics
 
-  @impl true
-  def handle_signal("get_pipeline_metrics", _data, agent) do
+    def handle_signal("get_pipeline_metrics", _data, agent) do
     metrics = Map.merge(agent.metrics, %{
       "cache_hit_rate" => calculate_cache_hit_rate(agent),
       "avg_pipeline_time_ms" => calculate_avg_pipeline_time(agent),
@@ -241,8 +233,7 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
     {:ok, metrics, agent}
   end
 
-  @impl true
-  def handle_signal("run_ab_test", data, agent) do
+    def handle_signal("run_ab_test", data, agent) do
     test = %{
       id: generate_test_id(),
       name: data["name"],
@@ -265,8 +256,7 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
     {:ok, %{"test_id" => test.id, "status" => "started"}, agent}
   end
 
-  @impl true
-  def handle_signal("optimize_pipeline", data, agent) do
+    def handle_signal("optimize_pipeline", data, agent) do
     optimization_type = data["type"] || "auto"
     
     optimizations = case optimization_type do

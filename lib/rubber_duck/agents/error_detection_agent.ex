@@ -72,7 +72,6 @@ defmodule RubberDuck.Agents.ErrorDetectionAgent do
 
   # Signal Handlers
 
-  @impl true
   def handle_signal(agent, %{"type" => "error_detection_request"} = signal) do
     %{
       "data" => %{
