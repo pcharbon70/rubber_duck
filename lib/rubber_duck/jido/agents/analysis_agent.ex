@@ -49,7 +49,6 @@ defmodule RubberDuck.Jido.Agents.AnalysisAgent do
 
   require Logger
 
-  @impl true
   def mount(agent) do
     # Initialize engines based on config
     engines = initialize_engines(agent.state.config)

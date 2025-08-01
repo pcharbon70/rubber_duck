@@ -22,7 +22,7 @@ defmodule RubberDuck.Jido.Actions.ShortTermMemory.GetMemoryAction do
     agent = context.agent
     
     case :ets.lookup(agent.state.ets_tables.primary, params.item_id) do
-      [{item_id, item_data}] ->
+      [{_item_id, item_data}] ->
         # Check if expired
         if DateTime.compare(DateTime.utc_now(), item_data.expires_at) == :lt do
           # Item found and not expired - cache hit
