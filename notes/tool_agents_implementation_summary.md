@@ -259,11 +259,31 @@ This document tracks the implementation of tool-specific agents in the RubberDuc
 - **State**: Scan history, vulnerability cache, security policies, threat intelligence, remediation templates
 - **Status**: Implemented with Jido actions
 
-### Remaining Agents (To Be Implemented)
+#### 16. PerformanceAnalyzerAgent ✓
+- **Tool**: `:performance_analyzer`
+- **Description**: Analyzes code performance and provides optimization recommendations
+- **Signals**:
+  - `tool_request` → Standard tool execution (via BaseToolAgent)
+  - `profile_code` → Profile code execution to identify bottlenecks
+  - `analyze_complexity` → Analyze time and space complexity
+  - `optimize_queries` → Optimize database queries
+  - `identify_caching` → Identify caching opportunities
+  - `generate_benchmark` → Generate performance benchmarks
+  - `analyze_memory` → Analyze memory usage patterns
+  - `generate_report` → Generate performance analysis reports
+- **Actions**:
+  - `ExecuteToolAction` → Execute performance analysis
+  - `ProfileCodeAction` → CPU/memory/IO profiling with hotspot detection
+  - `AnalyzeComplexityAction` → Time and space complexity analysis
+  - `OptimizeDatabaseQueriesAction` → Query optimization and index recommendations
+  - `IdentifyCachingOpportunitiesAction` → Cache strategy recommendations
+  - `GenerateBenchmarkAction` → Micro/macro/stress benchmark generation
+  - `AnalyzeMemoryUsageAction` → Memory leak detection and optimization
+  - `GeneratePerformanceReportAction` → Multi-format performance reports
+- **State**: Profile cache, analysis history, performance baselines, optimization tracking, benchmarks
+- **Status**: Implemented with Jido actions
 
-16. **PerformanceAnalyzerAgent**
-    - Tool: `:performance_analyzer`
-    - Will analyze performance issues
+### Remaining Agents (To Be Implemented)
 
 17. **DependencyAnalyzerAgent**
     - Tool: `:dependency_analyzer`
@@ -311,7 +331,7 @@ Each agent has comprehensive tests covering:
 ## Next Steps
 
 1. Complete migration of existing agents to use Jido actions
-2. Implement remaining 2 agents with action-based architecture
+2. Implement remaining 1 agent with action-based architecture
 3. Add integration tests for agent interactions
 4. Document agent communication patterns
 5. Create agent composition examples
