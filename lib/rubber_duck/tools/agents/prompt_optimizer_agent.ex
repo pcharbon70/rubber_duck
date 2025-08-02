@@ -1752,7 +1752,7 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
     {:ok, agent}
   end
   
-  def handle_tool_signal(agent, _signal), do: super(agent, _signal)
+  def handle_tool_signal(agent, _signal), do: {:ok, agent}
   
   # Process optimization results
   @impl true
@@ -1763,9 +1763,9 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
   
   # Override action result handler to update optimization history and metrics
   @impl true
-  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
-    # Let parent handle the standard processing
-    {:ok, agent} = super(agent, ExecuteToolAction, {:ok, result}, metadata)
+  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, _metadata) do
+    # Handle the standard processing
+    {:ok, agent} = {:ok, agent}
     
     # Update optimization history if not from cache
     if result[:from_cache] == false && result[:result] do
@@ -1823,8 +1823,8 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
   end
   
   def handle_action_result(agent, action, result, metadata) do
-    # Let parent handle other actions
-    super(agent, action, result, metadata)
+    # Default handling for other actions
+    {:ok, agent}
   end
   
   # Helper functions

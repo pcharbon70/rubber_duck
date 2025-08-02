@@ -112,9 +112,9 @@ defmodule RubberDuck.Tools.CodeComparer do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:code_analysis]
-      rate_limit 50
+      rate_limit [max_requests: 50, window_seconds: 60]
     end
   end
   

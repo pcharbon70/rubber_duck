@@ -216,8 +216,11 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
       
       # Use the BaseAgent with base actions
       # Additional actions will be registered via the actions/0 callback
+      # Filter out the :tool option as it's not valid for Jido.Agent
+      filtered_opts = unquote(opts) |> Keyword.delete(:tool) |> Keyword.delete(:cache_ttl)
+      
       use RubberDuck.Agents.BaseAgent,
-        Keyword.merge(unquote(opts), [
+        Keyword.merge(filtered_opts, [
           schema: unquote(combined_schema)
         ])
       
@@ -614,9 +617,6 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
         end)
       end
       
-      # Add overridable flag for handle_action_result
-      defoverridable [handle_action_result: 4]
-      
       # Default implementations for optional callbacks
       def validate_params(params), do: {:ok, params}
       def process_result(result, _context), do: result
@@ -625,6 +625,7 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
       
       # Allow overriding these functions
       defoverridable [
+        handle_action_result: 4,
         handle_signal: 2,
         validate_params: 1,
         process_result: 2,

@@ -2518,7 +2518,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     end
     
     defp extract_optimization_potential(profile) do
-      if profile["optimization"_opportunities] do
+      if profile[:optimization_opportunities] do
         opportunities = profile.optimization_opportunities
         high_priority = Enum.count(opportunities, &(&1.priority == "high"))
         
@@ -2585,7 +2585,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
       end
       
       # Complexity bottlenecks
-      if results[:complexity] && results.complexity["optimization"_targets] do
+      if results[:complexity] && results.complexity[:optimization_targets] do
         complexity_bottlenecks = Enum.map(results.complexity.optimization_targets, fn t ->
           %{
             category: "algorithmic",
@@ -2620,14 +2620,14 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
         all_optimizations = all_optimizations ++ results.profile.recommendations
       end
       
-      if results[:complexity] && results.complexity["optimization"_targets] do
+      if results[:complexity] && results.complexity[:optimization_targets] do
         complexity_opts = Enum.flat_map(results.complexity.optimization_targets, fn target ->
           ["Optimize #{target.function}: #{target.improvement_potential}"]
         end)
         all_optimizations = all_optimizations ++ complexity_opts
       end
       
-      if results[:memory] && results.memory["optimization"_suggestions] do
+      if results[:memory] && results.memory[:optimization_suggestions] do
         memory_opts = Enum.map(results.memory.optimization_suggestions, & &1.description)
         all_optimizations = all_optimizations ++ memory_opts
       end
@@ -3102,7 +3102,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     # Add to analysis history
     history_entry = %{
       timestamp: DateTime.utc_now(),
-      type: "performance"_profile,
+      type: :performance_profile,
       profile_type: result.profile_type,
       hotspot_count: length(result.hotspots),
       score: result.metrics.profile_score,

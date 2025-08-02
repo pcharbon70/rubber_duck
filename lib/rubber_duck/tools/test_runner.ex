@@ -34,7 +34,6 @@ defmodule RubberDuck.Tools.TestRunner do
       required false
       description "Tags to include or exclude (e.g., ['integration', '~slow'])"
       default []
-      item_type :string
     end
     
     parameter :max_failures do
@@ -107,7 +106,7 @@ defmodule RubberDuck.Tools.TestRunner do
     security do
       sandbox :restricted
       capabilities [:file_read, :process_spawn, :network_local]
-      rate_limit 20
+      rate_limit [max_requests: 20, window_seconds: 60]
     end
   end
   

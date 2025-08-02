@@ -328,8 +328,8 @@ defmodule RubberDuck.Tools.Agents.TestGeneratorAgent do
   
   @impl true
   def handle_signal(agent, %{"type" => "tool_result"} = signal) do
-    # Let base handle the signal first
-    {:ok, agent} = super(agent, signal)
+    # Process the signal
+    # Note: BaseToolAgent doesn't define handle_signal as overridable
     
     %{"data" => data} = signal
     
@@ -370,8 +370,8 @@ defmodule RubberDuck.Tools.Agents.TestGeneratorAgent do
   end
   
   def handle_signal(agent, signal) do
-    # Delegate to parent for standard handling
-    super(agent, signal)
+    # Return agent unchanged for unhandled signals
+    {:ok, agent}
   end
   
   # Private helpers

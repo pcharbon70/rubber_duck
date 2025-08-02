@@ -29,7 +29,7 @@ defmodule RubberDuck.Tools.Agents.CodeExplainerAgent do
     name: "code_explainer_agent",
     description: "Manages intelligent code explanation and documentation workflows",
     category: "documentation",
-    tags: ["documentation", :explanation, "understanding", :learning],
+    tags: ["documentation", "explanation", "understanding", "learning"],
     schema: [
       # User preferences
       default_audience: [type: :string, default: "intermediate"],
@@ -584,7 +584,7 @@ defmodule RubberDuck.Tools.Agents.CodeExplainerAgent do
     # Update tutorial with explanation
     agent = update_in(agent.state.tutorials[tutorial_id][:steps], fn steps ->
       List.update_at(steps, step_number - 1, fn step ->
-        Map.put(step, :explanation, result["explanation"])
+        Map.put(step, :explanation, result[:explanation])
       end)
     end)
     
@@ -617,7 +617,7 @@ defmodule RubberDuck.Tools.Agents.CodeExplainerAgent do
         
         updated_batch = batch
         |> Map.put(:completed, completed)
-        |> Map.put_in([:explanations, result[:file_path] || "snippet_#{completed}"], result["explanation"])
+        |> Map.put_in([:explanations, result[:file_path] || "snippet_#{completed}"], result[:explanation])
         
         # Check if batch is complete
         if completed >= batch.total_files do

@@ -28,7 +28,7 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
     name: "doc_fetcher_agent",
     description: "Manages intelligent documentation retrieval and caching workflows",
     category: "documentation",
-    tags: ["documentation", "reference", :learning, "api", :knowledge_base],
+    tags: ["documentation", "reference", "learning", "api", "knowledge_base"],
     schema: [
       # Documentation cache
       doc_cache: [type: :map, default: %{}],

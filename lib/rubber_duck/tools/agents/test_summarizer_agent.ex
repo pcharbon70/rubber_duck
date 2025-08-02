@@ -11,7 +11,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
     name: "test_summarizer_agent",
     description: "Orchestrates test result analysis and provides actionable insights",
     category: "testing",
-    tags: ["testing", "analysis", :reporting, "quality", "metrics"],
+    tags: ["testing", "analysis", "reporting", "quality", "metrics"],
     vsn: "1.0.0",
     schema: [
       analysis_config: [

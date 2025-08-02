@@ -37,7 +37,6 @@ defmodule RubberDuck.Tools.TodoExtractor do
       required false
       description "Custom patterns to search for"
       default ["TODO", "FIXME", "HACK", "BUG", "NOTE", "OPTIMIZE"]
-      item_type :string
     end
     
     parameter :include_standard do
@@ -52,7 +51,6 @@ defmodule RubberDuck.Tools.TodoExtractor do
       required false
       description "Keywords that indicate high priority items"
       default ["URGENT", "CRITICAL", "IMPORTANT", "ASAP"]
-      item_type :string
     end
     
     parameter :author_extraction do
@@ -100,7 +98,7 @@ defmodule RubberDuck.Tools.TodoExtractor do
     security do
       sandbox :restricted
       capabilities [:file_read]
-      rate_limit 100
+      rate_limit [max_requests: 100, window_seconds: 60]
     end
   end
   

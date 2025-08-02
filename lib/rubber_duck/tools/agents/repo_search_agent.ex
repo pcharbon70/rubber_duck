@@ -1061,8 +1061,8 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
     })
     emit_signal(agent, signal)
     
-    # Call parent handler
-    super(agent, ExecuteToolAction, {:ok, result}, metadata)
+    # Return updated agent
+    {:ok, agent}
   end
   
   @impl true
@@ -1081,7 +1081,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
     })
     emit_signal(agent, signal)
     
-    # Call parent handler
-    super(agent, ExecuteToolAction, {:error, reason}, metadata)
+    # Return updated agent
+    {:ok, agent}
   end
 end

@@ -28,7 +28,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
     name: "test_runner_agent",
     description: "Manages intelligent test execution and analysis workflows",
     category: "testing",
-    tags: ["testing", "quality", :ci, "automation", :coverage],
+    tags: ["testing", "quality", "ci", "automation", "coverage"],
     schema: [
       # Test execution history
       test_history: [type: {:list, :map}, default: []],

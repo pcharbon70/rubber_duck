@@ -71,20 +71,20 @@ Based on comprehensive analysis of 90+ agent files:
   - [x] `ProviderRateLimitAction` - Handle rate limiting with auto-adjustment
   - [x] `ProviderFailoverAction` - Handle provider failures with intelligent recovery
 
-### 16.2.2 Analysis Agent Migration **CRITICAL**
-- [ ] **16.2.2.1 Convert AnalysisAgent from Behavior**
-  - [ ] Replace `use RubberDuck.Agents.Behavior` with `use RubberDuck.Agents.BaseAgent`
-  - [ ] Extract analysis logic into Jido Actions
-  - [ ] Implement signal-based request handling
-  - [ ] Add proper schema validation
-  - [ ] Create caching and state management
+### 16.2.2 Analysis Agent Migration **CRITICAL** ✅
+- [x] **16.2.2.1 Convert AnalysisAgent from Behavior**
+  - [x] Replace `use RubberDuck.Agents.Behavior` with `use RubberDuck.Agents.BaseAgent`
+  - [x] Extract analysis logic into Jido Actions
+  - [x] Implement signal-based request handling
+  - [x] Add proper schema validation
+  - [x] Create caching and state management
 
-- [ ] **16.2.2.2 Create Analysis Actions**
-  - [ ] `CodeAnalysisAction` - Semantic, style, security analysis
-  - [ ] `ComplexityAnalysisAction` - Code complexity metrics
-  - [ ] `PatternDetectionAction` - Code patterns and anti-patterns
-  - [ ] `SecurityReviewAction` - Security vulnerability detection
-  - [ ] `StyleCheckAction` - Code style verification
+- [x] **16.2.2.2 Create Analysis Actions**
+  - [x] `CodeAnalysisAction` - Semantic, style, security analysis
+  - [x] `ComplexityAnalysisAction` - Code complexity metrics
+  - [x] `PatternDetectionActionV2` - Code patterns and anti-patterns (enhanced)
+  - [x] `SecurityReviewActionV2` - Security vulnerability detection (enhanced)
+  - [x] `StyleCheckActionV2` - Code style verification (enhanced)
 
 ### 16.2.3 Generation Agent Migration **CRITICAL**
 - [ ] **16.2.3.1 Convert GenerationAgent from Behavior**

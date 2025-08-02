@@ -67,7 +67,6 @@ defmodule RubberDuck.Tools.CodeExplainer do
       required false
       description "Specific aspects to focus on"
       default []
-      item_type :string
     end
     
     execution do
@@ -80,7 +79,7 @@ defmodule RubberDuck.Tools.CodeExplainer do
     security do
       sandbox :restricted
       capabilities [:llm_access, :code_analysis]
-      rate_limit 150
+      rate_limit [max_requests: 150, window_seconds: 60]
     end
   end
   

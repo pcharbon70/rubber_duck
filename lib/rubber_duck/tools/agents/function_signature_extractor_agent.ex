@@ -470,8 +470,8 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
         signatures2: [type: {:list, :map}, required: true],
         comparison_type: [
           type: :atom,
-          values: ["api"_changes, :compatibility, :coverage],
-          default: "api"_changes
+          values: [:api_changes, :compatibility, :coverage],
+          default: :api_changes
         ]
       ]
     
@@ -481,7 +481,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
       sigs2 = params.signatures2
       
       comparison = case params.comparison_type do
-        "api"_changes -> compare_api_changes(sigs1, sigs2)
+        :api_changes -> compare_api_changes(sigs1, sigs2)
         :compatibility -> check_compatibility(sigs1, sigs2)
         :coverage -> compare_coverage(sigs1, sigs2)
       end
@@ -750,7 +750,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
   def handle_tool_signal(agent, %{"type" => "compare_signatures"} = signal) do
     signatures1 = get_in(signal, ["data", "signatures1"]) || []
     signatures2 = get_in(signal, ["data", "signatures2"]) || []
-    comparison_type = get_in(signal, ["data", "comparison_type"]) || "api"_changes
+    comparison_type = get_in(signal, ["data", "comparison_type"]) || :api_changes
     
     # Execute signature comparison action
     {:ok, _ref} = __MODULE__.cmd_async(agent, CompareSignaturesAction, %{
