@@ -6,13 +6,16 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
   from multiple sources to provide relevant information for LLM interactions.
   It ensures efficient token usage while maximizing context relevance.
   
+  Migrated to Jido-compliant action-based architecture for better maintainability,
+  testability, and reusability of context management workflows.
+  
   ## Responsibilities
   
-  - Aggregate context from multiple sources
-  - Prioritize content based on relevance and importance
-  - Optimize context size through compression and deduplication
-  - Provide streaming context updates
-  - Track context quality metrics
+  - Route context requests to appropriate Actions
+  - Maintain context sources registry and configuration
+  - Provide centralized context caching and metrics
+  - Handle context lifecycle management
+  - Support streaming and real-time context updates
   
   ## State Structure
   
@@ -44,9 +47,29 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
   use RubberDuck.Agents.BaseAgent,
     name: "context_builder",
     description: "Manages context aggregation, prioritization, and optimization for LLM interactions",
-    category: "memory"
+    category: "memory",
+    schema: [
+      sources: [type: :map, default: %{}, doc: "Registered context sources"],
+      cache: [type: :map, default: %{}, doc: "Built context cache"],
+      active_builds: [type: :map, default: %{}, doc: "Active context builds"],
+      priorities: [type: :map, default: %{}, doc: "Context prioritization weights"],
+      metrics: [type: :map, default: %{}, doc: "Performance and usage metrics"],
+      config: [type: :map, default: %{}, doc: "Agent configuration"]
+    ],
+    actions: [
+      RubberDuck.Jido.Actions.Context.ContextAssemblyAction,
+      RubberDuck.Jido.Actions.Context.ContextCacheAction,
+      RubberDuck.Jido.Actions.Context.ContextSourceManagementAction,
+      RubberDuck.Jido.Actions.Context.ContextConfigurationAction
+    ]
 
   alias RubberDuck.Context.{ContextEntry, ContextSource, ContextRequest}
+  alias RubberDuck.Jido.Actions.Context.{
+    ContextAssemblyAction, 
+    ContextCacheAction,
+    ContextSourceManagementAction,
+    ContextConfigurationAction
+  }
   require Logger
 
   @default_config %{
@@ -95,174 +118,168 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     {:ok, state}
   end
 
-  ## Signal Handlers - Context Operations
-
-    def handle_signal("build_context", data, agent) do
-    request = build_context_request(data)
-    
-    # Check cache first
-    case get_cached_context(agent, request.id) do
-      {:ok, cached_context} ->
-        agent = update_in(agent.metrics.cache_hits, &(&1 + 1))
-        {:ok, cached_context, agent}
-        
-      :not_found ->
-        agent = update_in(agent.metrics.cache_misses, &(&1 + 1))
-        build_new_context(agent, request)
-    end
-  end
-
-    def handle_signal("update_context", data, agent) do
+  ## Action-based Signal Processing
+  
+  # All signal handling now routed through Actions via signal_mappings
+  # This enables:
+  # - Pure function-based business logic
+  # - Reusable action components
+  # - Better testability and maintainability
+  # - Consistent error handling patterns
+  
+  # Signal-to-Action parameter extraction functions
+  
+  # ContextAssemblyAction parameter extractors
+  def extract_build_params(signal_data) do
     %{
-      "request_id" => request_id,
-      "updates" => updates
-    } = data
-    
-    case Map.get(agent.cache, request_id) do
-      nil ->
-        {:error, "Context not found", agent}
-        
-      existing_context ->
-        updated_context = apply_context_updates(existing_context, updates)
-        agent = put_in(agent.cache[request_id], updated_context)
-        
-        {:ok, updated_context, agent}
-    end
-  end
-
-    def handle_signal("stream_context", data, agent) do
-    request = build_context_request(data)
-    chunk_size = data["chunk_size"] || 1000
-    
-    # Start async context building with streaming
-    {:ok, build_pid} = start_streaming_build(agent, request, chunk_size)
-    
-    agent = put_in(agent.active_builds[request.id], %{
-      pid: build_pid,
-      started_at: DateTime.utc_now(),
-      request: request
-    })
-    
-    {:ok, %{"build_id" => request.id, "streaming" => true}, agent}
-  end
-
-    def handle_signal("invalidate_context", %{"pattern" => pattern}, agent) do
-    invalidated = invalidate_cache_entries(agent, pattern)
-    
-    {:ok, %{"invalidated" => length(invalidated)}, agent}
-  end
-
-  ## Signal Handlers - Source Management
-
-    def handle_signal("register_source", data, agent) do
-    source = ContextSource.new(%{
-      id: data["id"] || generate_source_id(),
-      name: data["name"],
-      type: String.to_atom(data["type"]),
-      weight: data["weight"] || 1.0,
-      config: data["config"] || %{},
-      transformer: data["transformer"]
-    })
-    
-    if source.type in @source_types do
-      agent = put_in(agent.sources[source.id], source)
-      
-      emit_signal("source_registered", %{
-        "source_id" => source.id,
-        "type" => source.type
-      })
-      
-      {:ok, %{"source_id" => source.id}, agent}
-    else
-      {:error, "Invalid source type: #{source.type}", agent}
-    end
-  end
-
-    def handle_signal("update_source", data, agent) do
-    %{"source_id" => source_id, "updates" => updates} = data
-    
-    case Map.get(agent.sources, source_id) do
-      nil ->
-        {:error, "Source not found", agent}
-        
-      source ->
-        updated_source = ContextSource.update(source, updates)
-        agent = put_in(agent.sources[source_id], updated_source)
-        
-        {:ok, %{"source" => updated_source}, agent}
-    end
-  end
-
-    def handle_signal("remove_source", %{"source_id" => source_id}, agent) do
-    agent = update_in(agent.sources, &Map.delete(&1, source_id))
-    
-    # Invalidate cache entries using this source
-    agent = invalidate_source_cache(agent, source_id)
-    
-    {:ok, %{"removed" => true}, agent}
-  end
-
-    def handle_signal("get_source_status", %{"source_id" => source_id}, agent) do
-    case Map.get(agent.sources, source_id) do
-      nil ->
-        {:error, "Source not found", agent}
-        
-      source ->
-        status = %{
-          "id" => source.id,
-          "name" => source.name,
-          "type" => source.type,
-          "status" => source.status,
-          "last_fetch" => source.last_fetch,
-          "failure_count" => Map.get(agent.metrics.source_failures, source_id, 0),
-          "weight" => source.weight
-        }
-        
-        {:ok, status, agent}
-    end
-  end
-
-  ## Signal Handlers - Configuration
-
-    def handle_signal("set_priorities", data, agent) do
-    priorities = %{
-      relevance_weight: data["relevance_weight"] || agent.priorities.relevance_weight,
-      recency_weight: data["recency_weight"] || agent.priorities.recency_weight,
-      importance_weight: data["importance_weight"] || agent.priorities.importance_weight
+      mode: :build,
+      request_id: signal_data["request_id"],
+      purpose: signal_data["purpose"] || "general",
+      max_tokens: signal_data["max_tokens"] || @default_config.default_max_tokens,
+      required_sources: signal_data["required_sources"] || [],
+      excluded_sources: signal_data["excluded_sources"] || [],
+      filters: signal_data["filters"] || %{},
+      preferences: signal_data["preferences"] || %{},
+      streaming: signal_data["streaming"] || false,
+      priority: string_to_atom(signal_data["priority"]) || :normal
     }
-    
-    # Normalize weights
-    total = priorities.relevance_weight + priorities.recency_weight + priorities.importance_weight
-    normalized = Map.new(priorities, fn {k, v} -> {k, v / total} end)
-    
-    agent = %{agent | priorities: normalized}
-    
-    {:ok, normalized, agent}
   end
 
-    def handle_signal("configure_limits", data, agent) do
-    config_updates = %{
-      max_cache_size: data["max_cache_size"] || agent.config.max_cache_size,
-      default_max_tokens: data["default_max_tokens"] || agent.config.default_max_tokens,
-      compression_threshold: data["compression_threshold"] || agent.config.compression_threshold,
-      source_timeout: data["source_timeout"] || agent.config.source_timeout
+  def extract_context_update_params(signal_data) do
+    %{
+      mode: :update,
+      request_id: signal_data["request_id"],
+      update_data: signal_data["updates"] || %{}
     }
-    
-    agent = update_in(agent.config, &Map.merge(&1, config_updates))
-    
-    {:ok, agent.config, agent}
   end
 
-    def handle_signal("get_metrics", _data, agent) do
-    metrics = Map.merge(agent.metrics, %{
-      "cache_size" => map_size(agent.cache),
-      "active_builds" => map_size(agent.active_builds),
-      "registered_sources" => map_size(agent.sources),
-      "cache_hit_rate" => calculate_cache_hit_rate(agent)
-    })
-    
-    {:ok, metrics, agent}
+  def extract_stream_params(signal_data) do
+    %{
+      mode: :stream,
+      request_id: signal_data["request_id"],
+      purpose: signal_data["purpose"] || "general",
+      max_tokens: signal_data["max_tokens"] || @default_config.default_max_tokens,
+      chunk_size: signal_data["chunk_size"] || 1000,
+      streaming: true
+    }
   end
+
+  # ContextCacheAction parameter extractors
+  def extract_invalidate_params(signal_data) do
+    %{
+      operation: :invalidate,
+      invalidation_pattern: signal_data["pattern"],
+      request_id: signal_data["request_id"],
+      cache_key: signal_data["cache_key"]
+    }
+  end
+
+  def extract_stats_params(_signal_data) do
+    %{
+      operation: :stats,
+      metrics_enabled: true,
+      include_detailed_metrics: true
+    }
+  end
+
+  def extract_cleanup_params(signal_data) do
+    %{
+      operation: :cleanup,
+      cleanup_threshold: signal_data["threshold"] || 0.8,
+      max_entries: signal_data["max_entries"] || @default_config.max_cache_size
+    }
+  end
+
+  # ContextSourceManagementAction parameter extractors
+  def extract_register_params(signal_data) do
+    %{
+      operation: :register,
+      source_data: signal_data
+    }
+  end
+
+  def extract_source_update_params(signal_data) do
+    %{
+      operation: :update,
+      source_id: signal_data["source_id"],
+      updates: signal_data["updates"] || %{}
+    }
+  end
+
+  def extract_remove_params(signal_data) do
+    %{
+      operation: :remove,
+      source_id: signal_data["source_id"]
+    }
+  end
+
+  def extract_status_params(signal_data) do
+    %{
+      operation: :status,
+      source_id: signal_data["source_id"],
+      include_config: signal_data["include_config"] || false
+    }
+  end
+
+  # ContextConfigurationAction parameter extractors
+  def extract_priorities_params(signal_data) do
+    %{
+      operation: :set_priorities,
+      priorities: %{
+        relevance_weight: signal_data["relevance_weight"],
+        recency_weight: signal_data["recency_weight"],
+        importance_weight: signal_data["importance_weight"]
+      }
+    }
+  end
+
+  def extract_limits_params(signal_data) do
+    %{
+      operation: :configure_limits,
+      limits: signal_data
+    }
+  end
+
+  def extract_metrics_params(signal_data) do
+    %{
+      operation: :get_metrics,
+      include_detailed_metrics: signal_data["detailed"] || false,
+      metrics_time_range: signal_data["time_range"] || 24
+    }
+  end
+
+  # BaseAgent callback implementations
+  
+  @impl RubberDuck.Agents.BaseAgent
+  def signal_mappings do
+    %{
+      # Context operations → ContextAssemblyAction
+      "build_context" => {RubberDuck.Jido.Actions.Context.ContextAssemblyAction, :extract_build_params},
+      "update_context" => {RubberDuck.Jido.Actions.Context.ContextAssemblyAction, :extract_context_update_params},
+      "stream_context" => {RubberDuck.Jido.Actions.Context.ContextAssemblyAction, :extract_stream_params},
+      
+      # Cache operations → ContextCacheAction
+      "invalidate_context" => {RubberDuck.Jido.Actions.Context.ContextCacheAction, :extract_invalidate_params},
+      "get_cache_stats" => {RubberDuck.Jido.Actions.Context.ContextCacheAction, :extract_stats_params},
+      "cleanup_cache" => {RubberDuck.Jido.Actions.Context.ContextCacheAction, :extract_cleanup_params},
+      
+      # Source management → ContextSourceManagementAction
+      "register_source" => {RubberDuck.Jido.Actions.Context.ContextSourceManagementAction, :extract_register_params},
+      "update_source" => {RubberDuck.Jido.Actions.Context.ContextSourceManagementAction, :extract_source_update_params},
+      "remove_source" => {RubberDuck.Jido.Actions.Context.ContextSourceManagementAction, :extract_remove_params},
+      "get_source_status" => {RubberDuck.Jido.Actions.Context.ContextSourceManagementAction, :extract_status_params},
+      
+      # Configuration → ContextConfigurationAction
+      "set_priorities" => {RubberDuck.Jido.Actions.Context.ContextConfigurationAction, :extract_priorities_params},
+      "configure_limits" => {RubberDuck.Jido.Actions.Context.ContextConfigurationAction, :extract_limits_params},
+      "get_metrics" => {RubberDuck.Jido.Actions.Context.ContextConfigurationAction, :extract_metrics_params}
+    }
+  end
+
+  # Helper functions
+  defp string_to_atom(nil), do: nil
+  defp string_to_atom(str) when is_binary(str), do: String.to_atom(str)
+  defp string_to_atom(atom) when is_atom(atom), do: atom
 
   ## Private Functions - Context Building
 
