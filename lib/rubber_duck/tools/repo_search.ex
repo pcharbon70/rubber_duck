@@ -83,7 +83,6 @@ defmodule RubberDuck.Tools.RepoSearch do
       required false
       description "Patterns to exclude from search"
       default ["_build/**", "deps/**", ".git/**", "node_modules/**"]
-      item_type :string
     end
     
     execution do
@@ -96,7 +95,7 @@ defmodule RubberDuck.Tools.RepoSearch do
     security do
       sandbox :restricted
       capabilities [:file_read]
-      rate_limit 200
+      rate_limit [max_requests: 200, window_seconds: 60]
     end
   end
   

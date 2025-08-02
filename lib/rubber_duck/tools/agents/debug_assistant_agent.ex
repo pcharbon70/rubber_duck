@@ -30,7 +30,7 @@ defmodule RubberDuck.Tools.Agents.DebugAssistantAgent do
     name: "debug_assistant_agent",
     description: "Manages intelligent error analysis and debugging workflows",
     category: "debugging",
-    tags: ["debugging", :troubleshooting, :error_analysis, :diagnostics],
+    tags: ["debugging", "troubleshooting", "error_analysis", "diagnostics"],
     schema: [
       # Active debugging sessions
       debug_sessions: [type: :map, default: %{}],

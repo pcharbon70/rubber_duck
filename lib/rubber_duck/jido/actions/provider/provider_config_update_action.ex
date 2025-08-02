@@ -33,7 +33,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderConfigUpdateAction do
     
     try do
       # Validate the agent has the expected state structure
-      unless is_valid_provider_agent?(agent) do
+      if not is_valid_provider_agent?(agent) do
         {:error, {:invalid_provider_agent, "Agent does not have provider configuration"}}
       else
       
@@ -62,6 +62,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderConfigUpdateAction do
         {:error, validation_errors} ->
           {:error, {:config_validation_failed, validation_errors}}
       end
+      end # This closes the if statement from line 36
       
     rescue
       error ->

@@ -30,7 +30,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     name: "regex_extractor_agent",
     description: "Manages intelligent regex pattern extraction and optimization workflows",
     category: "text_analysis",
-    tags: [:regex, :pattern_extraction, :text_processing, :data_mining],
+    tags: ["regex", "pattern_extraction", "text_processing", "data_mining"],
     schema: [
       # Pattern management
       custom_patterns: [type: :map, default: %{}],
@@ -1596,8 +1596,8 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     })
     emit_signal(agent, signal)
     
-    # Call parent handler
-    super(agent, ExecuteToolAction, {:ok, result}, metadata)
+    # Return updated agent
+    {:ok, agent}
   end
   
   @impl true
@@ -1616,8 +1616,8 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     })
     emit_signal(agent, signal)
     
-    # Call parent handler
-    super(agent, ExecuteToolAction, {:error, reason}, metadata)
+    # Return updated agent
+    {:ok, agent}
   end
   
   # Helper functions

@@ -13,6 +13,7 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
   
   use RubberDuck.Tools.Agents.BaseToolAgent,
     tool: :cve_checker,
+    name: "cve_analyzer_agent",
     description: "Analyzes CVE vulnerabilities across dependency chains"
   
   # Additional actions for CVE analysis

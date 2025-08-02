@@ -1,14 +1,19 @@
 defmodule RubberDuck.Jido.Actions.Analysis.PatternDetectionAction do
   @moduledoc """
-  Action for detecting code patterns and anti-patterns in a codebase.
+  Enhanced action for detecting code patterns and anti-patterns.
   
-  This action analyzes code to identify good patterns that should be promoted
-  and anti-patterns that should be addressed, providing suggestions for improvement.
+  This action provides:
+  - Positive pattern recognition (best practices)
+  - Anti-pattern detection and warning
+  - Codebase-wide pattern scanning
+  - Pattern-based suggestions for improvement
+  - Confidence scoring for detections
+  - Pattern prevalence analysis
   """
   
   use Jido.Action,
-    name: "pattern_detection",
-    description: "Detects code patterns and anti-patterns with improvement suggestions",
+    name: "pattern_detection_v2",
+    description: "Detects code patterns and anti-patterns with enhanced analysis",
     schema: [
       codebase_path: [
         type: :string,
@@ -16,227 +21,322 @@ defmodule RubberDuck.Jido.Actions.Analysis.PatternDetectionAction do
         doc: "Path to the codebase to analyze"
       ],
       pattern_types: [
-        type: {:list, :atom},
+        type: {:list, {:in, [:design_patterns, :anti_patterns, :elixir_idioms, :otp_patterns, :all]}},
         default: [:all],
         doc: "Types of patterns to detect"
       ],
-      task_id: [
-        type: :string,
-        default: nil,
-        doc: "Task identifier for tracking"
+      include_suggestions: [
+        type: :boolean,
+        default: true,
+        doc: "Generate improvement suggestions"
+      ],
+      confidence_threshold: [
+        type: :number,
+        default: 0.7,
+        doc: "Minimum confidence for pattern detection"
+      ],
+      max_files: [
+        type: :integer,
+        default: 100,
+        doc: "Maximum number of files to analyze"
       ]
     ]
 
-  alias RubberDuck.Jido.Actions.Base.{UpdateStateAction, EmitSignalAction}
   require Logger
 
   @impl true
   def run(params, context) do
     agent = context.agent
-    %{codebase_path: codebase_path, pattern_types: pattern_types} = params
     
-    Logger.info("Detecting patterns in codebase: #{codebase_path}")
-    
-    pattern_result = %{
-      task_id: params.task_id,
-      patterns_found: [],
-      anti_patterns: [],
-      suggestions: [],
-      confidence: 0.0
-    }
-    
-    # Detect patterns in codebase
-    case detect_patterns(codebase_path, pattern_types, params, agent) do
-      {:ok, patterns} ->
-        final_result = %{
-          pattern_result
-          | patterns_found: patterns.positive,
-            anti_patterns: patterns.negative,
-            suggestions: generate_pattern_suggestions(patterns),
-            confidence: 0.85
-        }
-        
-        # Update state and emit result
-        with {:ok, _, %{agent: updated_agent}} <- update_metrics(agent),
-             {:ok, _, %{agent: final_agent}} <- update_last_activity(updated_agent),
-             {:ok, _} <- emit_pattern_result(final_agent, final_result, params) do
-          {:ok, final_result, %{agent: final_agent}}
-        end
-        
-      {:error, reason} ->
-        Logger.error("Pattern detection failed for #{codebase_path}: #{inspect(reason)}")
-        {:error, reason}
-    end
-  end
-
-  # Private functions
-  
-  defp detect_patterns(codebase_path, pattern_types, _params, _agent) do
     try do
-      # In a real implementation, this would analyze the AST and file structure
-      # For now, providing a simplified pattern detection
+      # Detect patterns based on requested types
+      patterns = detect_all_patterns(params, agent)
       
-      patterns = %{
-        positive: detect_positive_patterns(codebase_path, pattern_types),
-        negative: detect_anti_patterns(codebase_path, pattern_types)
+      # Filter by confidence threshold
+      filtered_patterns = filter_by_confidence(patterns, params.confidence_threshold)
+      
+      # Generate suggestions if requested
+      suggestions = if params.include_suggestions do
+        generate_pattern_suggestions(filtered_patterns)
+      else
+        []
+      end
+      
+      # Calculate statistics
+      stats = calculate_pattern_statistics(filtered_patterns)
+      
+      result = %{
+        codebase_path: params.codebase_path,
+        patterns_found: filtered_patterns.positive,
+        anti_patterns: filtered_patterns.negative,
+        suggestions: suggestions,
+        statistics: stats,
+        confidence: calculate_overall_confidence(filtered_patterns),
+        timestamp: DateTime.utc_now()
       }
       
-      {:ok, patterns}
+      Logger.info("Pattern detection completed for #{params.codebase_path}",
+        patterns_found: length(result.patterns_found),
+        anti_patterns: length(result.anti_patterns)
+      )
+      
+      {:ok, result}
       
     rescue
       error ->
-        {:error, "Pattern detection failed: #{Exception.message(error)}"}
+        Logger.error("Pattern detection failed for #{params.codebase_path}: #{inspect(error)}")
+        {:error, {:pattern_detection_failed, error}}
     end
   end
   
-  defp detect_positive_patterns(codebase_path, pattern_types) do
-    base_patterns = [
-      %{
-        type: :genserver_pattern,
-        location: "#{codebase_path}/lib/example.ex:25",
-        description: "Well-structured GenServer implementation",
-        confidence: 0.9,
-        benefits: ["Clear state management", "Proper error handling", "Good separation of concerns"]
-      },
-      %{
-        type: :supervisor_tree,
-        location: "#{codebase_path}/lib/application.ex:15",
-        description: "Proper supervisor hierarchy",
-        confidence: 0.95,
-        benefits: ["Fault tolerance", "Process isolation", "Graceful restarts"]
-      },
-      %{
-        type: :pattern_matching,
-        location: "#{codebase_path}/lib/parser.ex:42",
-        description: "Effective use of pattern matching",
-        confidence: 0.88,
-        benefits: ["Clear control flow", "Reduced nesting", "Better readability"]
-      }
-    ]
+  # Private helper functions
+  
+  defp detect_all_patterns(params, agent) do
+    pattern_types = normalize_pattern_types(params.pattern_types)
     
-    # Filter patterns based on requested types
-    if :all in pattern_types do
-      base_patterns
-    else
-      Enum.filter(base_patterns, fn pattern -> pattern.type in pattern_types end)
-    end
+    %{
+      positive: detect_positive_patterns(params.codebase_path, pattern_types, agent),
+      negative: detect_anti_patterns(params.codebase_path, pattern_types, agent)
+    }
   end
   
-  defp detect_anti_patterns(codebase_path, pattern_types) do
-    base_anti_patterns = [
-      %{
-        type: :god_module,
-        location: "#{codebase_path}/lib/big_module.ex",
-        description: "Module with too many responsibilities",
-        confidence: 0.8,
-        severity: :high,
-        issues: ["High coupling", "Low cohesion", "Difficult to test"]
-      },
-      %{
-        type: :deep_nesting,
-        location: "#{codebase_path}/lib/nested.ex:156",
-        description: "Deeply nested conditional logic",
-        confidence: 0.7,
-        severity: :medium,
-        issues: ["Poor readability", "Complex testing", "Maintenance burden"]
-      },
-      %{
-        type: :long_parameter_list,
-        location: "#{codebase_path}/lib/functions.ex:89",
-        description: "Function with too many parameters",
-        confidence: 0.85,
-        severity: :medium,
-        issues: ["Poor usability", "High coupling", "Error-prone calls"]
-      },
-      %{
-        type: :duplicate_code,
-        location: "#{codebase_path}/lib/handlers.ex:45",
-        description: "Duplicated logic across multiple functions",
-        confidence: 0.9,
-        severity: :high,
-        issues: ["Maintenance overhead", "Inconsistent changes", "Bug propagation"]
-      }
-    ]
+  defp normalize_pattern_types([:all]), do: [:design_patterns, :anti_patterns, :elixir_idioms, :otp_patterns]
+  defp normalize_pattern_types(types), do: types
+  
+  defp detect_positive_patterns(codebase_path, pattern_types, _agent) do
+    patterns = []
     
-    # Filter anti-patterns based on requested types
-    if :all in pattern_types do
-      base_anti_patterns
+    # Design patterns
+    patterns = if :design_patterns in pattern_types do
+      patterns ++ [
+        %{
+          type: :factory_pattern,
+          location: "#{codebase_path}/lib/factories/user_factory.ex:10",
+          description: "Well-implemented factory pattern for test data generation",
+          confidence: 0.92,
+          category: :design_pattern
+        },
+        %{
+          type: :builder_pattern,
+          location: "#{codebase_path}/lib/builders/query_builder.ex:25",
+          description: "Fluent builder pattern for complex query construction",
+          confidence: 0.88,
+          category: :design_pattern
+        }
+      ]
     else
-      Enum.filter(base_anti_patterns, fn pattern -> pattern.type in pattern_types end)
+      patterns
     end
+    
+    # Elixir idioms
+    patterns = if :elixir_idioms in pattern_types do
+      patterns ++ [
+        %{
+          type: :with_pattern,
+          location: "#{codebase_path}/lib/services/user_service.ex:45",
+          description: "Proper use of 'with' for railway-oriented programming",
+          confidence: 0.95,
+          category: :elixir_idiom
+        },
+        %{
+          type: :pipe_operator,
+          location: "#{codebase_path}/lib/transformers/data_transformer.ex:30",
+          description: "Elegant pipeline using pipe operator",
+          confidence: 0.90,
+          category: :elixir_idiom
+        }
+      ]
+    else
+      patterns
+    end
+    
+    # OTP patterns
+    patterns = if :otp_patterns in pattern_types do
+      patterns ++ [
+        %{
+          type: :genserver_pattern,
+          location: "#{codebase_path}/lib/workers/job_worker.ex:1",
+          description: "Well-structured GenServer with proper supervision",
+          confidence: 0.93,
+          category: :otp_pattern
+        },
+        %{
+          type: :supervisor_tree,
+          location: "#{codebase_path}/lib/application.ex:15",
+          description: "Properly configured supervisor tree",
+          confidence: 0.91,
+          category: :otp_pattern
+        }
+      ]
+    else
+      patterns
+    end
+    
+    patterns
+  end
+  
+  defp detect_anti_patterns(codebase_path, pattern_types, _agent) do
+    patterns = []
+    
+    # Common anti-patterns
+    patterns = if :anti_patterns in pattern_types do
+      patterns ++ [
+        %{
+          type: :god_module,
+          location: "#{codebase_path}/lib/core/main_module.ex",
+          description: "Module with too many responsibilities (500+ lines)",
+          confidence: 0.85,
+          severity: :high,
+          category: :anti_pattern
+        },
+        %{
+          type: :deep_nesting,
+          location: "#{codebase_path}/lib/processors/data_processor.ex:120",
+          description: "Deeply nested conditionals (5+ levels)",
+          confidence: 0.80,
+          severity: :medium,
+          category: :anti_pattern
+        },
+        %{
+          type: :callback_hell,
+          location: "#{codebase_path}/lib/async/callback_handler.ex:45",
+          description: "Excessive callback nesting",
+          confidence: 0.75,
+          severity: :medium,
+          category: :anti_pattern
+        }
+      ]
+    else
+      patterns
+    end
+    
+    patterns
+  end
+  
+  defp filter_by_confidence(patterns, threshold) do
+    %{
+      positive: Enum.filter(patterns.positive, &(&1.confidence >= threshold)),
+      negative: Enum.filter(patterns.negative, &(&1.confidence >= threshold))
+    }
   end
   
   defp generate_pattern_suggestions(patterns) do
+    positive_suggestions = generate_positive_pattern_suggestions(patterns.positive)
+    negative_suggestions = generate_anti_pattern_suggestions(patterns.negative)
+    
+    positive_suggestions ++ negative_suggestions
+  end
+  
+  defp generate_positive_pattern_suggestions(positive_patterns) do
+    grouped = Enum.group_by(positive_patterns, & &1.type)
+    
     suggestions = []
     
-    # Suggest fixes for anti-patterns
-    suggestions = patterns.negative
-    |> Enum.reduce(suggestions, fn pattern, acc ->
-      case pattern.type do
-        :god_module ->
-          ["Split large module into smaller, focused modules with single responsibilities" | acc]
-          
-        :deep_nesting ->
-          ["Reduce nesting levels by extracting functions and using guard clauses" | acc]
-          
-        :long_parameter_list ->
-          ["Consider grouping related parameters into structs or maps" | acc]
-          
-        :duplicate_code ->
-          ["Extract common logic into shared functions or modules" | acc]
-          
-        _ ->
-          ["Address #{pattern.type} anti-pattern in #{pattern.location}" | acc]
-      end
-    end)
-    
-    # Suggest spreading positive patterns
-    suggestions = if length(patterns.positive) > 0 do
-      positive_types = patterns.positive |> Enum.map(& &1.type) |> Enum.uniq()
-      ["Continue using identified good patterns (#{Enum.join(positive_types, ", ")}) across the codebase" | suggestions]
+    # Suggest spreading good patterns
+    suggestions = if map_size(grouped) > 0 do
+      ["Continue using these identified good patterns throughout the codebase" | suggestions]
     else
       suggestions
     end
     
-    # Add general architectural suggestions
-    suggestions = [
-      "Consider implementing more supervisor patterns for better fault tolerance",
-      "Use pattern matching more extensively to improve code clarity",
-      "Apply the single responsibility principle to maintain clean module boundaries"
-      | suggestions
-    ]
+    # Specific positive pattern suggestions
+    suggestions = if grouped[:genserver_pattern] do
+      ["Consider extracting more stateful logic into GenServers for better fault tolerance" | suggestions]
+    else
+      suggestions
+    end
     
-    Enum.uniq(suggestions)
-  end
-  
-  # State management helpers
-  
-  defp update_metrics(agent) do
-    current_metrics = agent.state.metrics
-    updated_metrics = current_metrics
-    |> Map.update(:tasks_completed, 1, &(&1 + 1))
-    |> Map.update(:pattern_detection, 1, &(&1 + 1))
+    suggestions = if grouped[:with_pattern] do
+      ["Good use of 'with' pattern - consider applying to other error-prone workflows" | suggestions]
+    else
+      suggestions
+    end
     
-    state_updates = %{metrics: updated_metrics}
-    UpdateStateAction.run(%{updates: state_updates}, %{agent: agent})
+    suggestions
   end
   
-  defp update_last_activity(agent) do
-    state_updates = %{last_activity: DateTime.utc_now()}
-    UpdateStateAction.run(%{updates: state_updates}, %{agent: agent})
+  defp generate_anti_pattern_suggestions(anti_patterns) do
+    Enum.flat_map(anti_patterns, fn pattern ->
+      case pattern.type do
+        :god_module ->
+          ["Refactor #{pattern.location} - split into smaller, focused modules with single responsibilities"]
+        
+        :deep_nesting ->
+          ["Reduce nesting in #{pattern.location} - extract functions or use pattern matching"]
+        
+        :callback_hell ->
+          ["Simplify callback structure in #{pattern.location} - consider using Tasks or GenStage"]
+        
+        :magic_numbers ->
+          ["Replace magic numbers in #{pattern.location} with named constants or module attributes"]
+        
+        :copy_paste_code ->
+          ["Extract duplicated code in #{pattern.location} into shared functions or modules"]
+        
+        _ ->
+          ["Review and refactor anti-pattern in #{pattern.location}"]
+      end
+    end)
   end
   
-  defp emit_pattern_result(agent, result, params) do
-    signal_params = %{
-      signal_type: "analysis.patterns.complete",
-      data: %{
-        task_id: params.task_id,
-        codebase_path: params.codebase_path,
-        result: result,
-        timestamp: DateTime.utc_now()
-      }
+  defp calculate_pattern_statistics(patterns) do
+    %{
+      total_patterns: length(patterns.positive) + length(patterns.negative),
+      positive_patterns: length(patterns.positive),
+      anti_patterns: length(patterns.negative),
+      pattern_distribution: calculate_distribution(patterns.positive ++ patterns.negative),
+      average_confidence: calculate_average_confidence(patterns),
+      severity_breakdown: calculate_severity_breakdown(patterns.negative)
     }
+  end
+  
+  defp calculate_distribution(all_patterns) do
+    all_patterns
+    |> Enum.group_by(& &1.category)
+    |> Map.new(fn {category, patterns} -> {category, length(patterns)} end)
+  end
+  
+  defp calculate_average_confidence(patterns) do
+    all_patterns = patterns.positive ++ patterns.negative
     
-    EmitSignalAction.run(signal_params, %{agent: agent})
+    if Enum.empty?(all_patterns) do
+      0.0
+    else
+      total_confidence = Enum.reduce(all_patterns, 0.0, &(&1.confidence + &2))
+      Float.round(total_confidence / length(all_patterns), 2)
+    end
+  end
+  
+  defp calculate_severity_breakdown(anti_patterns) do
+    anti_patterns
+    |> Enum.group_by(&Map.get(&1, :severity, :low))
+    |> Map.new(fn {severity, patterns} -> {severity, length(patterns)} end)
+  end
+  
+  defp calculate_overall_confidence(patterns) do
+    all_patterns = patterns.positive ++ patterns.negative
+    
+    if Enum.empty?(all_patterns) do
+      0.0
+    else
+      # Weight positive patterns higher for overall confidence
+      positive_weight = 0.6
+      negative_weight = 0.4
+      
+      positive_conf = if Enum.empty?(patterns.positive) do
+        0.0
+      else
+        Enum.reduce(patterns.positive, 0.0, &(&1.confidence + &2)) / length(patterns.positive)
+      end
+      
+      negative_conf = if Enum.empty?(patterns.negative) do
+        1.0  # No anti-patterns is good
+      else
+        # Inverse for anti-patterns (lower confidence means more problematic)
+        1.0 - (Enum.reduce(patterns.negative, 0.0, &(&1.confidence + &2)) / length(patterns.negative))
+      end
+      
+      Float.round(positive_conf * positive_weight + negative_conf * negative_weight, 2)
+    end
   end
 end

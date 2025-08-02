@@ -73,7 +73,6 @@ defmodule RubberDuck.Tools.DebugAssistant do
       required false
       description "Previous debugging attempts that didn't work"
       default []
-      item_type :string
     end
     
     parameter :error_history do
@@ -81,7 +80,6 @@ defmodule RubberDuck.Tools.DebugAssistant do
       required false
       description "Recent errors in the same session/module"
       default []
-      item_type :string
     end
     
     parameter :include_examples do
@@ -101,7 +99,7 @@ defmodule RubberDuck.Tools.DebugAssistant do
     security do
       sandbox :restricted
       capabilities [:llm_access]
-      rate_limit 100
+      rate_limit [max_requests: 100, window_seconds: 60]
     end
   end
   

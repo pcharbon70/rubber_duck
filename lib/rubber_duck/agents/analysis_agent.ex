@@ -1,6 +1,6 @@
 defmodule RubberDuck.Agents.AnalysisAgent do
   @moduledoc """
-  Analysis Agent specialized in code analysis using existing analysis engines.
+  Analysis Agent specialized in code analysis using Jido-compliant actions.
 
   The Analysis Agent is responsible for:
   - Performing semantic, style, and security analysis on code
@@ -8,6 +8,10 @@ defmodule RubberDuck.Agents.AnalysisAgent do
   - Providing comprehensive code quality assessments
   - Generating actionable insights and recommendations
   - Supporting incremental analysis for performance
+
+  ## Jido Compliance
+  This agent has been fully migrated to use Jido.Agent patterns with action-based
+  architecture. All business logic is extracted into reusable Actions.
 
   ## Capabilities
 
@@ -17,139 +21,185 @@ defmodule RubberDuck.Agents.AnalysisAgent do
   - `:pattern_detection` - Identifying code patterns and anti-patterns
   - `:style_checking` - Code style and formatting analysis
 
-  ## Task Types
+  ## Signals
 
-  - `:analyze_code` - Comprehensive code analysis
-  - `:security_review` - Security-focused analysis
-  - `:complexity_analysis` - Complexity metrics calculation
-  - `:pattern_detection` - Pattern and anti-pattern detection
-  - `:style_check` - Style and formatting verification
+  The agent responds to the following signals:
+  - `analysis.code.request` - Triggers comprehensive code analysis
+  - `analysis.security.request` - Triggers security review
+  - `analysis.complexity.request` - Triggers complexity analysis
+  - `analysis.pattern.request` - Triggers pattern detection
+  - `analysis.style.request` - Triggers style checking
 
   ## Example Usage
 
-      # Analyze code file
-      task = %{
-        id: "analysis_1",
-        type: :analyze_code,
-        payload: %{
-          file_path: "lib/example.ex",
-          analysis_types: [:semantic, :style, :security]
+      # Via signal
+      signal = %{
+        "type" => "analysis.code.request",
+        "data" => %{
+          "file_path" => "lib/example.ex",
+          "analysis_types" => ["semantic", "style", "security"]
         }
       }
 
-      {:ok, result} = Agent.assign_task(agent_pid, task, context)
+      Jido.Signal.Bus.publish(signal)
   """
 
-  use RubberDuck.Agents.Behavior
+  use RubberDuck.Agents.BaseAgent,
+    name: "analysis_agent",
+    description: "Code analysis and quality assessment agent",
+    schema: [
+      analysis_cache: [
+        type: :map,
+        default: %{},
+        doc: "Cache for analysis results"
+      ],
+      engines: [
+        type: :map,
+        default: %{},
+        doc: "Analysis engine configurations"
+      ],
+      metrics: [
+        type: :map,
+        default: %{
+          tasks_completed: 0,
+          cache_hits: 0,
+          cache_misses: 0,
+          total_execution_time: 0
+        },
+        doc: "Agent performance metrics"
+      ],
+      last_activity: [
+        type: {:or, [:datetime, :nil]},
+        default: nil,
+        doc: "Last activity timestamp"
+      ],
+      enable_self_correction: [
+        type: :boolean,
+        default: true,
+        doc: "Enable self-correction for analysis results"
+      ],
+      cache_ttl_seconds: [
+        type: :integer,
+        default: 3600,
+        doc: "Cache time-to-live in seconds"
+      ],
+      capabilities: [
+        type: {:list, :atom},
+        default: [
+          :code_analysis,
+          :security_analysis,
+          :complexity_analysis,
+          :pattern_detection,
+          :style_checking
+        ],
+        doc: "Agent capabilities"
+      ]
+    ],
+    actions: [
+      RubberDuck.Jido.Actions.Analysis.CodeAnalysisAction,
+      RubberDuck.Jido.Actions.Analysis.ComplexityAnalysisAction,
+      RubberDuck.Jido.Actions.Analysis.PatternDetectionAction,
+      RubberDuck.Jido.Actions.Analysis.SecurityReviewAction,
+      RubberDuck.Jido.Actions.Analysis.StyleCheckAction
+    ]
 
-  alias RubberDuck.Analysis.{Semantic, Style, Security}
-  alias RubberDuck.SelfCorrection.Engine, as: SelfCorrection
-  # alias RubberDuck.LLM.Service, as: LLMService
-
+  
   require Logger
 
-  @capabilities [
-    :code_analysis,
-    :security_analysis,
-    :complexity_analysis,
-    :pattern_detection,
-    :style_checking
-  ]
-
-  # Behavior Implementation
-
+  # Signal-to-Action Mappings
+  # This replaces the old handle_task callbacks with Jido signal routing
+  
   @impl true
-  def init(config) do
-    state = %{
-      config: config,
-      analysis_cache: %{},
-      engines: initialize_engines(config),
-      metrics: initialize_metrics(),
-      last_activity: DateTime.utc_now()
-    }
-
-    Logger.info("Analysis Agent initialized with config: #{inspect(config)}")
-    {:ok, state}
-  end
-
-  @impl true
-  def handle_task(task, context, state) do
-    Logger.info("Analysis Agent handling task: #{task.type}")
-
-    case task.type do
-      :analyze_code ->
-        handle_analyze_code(task, context, state)
-
-      :security_review ->
-        handle_security_review(task, context, state)
-
-      :complexity_analysis ->
-        handle_complexity_analysis(task, context, state)
-
-      :pattern_detection ->
-        handle_pattern_detection(task, context, state)
-
-      :style_check ->
-        handle_style_check(task, context, state)
-
-      _ ->
-        {:error, {:unsupported_task_type, task.type}, state}
-    end
-  end
-
-  @impl true
-  def handle_message(message, from, state) do
-    case message do
-      {:analysis_request, file_path, analysis_types} ->
-        result = perform_quick_analysis(file_path, analysis_types, state)
-        send_response(from, {:analysis_result, result})
-        {:ok, state}
-
-      {:cache_query, file_path} ->
-        result = Map.get(state.analysis_cache, file_path)
-        send_response(from, {:cache_result, result})
-        {:ok, state}
-
-      {:engine_status} ->
-        status = get_engine_status(state.engines)
-        send_response(from, {:engine_status, status})
-        {:ok, state}
-
-      _ ->
-        Logger.debug("Analysis Agent received unknown message: #{inspect(message)}")
-        {:noreply, state}
-    end
-  end
-
-  @impl true
-  def get_capabilities(_state) do
-    @capabilities
-  end
-
-  @impl true
-  def get_status(state) do
+  def signal_mappings do
     %{
-      status: determine_status(state),
-      current_task: Map.get(state, :current_task),
-      metrics: state.metrics,
-      health: %{
-        healthy: true,
-        cache_size: map_size(state.analysis_cache),
-        engines_loaded: map_size(state.engines)
-      },
-      last_activity: state.last_activity,
-      capabilities: @capabilities
+      "analysis.code.request" => {RubberDuck.Jido.Actions.Analysis.CodeAnalysisAction, :extract_code_params},
+      "analysis.security.request" => {RubberDuck.Jido.Actions.Analysis.SecurityReviewAction, :extract_security_params},
+      "analysis.complexity.request" => {RubberDuck.Jido.Actions.Analysis.ComplexityAnalysisAction, :extract_complexity_params},
+      "analysis.pattern.request" => {RubberDuck.Jido.Actions.Analysis.PatternDetectionAction, :extract_pattern_params},
+      "analysis.style.request" => {RubberDuck.Jido.Actions.Analysis.StyleCheckAction, :extract_style_params}
     }
   end
-
+  
+  # Parameter extraction functions for signal-to-action mapping
+  
+  def extract_code_params(%{"data" => data}) do
+    %{
+      file_path: data["file_path"],
+      analysis_types: parse_analysis_types(data["analysis_types"]),
+      enable_cache: Map.get(data, "enable_cache", true),
+      apply_self_correction: Map.get(data, "apply_self_correction", true),
+      include_metrics: Map.get(data, "include_metrics", true)
+    }
+  end
+  
+  def extract_security_params(%{"data" => data}) do
+    %{
+      file_paths: ensure_list(data["file_paths"]),
+      vulnerability_types: parse_vulnerability_types(data["vulnerability_types"]),
+      severity_threshold: parse_severity(data["severity_threshold"]),
+      include_remediation: Map.get(data, "include_remediation", true),
+      check_dependencies: Map.get(data, "check_dependencies", true)
+    }
+  end
+  
+  def extract_complexity_params(%{"data" => data}) do
+    %{
+      module_path: data["module_path"],
+      metrics: parse_metrics(data["metrics"]),
+      include_recommendations: Map.get(data, "include_recommendations", true),
+      include_function_details: Map.get(data, "include_function_details", false)
+    }
+  end
+  
+  def extract_pattern_params(%{"data" => data}) do
+    %{
+      codebase_path: data["codebase_path"],
+      pattern_types: parse_pattern_types(data["pattern_types"]),
+      include_suggestions: Map.get(data, "include_suggestions", true),
+      confidence_threshold: Map.get(data, "confidence_threshold", 0.7)
+    }
+  end
+  
+  def extract_style_params(%{"data" => data}) do
+    %{
+      file_paths: ensure_list(data["file_paths"]),
+      style_rules: parse_style_rules(data["style_rules"]),
+      detect_auto_fixable: Map.get(data, "detect_auto_fixable", true),
+      check_formatting: Map.get(data, "check_formatting", true),
+      max_line_length: Map.get(data, "max_line_length", 120)
+    }
+  end
+  
+  # Lifecycle hooks for Jido compliance
+  
   @impl true
-  def terminate(_reason, _state) do
-    Logger.info("Analysis Agent terminating, cleaning up cache")
-    # Clean up any resources if needed
-    :ok
+  def on_before_init(config) do
+    # Initialize engines based on configuration
+    engines = initialize_engines(config)
+    
+    # Merge engine configuration into initial state
+    Map.put(config, :engines, engines)
+  end
+  
+  @impl true
+  def on_after_start(agent) do
+    Logger.info("Analysis Agent started successfully", 
+      name: agent.name,
+      capabilities: agent.state.capabilities
+    )
+    agent
+  end
+  
+  @impl true
+  def on_before_stop(agent) do
+    Logger.info("Analysis Agent stopping, cleaning up cache",
+      cache_size: map_size(agent.state.analysis_cache)
+    )
+    agent
   end
 
   # Helper Functions
+  # These are preserved for backward compatibility and utility
 
   defp initialize_engines(config) do
     engines = Map.get(config, :engines, [:semantic, :style, :security])
@@ -166,514 +216,45 @@ defmodule RubberDuck.Agents.AnalysisAgent do
   defp get_engine_module(:semantic), do: RubberDuck.Analysis.Semantic
   defp get_engine_module(:style), do: RubberDuck.Analysis.Style
   defp get_engine_module(:security), do: RubberDuck.Analysis.Security
-
-  defp initialize_metrics do
-    %{
-      tasks_completed: 0,
-      analyze_code: 0,
-      analyze_code_cached: 0,
-      security_review: 0,
-      complexity_analysis: 0,
-      pattern_detection: 0,
-      style_check: 0,
-      total_execution_time: 0,
-      cache_hits: 0,
-      cache_misses: 0
-    }
+  
+  # Parsing helper functions for signal parameter extraction
+  
+  defp parse_analysis_types(nil), do: [:semantic, :style, :security]
+  defp parse_analysis_types(types) when is_list(types) do
+    Enum.map(types, &String.to_atom/1)
   end
-
-  defp update_task_metrics(metrics, task_type) do
-    metrics
-    |> Map.update(:tasks_completed, 1, &(&1 + 1))
-    |> Map.update(task_type, 1, &(&1 + 1))
+  defp parse_analysis_types(type) when is_binary(type) do
+    [String.to_atom(type)]
   end
-
-  defp determine_status(state) do
-    if Map.has_key?(state, :current_task) do
-      :busy
-    else
-      :idle
-    end
+  
+  defp parse_vulnerability_types(nil), do: [:all]
+  defp parse_vulnerability_types("all"), do: [:all]
+  defp parse_vulnerability_types(types) when is_list(types) do
+    Enum.map(types, &String.to_atom/1)
   end
-
-  defp generate_complexity_recommendations(metrics) do
-    recommendations = []
-
-    cyclomatic = Map.get(metrics, :cyclomatic, 0)
-
-    recommendations =
-      if cyclomatic > 10 do
-        ["Consider breaking down complex functions (cyclomatic complexity: #{cyclomatic})"] ++ recommendations
-      else
-        recommendations
-      end
-
-    cognitive = Map.get(metrics, :cognitive, 0)
-
-    recommendations =
-      if cognitive > 15 do
-        ["High cognitive complexity detected (#{cognitive}). Simplify logic flow."] ++ recommendations
-      else
-        recommendations
-      end
-
-    recommendations
+  
+  defp parse_severity(nil), do: :low
+  defp parse_severity(severity) when is_binary(severity) do
+    String.to_atom(severity)
   end
-
-  # Task Handlers
-
-  defp handle_analyze_code(%{payload: payload} = _task, context, state) do
-    file_path = payload.file_path
-    analysis_types = Map.get(payload, :analysis_types, [:semantic, :style, :security])
-
-    # Check cache first
-    cache_key = {file_path, analysis_types}
-
-    case Map.get(state.analysis_cache, cache_key) do
-      nil ->
-        # Perform fresh analysis
-        analysis_result = perform_comprehensive_analysis(file_path, analysis_types, context, state)
-
-        # Apply self-correction if configured
-        final_result =
-          if Map.get(state.config, :enable_self_correction, true) do
-            apply_self_correction(analysis_result, context, state)
-          else
-            analysis_result
-          end
-
-        # Update cache
-        new_cache = Map.put(state.analysis_cache, cache_key, final_result)
-
-        new_state = %{
-          state
-          | analysis_cache: new_cache,
-            metrics: update_task_metrics(state.metrics, :analyze_code),
-            last_activity: DateTime.utc_now()
-        }
-
-        {:ok, final_result, new_state}
-
-      cached_result ->
-        # Return cached result
-        Logger.debug("Returning cached analysis for #{file_path}")
-
-        new_state = %{
-          state
-          | metrics: update_task_metrics(state.metrics, :analyze_code_cached),
-            last_activity: DateTime.utc_now()
-        }
-
-        {:ok, cached_result, new_state}
-    end
+  defp parse_severity(severity) when is_atom(severity), do: severity
+  
+  defp parse_metrics(nil), do: [:cyclomatic, :cognitive]
+  defp parse_metrics(metrics) when is_list(metrics) do
+    Enum.map(metrics, &String.to_atom/1)
   end
-
-  defp handle_security_review(%{payload: payload} = task, context, state) do
-    file_paths = payload.file_paths
-    vulnerability_types = Map.get(payload, :vulnerability_types, :all)
-
-    security_result = %{
-      task_id: task.id,
-      vulnerabilities: [],
-      severity_summary: %{critical: 0, high: 0, medium: 0, low: 0},
-      scanned_files: length(file_paths),
-      timestamp: DateTime.utc_now()
-    }
-
-    # Analyze each file for security issues
-    security_result =
-      file_paths
-      |> Enum.reduce(security_result, fn file_path, acc ->
-        {:ok, vulnerabilities} = analyze_file_security(file_path, vulnerability_types, context, state)
-
-        %{
-          acc
-          | vulnerabilities: acc.vulnerabilities ++ vulnerabilities,
-            severity_summary: update_severity_summary(acc.severity_summary, vulnerabilities)
-        }
-      end)
-
-    # Add recommendations
-    final_result =
-      Map.put(security_result, :recommendations, generate_security_recommendations(security_result.vulnerabilities))
-
-    new_state = %{
-      state
-      | metrics: update_task_metrics(state.metrics, :security_review),
-        last_activity: DateTime.utc_now()
-    }
-
-    {:ok, final_result, new_state}
+  
+  defp parse_pattern_types(nil), do: [:all]
+  defp parse_pattern_types(types) when is_list(types) do
+    Enum.map(types, &String.to_atom/1)
   end
-
-  defp handle_complexity_analysis(%{payload: payload} = task, context, state) do
-    module_path = payload.module_path
-    metrics_types = Map.get(payload, :metrics, [:cyclomatic, :cognitive])
-
-    complexity_result = %{
-      task_id: task.id,
-      module_path: module_path,
-      complexity_metrics: %{},
-      recommendations: [],
-      timestamp: DateTime.utc_now()
-    }
-
-    # Calculate complexity metrics
-    {:ok, metrics} = calculate_complexity_metrics(module_path, metrics_types, context, state)
-
-    recommendations = generate_complexity_recommendations(metrics)
-
-    final_result =
-      complexity_result
-      |> Map.put(:complexity_metrics, metrics)
-      |> Map.put(:recommendations, recommendations)
-      |> Map.put(:confidence, 0.9)
-
-    new_state = %{
-      state
-      | metrics: update_task_metrics(state.metrics, :complexity_analysis),
-        last_activity: DateTime.utc_now()
-    }
-
-    {:ok, final_result, new_state}
+  
+  defp parse_style_rules(nil), do: :default
+  defp parse_style_rules(rules) when is_binary(rules) do
+    String.to_atom(rules)
   end
-
-  defp handle_pattern_detection(%{payload: payload} = task, context, state) do
-    codebase_path = payload.codebase_path
-    pattern_types = Map.get(payload, :pattern_types, [:all])
-
-    pattern_result = %{
-      task_id: task.id,
-      patterns_found: [],
-      anti_patterns: [],
-      suggestions: [],
-      confidence: 0.0
-    }
-
-    # Detect patterns in codebase
-    {:ok, patterns} = detect_patterns(codebase_path, pattern_types, context, state)
-
-    final_result = %{
-      pattern_result
-      | patterns_found: patterns.positive,
-        anti_patterns: patterns.negative,
-        suggestions: generate_pattern_suggestions(patterns),
-        confidence: 0.85
-    }
-
-    new_state = %{
-      state
-      | metrics: update_task_metrics(state.metrics, :pattern_detection),
-        last_activity: DateTime.utc_now()
-    }
-
-    {:ok, final_result, new_state}
-  end
-
-  defp handle_style_check(%{payload: payload} = task, context, state) do
-    file_paths = payload.file_paths
-    style_rules = Map.get(payload, :style_rules, :default)
-
-    style_result = %{
-      task_id: task.id,
-      violations: [],
-      summary: %{},
-      auto_fixable: [],
-      confidence: 0.95
-    }
-
-    # Check style for each file
-    style_result =
-      file_paths
-      |> Enum.reduce(style_result, fn file_path, acc ->
-        {:ok, violations} = check_file_style(file_path, style_rules, context, state)
-
-        %{
-          acc
-          | violations: acc.violations ++ violations,
-            auto_fixable: acc.auto_fixable ++ filter_auto_fixable(violations)
-        }
-      end)
-
-    # Generate summary
-    final_result = %{
-      style_result
-      | summary: summarize_style_violations(style_result.violations)
-    }
-
-    new_state = %{
-      state
-      | metrics: update_task_metrics(state.metrics, :style_check),
-        last_activity: DateTime.utc_now()
-    }
-
-    {:ok, final_result, new_state}
-  end
-
-  defp perform_comprehensive_analysis(file_path, analysis_types, context, state) do
-    base_result = %{
-      task_id: Map.get(context, :task_id),
-      file_path: file_path,
-      analysis_results: %{},
-      issues_found: [],
-      confidence: 0.0,
-      timestamp: DateTime.utc_now()
-    }
-
-    # Run each analysis type
-    result =
-      analysis_types
-      |> Enum.reduce(base_result, fn analysis_type, acc ->
-        {:ok, engine_result} = run_analysis_engine(file_path, analysis_type, context, state)
-
-        %{
-          acc
-          | analysis_results: Map.put(acc.analysis_results, analysis_type, engine_result),
-            issues_found: acc.issues_found ++ extract_issues(engine_result)
-        }
-      end)
-
-    # Calculate overall confidence
-    %{result | confidence: calculate_analysis_confidence(result)}
-  end
-
-  defp run_analysis_engine(file_path, :semantic, _context, state) do
-    engine_config = get_in(state.engines, [:semantic, :config])
-    Semantic.analyze(file_path, engine_config)
-  end
-
-  defp run_analysis_engine(file_path, :style, _context, state) do
-    engine_config = get_in(state.engines, [:style, :config])
-    Style.analyze(file_path, engine_config)
-  end
-
-  defp run_analysis_engine(file_path, :security, _context, state) do
-    engine_config = get_in(state.engines, [:security, :config])
-    Security.analyze(file_path, engine_config)
-  end
-
-  defp extract_issues(engine_result) do
-    Map.get(engine_result, :issues, [])
-  end
-
-  defp calculate_analysis_confidence(analysis_result) do
-    if Enum.empty?(analysis_result.analysis_results) do
-      0.0
-    else
-      # Average confidence across all engines
-      confidences =
-        analysis_result.analysis_results
-        |> Map.values()
-        |> Enum.map(&Map.get(&1, :confidence, 0.8))
-
-      Enum.sum(confidences) / length(confidences)
-    end
-  end
-
-  defp apply_self_correction(analysis_result, context, _state) do
-    case SelfCorrection.correct(%{
-           input: analysis_result,
-           strategies: [:consistency_check, :false_positive_detection],
-           context: context
-         }) do
-      {:ok, corrected_result} ->
-        Map.put(corrected_result, :self_corrected, true)
-
-      {:error, _reason} ->
-        analysis_result
-    end
-  end
-
-  defp analyze_file_security(file_path, vulnerability_types, _context, state) do
-    engine_config = get_in(state.engines, [:security, :config])
-
-    case Security.analyze(file_path, Map.put(engine_config, :vulnerability_types, vulnerability_types)) do
-      {:ok, result} ->
-        # Security.analyze returns issues, not vulnerabilities
-        vulnerabilities = Map.get(result, :issues, [])
-        {:ok, vulnerabilities}
-
-      error ->
-        error
-    end
-  end
-
-  defp update_severity_summary(summary, vulnerabilities) do
-    Enum.reduce(vulnerabilities, summary, fn vuln, acc ->
-      severity = Map.get(vuln, :severity, :low)
-      Map.update(acc, severity, 1, &(&1 + 1))
-    end)
-  end
-
-  defp generate_security_recommendations(vulnerabilities) do
-    vulnerabilities
-    |> Enum.group_by(& &1.type)
-    |> Enum.map(fn {type, vulns} ->
-      %{
-        type: type,
-        count: length(vulns),
-        recommendation: get_security_recommendation(type, length(vulns))
-      }
-    end)
-  end
-
-  defp get_security_recommendation(:sql_injection, _count) do
-    "Use parameterized queries and avoid string concatenation in SQL"
-  end
-
-  defp get_security_recommendation(:hardcoded_secrets, _count) do
-    "Move secrets to environment variables or secure vault"
-  end
-
-  defp get_security_recommendation(_, _count) do
-    "Review and address security vulnerabilities"
-  end
-
-  defp calculate_complexity_metrics(module_path, metrics_types, _context, state) do
-    engine_config = get_in(state.engines, [:semantic, :config])
-
-    # Semantic.analyze always returns {:ok, result}
-    {:ok, result} = Semantic.analyze(module_path, Map.put(engine_config, :analysis_type, :complexity))
-
-    metrics =
-      metrics_types
-      |> Enum.reduce(%{}, fn metric_type, acc ->
-        value = get_complexity_metric(result, metric_type)
-        Map.put(acc, metric_type, value)
-      end)
-
-    {:ok, metrics}
-  end
-
-  defp get_complexity_metric(result, :cyclomatic) do
-    get_in(result, [:complexity, :cyclomatic]) || calculate_cyclomatic_complexity(result)
-  end
-
-  defp get_complexity_metric(result, :cognitive) do
-    # Default
-    get_in(result, [:complexity, :cognitive]) || 5
-  end
-
-  defp get_complexity_metric(result, :halstead) do
-    get_in(result, [:complexity, :halstead]) || %{}
-  end
-
-  defp calculate_cyclomatic_complexity(_result) do
-    # Simplified calculation
-    # Would calculate based on AST
-    10
-  end
-
-  defp detect_patterns(codebase_path, _pattern_types, _context, _state) do
-    # Simplified pattern detection
-    patterns = %{
-      positive: [
-        %{
-          type: :genserver_pattern,
-          location: "#{codebase_path}/lib/example.ex:25",
-          description: "Well-structured GenServer implementation",
-          confidence: 0.9
-        }
-      ],
-      negative: [
-        %{
-          type: :god_module,
-          location: "#{codebase_path}/lib/big_module.ex",
-          description: "Module with too many responsibilities",
-          confidence: 0.8
-        }
-      ]
-    }
-
-    {:ok, patterns}
-  end
-
-  defp generate_pattern_suggestions(patterns) do
-    suggestions = []
-
-    # Suggest fixes for anti-patterns
-    suggestions =
-      patterns.negative
-      |> Enum.reduce(suggestions, fn pattern, acc ->
-        case pattern.type do
-          :god_module ->
-            ["Split large module into smaller, focused modules"] ++ acc
-
-          :deep_nesting ->
-            ["Reduce nesting levels by extracting functions"] ++ acc
-
-          _ ->
-            acc
-        end
-      end)
-
-    # Suggest spreading positive patterns
-    suggestions =
-      if length(patterns.positive) > 0 do
-        ["Continue using identified good patterns across the codebase"] ++ suggestions
-      else
-        suggestions
-      end
-
-    suggestions
-  end
-
-  defp check_file_style(file_path, style_rules, _context, state) do
-    engine_config = get_in(state.engines, [:style, :config])
-
-    case Style.analyze(file_path, Map.put(engine_config, :rules, style_rules)) do
-      {:ok, result} ->
-        violations = Map.get(result, :violations, [])
-        {:ok, violations}
-
-      error ->
-        error
-    end
-  end
-
-  defp filter_auto_fixable(violations) do
-    Enum.filter(violations, & &1.auto_fixable)
-  end
-
-  defp summarize_style_violations(violations) do
-    violations
-    |> Enum.group_by(& &1.rule)
-    |> Map.new(fn {rule, rule_violations} ->
-      {rule,
-       %{
-         count: length(rule_violations),
-         severity: get_most_severe(rule_violations)
-       }}
-    end)
-  end
-
-  defp get_most_severe(violations) do
-    severities = [:error, :warning, :info]
-
-    violations
-    |> Enum.map(& &1.severity)
-    |> Enum.min_by(&Enum.find_index(severities, fn s -> s == &1 end))
-  end
-
-  defp perform_quick_analysis(file_path, analysis_types, state) do
-    # Quick analysis without full task handling
-    perform_comprehensive_analysis(file_path, analysis_types, %{}, state)
-  end
-
-  defp get_engine_status(engines) do
-    Map.new(engines, fn {type, engine_info} ->
-      {type,
-       %{
-         module: engine_info.module,
-         loaded: Code.ensure_loaded?(engine_info.module),
-         config: Map.keys(engine_info.config)
-       }}
-    end)
-  end
-
-  defp send_response(from, message) do
-    if is_pid(from) do
-      send(from, message)
-    end
-  end
+  defp parse_style_rules(rules) when is_atom(rules), do: rules
+  
+  defp ensure_list(value) when is_list(value), do: value
+  defp ensure_list(value), do: [value]
 end

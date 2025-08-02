@@ -41,7 +41,6 @@ defmodule RubberDuck.Tools.CodeFormatter do
       required false
       description "Functions to format without parentheses"
       default []
-      item_type :string
     end
     
     parameter :force_do_end_blocks do
@@ -96,7 +95,7 @@ defmodule RubberDuck.Tools.CodeFormatter do
     security do
       sandbox :restricted
       capabilities [:code_analysis]
-      rate_limit 200
+      rate_limit [max_requests: 200, window_seconds: 60]
     end
   end
   

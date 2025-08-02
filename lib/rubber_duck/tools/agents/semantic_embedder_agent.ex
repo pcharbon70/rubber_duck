@@ -12,7 +12,7 @@ defmodule RubberDuck.Tools.Agents.SemanticEmbedderAgent do
     name: "semantic_embedder_agent",
     description: "Orchestrates semantic embedding generation and similarity search",
     category: "analysis",
-    tags: [:embeddings, "search", :ml, :similarity, :vectors],
+    tags: ["embeddings", "search", "ml", "similarity", "vectors"],
     vsn: "1.0.0",
     schema: [
       embedding_config: [

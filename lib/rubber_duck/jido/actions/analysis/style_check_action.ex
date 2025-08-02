@@ -1,14 +1,19 @@
 defmodule RubberDuck.Jido.Actions.Analysis.StyleCheckAction do
   @moduledoc """
-  Action for code style analysis and formatting checks.
+  Enhanced action for code style and formatting verification.
   
-  This action analyzes code files for style violations, categorizes them by
-  severity, and identifies violations that can be automatically fixed.
+  This action provides:
+  - Multi-file style checking
+  - Configurable style rules
+  - Auto-fixable violation detection
+  - Violation summarization and reporting
+  - Style guide compliance checking
+  - Formatting consistency analysis
   """
   
   use Jido.Action,
-    name: "style_check",
-    description: "Performs code style analysis and identifies formatting violations",
+    name: "style_check_v2",
+    description: "Performs comprehensive code style and formatting verification",
     schema: [
       file_paths: [
         type: {:list, :string},
@@ -16,154 +21,337 @@ defmodule RubberDuck.Jido.Actions.Analysis.StyleCheckAction do
         doc: "List of file paths to check for style violations"
       ],
       style_rules: [
-        type: :atom,
+        type: {:in, [:default, :strict, :relaxed, :custom]},
         default: :default,
-        doc: "Style rules to apply (e.g., :default, :strict, :relaxed)"
+        doc: "Style rule set to apply"
       ],
-      task_id: [
-        type: :string,
-        default: nil,
-        doc: "Task identifier for tracking"
+      custom_rules: [
+        type: :map,
+        default: %{},
+        doc: "Custom style rules configuration"
+      ],
+      detect_auto_fixable: [
+        type: :boolean,
+        default: true,
+        doc: "Identify which violations can be auto-fixed"
+      ],
+      check_formatting: [
+        type: :boolean,
+        default: true,
+        doc: "Check code formatting consistency"
+      ],
+      max_line_length: [
+        type: :integer,
+        default: 120,
+        doc: "Maximum allowed line length"
       ]
     ]
 
   alias RubberDuck.Analysis.Style
-  alias RubberDuck.Jido.Actions.Base.{UpdateStateAction, EmitSignalAction}
+  
   require Logger
 
   @impl true
   def run(params, context) do
     agent = context.agent
-    %{file_paths: file_paths, style_rules: style_rules} = params
     
-    Logger.info("Checking style for #{length(file_paths)} files")
-    
-    style_result = %{
-      task_id: params.task_id,
-      violations: [],
-      summary: %{},
-      auto_fixable: [],
-      confidence: 0.95
-    }
-    
-    # Check style for each file
-    case check_files_style(file_paths, style_rules, agent, style_result) do
-      {:ok, final_result} ->
-        # Generate summary
-        final_result_with_summary = %{
-          final_result
-          | summary: summarize_style_violations(final_result.violations)
-        }
-        
-        # Update state and emit result
-        with {:ok, _, %{agent: updated_agent}} <- update_metrics(agent),
-             {:ok, _, %{agent: final_agent}} <- update_last_activity(updated_agent),
-             {:ok, _} <- emit_style_result(final_agent, final_result_with_summary, params) do
-          {:ok, final_result_with_summary, %{agent: final_agent}}
-        end
-        
-      {:error, reason} ->
-        Logger.error("Style check failed: #{inspect(reason)}")
-        {:error, reason}
-    end
-  end
-
-  # Private functions
-  
-  defp check_files_style(file_paths, style_rules, agent, initial_result) do
     try do
-      final_result = file_paths
-      |> Enum.reduce(initial_result, fn file_path, acc ->
-        case check_file_style(file_path, style_rules, agent) do
-          {:ok, violations} ->
-            %{
-              acc
-              | violations: acc.violations ++ violations,
-                auto_fixable: acc.auto_fixable ++ filter_auto_fixable(violations)
-            }
-          {:error, reason} ->
-            Logger.warning("Failed to check style for #{file_path}: #{inspect(reason)}")
-            acc
-        end
-      end)
+      # Get style rules configuration
+      style_config = get_style_configuration(params)
       
-      {:ok, final_result}
+      # Check each file for style violations
+      all_violations = check_files_for_violations(params.file_paths, style_config, agent)
+      
+      # Categorize violations
+      categorized = categorize_violations(all_violations)
+      
+      # Identify auto-fixable violations if requested
+      {auto_fixable, manual_fix} = if params.detect_auto_fixable do
+        partition_auto_fixable(all_violations)
+      else
+        {[], all_violations}
+      end
+      
+      # Generate summary statistics
+      summary = generate_violation_summary(categorized)
+      
+      # Generate fix suggestions
+      fix_suggestions = generate_fix_suggestions(categorized)
+      
+      result = %{
+        file_paths: params.file_paths,
+        violations: all_violations,
+        auto_fixable: auto_fixable,
+        manual_fix_required: manual_fix,
+        summary: summary,
+        fix_suggestions: fix_suggestions,
+        style_score: calculate_style_score(all_violations, length(params.file_paths)),
+        categories: categorized,
+        confidence: 0.95,
+        timestamp: DateTime.utc_now()
+      }
+      
+      Logger.info("Style check completed",
+        files_checked: length(params.file_paths),
+        violations_found: length(all_violations),
+        auto_fixable: length(auto_fixable)
+      )
+      
+      {:ok, result}
       
     rescue
       error ->
-        {:error, "Style checking failed: #{Exception.message(error)}"}
+        Logger.error("Style check failed: #{inspect(error)}")
+        {:error, {:style_check_failed, error}}
     end
   end
   
-  defp check_file_style(file_path, style_rules, agent) do
-    engine_config = get_in(agent.state.engines, [:style, :config]) || %{}
+  # Private helper functions
+  
+  defp get_style_configuration(params) do
+    base_config = case params.style_rules do
+      :default -> default_style_rules()
+      :strict -> strict_style_rules()
+      :relaxed -> relaxed_style_rules()
+      :custom -> %{}
+    end
     
-    case Style.analyze(file_path, Map.put(engine_config, :rules, style_rules)) do
-      {:ok, result} ->
-        violations = Map.get(result, :violations, [])
-        {:ok, violations}
-        
-      error ->
-        error
-    end
+    Map.merge(base_config, params.custom_rules)
+    |> Map.put(:max_line_length, params.max_line_length)
+    |> Map.put(:check_formatting, params.check_formatting)
   end
   
-  defp filter_auto_fixable(violations) do
-    Enum.filter(violations, fn violation ->
-      Map.get(violation, :auto_fixable, false)
+  defp default_style_rules do
+    %{
+      line_length: true,
+      trailing_whitespace: true,
+      indentation: :spaces_2,
+      naming_convention: :snake_case,
+      module_doc: :required,
+      function_doc: :public_only,
+      parentheses_in_zero_arity: false,
+      pipe_chain_start: true,
+      single_quote_strings: false,
+      max_function_length: 50,
+      max_module_length: 500
+    }
+  end
+  
+  defp strict_style_rules do
+    %{
+      line_length: true,
+      trailing_whitespace: true,
+      indentation: :spaces_2,
+      naming_convention: :snake_case,
+      module_doc: :required,
+      function_doc: :required,
+      parentheses_in_zero_arity: true,
+      pipe_chain_start: true,
+      single_quote_strings: true,
+      max_function_length: 30,
+      max_module_length: 300,
+      max_complexity: 10,
+      enforce_pattern_matching: true
+    }
+  end
+  
+  defp relaxed_style_rules do
+    %{
+      line_length: false,
+      trailing_whitespace: true,
+      indentation: :any,
+      naming_convention: :snake_case,
+      module_doc: :optional,
+      function_doc: :optional,
+      parentheses_in_zero_arity: false,
+      pipe_chain_start: false,
+      single_quote_strings: false,
+      max_function_length: 100,
+      max_module_length: 1000
+    }
+  end
+  
+  defp check_files_for_violations(file_paths, style_config, agent) do
+    engine_config = get_engine_config(agent, :style)
+    
+    file_paths
+    |> Enum.flat_map(fn file_path ->
+      check_single_file(file_path, style_config, engine_config)
     end)
   end
   
-  defp summarize_style_violations(violations) do
+  defp check_single_file(file_path, style_config, engine_config) do
+    case Style.analyze(file_path, Map.merge(engine_config, %{rules: style_config})) do
+      {:ok, result} ->
+        result.violations
+        |> Enum.map(fn violation ->
+          %{
+            file_path: file_path,
+            rule: violation.rule || :unknown,
+            line: violation.line || 0,
+            column: violation.column || 0,
+            message: violation.message || "Style violation detected",
+            severity: violation.severity || :warning,
+            auto_fixable: violation.auto_fixable || false,
+            category: categorize_rule(violation.rule)
+          }
+        end)
+      
+      {:error, reason} ->
+        Logger.warning("Failed to check style for #{file_path}: #{inspect(reason)}")
+        []
+    end
+  end
+  
+  defp categorize_rule(rule) do
+    cond do
+      rule in [:line_length, :trailing_whitespace, :indentation] -> :formatting
+      rule in [:naming_convention, :module_name, :function_name] -> :naming
+      rule in [:module_doc, :function_doc, :type_spec] -> :documentation
+      rule in [:parentheses_in_zero_arity, :pipe_chain_start] -> :syntax
+      rule in [:max_function_length, :max_module_length, :max_complexity] -> :complexity
+      true -> :other
+    end
+  end
+  
+  defp categorize_violations(violations) do
     violations
-    |> Enum.group_by(fn violation -> Map.get(violation, :rule, :unknown) end)
-    |> Map.new(fn {rule, rule_violations} ->
-      {rule, %{
-        count: length(rule_violations),
-        severity: get_most_severe(rule_violations),
-        auto_fixable_count: Enum.count(rule_violations, &Map.get(&1, :auto_fixable, false)),
-        locations: Enum.map(rule_violations, fn v ->
-          "#{Map.get(v, :file, "unknown")}:#{Map.get(v, :line, 0)}"
-        end) |> Enum.take(5) # Limit to first 5 locations
+    |> Enum.group_by(& &1.category)
+    |> Map.new(fn {category, cat_violations} ->
+      {category, %{
+        violations: cat_violations,
+        count: length(cat_violations),
+        severity_breakdown: severity_breakdown(cat_violations)
       }}
     end)
   end
   
-  defp get_most_severe(violations) do
-    severities = [:error, :warning, :info]
-    
+  defp severity_breakdown(violations) do
     violations
-    |> Enum.map(fn v -> Map.get(v, :severity, :info) end)
-    |> Enum.min_by(&Enum.find_index(severities, fn s -> s == &1 end), fn -> :info end)
+    |> Enum.group_by(& &1.severity)
+    |> Map.new(fn {severity, sev_violations} -> {severity, length(sev_violations)} end)
   end
   
-  # State management helpers
+  defp partition_auto_fixable(violations) do
+    Enum.split_with(violations, & &1.auto_fixable)
+  end
   
-  defp update_metrics(agent) do
-    current_metrics = agent.state.metrics
-    updated_metrics = current_metrics
-    |> Map.update(:tasks_completed, 1, &(&1 + 1))
-    |> Map.update(:style_check, 1, &(&1 + 1))
+  defp generate_violation_summary(categorized) do
+    total_violations = categorized
+      |> Map.values()
+      |> Enum.reduce(0, fn cat_data, acc -> acc + cat_data.count end)
     
-    state_updates = %{metrics: updated_metrics}
-    UpdateStateAction.run(%{updates: state_updates}, %{agent: agent})
-  end
-  
-  defp update_last_activity(agent) do
-    state_updates = %{last_activity: DateTime.utc_now()}
-    UpdateStateAction.run(%{updates: state_updates}, %{agent: agent})
-  end
-  
-  defp emit_style_result(agent, result, params) do
-    signal_params = %{
-      signal_type: "analysis.style.complete",
-      data: %{
-        task_id: params.task_id,
-        result: result,
-        timestamp: DateTime.utc_now()
-      }
+    %{
+      total_violations: total_violations,
+      by_category: Map.new(categorized, fn {cat, data} -> {cat, data.count} end),
+      most_common_category: find_most_common_category(categorized),
+      severity_distribution: aggregate_severities(categorized),
+      top_violations: find_top_violations(categorized)
     }
+  end
+  
+  defp find_most_common_category(categorized) do
+    case Enum.max_by(categorized, fn {_, data} -> data.count end, fn -> nil end) do
+      nil -> nil
+      {category, _} -> category
+    end
+  end
+  
+  defp aggregate_severities(categorized) do
+    categorized
+    |> Map.values()
+    |> Enum.reduce(%{}, fn cat_data, acc ->
+      Enum.reduce(cat_data.severity_breakdown, acc, fn {severity, count}, acc2 ->
+        Map.update(acc2, severity, count, &(&1 + count))
+      end)
+    end)
+  end
+  
+  defp find_top_violations(categorized) do
+    all_violations = categorized
+      |> Map.values()
+      |> Enum.flat_map(& &1.violations)
     
-    EmitSignalAction.run(signal_params, %{agent: agent})
+    all_violations
+    |> Enum.group_by(& &1.rule)
+    |> Enum.map(fn {rule, rule_violations} -> {rule, length(rule_violations)} end)
+    |> Enum.sort_by(fn {_, count} -> count end, :desc)
+    |> Enum.take(5)
+    |> Enum.map(fn {rule, count} -> %{rule: rule, count: count} end)
+  end
+  
+  defp generate_fix_suggestions(categorized) do
+    suggestions = []
+    
+    # Formatting suggestions
+    suggestions = case categorized[:formatting] do
+      nil -> suggestions
+      %{count: count} when count > 10 ->
+        ["Run `mix format` to automatically fix #{count} formatting violations" | suggestions]
+      %{count: count} when count > 0 ->
+        ["Consider running `mix format` to fix formatting issues" | suggestions]
+      _ -> suggestions
+    end
+    
+    # Documentation suggestions
+    suggestions = case categorized[:documentation] do
+      nil -> suggestions
+      %{count: count} when count > 0 ->
+        ["Add missing documentation to improve code maintainability (#{count} violations)" | suggestions]
+      _ -> suggestions
+    end
+    
+    # Naming suggestions
+    suggestions = case categorized[:naming] do
+      nil -> suggestions
+      %{count: count} when count > 0 ->
+        ["Review naming conventions - #{count} naming violations found" | suggestions]
+      _ -> suggestions
+    end
+    
+    # Complexity suggestions
+    suggestions = case categorized[:complexity] do
+      nil -> suggestions
+      %{count: count} when count > 0 ->
+        ["Refactor complex code - #{count} complexity violations detected" | suggestions]
+      _ -> suggestions
+    end
+    
+    if Enum.empty?(suggestions) do
+      ["Code style is excellent! No significant issues found."]
+    else
+      suggestions
+    end
+  end
+  
+  defp calculate_style_score(violations, files_checked) do
+    # Calculate a style score from 0-100
+    # Higher score = better style compliance
+    
+    if files_checked == 0 do
+      100.0
+    else
+      base_score = 100.0
+    
+    # Deduct points based on violations and their severity
+    deductions = Enum.reduce(violations, 0, fn violation, acc ->
+      case violation.severity do
+        :error -> acc + 5
+        :warning -> acc + 2
+        :info -> acc + 1
+        _ -> acc + 1
+      end
+    end)
+    
+      # Normalize by files checked
+      normalized_deductions = deductions / files_checked * 5
+      
+      score = max(0, base_score - normalized_deductions)
+      Float.round(score, 2)
+    end
+  end
+  
+  defp get_engine_config(agent, engine_type) do
+    get_in(agent.state, [:engines, engine_type, :config]) || %{}
   end
 end
