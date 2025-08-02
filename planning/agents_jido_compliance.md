@@ -30,27 +30,27 @@ Based on comprehensive analysis of 90+ agent files:
 - [x] Signal routing and lifecycle hooks working correctly
 - [x] Schema validation and state management in place
 
-### 16.1.2 Create Migration Utilities
-- [ ] **16.1.2.1 Create Migration Helper Module**
-  - [ ] Implement `RubberDuck.Agents.Migration.Helpers`
-  - [ ] Add behavior pattern detection utilities
-  - [ ] Create action extraction helpers
-  - [ ] Implement signal mapping generators
-  - [ ] Add validation utilities
+### 16.1.2 Create Migration Utilities ✅
+- [x] **16.1.2.1 Create Migration Helper Module**
+  - [x] Implement `RubberDuck.Agents.Migration.Helpers`
+  - [x] Add behavior pattern detection utilities
+  - [x] Create action extraction helpers
+  - [x] Implement signal mapping generators
+  - [x] Add validation utilities
 
-- [ ] **16.1.2.2 Build Action Template Generator**
-  - [ ] Create `mix jido.gen.action` task
-  - [ ] Generate action modules from existing functions
-  - [ ] Add schema inference from function signatures
-  - [ ] Create test templates
-  - [ ] Add documentation templates
+- [x] **16.1.2.2 Build Action Template Generator**
+  - [x] Create `mix jido.gen.action` task
+  - [x] Generate action modules from existing functions
+  - [x] Add schema inference from function signatures
+  - [x] Create test templates
+  - [x] Add documentation templates
 
-- [ ] **16.1.2.3 Create Agent Migration Scripts**
-  - [ ] Build automated migration detection
-  - [ ] Create behavior-to-agent conversion
-  - [ ] Add signal handler extraction
-  - [ ] Implement schema generation
-  - [ ] Create validation and compliance checks
+- [x] **16.1.2.3 Create Agent Migration Scripts**
+  - [x] Build automated migration detection
+  - [x] Create behavior-to-agent conversion
+  - [x] Add signal handler extraction
+  - [x] Implement schema generation
+  - [x] Create validation and compliance checks
 
 ---
 
