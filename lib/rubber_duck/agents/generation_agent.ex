@@ -1,584 +1,396 @@
 defmodule RubberDuck.Agents.GenerationAgent do
   @moduledoc """
-  Generation Agent specialized in code generation using LLM services and RAG.
+  Generation Agent specialized in code generation using Jido-compliant actions.
 
   The Generation Agent is responsible for:
-  - Generating code from natural language descriptions
+  - Generating code from natural language descriptions using RAG
   - Refactoring existing code for improvements
   - Fixing broken or incomplete code
   - Providing intelligent code completions
   - Generating documentation and tests
-  - Learning from user preferences and patterns
+  - Supporting streaming generation with real-time feedback
+  - Template-based code generation with versioning
+
+  ## Jido Compliance
+  This agent has been fully migrated to use BaseAgent patterns with action-based
+  architecture. All business logic is extracted into reusable Actions.
 
   ## Capabilities
 
   - `:code_generation` - Generate new code from descriptions
-  - `:code_refactoring` - Improve existing code structure
+  - `:code_refactoring` - Improve existing code structure  
   - `:code_fixing` - Fix syntax and logic errors
   - `:code_completion` - Complete partial code snippets
   - `:documentation_generation` - Generate docs and comments
+  - `:template_rendering` - Render code from templates
+  - `:streaming_generation` - Real-time streaming generation
+  - `:quality_validation` - Validate generated code quality
 
-  ## Task Types
+  ## Signals
 
-  - `:generate_code` - Create new code from natural language
-  - `:refactor_code` - Improve code quality and structure
-  - `:fix_code` - Fix errors and issues in code
-  - `:complete_code` - Complete code at cursor position
-  - `:generate_docs` - Generate documentation
+  The agent responds to the following signals:
+  - `generation.code.request` - Triggers code generation
+  - `generation.refactor.request` - Triggers code refactoring
+  - `generation.fix.request` - Triggers code fixing
+  - `generation.complete.request` - Triggers code completion
+  - `generation.docs.request` - Triggers documentation generation
+  - `generation.template.request` - Triggers template rendering
+  - `generation.streaming.request` - Triggers streaming generation
+  - `generation.validate.request` - Triggers quality validation
 
   ## Example Usage
 
-      # Generate new code
-      task = %{
-        id: "gen_1",
-        type: :generate_code,
-        payload: %{
-          prompt: "Create a GenServer that manages user sessions",
-          language: :elixir,
-          context_files: ["lib/user.ex"]
+      # Via signal
+      signal = %{
+        "type" => "generation.code.request",
+        "data" => %{
+          "prompt" => "Create a GenServer that manages user sessions",
+          "language" => "elixir",
+          "context" => %{"relevant_files" => ["lib/user.ex"]}
         }
       }
 
-      {:ok, result} = Agent.assign_task(agent_pid, task, context)
+      Jido.Signal.Bus.publish(signal)
+
+      # Via direct action
+      {:ok, agent} = GenerationAgent.start_link(id: "gen_agent")
+      {:ok, result} = GenerationAgent.cmd(agent, CodeGenerationAction, params)
   """
 
-  use RubberDuck.Agents.Behavior
-
-  alias RubberDuck.Engines.Generation, as: GenerationEngine
-  alias RubberDuck.LLM.Service, as: LLMService
-  alias RubberDuck.SelfCorrection.Engine, as: SelfCorrection
-  alias RubberDuck.RAG.Pipeline, as: RAGPipeline
-  # alias RubberDuck.Context.Builder, as: ContextBuilder
+  use RubberDuck.Agents.BaseAgent,
+    name: "generation_agent",
+    description: "Code generation and quality improvement agent",
+    schema: [
+      generation_cache: [
+        type: :map,
+        default: %{},
+        doc: "Cache for generation results"
+      ],
+      user_preferences: [
+        type: :map,
+        default: %{
+          code_style: :balanced,
+          comments: :helpful,
+          error_handling: :comprehensive,
+          naming_convention: :snake_case
+        },
+        doc: "User preferences for code generation"
+      ],
+      generation_history: [
+        type: :list,
+        default: [],
+        doc: "History of generation requests and results"
+      ],
+      metrics: [
+        type: :map,
+        default: %{
+          tasks_completed: 0,
+          generate_code: 0,
+          refactor_code: 0,
+          fix_code: 0,
+          complete_code: 0,
+          generate_docs: 0,
+          template_renders: 0,
+          streaming_sessions: 0,
+          total_tokens_used: 0,
+          cache_hits: 0,
+          cache_misses: 0
+        },
+        doc: "Agent performance metrics"
+      ],
+      llm_config: [
+        type: :map,
+        default: %{
+          provider: :openai,
+          model: "gpt-4",
+          temperature: 0.7,
+          max_tokens: 2048
+        },
+        doc: "LLM configuration for generation"
+      ],
+      last_activity: [
+        type: {:or, [:datetime, :nil]},
+        default: nil,
+        doc: "Last activity timestamp"
+      ],
+      streaming_sessions: [
+        type: :map,
+        default: %{},
+        doc: "Active streaming sessions"
+      ],
+      template_cache: [
+        type: :map,
+        default: %{},
+        doc: "Cache for rendered templates"
+      ],
+      enable_self_correction: [
+        type: :boolean,
+        default: true,
+        doc: "Enable self-correction for generation results"
+      ],
+      cache_ttl_seconds: [
+        type: :integer,
+        default: 3600,
+        doc: "Cache time-to-live in seconds"
+      ],
+      capabilities: [
+        type: {:list, :atom},
+        default: [
+          :code_generation,
+          :code_refactoring,
+          :code_fixing,
+          :code_completion,
+          :documentation_generation,
+          :template_rendering,
+          :streaming_generation,
+          :quality_validation
+        ],
+        doc: "Agent capabilities"
+      ]
+    ],
+    actions: [
+      RubberDuck.Jido.Actions.Generation.CodeGenerationAction,
+      RubberDuck.Jido.Actions.Generation.TemplateRenderAction,
+      RubberDuck.Jido.Actions.Generation.QualityValidationAction,
+      RubberDuck.Jido.Actions.Generation.StreamingGenerationAction,
+      RubberDuck.Jido.Actions.Generation.PostProcessingAction
+    ]
 
   require Logger
 
-  @capabilities [
-    :code_generation,
-    :code_refactoring,
-    :code_fixing,
-    :code_completion,
-    :documentation_generation
-  ]
+  alias RubberDuck.Jido.Actions.Generation.{
+    CodeGenerationAction,
+    TemplateRenderAction,
+    QualityValidationAction,
+    StreamingGenerationAction,
+    PostProcessingAction
+  }
 
-  # Helper functions first
-
-  defp initialize_metrics do
+  # Signal mappings for generation workflows
+  @impl true
+  def signal_mappings do
     %{
-      tasks_completed: 0,
-      generate_code: 0,
-      refactor_code: 0,
-      fix_code: 0,
-      complete_code: 0,
-      generate_docs: 0,
-      total_tokens_used: 0,
-      cache_hits: 0,
-      cache_misses: 0
+      "generation.code.request" => {CodeGenerationAction, &extract_generation_params/1},
+      "generation.refactor.request" => {CodeGenerationAction, &extract_refactor_params/1},
+      "generation.fix.request" => {CodeGenerationAction, &extract_fix_params/1},
+      "generation.complete.request" => {CodeGenerationAction, &extract_completion_params/1},
+      "generation.docs.request" => {CodeGenerationAction, &extract_docs_params/1},
+      "generation.template.request" => {TemplateRenderAction, &extract_template_params/1},
+      "generation.streaming.request" => {StreamingGenerationAction, &extract_streaming_params/1},
+      "generation.validate.request" => {QualityValidationAction, &extract_validation_params/1},
+      "generation.process.request" => {PostProcessingAction, &extract_processing_params/1}
     }
   end
 
-  defp update_task_metrics(metrics, task_type) do
-    metrics
-    |> Map.update(:tasks_completed, 1, &(&1 + 1))
-    |> Map.update(task_type, 1, &(&1 + 1))
-  end
+  # Lifecycle hooks
 
-  defp determine_status(state) do
-    if Map.has_key?(state, :current_task) do
-      :busy
+  @impl true
+  def on_before_validate_state(state) do
+    # Ensure metrics are properly initialized
+    if is_map(state.metrics) and Map.has_key?(state.metrics, :tasks_completed) do
+      {:ok, state}
     else
-      :idle
+      {:error, :invalid_metrics_structure}
     end
   end
 
-  defp send_response(from, message) do
-    if is_pid(from) do
-      send(from, message)
+  @impl true
+  def on_after_validate_state(state) do
+    # Update last activity timestamp
+    {:ok, %{state | last_activity: DateTime.utc_now()}}
+  end
+
+  @impl true
+  def on_before_run(agent) do
+    # Log generation activity
+    Logger.info("Generation Agent #{agent.id} starting task execution")
+    {:ok, agent}
+  end
+
+  @impl true
+  def on_after_run(agent, _action, result) do
+    # Update metrics based on successful execution
+    case result do
+      {:ok, _} ->
+        new_metrics = update_task_metrics(agent.state.metrics, :tasks_completed)
+        new_state = %{agent.state | metrics: new_metrics, last_activity: DateTime.utc_now()}
+        {:ok, %{agent | state: new_state}}
+      
+      {:error, _} ->
+        # Don't update success metrics on error
+        new_state = %{agent.state | last_activity: DateTime.utc_now()}
+        {:ok, %{agent | state: new_state}}
     end
   end
 
-  # Behavior Implementation
-
   @impl true
-  def init(config) do
-    state = %{
-      config: config,
-      generation_cache: %{},
-      user_preferences: initialize_user_preferences(config),
-      generation_history: [],
-      metrics: initialize_metrics(),
-      llm_config: configure_llm(config),
-      last_activity: DateTime.utc_now()
-    }
-
-    Logger.info("Generation Agent initialized with config: #{inspect(config)}")
-    {:ok, state}
-  end
-
-  @impl true
-  def handle_task(task, context, state) do
-    Logger.info("Generation Agent handling task: #{task.type}")
-
-    case task.type do
-      :generate_code ->
-        handle_generate_code(task, context, state)
-
-      :refactor_code ->
-        handle_refactor_code(task, context, state)
-
-      :fix_code ->
-        handle_fix_code(task, context, state)
-
-      :complete_code ->
-        handle_complete_code(task, context, state)
-
-      :generate_docs ->
-        handle_generate_docs(task, context, state)
-
+  def on_error(agent, error) do
+    Logger.error("Generation Agent #{agent.id} encountered error: #{inspect(error)}")
+    
+    # Reset to safe state if needed
+    case error do
+      %{type: :cache_corruption} ->
+        safe_state = %{agent.state | generation_cache: %{}, template_cache: %{}}
+        {:ok, %{agent | state: safe_state}}
+      
       _ ->
-        {:error, {:unsupported_task_type, task.type}, state}
+        # Let supervisor handle other errors
+        {:error, error}
     end
   end
 
+  # Health check implementation
   @impl true
-  def handle_message(message, from, state) do
-    case message do
-      {:generation_request, prompt, language} ->
-        result = quick_generate(prompt, language, state)
-        send_response(from, {:generation_result, result})
-        {:ok, state}
+  def health_check(agent) do
+    health_status = %{
+      healthy: true,
+      cache_size: map_size(agent.state.generation_cache),
+      history_size: length(agent.state.generation_history),
+      active_streaming_sessions: map_size(agent.state.streaming_sessions),
+      llm_config: agent.state.llm_config,
+      metrics: agent.state.metrics,
+      last_activity: agent.state.last_activity
+    }
 
-      {:preference_update, preferences} ->
-        new_preferences = Map.merge(state.user_preferences, preferences)
-        new_state = %{state | user_preferences: new_preferences}
-        send_response(from, :preferences_updated)
-        {:ok, new_state}
-
-      {:cache_stats} ->
-        stats = get_cache_stats(state)
-        send_response(from, {:cache_stats, stats})
-        {:ok, state}
-
-      _ ->
-        Logger.debug("Generation Agent received unknown message: #{inspect(message)}")
-        {:noreply, state}
+    # Check for potential issues
+    issues = []
+    
+    issues = if map_size(agent.state.generation_cache) > 1000 do
+      ["Large cache size may impact memory" | issues]
+    else
+      issues
     end
+    
+    issues = if length(agent.state.generation_history) > 500 do
+      ["Large history may impact performance" | issues]
+    else
+      issues
+    end
+
+    final_status = if Enum.empty?(issues) do
+      health_status
+    else
+      Map.put(health_status, :warnings, issues)
+    end
+
+    {:ok, final_status}
   end
 
-  @impl true
-  def get_capabilities(_state) do
-    @capabilities
-  end
+  # Parameter extraction functions for signal handling
 
-  @impl true
-  def get_status(state) do
+  defp extract_generation_params(%{"data" => data}) do
     %{
-      status: determine_status(state),
-      current_task: Map.get(state, :current_task),
-      metrics: state.metrics,
-      health: %{
-        healthy: true,
-        cache_size: map_size(state.generation_cache),
-        history_size: length(state.generation_history),
-        llm_connected: check_llm_connection(state)
-      },
-      llm_status: get_llm_status(state),
-      last_activity: state.last_activity,
-      capabilities: @capabilities
+      prompt: Map.get(data, "prompt", ""),
+      language: String.to_atom(Map.get(data, "language", "elixir")),
+      context: Map.get(data, "context", %{}),
+      user_preferences: Map.get(data, "user_preferences", %{}),
+      enable_self_correction: Map.get(data, "enable_self_correction", true),
+      max_iterations: Map.get(data, "max_iterations", 3)
     }
   end
 
-  @impl true
-  def terminate(_reason, _state) do
-    Logger.info("Generation Agent terminating")
-    :ok
-  end
-
-  # Task Handlers
-
-  defp handle_generate_code(%{payload: payload} = task, context, state) do
-    prompt = payload.prompt
-    language = Map.get(payload, :language, :elixir)
-    context_files = Map.get(payload, :context_files, [])
-
-    # Check cache first
-    cache_key = {prompt, language, context_files}
-
-    case Map.get(state.generation_cache, cache_key) do
-      nil ->
-        # Build RAG context
-        rag_context = build_rag_context(prompt, context_files, context, state)
-
-        # Generate code using Generation Engine
-        generation_result =
-          case GenerationEngine.execute(
-                 %{
-                   prompt: prompt,
-                   language: language,
-                   context: rag_context,
-                   user_preferences: state.user_preferences
-                 },
-                 state.llm_config
-               ) do
-            {:ok, result} ->
-              result
-
-            {:error, reason} ->
-              Logger.error("Generation failed: #{inspect(reason)}")
-
-              %{
-                code: "# Generation failed: #{inspect(reason)}",
-                explanation: "Failed to generate code",
-                confidence: 0.0
-              }
-          end
-
-        # Apply self-correction if enabled
-        final_result =
-          if Map.get(state.config, :enable_self_correction, true) and generation_result.confidence > 0 do
-            apply_self_correction_to_generation(generation_result, context, state)
-          else
-            generation_result
-          end
-
-        # Format result
-        result = %{
-          task_id: task.id,
-          generated_code: final_result.code,
-          explanation: final_result.explanation,
-          language: language,
-          imports_detected: detect_imports(final_result.code, language),
-          confidence: final_result.confidence,
-          syntax_valid: validate_syntax(final_result.code, language),
-          timestamp: DateTime.utc_now()
-        }
-
-        # Update cache and history
-        new_cache = Map.put(state.generation_cache, cache_key, result)
-        new_history = [{task.id, prompt, result} | Enum.take(state.generation_history, 99)]
-
-        new_state = %{
-          state
-          | generation_cache: new_cache,
-            generation_history: new_history,
-            metrics: update_task_metrics(state.metrics, :generate_code),
-            last_activity: DateTime.utc_now()
-        }
-
-        {:ok, result, new_state}
-
-      cached_result ->
-        # Return cached result
-        Logger.debug("Returning cached generation result")
-
-        new_state = %{
-          state
-          | metrics: update_task_metrics(Map.update(state.metrics, :cache_hits, 1, &(&1 + 1)), :generate_code),
-            last_activity: DateTime.utc_now()
-        }
-
-        {:ok, cached_result, new_state}
-    end
-  end
-
-  defp handle_refactor_code(%{payload: payload} = task, _context, state) do
-    code = payload.code
-    refactoring_type = Map.get(payload, :refactoring_type, :general)
-    preserve_behavior = Map.get(payload, :preserve_behavior, true)
-    language = Map.get(payload, :language, :elixir)
-
-    # Build refactoring prompt
-    refactoring_prompt = build_refactoring_prompt(code, refactoring_type, preserve_behavior)
-
-    # Use LLM for refactoring
-    refactoring_result =
-      case LLMService.completion(%{
-             model: get_model(state),
-             messages: [%{role: "user", content: refactoring_prompt}]
-           }) do
-        {:ok, %{choices: [%{message: %{content: refactored_code}} | _], usage: usage}} ->
-          %{
-            code: refactored_code,
-            changes: analyze_changes(code, refactored_code),
-            tokens_used: usage.total_tokens
-          }
-
-        {:error, reason} ->
-          Logger.error("Refactoring failed: #{inspect(reason)}")
-
-          %{
-            code: code,
-            changes: [],
-            tokens_used: 0
-          }
-      end
-
-    result = %{
-      task_id: task.id,
-      refactored_code: refactoring_result.code,
-      changes_made: refactoring_result.changes,
-      behavior_preserved: verify_behavior_preservation(code, refactoring_result.code, language),
-      refactoring_type: refactoring_type,
-      confidence: calculate_refactoring_confidence(refactoring_result),
-      timestamp: DateTime.utc_now()
-    }
-
-    new_state = %{
-      state
-      | metrics:
-          state.metrics
-          |> update_task_metrics(:refactor_code)
-          |> Map.update(:total_tokens_used, refactoring_result.tokens_used, &(&1 + refactoring_result.tokens_used)),
-        last_activity: DateTime.utc_now()
-    }
-
-    {:ok, result, new_state}
-  end
-
-  defp handle_fix_code(%{payload: payload} = task, _context, state) do
-    code = payload.code
-    error_message = Map.get(payload, :error_message, "")
-    file_path = Map.get(payload, :file_path)
-    language = Map.get(payload, :language, :elixir)
-
-    # Build fix prompt with error context
-    fix_prompt = build_fix_prompt(code, error_message, file_path)
-
-    # Use LLM to fix the code
-    fix_result =
-      case LLMService.completion(%{
-             model: get_model(state),
-             messages: [%{role: "user", content: fix_prompt}]
-           }) do
-        {:ok, %{choices: [%{message: %{content: fixed_code}} | _], usage: usage}} ->
-          %{
-            code: extract_code_from_response(fixed_code),
-            explanation: extract_explanation_from_response(fixed_code),
-            tokens_used: usage.total_tokens
-          }
-
-        {:error, reason} ->
-          Logger.error("Code fix failed: #{inspect(reason)}")
-
-          %{
-            code: code,
-            explanation: "Failed to fix: #{inspect(reason)}",
-            tokens_used: 0
-          }
-      end
-
-    # Validate the fix
-    syntax_valid = validate_syntax(fix_result.code, language)
-
-    result = %{
-      task_id: task.id,
-      fixed_code: fix_result.code,
-      fix_explanation: fix_result.explanation,
-      syntax_valid: syntax_valid,
-      original_error: error_message,
-      confidence: if(syntax_valid, do: 0.9, else: 0.3),
-      timestamp: DateTime.utc_now()
-    }
-
-    new_state = %{
-      state
-      | metrics:
-          state.metrics
-          |> update_task_metrics(:fix_code)
-          |> Map.update(:total_tokens_used, fix_result.tokens_used, &(&1 + fix_result.tokens_used)),
-        last_activity: DateTime.utc_now()
-    }
-
-    {:ok, result, new_state}
-  end
-
-  defp handle_complete_code(%{payload: payload} = task, _context, state) do
-    prefix = payload.prefix
-    suffix = Map.get(payload, :suffix, "")
-    cursor_position = Map.get(payload, :cursor_position, {0, 0})
-    language = Map.get(payload, :language, :elixir)
-
-    # Use FIM (Fill-in-the-Middle) approach
-    _fim_context = %{
-      prefix: prefix,
-      suffix: suffix,
-      cursor_position: cursor_position,
-      language: language
-    }
-
-    # Get completions from Generation Engine
-    # GenerationEngine.complete not yet implemented
-    # For now, return a simple completion
-    completions =
-      [%{text: "# Code completion placeholder", score: 0.8, tokens: 5}]
-
-    result = %{
-      task_id: task.id,
-      completions: completions,
-      context_used: %{prefix_lines: count_lines(prefix), suffix_lines: count_lines(suffix)},
-      cursor_position: cursor_position,
-      confidence: calculate_completion_confidence(completions),
-      timestamp: DateTime.utc_now()
-    }
-
-    new_state = %{
-      state
-      | metrics: update_task_metrics(state.metrics, :complete_code),
-        last_activity: DateTime.utc_now()
-    }
-
-    {:ok, result, new_state}
-  end
-
-  defp handle_generate_docs(%{payload: payload} = task, _context, state) do
-    code = payload.code
-    doc_type = Map.get(payload, :doc_type, :moduledoc)
-    language = Map.get(payload, :language, :elixir)
-
-    # Build documentation prompt
-    doc_prompt = build_doc_prompt(code, doc_type, language)
-
-    # Generate documentation
-    doc_result =
-      case LLMService.completion(%{
-             model: get_model(state),
-             messages: [%{role: "user", content: doc_prompt}]
-           }) do
-        {:ok, %{choices: [%{message: %{content: documentation}} | _], usage: usage}} ->
-          %{
-            documentation: format_documentation(documentation, doc_type, language),
-            examples_included: contains_examples?(documentation),
-            tokens_used: usage.total_tokens
-          }
-
-        {:error, reason} ->
-          Logger.error("Documentation generation failed: #{inspect(reason)}")
-
-          %{
-            documentation: "# Documentation generation failed",
-            examples_included: false,
-            tokens_used: 0
-          }
-      end
-
-    result = %{
-      task_id: task.id,
-      documentation: doc_result.documentation,
-      doc_type: doc_type,
-      examples_included: doc_result.examples_included,
-      confidence: 0.85,
-      timestamp: DateTime.utc_now()
-    }
-
-    new_state = %{
-      state
-      | metrics:
-          state.metrics
-          |> update_task_metrics(:generate_docs)
-          |> Map.update(:total_tokens_used, doc_result.tokens_used, &(&1 + doc_result.tokens_used)),
-        last_activity: DateTime.utc_now()
-    }
-
-    {:ok, result, new_state}
-  end
-
-  # Helper Functions
-
-  defp initialize_user_preferences(config) do
-    Map.get(config, :user_preferences, %{
-      code_style: :balanced,
-      comments: :helpful,
-      error_handling: :comprehensive,
-      naming_convention: :snake_case
-    })
-  end
-
-  defp configure_llm(config) do
+  defp extract_refactor_params(%{"data" => data}) do
     %{
-      provider: Map.get(config, :llm_provider, :openai),
-      model: Map.get(config, :model, "gpt-4"),
-      temperature: Map.get(config, :temperature, 0.7),
-      max_tokens: Map.get(config, :max_tokens, 2048)
+      prompt: build_refactor_prompt(data),
+      language: String.to_atom(Map.get(data, "language", "elixir")),
+      context: Map.merge(Map.get(data, "context", %{}), %{
+        original_code: Map.get(data, "code", ""),
+        refactoring_type: Map.get(data, "refactoring_type", "general"),
+        preserve_behavior: Map.get(data, "preserve_behavior", true)
+      })
     }
   end
 
-  defp build_rag_context(prompt, context_files, context, _state) do
-    # Use RAG Pipeline to retrieve relevant context
-    case RAGPipeline.retrieve(%{
-           query: prompt,
-           file_paths: context_files,
-           limit: 10
-         }) do
-      {:ok, documents} ->
-        %{
-          relevant_code: Enum.map(documents, & &1.content),
-          patterns: extract_patterns_from_docs(documents),
-          user_context: Map.get(context, :memory, %{})
-        }
+  defp extract_fix_params(%{"data" => data}) do
+    %{
+      prompt: build_fix_prompt(data),
+      language: String.to_atom(Map.get(data, "language", "elixir")),
+      context: Map.merge(Map.get(data, "context", %{}), %{
+        broken_code: Map.get(data, "code", ""),
+        error_message: Map.get(data, "error_message", ""),
+        file_path: Map.get(data, "file_path")
+      })
+    }
+  end
 
-      {:error, _reason} ->
-        %{
-          relevant_code: [],
-          patterns: [],
-          user_context: Map.get(context, :memory, %{})
-        }
+  defp extract_completion_params(%{"data" => data}) do
+    %{
+      prompt: build_completion_prompt(data),
+      language: String.to_atom(Map.get(data, "language", "elixir")),
+      context: Map.merge(Map.get(data, "context", %{}), %{
+        prefix: Map.get(data, "prefix", ""),
+        suffix: Map.get(data, "suffix", ""),
+        cursor_position: Map.get(data, "cursor_position", {0, 0})
+      })
+    }
+  end
+
+  defp extract_docs_params(%{"data" => data}) do
+    %{
+      prompt: build_docs_prompt(data),
+      language: String.to_atom(Map.get(data, "language", "elixir")),
+      context: Map.merge(Map.get(data, "context", %{}), %{
+        code: Map.get(data, "code", ""),
+        doc_type: String.to_atom(Map.get(data, "doc_type", "moduledoc"))
+      })
+    }
+  end
+
+  defp extract_template_params(%{"data" => data}) do
+    %{
+      template_name: Map.get(data, "template_name", ""),
+      template_data: Map.get(data, "template_data", %{}),
+      template_version: Map.get(data, "template_version", :latest),
+      language: String.to_atom(Map.get(data, "language", "elixir")),
+      output_format: String.to_atom(Map.get(data, "output_format", "code"))
+    }
+  end
+
+  defp extract_streaming_params(%{"data" => data}) do
+    %{
+      prompt: Map.get(data, "prompt", ""),
+      language: String.to_atom(Map.get(data, "language", "elixir")),
+      streaming_id: Map.get(data, "streaming_id"),
+      context: Map.get(data, "context", %{}),
+      chunk_size: Map.get(data, "chunk_size", 100),
+      max_chunks: Map.get(data, "max_chunks", 50)
+    }
+  end
+
+  defp extract_validation_params(%{"data" => data}) do
+    %{
+      code: Map.get(data, "code", ""),
+      language: String.to_atom(Map.get(data, "language", "elixir")),
+      validation_types: Enum.map(Map.get(data, "validation_types", ["syntax", "style"]), &String.to_atom/1),
+      quality_standards: String.to_atom(Map.get(data, "quality_standards", "standard")),
+      context: Map.get(data, "context", %{})
+    }
+  end
+
+  defp extract_processing_params(%{"data" => data}) do
+    %{
+      code: Map.get(data, "code", ""),
+      language: String.to_atom(Map.get(data, "language", "elixir")),
+      processing_types: Enum.map(Map.get(data, "processing_types", ["format", "optimize"]), &String.to_atom/1),
+      formatting_options: Map.get(data, "formatting_options", %{}),
+      optimization_level: String.to_atom(Map.get(data, "optimization_level", "standard")),
+      add_documentation: Map.get(data, "add_documentation", true),
+      add_tests: Map.get(data, "add_tests", false)
+    }
+  end
+
+  # Prompt building helpers
+
+  defp build_refactor_prompt(data) do
+    code = Map.get(data, "code", "")
+    refactoring_type = Map.get(data, "refactoring_type", "general")
+    preserve_behavior = Map.get(data, "preserve_behavior", true)
+
+    behavior_instruction = if preserve_behavior do
+      "IMPORTANT: The refactored code must preserve the exact same behavior and API."
+    else
+      "You may change the behavior if it improves the code quality."
     end
-  end
-
-  defp apply_self_correction_to_generation(generation_result, context, _state) do
-    case SelfCorrection.correct(%{
-           input: generation_result.code,
-           language: generation_result.language,
-           strategies: [:syntax_validation, :logic_verification],
-           context: context
-         }) do
-      {:ok, corrected} ->
-        %{
-          generation_result
-          | code: corrected.output,
-            confidence: corrected.confidence
-        }
-
-      {:error, _reason} ->
-        generation_result
-    end
-  end
-
-  defp detect_imports(code, :elixir) do
-    import_regex = ~r/^\s*(import|alias|use|require)\s+([A-Z][A-Za-z0-9._]*)/m
-
-    Regex.scan(import_regex, code)
-    |> Enum.map(fn [_full, directive, module] ->
-      %{directive: String.to_atom(directive), module: module}
-    end)
-  end
-
-  defp detect_imports(_code, _language) do
-    []
-  end
-
-  defp validate_syntax(code, :elixir) do
-    case Code.string_to_quoted(code) do
-      {:ok, _ast} -> true
-      {:error, _} -> false
-    end
-  end
-
-  defp validate_syntax(_code, _language) do
-    # For other languages, assume valid or use external validators
-    true
-  end
-
-  defp get_model(state) do
-    state.llm_config.model
-  end
-
-  defp build_refactoring_prompt(code, refactoring_type, preserve_behavior) do
-    behavior_instruction =
-      if preserve_behavior do
-        "IMPORTANT: The refactored code must preserve the exact same behavior and API."
-      else
-        "You may change the behavior if it improves the code quality."
-      end
 
     """
     Refactor the following code with focus on #{refactoring_type}.
@@ -593,56 +405,16 @@ defmodule RubberDuck.Agents.GenerationAgent do
     """
   end
 
-  defp analyze_changes(original, refactored) do
-    # Simple line-based diff analysis
-    original_lines = String.split(original, "\n")
-    refactored_lines = String.split(refactored, "\n")
+  defp build_fix_prompt(data) do
+    code = Map.get(data, "code", "")
+    error_message = Map.get(data, "error_message", "")
+    file_path = Map.get(data, "file_path")
 
-    changes = []
-
-    changes =
-      if length(original_lines) != length(refactored_lines) do
-        ["Line count changed from #{length(original_lines)} to #{length(refactored_lines)}"] ++ changes
-      else
-        changes
-      end
-
-    changes =
-      if String.contains?(refactored, "defp") and not String.contains?(original, "defp") do
-        ["Added private functions"] ++ changes
-      else
-        changes
-      end
-
-    changes
-  end
-
-  defp verify_behavior_preservation(_original, _refactored, _language) do
-    # Simplified - in production would run tests or deeper analysis
-    true
-  end
-
-  defp calculate_refactoring_confidence(refactoring_result) do
-    base_confidence = 0.7
-
-    # Adjust based on changes
-    confidence =
-      if length(refactoring_result.changes) > 0 do
-        base_confidence + 0.1
-      else
-        base_confidence - 0.2
-      end
-
-    min(max(confidence, 0.0), 1.0)
-  end
-
-  defp build_fix_prompt(code, error_message, file_path) do
-    file_context =
-      if file_path do
-        "File: #{file_path}"
-      else
-        ""
-      end
+    file_context = if file_path do
+      "File: #{file_path}"
+    else
+      ""
+    end
 
     """
     Fix the following code that has an error.
@@ -656,57 +428,41 @@ defmodule RubberDuck.Agents.GenerationAgent do
     ```
 
     Provide the fixed code and explain what was wrong and how you fixed it.
-    Format your response as:
-
-    FIXED CODE:
-    ```
-    [fixed code here]
-    ```
-
-    EXPLANATION:
-    [explanation here]
     """
   end
 
-  defp extract_code_from_response(response) do
-    case Regex.run(~r/FIXED CODE:\s*```[a-z]*\n(.*?)```/s, response) do
-      [_, code] -> String.trim(code)
-      # Fallback to full response
-      _ -> response
+  defp build_completion_prompt(data) do
+    prefix = Map.get(data, "prefix", "")
+    suffix = Map.get(data, "suffix", "")
+
+    """
+    Complete the following code at the cursor position.
+
+    Code before cursor:
+    ```
+    #{prefix}
+    ```
+
+    Code after cursor:
+    ```
+    #{suffix}
+    ```
+
+    Provide appropriate code completion for the cursor position.
+    """
+  end
+
+  defp build_docs_prompt(data) do
+    code = Map.get(data, "code", "")
+    doc_type = Map.get(data, "doc_type", "moduledoc")
+    language = Map.get(data, "language", "elixir")
+
+    doc_instruction = case doc_type do
+      "moduledoc" -> "Generate comprehensive module documentation"
+      "fundoc" -> "Generate function documentation with examples"  
+      "typedoc" -> "Generate type documentation"
+      _ -> "Generate appropriate documentation"
     end
-  end
-
-  defp extract_explanation_from_response(response) do
-    case Regex.run(~r/EXPLANATION:\s*(.+)/s, response) do
-      [_, explanation] -> String.trim(explanation)
-      _ -> "Code has been fixed"
-    end
-  end
-
-  defp count_lines(text) do
-    text
-    |> String.split("\n")
-    |> length()
-  end
-
-  defp calculate_completion_confidence(completions) do
-    if Enum.empty?(completions) do
-      0.0
-    else
-      # Average score of top completions
-      scores = Enum.map(completions, & &1.score)
-      Enum.sum(scores) / length(scores)
-    end
-  end
-
-  defp build_doc_prompt(code, doc_type, language) do
-    doc_instruction =
-      case doc_type do
-        :moduledoc -> "Generate comprehensive module documentation"
-        :fundoc -> "Generate function documentation with examples"
-        :typedoc -> "Generate type documentation"
-        _ -> "Generate appropriate documentation"
-      end
 
     """
     #{doc_instruction} for the following #{language} code:
@@ -723,90 +479,11 @@ defmodule RubberDuck.Agents.GenerationAgent do
     """
   end
 
-  defp format_documentation(doc, :moduledoc, :elixir) do
-    """
-    @moduledoc \"\"\"
-    #{String.trim(doc)}
-    \"\"\"
-    """
-  end
+  # Metrics helpers
 
-  defp format_documentation(doc, :fundoc, :elixir) do
-    """
-    @doc \"\"\"
-    #{String.trim(doc)}
-    \"\"\"
-    """
-  end
-
-  defp format_documentation(doc, _type, _language) do
-    doc
-  end
-
-  defp contains_examples?(documentation) do
-    String.contains?(documentation, "Example") or
-      String.contains?(documentation, "##") or
-      String.contains?(documentation, "iex>")
-  end
-
-  defp quick_generate(prompt, language, state) do
-    # Quick generation without full task handling
-    case GenerationEngine.execute(
-           %{
-             prompt: prompt,
-             language: language,
-             context: %{},
-             user_preferences: state.user_preferences
-           },
-           state.llm_config
-         ) do
-      {:ok, result} ->
-        %{
-          code: result.code,
-          confidence: result.confidence
-        }
-
-      {:error, reason} ->
-        %{
-          code: "# Generation failed: #{inspect(reason)}",
-          confidence: 0.0
-        }
-    end
-  end
-
-  defp get_cache_stats(state) do
-    %{
-      cache_size: map_size(state.generation_cache),
-      hit_rate: calculate_hit_rate(state.metrics),
-      total_cached: state.metrics.cache_hits + state.metrics.cache_misses
-    }
-  end
-
-  defp calculate_hit_rate(%{cache_hits: hits, cache_misses: misses}) when hits + misses > 0 do
-    hits / (hits + misses)
-  end
-
-  defp calculate_hit_rate(_metrics), do: 0.0
-
-  defp check_llm_connection(_state) do
-    # Simplified - would check actual LLM service status
-    true
-  end
-
-  defp get_llm_status(state) do
-    %{
-      provider: state.llm_config.provider,
-      model: state.llm_config.model,
-      connected: check_llm_connection(state),
-      tokens_used: state.metrics.total_tokens_used
-    }
-  end
-
-  defp extract_patterns_from_docs(documents) do
-    documents
-    |> Enum.flat_map(fn doc ->
-      Map.get(doc, :patterns, [])
-    end)
-    |> Enum.uniq()
+  defp update_task_metrics(metrics, task_type) do
+    metrics
+    |> Map.update(:tasks_completed, 1, &(&1 + 1))
+    |> Map.update(task_type, 1, &(&1 + 1))
   end
 end

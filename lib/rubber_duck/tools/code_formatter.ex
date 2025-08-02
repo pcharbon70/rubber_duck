@@ -93,7 +93,7 @@ defmodule RubberDuck.Tools.CodeFormatter do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:code_analysis]
       rate_limit [max_requests: 200, window_seconds: 60]
     end
