@@ -21,6 +21,10 @@ defmodule RubberDuck.Agents.ProviderAgent do
   defmacro __using__(opts) do
     base_actions = [
       RubberDuck.Jido.Actions.Provider.ProviderRequestAction,
+      RubberDuck.Jido.Actions.Provider.ProviderHealthCheckAction,
+      RubberDuck.Jido.Actions.Provider.ProviderConfigUpdateAction,
+      RubberDuck.Jido.Actions.Provider.ProviderRateLimitAction,
+      RubberDuck.Jido.Actions.Provider.ProviderFailoverAction,
       RubberDuck.Jido.Actions.Provider.FeatureCheckAction,
       RubberDuck.Jido.Actions.Provider.TokenEstimateAction,
       RubberDuck.Jido.Actions.Provider.GetStatusAction,
