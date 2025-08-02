@@ -72,7 +72,7 @@ defmodule RubberDuck.Jido.Actions.Conversation.Planning.ValidatePlanRequestActio
     {:ok, :started}
   end
 
-  defp validate_plan_async(agent_id, params, conversation) do
+  defp validate_plan_async(agent_id, params, _conversation) do
     case validate_plan(params.plan_id) do
       {:ok, validation_results} ->
         emit_agent_signal(agent_id, %{

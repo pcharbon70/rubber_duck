@@ -29,8 +29,8 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
     tool: :function_mover,
     name: "function_mover_agent",
     description: "Manages intelligent function relocation and module restructuring workflows",
-    category: :code_transformation,
-    tags: [:refactoring, :module_organization, :function_move, :code_structure],
+    category: "code_transformation",
+    tags: ["refactoring", :module_organization, :function_move, :code_structure],
     schema: [
       # Move history and tracking
       move_history: [type: {:list, :map}, default: []],

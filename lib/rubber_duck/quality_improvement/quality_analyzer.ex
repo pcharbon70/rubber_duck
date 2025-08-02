@@ -12,7 +12,7 @@ defmodule RubberDuck.QualityImprovement.QualityAnalyzer do
   @doc """
   Analyzes code metrics including complexity, maintainability, and technical debt.
   """
-  def analyze_code_metrics(code, standards, options \\ %{}) do
+  def analyze_code_metrics(code, standards, _options \\ %{}) do
     Logger.debug("QualityAnalyzer: Analyzing code metrics")
     
     try do
@@ -59,7 +59,7 @@ defmodule RubberDuck.QualityImprovement.QualityAnalyzer do
   @doc """
   Analyzes code style including formatting, naming conventions, and documentation.
   """
-  def analyze_code_style(code, standards, options \\ %{}) do
+  def analyze_code_style(code, standards, _options \\ %{}) do
     Logger.debug("QualityAnalyzer: Analyzing code style")
     
     try do
@@ -104,7 +104,7 @@ defmodule RubberDuck.QualityImprovement.QualityAnalyzer do
   @doc """
   Analyzes code complexity including function complexity and nesting depth.
   """
-  def analyze_complexity(code, options \\ %{}) do
+  def analyze_complexity(code, _options \\ %{}) do
     Logger.debug("QualityAnalyzer: Analyzing code complexity")
     
     try do
@@ -152,7 +152,7 @@ defmodule RubberDuck.QualityImprovement.QualityAnalyzer do
   @doc """
   Analyzes code maintainability including design patterns and architectural issues.
   """
-  def analyze_maintainability(code, practices, options \\ %{}) do
+  def analyze_maintainability(code, practices, _options \\ %{}) do
     Logger.debug("QualityAnalyzer: Analyzing maintainability")
     
     try do
@@ -197,7 +197,7 @@ defmodule RubberDuck.QualityImprovement.QualityAnalyzer do
   @doc """
   Analyzes documentation coverage and quality.
   """
-  def analyze_documentation(code, standards, options \\ %{}) do
+  def analyze_documentation(code, standards, _options \\ %{}) do
     Logger.debug("QualityAnalyzer: Analyzing documentation")
     
     try do
@@ -236,7 +236,7 @@ defmodule RubberDuck.QualityImprovement.QualityAnalyzer do
   @doc """
   Checks code against best practices.
   """
-  def check_best_practices(code, practices, practice_definitions, options \\ %{}) do
+  def check_best_practices(code, practices, practice_definitions, _options \\ %{}) do
     Logger.debug("QualityAnalyzer: Checking best practices")
     
     try do
@@ -434,7 +434,7 @@ defmodule RubberDuck.QualityImprovement.QualityAnalyzer do
 
   ## Private Functions - Style Analysis
 
-  defp check_formatting_issues(code, standards) do
+  defp check_formatting_issues(code, _standards) do
     issues = []
     
     # Check line length (simplified)
@@ -459,7 +459,7 @@ defmodule RubberDuck.QualityImprovement.QualityAnalyzer do
     issues ++ trailing_whitespace
   end
 
-  defp check_naming_conventions(ast, standards) do
+  defp check_naming_conventions(ast, _standards) do
     violations = []
     
     # Check function naming (simplified)
@@ -486,7 +486,7 @@ defmodule RubberDuck.QualityImprovement.QualityAnalyzer do
     violations ++ function_violations
   end
 
-  defp check_documentation_requirements(ast, standards) do
+  defp check_documentation_requirements(ast, _standards) do
     gaps = []
     
     # Check for missing module docs
@@ -714,12 +714,12 @@ defmodule RubberDuck.QualityImprovement.QualityAnalyzer do
     smells
   end
 
-  defp assess_architectural_issues(ast, practices) do
+  defp assess_architectural_issues(ast, _practices) do
     issues = []
     
     # Check for single responsibility violations
     if has_multiple_responsibilities?(ast) do
-      issues = [%{type: "srp_violation", severity: "high", description: "Module has multiple responsibilities"} | issues]
+      _ = [%{type: "srp_violation", severity: "high", description: "Module has multiple responsibilities"} | issues]
     end
     
     # Check for tight coupling
@@ -816,7 +816,7 @@ defmodule RubberDuck.QualityImprovement.QualityAnalyzer do
     end
   end
 
-  defp check_documentation_consistency(ast, standards) do
+  defp check_documentation_consistency(ast, _standards) do
     # Check for consistency issues in documentation
     issues = []
     
@@ -864,7 +864,7 @@ defmodule RubberDuck.QualityImprovement.QualityAnalyzer do
 
   ## Private Functions - Best Practices
 
-  defp check_single_practice(ast, practice, practice_def) do
+  defp check_single_practice(ast, practice, _practice_def) do
     case practice do
       "single_responsibility" ->
         if has_multiple_responsibilities?(ast) do

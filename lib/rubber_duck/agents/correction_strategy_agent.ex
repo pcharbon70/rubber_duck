@@ -98,13 +98,6 @@ defmodule RubberDuck.Agents.CorrectionStrategyAgent do
     ]
 
   require Logger
-  
-  alias RubberDuck.CorrectionStrategy.{
-    StrategyLibrary,
-    CostEstimator, 
-    StrategySelector,
-    LearningEngine
-  }
 
   # Signal Handlers
 
@@ -386,7 +379,7 @@ defmodule RubberDuck.Agents.CorrectionStrategyAgent do
     cost_models["complexity_based"]["multipliers"][complexity] || 1.0
   end
 
-  defp get_risk_multiplier(strategy, error_context) do
+  defp get_risk_multiplier(strategy, _error_context) do
     strategy_risk = strategy.metadata["risk_level"] || "medium"
     
     case strategy_risk do

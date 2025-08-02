@@ -303,13 +303,13 @@ defmodule RubberDuck.RAG.AugmentationProcessor do
     
     # Contains numbers or data
     if String.match?(sentence, ~r/\d+/) do
-      score = score + 0.2
+      _ = score + 0.2
     end
     
     # Contains key terms
     key_terms = ~w(important significant critical essential key main primary)
     if Enum.any?(key_terms, &String.contains?(String.downcase(sentence), &1)) do
-      score = score + 0.3
+      _ = score + 0.3
     end
     
     score

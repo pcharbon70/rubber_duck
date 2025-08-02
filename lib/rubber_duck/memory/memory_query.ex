@@ -349,7 +349,7 @@ defmodule RubberDuck.Memory.MemoryQuery do
       filter_str = query.filters
       |> Enum.map(&format_filter/1)
       |> Enum.join(" AND ")
-      parts = ["WHERE #{filter_str}" | parts]
+      _ = ["WHERE #{filter_str}" | parts]
     end
     
     # Add sorting
@@ -357,16 +357,16 @@ defmodule RubberDuck.Memory.MemoryQuery do
       sort_str = query.sort
       |> Enum.map(&"#{&1.field} #{&1.direction}")
       |> Enum.join(", ")
-      parts = parts ++ ["ORDER BY #{sort_str}"]
+      _ = parts ++ ["ORDER BY #{sort_str}"]
     end
     
     # Add pagination
     if query.pagination.page_size do
-      parts = parts ++ ["LIMIT #{query.pagination.page_size}"]
+      _ = parts ++ ["LIMIT #{query.pagination.page_size}"]
     end
     
     if query.pagination.offset do
-      parts = parts ++ ["OFFSET #{query.pagination.offset}"]
+      _ = parts ++ ["OFFSET #{query.pagination.offset}"]
     end
     
     Enum.join(parts, " ")

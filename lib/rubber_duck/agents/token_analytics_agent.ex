@@ -428,7 +428,7 @@ defmodule RubberDuck.Agents.TokenAnalyticsAgent do
   end
   defp format_model_breakdown(_), do: []
   
-  defp get_recent_analytics(agent, _entity_type, _entity_id) do
+  defp get_recent_analytics(_agent, _entity_type, _entity_id) do
     # Would fetch recent analytics from cache
     %{tokens: 0, cost: Decimal.new("0"), requests: 0}
   end

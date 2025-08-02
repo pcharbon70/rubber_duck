@@ -29,7 +29,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     tool: :regex_extractor,
     name: "regex_extractor_agent",
     description: "Manages intelligent regex pattern extraction and optimization workflows",
-    category: :text_analysis,
+    category: "text_analysis",
     tags: [:regex, :pattern_extraction, :text_processing, :data_mining],
     schema: [
       # Pattern management
@@ -1055,7 +1055,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
       # Replace .* with more specific patterns
       optimized = if String.contains?(pattern, ".*") do
         optimizations = [%{
-          type: :performance,
+          type: "performance",
           pattern: String.replace(pattern, ".*", "[^\\s]*"),
           explanation: "Replaced .* with [^\\s]* for better performance",
           impact: "high"
@@ -1067,7 +1067,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
       # Add anchoring for better performance
       optimized = if not (String.starts_with?(pattern, "^") or String.ends_with?(pattern, "$")) do
         [%{
-          type: :performance,
+          type: "performance",
           pattern: "^" <> pattern <> "$",
           explanation: "Added anchoring to prevent unnecessary backtracking",
           impact: "medium"
@@ -1080,7 +1080,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
       optimized = if String.contains?(pattern, "(") and not String.contains?(pattern, "?:") do
         non_capturing_pattern = String.replace(pattern, "(", "(?:")
         [%{
-          type: :performance,
+          type: "performance",
           pattern: non_capturing_pattern,
           explanation: "Converted capturing groups to non-capturing for better performance",
           impact: "low"

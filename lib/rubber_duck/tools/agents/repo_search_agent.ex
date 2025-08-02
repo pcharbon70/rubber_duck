@@ -27,31 +27,15 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
     tool: :repo_search,
     name: "repo_search_agent",
     description: "Manages intelligent code search and discovery workflows",
-    category: :navigation,
-    tags: [:search, :navigation, :discovery, :analysis, :code_exploration],
+    category: "navigation",
+    tags: ["search", "navigation", "discovery", "analysis", "code_exploration"],
     schema: [
       # Search history and tracking
       search_history: [type: {:list, :map}, default: []],
       max_history_size: [type: :integer, default: 100],
       
       # Search patterns and preferences
-      search_patterns: [type: :map, default: %{
-        "common_functions" => %{
-          patterns: ["def ", "defp ", "defmacro "],
-          search_type: "text",
-          file_pattern: "**/*.ex"
-        },
-        "test_functions" => %{
-          patterns: ["test ", "describe "],
-          search_type: "text", 
-          file_pattern: "test/**/*.exs"
-        },
-        "configuration" => %{
-          patterns: ["config ", "import_config"],
-          search_type: "text",
-          file_pattern: "config/**/*.exs"
-        }
-      }],
+      search_patterns: [type: :map, default: quote do %{} end],
       
       # Batch search operations
       active_batch_searches: [type: :map, default: %{}],
@@ -61,38 +45,17 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
       analysis_ttl: [type: :integer, default: 600_000], # 10 minutes
       
       # Search statistics
-      search_stats: [type: :map, default: %{
-        total_searches: 0,
-        successful_searches: 0,
-        failed_searches: 0,
-        average_results_per_search: 0.0,
-        most_searched_terms: %{},
-        search_types_used: %{}
-      }],
+      search_stats: [type: :map, default: quote do %{} end],
       
       # Smart suggestions
       suggested_searches: [type: {:list, :map}, default: []],
-      suggestion_context: [type: :map, default: %{
-        recent_files: [],
-        current_focus: nil,
-        project_patterns: %{}
-      }],
+      suggestion_context: [type: :map, default: quote do %{} end],
       
       # Search preferences
-      search_preferences: [type: :map, default: %{
-        default_search_type: "text",
-        default_file_pattern: "**/*.{ex,exs}",
-        default_context_lines: 2,
-        case_sensitive_by_default: false,
-        max_results_per_search: 100
-      }],
+      search_preferences: [type: :map, default: quote do %{} end],
       
       # Performance tracking
-      performance_metrics: [type: :map, default: %{
-        average_search_time: 0.0,
-        cache_hit_rate: 0.0,
-        search_efficiency_score: 0.0
-      }]
+      performance_metrics: [type: :map, default: quote do %{} end]
     ]
   
   require Logger
@@ -500,7 +463,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
     defp suggest_refactoring_opportunities(matches) do
       if length(matches) > 10 do
         [%{
-          type: :refactoring,
+          type: "refactoring",
           description: "Consider extracting common patterns found in #{length(matches)} locations",
           priority: :high
         }]
@@ -647,7 +610,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
       # Generate suggestions for potential refactoring opportunities
       [
         %{
-          type: :refactoring,
+          type: "refactoring",
           query: "def.*def.*def",
           description: "Find files with many function definitions (potential for splitting)",
           search_options: %{search_type: "regex"},

@@ -179,7 +179,7 @@ defmodule RubberDuck.Agents.TokenManager.CostCalculator do
       current_model = usage_summary.primary_model
       cheaper_alternatives = find_cheaper_alternatives(current_model, pricing_models)
       
-      recommendations ++ Enum.map(cheaper_alternatives, fn {model, pricing} ->
+      _ = recommendations ++ Enum.map(cheaper_alternatives, fn {model, pricing} ->
         savings = calculate_savings(
           usage_summary.average_tokens,
           pricing_models[current_model],
@@ -202,7 +202,7 @@ defmodule RubberDuck.Agents.TokenManager.CostCalculator do
         Decimal.new(usage_summary.duplicate_percentage / 100)
       )
       
-      recommendations ++ [%{
+      _ = recommendations ++ [%{
         type: "caching",
         description: "Implement response caching for duplicate requests",
         savings_percentage: usage_summary.duplicate_percentage,
@@ -219,7 +219,7 @@ defmodule RubberDuck.Agents.TokenManager.CostCalculator do
         potential_reduction
       )
       
-      recommendations ++ [%{
+      _ = recommendations ++ [%{
         type: "prompt_optimization",
         description: "Optimize prompts to reduce token usage",
         savings_percentage: potential_reduction * 100,

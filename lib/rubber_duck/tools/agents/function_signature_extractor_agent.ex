@@ -280,7 +280,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
     end
     
     defp count_documented(signatures) do
-      Enum.count(signatures, &(&1[:documentation] not in [nil, ""]))
+      Enum.count(signatures, &(&1["documentation"] not in [nil, ""]))
     end
     
     defp count_typed(signatures) do
@@ -384,7 +384,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
       name = signature[:name] || "unknown"
       params = format_parameters(signature[:parameters] || [])
       return_type = signature[:return_type] || "unknown"
-      doc = signature[:documentation] || "No documentation available."
+      doc = signature["documentation"] || "No documentation available."
       
       """
       ### `#{name}(#{params}) :: #{return_type}`
@@ -416,7 +416,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
       name = signature[:name] || "unknown"
       params = format_parameters(signature[:parameters] || [])
       return_type = signature[:return_type] || "unknown"
-      doc = signature[:documentation] || "No documentation available."
+      doc = signature["documentation"] || "No documentation available."
       
       """
       <h3><code>#{name}(#{params}) :: #{return_type}</code></h3>
@@ -437,7 +437,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
         name: signature[:name],
         parameters: signature[:parameters] || [],
         return_type: signature[:return_type],
-        documentation: signature[:documentation],
+        documentation: signature["documentation"],
         visibility: signature[:visibility],
         file: signature[:file],
         line: signature[:line]
@@ -470,8 +470,8 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
         signatures2: [type: {:list, :map}, required: true],
         comparison_type: [
           type: :atom,
-          values: [:api_changes, :compatibility, :coverage],
-          default: :api_changes
+          values: ["api"_changes, :compatibility, :coverage],
+          default: "api"_changes
         ]
       ]
     
@@ -481,7 +481,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
       sigs2 = params.signatures2
       
       comparison = case params.comparison_type do
-        :api_changes -> compare_api_changes(sigs1, sigs2)
+        "api"_changes -> compare_api_changes(sigs1, sigs2)
         :compatibility -> check_compatibility(sigs1, sigs2)
         :coverage -> compare_coverage(sigs1, sigs2)
       end
@@ -566,7 +566,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
     
     defp signatures_differ?(sig1, sig2) do
       sig1[:return_type] != sig2[:return_type] ||
-      sig1[:documentation] != sig2[:documentation] ||
+      sig1["documentation"] != sig2["documentation"] ||
       sig1[:visibility] != sig2[:visibility]
     end
     
@@ -585,8 +585,8 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
         changes
       end
       
-      changes = if old_sig[:documentation] != new_sig[:documentation] do
-        [%{type: :documentation, old: old_sig[:documentation], new: new_sig[:documentation]} | changes]
+      changes = if old_sig["documentation"] != new_sig["documentation"] do
+        [%{type: "documentation", old: old_sig["documentation"], new: new_sig["documentation"]} | changes]
       else
         changes
       end
@@ -652,7 +652,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
       
       %{
         total_functions: total,
-        documented: Enum.count(signatures, &(&1[:documentation] not in [nil, ""])),
+        documented: Enum.count(signatures, &(&1["documentation"] not in [nil, ""])),
         typed: Enum.count(signatures, &(&1[:return_type] not in [nil, "", "unknown"])),
         public: Enum.count(signatures, &(&1[:visibility] == :public))
       }
@@ -750,7 +750,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
   def handle_tool_signal(agent, %{"type" => "compare_signatures"} = signal) do
     signatures1 = get_in(signal, ["data", "signatures1"]) || []
     signatures2 = get_in(signal, ["data", "signatures2"]) || []
-    comparison_type = get_in(signal, ["data", "comparison_type"]) || :api_changes
+    comparison_type = get_in(signal, ["data", "comparison_type"]) || "api"_changes
     
     # Execute signature comparison action
     {:ok, _ref} = __MODULE__.cmd_async(agent, CompareSignaturesAction, %{

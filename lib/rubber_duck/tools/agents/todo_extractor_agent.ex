@@ -10,8 +10,8 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
   use Jido.Agent,
     name: "todo_extractor_agent",
     description: "Orchestrates TODO extraction and technical debt tracking",
-    category: :maintenance,
-    tags: [:maintenance, :debt, :planning, :documentation, :todos],
+    category: "maintenance",
+    tags: ["maintenance", :debt, :planning, "documentation", "todos"],
     vsn: "1.0.0",
     schema: [
       extraction_config: [

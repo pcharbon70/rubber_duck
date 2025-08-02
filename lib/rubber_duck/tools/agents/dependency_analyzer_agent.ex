@@ -250,7 +250,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     
     defp expand_tree(node, depth_limit) do
       if node.depth >= depth_limit do
-        Map.put(node, :dependencies, [])
+        Map.put(node, "dependencies", [])
       else
         # In real implementation, would fetch subdependencies
         # For now, just mark that expansion would happen
@@ -269,7 +269,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     end
     
     defp calculate_max_depth(node, current_depth \\ 0) do
-      if node[:dependencies] && length(node.dependencies) > 0 do
+      if node["dependencies"] && length(node.dependencies) > 0 do
         child_depths = Enum.map(node.dependencies, fn dep ->
           calculate_max_depth(dep, current_depth + 1)
         end)
@@ -280,9 +280,9 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     end
     
     defp count_all_dependencies(node) do
-      direct_count = length(node[:dependencies] || [])
+      direct_count = length(node["dependencies"] || [])
       
-      child_counts = if node[:dependencies] do
+      child_counts = if node["dependencies"] do
         Enum.map(node.dependencies, &count_all_dependencies/1)
         |> Enum.sum()
       else
@@ -299,7 +299,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     end
     
     defp collect_all_dependencies(node, acc \\ []) do
-      deps = node[:dependencies] || []
+      deps = node["dependencies"] || []
       
       all_deps = deps ++ acc
       
@@ -355,7 +355,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     defp collect_node_depths(node, current_depth \\ 0, acc \\ []) do
       acc = [current_depth | acc]
       
-      if node[:dependencies] do
+      if node["dependencies"] do
         Enum.reduce(node.dependencies, acc, fn dep, acc ->
           collect_node_depths(dep, current_depth + 1, acc)
         end)
@@ -458,7 +458,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     defp collect_all_dependencies_with_path(node, path \\ []) do
       current_path = path ++ [node.name]
       
-      deps = node[:dependencies] || []
+      deps = node["dependencies"] || []
       
       dep_entries = Enum.map(deps, fn dep ->
         %{
@@ -1698,7 +1698,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
         
         acc = [node_data | acc]
         
-        deps = node[:dependencies] || []
+        deps = node["dependencies"] || []
         filtered_deps = if include_dev do
           deps
         else
@@ -1717,7 +1717,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     
     defp calculate_node_size(node) do
       # Size based on number of dependencies
-      dep_count = length(node[:dependencies] || [])
+      dep_count = length(node["dependencies"] || [])
       
       cond do
         dep_count == 0 -> 5
@@ -1733,7 +1733,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
         has_vulnerabilities: node[:has_vulnerabilities] || false,
         license: node[:license] || "Unknown",
         update_available: node[:update_available] || false,
-        dependency_count: length(node[:dependencies] || [])
+        dependency_count: length(node["dependencies"] || [])
       }
     end
     
@@ -1755,7 +1755,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
           acc
         end
         
-        deps = node[:dependencies] || []
+        deps = node["dependencies"] || []
         filtered_deps = if include_dev do
           deps
         else
@@ -1863,7 +1863,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     end
     
     defp calculate_actual_depth(node, current \\ 0) do
-      if node[:dependencies] && length(node.dependencies) > 0 do
+      if node["dependencies"] && length(node.dependencies) > 0 do
         child_depths = Enum.map(node.dependencies, fn dep ->
           calculate_actual_depth(dep, current + 1)
         end)
@@ -2049,7 +2049,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
       end
       
       # Update recommendations
-      if results[:updates] && results.updates[:update_count][:security] > 0 do
+      if results[:updates] && results.updates[:update_count]["security"] > 0 do
         findings = ["Security updates available for #{results.updates.update_count.security} packages"] ++ findings
       end
       
@@ -2120,7 +2120,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
         security_risk = results.vulnerabilities[:risk_score] || 0
         if security_risk > 50 do
           risks = [%{
-            type: :security,
+            type: "security",
             level: :high,
             description: "High security risk from vulnerable dependencies"
           } | risks]

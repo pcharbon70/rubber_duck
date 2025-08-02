@@ -44,7 +44,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
     description: "Manages persistent storage and retrieval of long-term memories",
     category: "memory"
 
-  alias RubberDuck.Memory.{MemoryEntry, MemoryIndex, MemoryVersion, MemoryQuery}
+  alias RubberDuck.Memory.{MemoryEntry, MemoryVersion, MemoryQuery}
   require Logger
 
   @default_config %{
@@ -381,7 +381,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
         
       memory ->
         # Cache hit
-        agent = update_in(agent.metrics.cache_hits, &(&1 + 1))
+        _ = update_in(agent.metrics.cache_hits, &(&1 + 1))
         {:ok, memory}
     end
   end
@@ -417,7 +417,7 @@ defmodule RubberDuck.Agents.LongTermMemoryAgent do
   defp update_cache(agent, memory) do
     if map_size(agent.cache) >= agent.config.cache_size do
       # Evict least recently accessed
-      agent = evict_from_cache(agent)
+      _ = evict_from_cache(agent)
     end
     
     put_in(agent.cache[memory.id], memory)

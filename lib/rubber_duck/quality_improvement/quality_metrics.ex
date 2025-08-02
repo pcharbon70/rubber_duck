@@ -11,7 +11,7 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
   @doc """
   Calculates comprehensive quality metrics for code.
   """
-  def calculate_quality_metrics(code, options \\ %{}) do
+  def calculate_quality_metrics(code, _options \\ %{}) do
     Logger.debug("QualityMetrics: Calculating quality metrics")
     
     try do
@@ -59,7 +59,7 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
   @doc """
   Tracks quality improvements over time.
   """
-  def track_quality_improvements(improvement_history, options \\ %{}) do
+  def track_quality_improvements(improvement_history, _options \\ %{}) do
     Logger.debug("QualityMetrics: Tracking quality improvements over #{length(improvement_history)} entries")
     
     try do
@@ -76,7 +76,7 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
       roi_analysis = calculate_improvement_roi(improvement_history)
       
       # Detect quality regressions
-      regressions = detect_quality_regressions(improvement_history)
+      regressions = do_detect_quality_regressions(improvement_history)
       
       result = %{
         trends: trends,
@@ -507,7 +507,7 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
     end
   end
 
-  defp detect_quality_regressions(improvement_history) do
+  defp do_detect_quality_regressions(improvement_history) do
     # Detect periods where quality decreased
     quality_scores = improvement_history
     |> Enum.filter(fn entry -> entry[:result] && entry[:result][:overall_score] end)
@@ -595,7 +595,7 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
     }
   end
 
-  defp generate_quality_recommendations(quality_data, improvement_data) do
+  defp generate_quality_recommendations(quality_data, _improvement_data) do
     # Generate actionable recommendations
     recommendations = []
     
@@ -739,7 +739,7 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
     |> length()
   end
 
-  defp calculate_duplication_ratio(ast, code) do
+  defp calculate_duplication_ratio(_ast, code) do
     # Calculate code duplication ratio (simplified)
     lines = String.split(code, "\n")
     unique_lines = Enum.uniq(lines)
@@ -763,7 +763,7 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
     end
   end
 
-  defp calculate_cohesion_score(ast) do
+  defp calculate_cohesion_score(_ast) do
     # Calculate cohesion score (simplified)
     # This is a placeholder - real implementation would analyze method relationships
     0.7
@@ -925,7 +925,7 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
     end
   end
 
-  defp assess_documentation_quality(ast, code) do
+  defp assess_documentation_quality(_ast, code) do
     # Assess documentation quality (simplified)
     doc_lines = code
     |> String.split("\n")
@@ -968,7 +968,7 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
     |> Enum.sort()
   end
 
-  defp detect_score_regressions(quality_scores, threshold, window_size) do
+  defp detect_score_regressions(quality_scores, threshold, _window_size) do
     # Detect significant drops in quality scores
     quality_scores
     |> Enum.chunk_every(2, 1, :discard)
@@ -1002,7 +1002,7 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
     |> Enum.group_by(& &1.severity)
   end
 
-  defp analyze_regression_causes(regressions, quality_history) do
+  defp analyze_regression_causes(regressions, _quality_history) do
     # Analyze potential causes of regressions (simplified)
     regressions
     |> Enum.map(fn regression ->
@@ -1024,18 +1024,18 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
     |> Map.new()
   end
 
-  defp filter_data_by_time_period(quality_data, time_period) do
+  defp filter_data_by_time_period(quality_data, _time_period) do
     # Filter data by time period (simplified)
     # In practice, this would filter based on timestamps
     quality_data
   end
 
-  defp calculate_overall_trend(filtered_data) do
+  defp calculate_overall_trend(_filtered_data) do
     # Calculate overall trend (simplified)
     %{direction: "improving", strength: 0.7}
   end
 
-  defp calculate_individual_metric_trends(filtered_data) do
+  defp calculate_individual_metric_trends(_filtered_data) do
     # Calculate trends for individual metrics (simplified)
     %{
       complexity: %{trend: "improving", change: -0.1},
@@ -1044,22 +1044,22 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
     }
   end
 
-  defp identify_trend_patterns(filtered_data) do
+  defp identify_trend_patterns(_filtered_data) do
     # Identify patterns in trends (simplified)
     ["gradual_improvement", "periodic_fluctuation"]
   end
 
-  defp calculate_trend_strength(filtered_data) do
+  defp calculate_trend_strength(_filtered_data) do
     # Calculate strength of trends (simplified)
     0.75
   end
 
-  defp calculate_trend_confidence(filtered_data) do
+  defp calculate_trend_confidence(_filtered_data) do
     # Calculate confidence in trends (simplified)
     0.80
   end
 
-  defp forecast_quality_trends(filtered_data, options) do
+  defp forecast_quality_trends(_filtered_data, _options) do
     # Forecast future trends (simplified)
     %{
       next_month: %{predicted_score: 0.82, confidence: 0.7},
@@ -1126,7 +1126,7 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
     end
   end
 
-  defp analyze_temporal_improvement_patterns(improvement_history) do
+  defp analyze_temporal_improvement_patterns(_improvement_history) do
     # Analyze temporal patterns (simplified)
     %{
       peak_improvement_days: ["Monday", "Tuesday"],
@@ -1229,7 +1229,7 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
     |> Enum.map(fn {strategy, data} -> %{strategy: strategy, data: data} end)
   end
 
-  defp identify_improvement_opportunities(improvement_data) do
+  defp identify_improvement_opportunities(_improvement_data) do
     # Identify opportunities for improvement
     [
       %{opportunity: "automated_refactoring", potential_impact: "high", effort: "medium"},
@@ -1267,7 +1267,7 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
     }
   end
 
-  defp identify_seasonal_patterns(improvement_data, time_period) do
+  defp identify_seasonal_patterns(_improvement_data, _time_period) do
     # Identify seasonal patterns (simplified)
     %{
       pattern_detected: false,

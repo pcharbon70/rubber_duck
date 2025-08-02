@@ -97,7 +97,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
         target_framework: [type: :string, required: false],
         migration_type: [
           type: :atom,
-          values: [:language, :framework, :api, :dependency],
+          values: [:language, :framework, "api", :dependency],
           required: true
         ],
         analysis_depth: [
@@ -170,7 +170,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       type_specific_analysis = case migration_type do
         :language -> analyze_language_migration(source_path, analysis_depth, migration_rules)
         :framework -> analyze_framework_migration(source_path, analysis_depth, migration_rules)
-        :api -> analyze_api_migration(source_path, analysis_depth, migration_rules)
+        "api" -> analyze_api_migration(source_path, analysis_depth, migration_rules)
         :dependency -> analyze_dependency_migration(source_path, analysis_depth, migration_rules)
       end
       
@@ -221,7 +221,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       breaking_changes = simulate_breaking_changes(patterns_found)
       
       %{
-        migration_category: :language,
+        migration_category: "language",
         patterns_found: patterns_found,
         deprecated_features: deprecated_features,
         breaking_changes: breaking_changes,
@@ -241,7 +241,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       lifecycle_changes = simulate_lifecycle_changes(components_analyzed)
       
       %{
-        migration_category: :framework,
+        migration_category: "framework",
         components_analyzed: components_analyzed,
         api_changes: api_changes,
         lifecycle_changes: lifecycle_changes,
@@ -261,7 +261,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       authentication_changes = simulate_auth_changes(source_path)
       
       %{
-        migration_category: :api,
+        migration_category: "api",
         api_calls_found: api_calls_found,
         deprecated_apis: deprecated_apis,
         authentication_changes: authentication_changes,
@@ -281,7 +281,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       security_updates = simulate_security_updates(dependencies_found)
       
       %{
-        migration_category: :dependency,
+        migration_category: "dependency",
         dependencies_found: dependencies_found,
         version_conflicts: version_conflicts,
         security_updates: security_updates,
@@ -368,7 +368,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       base_complexity = case migration_type do
         :language -> 0.7
         :framework -> 0.6
-        :api -> 0.4
+        "api" -> 0.4
         :dependency -> 0.3
       end
       
@@ -379,7 +379,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       issue_factor = case migration_type do
         :language -> min((analysis_results.compatibility_issues || 0) / 10, 0.3)
         :framework -> if analysis_results.architecture_impact == :high, do: 0.3, else: 0.1
-        :api -> min(length(analysis_results.deprecated_apis || []) / 10, 0.2)
+        "api" -> min(length(analysis_results.deprecated_apis || []) / 10, 0.2)
         :dependency -> min((analysis_results.version_conflicts || 0) / 5, 0.2)
       end
       
@@ -397,7 +397,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       type_specific = case migration_type do
         :language -> generate_language_recommendations(analysis, target_language, migration_rules)
         :framework -> generate_framework_recommendations(analysis, target_framework, migration_rules)
-        :api -> generate_api_recommendations(analysis)
+        "api" -> generate_api_recommendations(analysis)
         :dependency -> generate_dependency_recommendations(analysis)
       end
       
@@ -510,7 +510,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       type_risks = case migration_type do
         :language -> assess_language_risks(analysis)
         :framework -> assess_framework_risks(analysis)
-        :api -> assess_api_risks(analysis)
+        "api" -> assess_api_risks(analysis)
         :dependency -> assess_dependency_risks(analysis)
       end
       
@@ -1073,7 +1073,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       migration_specific = case analysis[:migration_category] do
         :language -> ["Target language features utilized", "Deprecated constructs removed"]
         :framework -> ["New framework patterns adopted", "Legacy patterns removed"]
-        :api -> ["All API calls updated", "Error handling improved"]
+        "api" -> ["All API calls updated", "Error handling improved"]
         :dependency -> ["All dependencies updated", "Security vulnerabilities addressed"]
         _ -> []
       end
@@ -1467,7 +1467,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
         success_criteria: [type: {:list, :string}, required: true],
         validation_type: [
           type: :atom,
-          values: [:functional, :performance, :security, :comprehensive],
+          values: [:functional, "performance", "security", :comprehensive],
           default: :comprehensive
         ]
       ]
@@ -1481,8 +1481,8 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       # Perform different types of validation
       validation_results = case validation_type do
         :functional -> validate_functional_requirements(results, criteria)
-        :performance -> validate_performance_requirements(results, criteria)
-        :security -> validate_security_requirements(results, criteria)
+        "performance" -> validate_performance_requirements(results, criteria)
+        "security" -> validate_security_requirements(results, criteria)
         :comprehensive -> validate_comprehensive_requirements(results, criteria)
       end
       
@@ -1511,7 +1511,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       ]
       
       %{
-        category: :functional,
+        category: "functional",
         checks: functional_checks,
         passed: Enum.all?(functional_checks, & &1.passed)
       }
@@ -1526,7 +1526,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       ]
       
       %{
-        category: :performance,
+        category: "performance",
         checks: performance_checks,
         passed: Enum.all?(performance_checks, & &1.passed)
       }
@@ -1541,7 +1541,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       ]
       
       %{
-        category: :security,
+        category: "security",
         checks: security_checks,
         passed: Enum.all?(security_checks, & &1.passed)
       }
@@ -1553,7 +1553,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       security = validate_security_requirements(results, criteria)
       
       %{
-        category: :comprehensive,
+        category: "comprehensive",
         functional: functional,
         performance: performance,
         security: security,
@@ -1813,7 +1813,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     end
     
     defp format_detailed_results(validation_results) do
-      sections = [:functional, :performance, :security]
+      sections = [:functional, "performance", "security"]
       
       Enum.map(sections, fn section ->
         section_data = validation_results[section]
@@ -1847,7 +1847,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       # Add specific recommendations based on failed checks
       failed_checks = case validation_results.category do
         :comprehensive ->
-          [:functional, :performance, :security]
+          [:functional, "performance", "security"]
           |> Enum.flat_map(fn section ->
             validation_results[section].checks
             |> Enum.filter(fn check -> not check.passed end)
@@ -2324,7 +2324,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       
       detailed_deps = generate_sample_dependencies(simulated_deps.total_dependencies)
       
-      {:ok, Map.put(simulated_deps, :dependencies, detailed_deps)}
+      {:ok, Map.put(simulated_deps, "dependencies", detailed_deps)}
     end
     
     defp detect_package_manager(project_path) do

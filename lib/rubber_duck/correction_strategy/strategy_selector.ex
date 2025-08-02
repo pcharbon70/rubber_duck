@@ -10,7 +10,6 @@ defmodule RubberDuck.CorrectionStrategy.StrategySelector do
   - Confidence scoring and uncertainty quantification
   """
 
-  alias RubberDuck.CorrectionStrategy.{CostEstimator, StrategyLibrary}
 
   @doc """
   Selects optimal strategies based on multi-criteria analysis.
@@ -211,7 +210,7 @@ defmodule RubberDuck.CorrectionStrategy.StrategySelector do
   end
 
   # Strategy Scoring Functions
-  defp calculate_strategy_scores(strategy, error_context, constraints) do
+  defp calculate_strategy_scores(strategy, error_context, _constraints) do
     %{
       effectiveness: calculate_effectiveness_score(strategy, error_context),
       cost_efficiency: calculate_cost_efficiency_score(strategy, error_context),
@@ -250,7 +249,7 @@ defmodule RubberDuck.CorrectionStrategy.StrategySelector do
     end
   end
 
-  defp calculate_reliability_score(strategy, error_context) do
+  defp calculate_reliability_score(strategy, _error_context) do
     # Base reliability from success rate
     base_reliability = strategy.success_rate
     
@@ -271,7 +270,7 @@ defmodule RubberDuck.CorrectionStrategy.StrategySelector do
     min(1.0, base_reliability + rollback_bonus + testing_bonus)
   end
 
-  defp calculate_speed_score(strategy, error_context) do
+  defp calculate_speed_score(strategy, _error_context) do
     execution_time = strategy.metadata["avg_execution_time"] || 2000
     
     # Normalize to 0-1 scale (faster = higher score)
@@ -558,7 +557,7 @@ defmodule RubberDuck.CorrectionStrategy.StrategySelector do
     end
   end
 
-  defp constraint_satisfied?(strategy, error_context, constraint_type, constraint_value) do
+  defp constraint_satisfied?(strategy, _error_context, constraint_type, constraint_value) do
     case constraint_type do
       "max_cost" ->
         strategy.base_cost <= constraint_value
@@ -898,7 +897,7 @@ defmodule RubberDuck.CorrectionStrategy.StrategySelector do
     end
   end
 
-  defp chi_square_to_p_value(chi_square, degrees_of_freedom) do
+  defp chi_square_to_p_value(chi_square, _degrees_of_freedom) do
     # Simplified p-value calculation (would use proper statistical library in production)
     cond do
       chi_square > 6.635 -> 0.01  # p < 0.01

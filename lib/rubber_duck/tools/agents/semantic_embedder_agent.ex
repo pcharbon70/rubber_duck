@@ -11,8 +11,8 @@ defmodule RubberDuck.Tools.Agents.SemanticEmbedderAgent do
   use Jido.Agent,
     name: "semantic_embedder_agent",
     description: "Orchestrates semantic embedding generation and similarity search",
-    category: :analysis,
-    tags: [:embeddings, :search, :ml, :similarity, :vectors],
+    category: "analysis",
+    tags: [:embeddings, "search", :ml, :similarity, :vectors],
     vsn: "1.0.0",
     schema: [
       embedding_config: [
@@ -714,7 +714,7 @@ defmodule RubberDuck.Tools.Agents.SemanticEmbedderAgent do
     
     state = update_in(state.search_history, &([history_entry | &1] |> Enum.take(100)))
     
-    {:ok, update_performance_metrics(state, :search)}
+    {:ok, update_performance_metrics(state, "search")}
   end
   
   @impl true
@@ -750,7 +750,7 @@ defmodule RubberDuck.Tools.Agents.SemanticEmbedderAgent do
     end)
   end
   
-  defp update_performance_metrics(state, :search) do
+  defp update_performance_metrics(state, "search") do
     update_in(state.performance_metrics, fn metrics ->
       %{metrics | total_searches: metrics.total_searches + 1}
     end)

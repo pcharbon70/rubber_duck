@@ -886,37 +886,37 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
     defp get_security_checks(language, categories) do
       base_checks = [
         %{
-          category: :authentication,
+          category: "authentication",
           check: :password_storage,
           patterns: [~r/password.*=.*plain/i, ~r/store.*password.*text/i],
           message: "Passwords should be hashed, not stored in plain text"
         },
         %{
-          category: :authentication,
+          category: "authentication",
           check: :session_management,
           patterns: [~r/session.*never.*expire/i, ~r/timeout.*=.*0/],
           message: "Sessions should have appropriate timeouts"
         },
         %{
-          category: :input_validation,
+          category: "input_validation",
           check: :missing_validation,
           patterns: [~r/request\.\w+(?!\s*\.|;)/],
           message: "User input should be validated before use"
         },
         %{
-          category: :error_handling,
+          category: "error_handling",
           check: :information_disclosure,
           patterns: [~r/catch.*\{.*console\.log.*error/i, ~r/printStackTrace/],
           message: "Error details should not be exposed to users"
         },
         %{
-          category: :cryptography,
+          category: "cryptography",
           check: :random_generation,
           patterns: [~r/Math\.random.*password/i, ~r/rand\(\).*token/i],
           message: "Use cryptographically secure random generation"
         },
         %{
-          category: :access_control,
+          category: "access_control",
           check: :missing_authorization,
           patterns: [~r/admin.*route.*(?!auth)/i, ~r/delete.*(?!authorize)/i],
           message: "Sensitive operations require authorization checks"
@@ -1986,12 +1986,12 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       if Enum.any?(threats, &(&1.type == :spoofing)) do
         auth_reqs = [
           %{
-            category: :authentication,
+            category: "authentication",
             requirement: "Multi-factor authentication for sensitive operations",
             priority: :high
           },
           %{
-            category: :authentication,
+            category: "authentication",
             requirement: "Secure session management with timeout",
             priority: :high
           }
@@ -2003,12 +2003,12 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       if Enum.any?(threats, &(&1.type in [:information_disclosure, :tampering])) do
         crypto_reqs = [
           %{
-            category: :cryptography,
+            category: "cryptography",
             requirement: "TLS 1.3 for all external communications",
             priority: :critical
           },
           %{
-            category: :cryptography,
+            category: "cryptography",
             requirement: "Encryption at rest for sensitive data",
             priority: :high
           }
@@ -2020,12 +2020,12 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       if Enum.any?(threats, &(&1.type == :elevation_of_privilege)) do
         access_reqs = [
           %{
-            category: :access_control,
+            category: "access_control",
             requirement: "Role-based access control implementation",
             priority: :critical
           },
           %{
-            category: :access_control,
+            category: "access_control",
             requirement: "Regular access reviews and recertification",
             priority: :medium
           }
@@ -3007,7 +3007,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
   
   # Helper functions
   defp generate_cache_key(metadata) do
-    content = metadata[:source_code] || metadata[:dependencies] || ""
+    content = metadata[:source_code] || metadata["dependencies"] || ""
     :crypto.hash(:md5, content) |> Base.encode16()
   end
   

@@ -1136,7 +1136,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
       end)
       |> Enum.map(fn {line, line_num} ->
         %{
-          type: :api,
+          type: "api",
           line: line_num,
           code: String.trim(line),
           method: detect_http_method(line)
@@ -2518,7 +2518,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     end
     
     defp extract_optimization_potential(profile) do
-      if profile[:optimization_opportunities] do
+      if profile["optimization"_opportunities] do
         opportunities = profile.optimization_opportunities
         high_priority = Enum.count(opportunities, &(&1.priority == "high"))
         
@@ -2585,10 +2585,10 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
       end
       
       # Complexity bottlenecks
-      if results[:complexity] && results.complexity[:optimization_targets] do
+      if results[:complexity] && results.complexity["optimization"_targets] do
         complexity_bottlenecks = Enum.map(results.complexity.optimization_targets, fn t ->
           %{
-            category: :algorithmic,
+            category: "algorithmic",
             function: t.function,
             severity: t.current_complexity,
             impact: t.improvement_potential
@@ -2601,7 +2601,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
       if results[:memory] && results.memory[:memory_hotspots] do
         memory_bottlenecks = Enum.map(results.memory.memory_hotspots, fn h ->
           %{
-            category: :memory,
+            category: "memory",
             location: "Line #{h.line}",
             severity: h.severity,
             types: h.types
@@ -2620,14 +2620,14 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
         all_optimizations = all_optimizations ++ results.profile.recommendations
       end
       
-      if results[:complexity] && results.complexity[:optimization_targets] do
+      if results[:complexity] && results.complexity["optimization"_targets] do
         complexity_opts = Enum.flat_map(results.complexity.optimization_targets, fn target ->
           ["Optimize #{target.function}: #{target.improvement_potential}"]
         end)
         all_optimizations = all_optimizations ++ complexity_opts
       end
       
-      if results[:memory] && results.memory[:optimization_suggestions] do
+      if results[:memory] && results.memory["optimization"_suggestions] do
         memory_opts = Enum.map(results.memory.optimization_suggestions, & &1.description)
         all_optimizations = all_optimizations ++ memory_opts
       end
@@ -3102,7 +3102,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     # Add to analysis history
     history_entry = %{
       timestamp: DateTime.utc_now(),
-      type: :performance_profile,
+      type: "performance"_profile,
       profile_type: result.profile_type,
       hotspot_count: length(result.hotspots),
       score: result.metrics.profile_score,

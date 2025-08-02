@@ -148,7 +148,7 @@ defmodule RubberDuck.Jido.Actions.Conversation.Enhancement.EnhancementRequestAct
     EmitSignalAction.run(signal_params, %{agent: agent})
   end
 
-  defp process_enhancement_async(agent_id, enhancement) do
+  defp process_enhancement_async(_agent_id, enhancement) do
     try do
       # Select enhancement techniques
       techniques = select_techniques(enhancement.task, enhancement.preferences)

@@ -133,7 +133,7 @@ defmodule RubberDuck.Jido.Actions.Conversation.General.ConversationRequestAction
     EmitSignalAction.run(signal_params, %{agent: agent})
   end
 
-  defp process_conversation_async(agent_id, params) do
+  defp process_conversation_async(_agent_id, params) do
     start_time = System.monotonic_time(:millisecond)
     
     try do
