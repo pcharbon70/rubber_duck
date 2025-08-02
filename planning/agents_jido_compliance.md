@@ -50,7 +50,7 @@ Based on comprehensive analysis of 90+ agent files:
   - [ ] Create behavior-to-agent conversion
   - [ ] Add signal handler extraction
   - [ ] Implement schema generation
-  - [ ] Create rollback mechanisms
+  - [ ] Create validation and compliance checks
 
 ---
 
@@ -216,7 +216,7 @@ Based on comprehensive analysis of 90+ agent files:
   - [ ] Parallel action execution  
   - [ ] Conditional action branching
   - [ ] Error handling and retry
-  - [ ] Compensation and rollback
+  - [ ] Error handling and recovery
 
 - [ ] **16.5.2.2 Add Action Middleware**
   - [ ] Logging and telemetry
@@ -248,7 +248,7 @@ Based on comprehensive analysis of 90+ agent files:
 - [ ] **16.6.2.1 Create Signal Transformers**
   - [ ] Format validation and normalization
   - [ ] Data enrichment and augmentation
-  - [ ] Schema evolution and compatibility
+  - [ ] Schema validation and enforcement
   - [ ] Security filtering and sanitization
   - [ ] Performance optimization
 
@@ -374,54 +374,54 @@ Based on comprehensive analysis of 90+ agent files:
 ## 16.8 Migration Execution Strategy
 
 ### 16.8.1 Migration Phases
-1. **Phase 1 (Week 1-2)**: Foundation and utilities
-2. **Phase 2 (Week 3-4)**: Critical core agents (Provider, Analysis, Generation)  
-3. **Phase 3 (Week 5-6)**: Active subsystem agents (Memory, Context, Quality)
-4. **Phase 4 (Week 7-8)**: Support and legacy agents
-5. **Phase 5 (Week 9-10)**: Standardization and optimization
-6. **Phase 6 (Week 11-12)**: Validation and testing
+1. **Phase 1 (Week 1)**: Foundation and utilities
+2. **Phase 2 (Week 2-3)**: Critical core agents (Provider, Analysis, Generation)  
+3. **Phase 3 (Week 4)**: Active subsystem agents (Memory, Context, Quality)
+4. **Phase 4 (Week 5)**: Support and legacy agents
+5. **Phase 5 (Week 6)**: Standardization and optimization
+6. **Phase 6 (Week 7)**: Validation and testing
 
 ### 16.8.2 Migration Process per Agent
 - [ ] **16.8.2.1 Assessment and Planning**
   - [ ] Analyze current agent implementation
-  - [ ] Identify deviations from Jido patterns
+  - [ ] Identify complete replacement requirements
   - [ ] Plan action extraction strategy
   - [ ] Define signal mapping requirements
   - [ ] Create migration checklist
 
-- [ ] **16.8.2.2 Action Extraction**
+- [ ] **16.8.2.2 Complete Replacement**
+  - [ ] Delete legacy behavior implementation
   - [ ] Extract business logic into Actions
   - [ ] Add schema validation and error handling
   - [ ] Implement proper tagged tuple returns
   - [ ] Create comprehensive test coverage
-  - [ ] Document action interfaces
 
-- [ ] **16.8.2.3 Agent Conversion**
-  - [ ] Replace behavior with `BaseAgent`
+- [ ] **16.8.2.3 Jido Implementation**
+  - [ ] Implement pure `BaseAgent` foundation
   - [ ] Implement action registration
   - [ ] Add signal-to-action routing
-  - [ ] Convert state management
+  - [ ] Implement Jido state management
   - [ ] Add lifecycle hooks
 
-- [ ] **16.8.2.4 Signal Integration**
-  - [ ] Replace direct signal handlers
-  - [ ] Implement signal mappings
+- [ ] **16.8.2.4 Signal Architecture**
+  - [ ] Implement signal-to-action mappings
   - [ ] Add signal emission via Jido.Signal.Bus
   - [ ] Test signal routing and delivery
   - [ ] Validate end-to-end workflows
+  - [ ] Remove all direct signal handlers
 
 - [ ] **16.8.2.5 Validation and Testing**
   - [ ] Unit test all actions
   - [ ] Integration test agent workflows
   - [ ] Performance test signal handling
-  - [ ] Validate compliance checklist
-  - [ ] Document migration changes
+  - [ ] Validate Jido compliance checklist
+  - [ ] Document complete migration
 
 ### 16.8.3 Migration Templates
 
 #### Template: Legacy Behavior to BaseAgent
 ```elixir
-# BEFORE (Non-Compliant)
+# BEFORE (Legacy - TO BE DELETED)
 defmodule RubberDuck.Agents.AnalysisAgent do
   use RubberDuck.Agents.Behavior
   
@@ -431,7 +431,7 @@ defmodule RubberDuck.Agents.AnalysisAgent do
   end
 end
 
-# AFTER (Jido Compliant)
+# AFTER (Complete Jido Replacement)
 defmodule RubberDuck.Agents.AnalysisAgent do
   use RubberDuck.Agents.BaseAgent,
     name: "analysis_agent",
@@ -466,7 +466,7 @@ end
 
 #### Template: Direct Signal Handler to Action Routing
 ```elixir
-# BEFORE (Non-Compliant)
+# BEFORE (Legacy - TO BE DELETED)
 def handle_signal(agent, %{"type" => "analysis.request"} = signal) do
   params = signal["data"]
   result = perform_analysis(params)
@@ -474,7 +474,7 @@ def handle_signal(agent, %{"type" => "analysis.request"} = signal) do
   {:ok, agent}
 end
 
-# AFTER (Jido Compliant)
+# AFTER (Pure Jido Implementation)
 def signal_mappings do
   %{
     "analysis.request" => {CodeAnalysisAction, :extract_analysis_params},
@@ -569,12 +569,12 @@ end
 - **Observability**: Built-in metrics and monitoring through Jido
 - **Composability**: Actions can be reused across agents
 
-### Risk Mitigation
-- **Backward Compatibility**: Maintain all existing APIs during migration
-- **Incremental Migration**: Migrate one agent at a time with full testing
-- **Rollback Strategy**: Keep original implementations until validation complete
+### Migration Strategy
+- **Clean Break Approach**: Complete replacement of legacy patterns with Jido implementations
+- **Aggressive Migration**: Replace entire agent implementations without legacy fallbacks
+- **Breaking Changes Accepted**: Modernization takes priority over API preservation
 - **Performance Monitoring**: Track metrics throughout migration
-- **Communication**: Document all changes with before/after examples
+- **Documentation**: Complete before/after examples for all changes
 
 ### Success Criteria
 1. All 90+ agents fully compliant with Jido patterns
@@ -584,4 +584,4 @@ end
 5. Complete test coverage with performance validation
 6. Full documentation and migration runbooks
 
-This migration will establish RubberDuck as a fully modern, Jido-compliant agent system with enterprise-grade reliability, maintainability, and scalability while maintaining all existing functionality and enabling future growth.
+This migration will establish RubberDuck as a fully modern, Jido-compliant agent system with enterprise-grade reliability, maintainability, and scalability through complete modernization and elimination of legacy patterns.
