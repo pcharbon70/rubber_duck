@@ -28,8 +28,8 @@ defmodule RubberDuck.Tools.Agents.CodeExplainerAgent do
     tool: :code_explainer,
     name: "code_explainer_agent",
     description: "Manages intelligent code explanation and documentation workflows",
-    category: :documentation,
-    tags: [:documentation, :explanation, :understanding, :learning],
+    category: "documentation",
+    tags: ["documentation", :explanation, "understanding", :learning],
     schema: [
       # User preferences
       default_audience: [type: :string, default: "intermediate"],

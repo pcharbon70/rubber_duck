@@ -27,8 +27,8 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
   use Jido.Agent,
     name: "dependency_inspector_agent",
     description: "Manages intelligent dependency analysis and monitoring workflows",
-    category: :analysis,
-    tags: [:dependencies, :architecture, :maintenance, :security, :quality],
+    category: "analysis",
+    tags: ["dependencies", "architecture", "maintenance", "security", "quality"],
     schema: [
       # Analysis history
       analysis_history: [type: {:list, :map}, default: []],
@@ -200,28 +200,30 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     end
     
     defp build_dependency_nodes(result, remaining_depth) do
-      return [] if remaining_depth <= 0
-      
-      # Combine all dependency types
-      all_deps = (result.external.hex || []) ++
-                 Enum.map(result.external.erlang || [], &{&1, :erlang}) ++
-                 Enum.map(result.external.elixir || [], &{&1, :elixir}) ++
-                 Enum.map(result.internal || [], &{&1, :internal})
-      
-      Enum.map(all_deps, fn dep ->
-        {name, type} = case dep do
-          {mod, package} when is_atom(package) -> {to_string(mod), package}
-          {mod, package} -> {to_string(mod), :hex}
-          mod -> {to_string(mod), :unknown}
-        end
+      if remaining_depth <= 0 do
+        []
+      else
+        # Combine all dependency types
+        all_deps = (result.external.hex || []) ++
+                   Enum.map(result.external.erlang || [], &{&1, :erlang}) ++
+                   Enum.map(result.external.elixir || [], &{&1, :elixir}) ++
+                   Enum.map(result.internal || [], &{&1, :internal})
         
-        %{
-          name: name,
-          type: type,
-          version: "unknown", # Would fetch from mix.lock or similar
-          dependencies: [] # Would recursively fetch subdependencies
-        }
-      end)
+        Enum.map(all_deps, fn dep ->
+          {name, type} = case dep do
+            {mod, package} when is_atom(package) -> {to_string(mod), package}
+            {mod, package} -> {to_string(mod), :hex}
+            mod -> {to_string(mod), :unknown}
+          end
+          
+          %{
+            name: name,
+            type: type,
+            version: "unknown", # Would fetch from mix.lock or similar
+            dependencies: [] # Would recursively fetch subdependencies
+          }
+        end)
+      end
     end
     
     defp calculate_actual_depth(node, current_depth \\ 0) do
@@ -470,35 +472,39 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     end
     
     defp find_cycles_dfs(current, target, adjacency_list, path, max_length) do
-      return [] if length(path) > max_length
-      
-      if current == target and path != [] do
-        # Found a cycle
-        [[current | Enum.reverse(path)]]
+      if length(path) > max_length do
+        []
       else
-        neighbors = Map.get(adjacency_list, current, [])
-        
-        Enum.flat_map(neighbors, fn neighbor ->
-          if neighbor in path do
-            [] # Already visited in this path
-          else
-            find_cycles_dfs(neighbor, target, adjacency_list, [current | path], max_length)
-          end
-        end)
+        if current == target and path != [] do
+          # Found a cycle
+          [[current | Enum.reverse(path)]]
+        else
+          neighbors = Map.get(adjacency_list, current, [])
+          
+          Enum.flat_map(neighbors, fn neighbor ->
+            if neighbor in path do
+              [] # Already visited in this path
+            else
+              find_cycles_dfs(neighbor, target, adjacency_list, [current | path], max_length)
+            end
+          end)
+        end
       end
     end
     
     defp analyze_cycles(cycles) do
-      return %{} if cycles == []
-      
-      %{
-        total_cycles: length(cycles),
-        shortest_cycle: cycles |> Enum.map(&length/1) |> Enum.min(),
-        longest_cycle: cycles |> Enum.map(&length/1) |> Enum.max(),
-        average_cycle_length: Enum.sum(Enum.map(cycles, &length/1)) / length(cycles),
-        modules_involved: cycles |> List.flatten() |> Enum.uniq() |> length(),
-        cycle_categories: categorize_cycles(cycles)
-      }
+      if cycles == [] do
+        %{}
+      else
+        %{
+          total_cycles: length(cycles),
+          shortest_cycle: cycles |> Enum.map(&length/1) |> Enum.min(),
+          longest_cycle: cycles |> Enum.map(&length/1) |> Enum.max(),
+          average_cycle_length: Enum.sum(Enum.map(cycles, &length/1)) / length(cycles),
+          modules_involved: cycles |> List.flatten() |> Enum.uniq() |> length(),
+          cycle_categories: categorize_cycles(cycles)
+        }
+      end
     end
     
     defp categorize_cycles(cycles) do
@@ -516,11 +522,13 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     end
     
     defp generate_cycle_recommendations(cycles) do
-      return [] if cycles == []
+      if cycles == [] do
+        []
+      else
       
       base_recommendations = [
         %{
-          type: :refactoring,
+          type: "refactoring",
           priority: :high,
           message: "Circular dependencies detected. Consider refactoring to break cycles.",
           action: "Extract common functionality to a separate module"
@@ -531,7 +539,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
       if Enum.any?(cycles, &(length(&1) == 2)) do
         base_recommendations ++ [
           %{
-            type: :architecture,
+            type: "architecture",
             priority: :high,
             message: "Direct mutual dependencies found between modules",
             action: "Consider introducing an interface or protocol"
@@ -539,6 +547,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
         ]
       else
         base_recommendations
+      end
       end
     end
   end
@@ -627,7 +636,9 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     end
     
     defp generate_unused_recommendations(unused) do
-      return [] if unused == []
+      if unused == [] do
+        []
+      else
       
       [
         %{
@@ -638,6 +649,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
           specific_deps: unused
         }
       ]
+      end
     end
     
     defp calculate_confidence_scores(unused, usage_result) do
@@ -858,7 +870,9 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     end
     
     defp generate_security_recommendations(vulnerabilities) do
-      return [] if vulnerabilities == []
+      if vulnerabilities == [] do
+        []
+      else
       
       critical_vulns = Enum.filter(vulnerabilities, &(&1.severity in [:critical, :high]))
       
@@ -868,6 +882,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
         ["URGENT: Address #{length(critical_vulns)} critical/high severity vulnerabilities immediately" | recommendations]
       else
         recommendations
+      end
       end
     end
   end

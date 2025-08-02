@@ -96,7 +96,7 @@ defmodule RubberDuck.Tools.Agents.CodeComparerAgent do
       schema: [
         pattern_type: [
           type: :atom,
-          values: [:refactoring, :bug_fixes, :feature_additions, :all],
+          values: ["refactoring", :bug_fixes, :feature_additions, :all],
           default: :all
         ],
         min_occurrences: [type: :integer, default: 2]
@@ -120,7 +120,7 @@ defmodule RubberDuck.Tools.Agents.CodeComparerAgent do
     end
     
     defp analyze_all_patterns(history, min_occurrences) do
-      [:refactoring, :bug_fixes, :feature_additions]
+      ["refactoring", :bug_fixes, :feature_additions]
       |> Enum.flat_map(&analyze_specific_pattern(history, &1, min_occurrences))
     end
     
@@ -376,7 +376,7 @@ defmodule RubberDuck.Tools.Agents.CodeComparerAgent do
     changes = result[:changes] || []
     
     cond do
-      mostly_refactoring?(changes) -> :refactoring
+      mostly_refactoring?(changes) -> "refactoring"
       contains_bug_fix_patterns?(changes) -> :bug_fixes
       mostly_additions?(changes) -> :feature_additions
       true -> :other
@@ -411,7 +411,7 @@ defmodule RubberDuck.Tools.Agents.CodeComparerAgent do
   defp detect_and_update_patterns(agent, comparison) do
     type = comparison[:type]
     
-    if type in [:refactoring, :bug_fixes, :feature_additions] do
+    if type in ["refactoring", :bug_fixes, :feature_additions] do
       update_in(agent.state.common_patterns[type], fn patterns ->
         # Simple pattern tracking - could be enhanced
         signature = %{

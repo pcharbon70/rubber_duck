@@ -28,8 +28,8 @@ defmodule RubberDuck.Tools.Agents.CodeFormatterAgent do
     tool: :code_formatter,
     name: "code_formatter_agent",
     description: "Manages Elixir code formatting workflows",
-    category: :code_quality,
-    tags: [:formatting, :style, :quality, :consistency],
+    category: "code_quality",
+    tags: [:formatting, :style, "quality", :consistency],
     schema: [
       # Formatting configurations
       format_configs: [type: :map, default: %{}],

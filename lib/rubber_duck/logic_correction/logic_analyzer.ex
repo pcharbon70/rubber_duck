@@ -12,7 +12,7 @@ defmodule RubberDuck.LogicCorrection.LogicAnalyzer do
   @doc """
   Analyzes control flow and data flow in code to detect logical issues.
   """
-  def analyze_control_flow(code, patterns, options \\ %{}) do
+  def analyze_control_flow(code, _patterns, _options \\ %{}) do
     Logger.debug("LogicAnalyzer: Starting control flow analysis")
     
     try do
@@ -54,7 +54,7 @@ defmodule RubberDuck.LogicCorrection.LogicAnalyzer do
   @doc """
   Checks logical conditions for tautologies, contradictions, and violations.
   """
-  def check_conditions(code, constraints, options \\ %{}) do
+  def check_conditions(code, constraints, _options \\ %{}) do
     Logger.debug("LogicAnalyzer: Starting condition checking")
     
     try do
@@ -156,7 +156,7 @@ defmodule RubberDuck.LogicCorrection.LogicAnalyzer do
   @doc """
   Tracks state changes and mutations throughout code execution.
   """
-  def track_state_changes(code, options \\ %{}) do
+  def track_state_changes(code, _options \\ %{}) do
     Logger.debug("LogicAnalyzer: Starting state tracking")
     
     try do
@@ -191,7 +191,7 @@ defmodule RubberDuck.LogicCorrection.LogicAnalyzer do
   @doc """
   Checks code invariants and suggests new ones.
   """
-  def check_invariants(code, constraints, options \\ %{}) do
+  def check_invariants(code, constraints, _options \\ %{}) do
     Logger.debug("LogicAnalyzer: Starting invariant checking")
     
     try do
@@ -201,8 +201,8 @@ defmodule RubberDuck.LogicCorrection.LogicAnalyzer do
           current_invariants = extract_invariants_from_ast(ast)
           violations = []
           preserved = []
-          suggestions = []
-          proof_obligations = []
+          _suggestions = []
+          _proof_obligations = []
           
           # Check existing invariants
           {violations, preserved} = Enum.reduce(current_invariants, {violations, preserved},
@@ -574,7 +574,7 @@ defmodule RubberDuck.LogicCorrection.LogicAnalyzer do
     "# Fixed code would be generated here"
   end
 
-  defp verify_corrections(fixed_code, original_errors) do
+  defp verify_corrections(_fixed_code, original_errors) do
     # Verify that corrections actually fix the errors
     %{
       verified: true,
@@ -754,7 +754,7 @@ defmodule RubberDuck.LogicCorrection.LogicAnalyzer do
     # Calculate confidence based on analysis completeness
     node_count = length(control_flow.nodes)
     edge_count = length(control_flow.edges)
-    var_count = length(data_flow.variables)
+    _var_count = length(data_flow.variables)
     
     # Higher confidence with more complete analysis
     base_confidence = 0.7

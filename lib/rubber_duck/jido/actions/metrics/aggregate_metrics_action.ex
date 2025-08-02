@@ -75,7 +75,7 @@ defmodule RubberDuck.Jido.Actions.Metrics.AggregateMetricsAction do
   defp update_time_series(current_state, aggregated_data) do
     try do
       # Extract error data
-      error_data = Map.get(aggregated_data, :errors, %{})
+      _error_data = Map.get(aggregated_data, :errors, %{})
       action_data = Map.delete(aggregated_data, :errors)
       
       # Update latency time series

@@ -27,8 +27,8 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
   use Jido.Agent,
     name: "doc_fetcher_agent",
     description: "Manages intelligent documentation retrieval and caching workflows",
-    category: :documentation,
-    tags: [:documentation, :reference, :learning, :api, :knowledge_base],
+    category: "documentation",
+    tags: ["documentation", "reference", :learning, "api", :knowledge_base],
     schema: [
       # Documentation cache
       doc_cache: [type: :map, default: %{}],

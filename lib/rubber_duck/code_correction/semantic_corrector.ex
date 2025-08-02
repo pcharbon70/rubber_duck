@@ -408,15 +408,15 @@ defmodule RubberDuck.CodeCorrection.SemanticCorrector do
     # Add type specs if missing
     if config["add_typespecs"] do
       {updated_code, specs_added} = add_type_specs(refactored_code)
-      refactored_code = updated_code
-      refactorings = ["Added #{specs_added} type specifications" | refactorings]
+      _ = updated_code
+      _ = ["Added #{specs_added} type specifications" | refactorings]
     end
     
     # Format code
     if config["format_code"] do
       formatted_code = format_code(refactored_code)
-      refactored_code = formatted_code
-      refactorings = ["Formatted code for consistency" | refactorings]
+      _ = formatted_code
+      _ = ["Formatted code for consistency" | refactorings]
     end
     
     if refactored_code != code do

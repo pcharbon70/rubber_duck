@@ -442,7 +442,7 @@ defmodule RubberDuck.Agents.MemoryCoordinatorAgent do
     end
   end
   
-  defp replicate_critical_items(user_id, source_tier, target_tier) do
+  defp replicate_critical_items(_user_id, source_tier, target_tier) do
     # Implementation for replication
     {:ok, %{
       items_replicated: 0,
@@ -452,7 +452,7 @@ defmodule RubberDuck.Agents.MemoryCoordinatorAgent do
     }}
   end
   
-  defp consolidate_related_items(user_id, source_tier, target_tier) do
+  defp consolidate_related_items(_user_id, source_tier, target_tier) do
     # Implementation for consolidation
     {:ok, %{
       items_consolidated: 0,
@@ -509,7 +509,7 @@ defmodule RubberDuck.Agents.MemoryCoordinatorAgent do
   
   # Private Functions - Access Control
   
-  defp check_access_permissions(user_id, access_type, tier, resource_id) do
+  defp check_access_permissions(_user_id, access_type, tier, _resource_id) do
     # Simplified access control - in production would check actual permissions
     case {access_type, tier} do
       {"read", _} -> "granted"
@@ -528,7 +528,7 @@ defmodule RubberDuck.Agents.MemoryCoordinatorAgent do
   
   # Private Functions - Metrics
   
-  defp collect_coordination_metrics(agent, metric_types, time_range) do
+  defp collect_coordination_metrics(agent, metric_types, _time_range) do
     base_metrics = %{
       "performance" => %{
         "operations_completed" => agent.state.performance_metrics.operations_completed,

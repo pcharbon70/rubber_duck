@@ -121,7 +121,7 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
         language: [type: :atom, required: true],
         doc_type: [
           type: :atom,
-          values: [:api, :library, :module],
+          values: ["api", :library, :module],
           default: :library
         ],
         format: [type: :atom, values: [:html, :markdown, :json], default: :markdown],
@@ -791,12 +791,12 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
       format: result[:format],
       doc_type: result[:doc_type] || result[:type],
       pages_generated: result[:metadata][:functions_documented] || result[:metadata][:endpoints_count] || 0,
-      size_estimate: div(String.length(inspect(result[:documentation] || "")), 100) # Rough size in KB
+      size_estimate: div(String.length(inspect(result["documentation"] || "")), 100) # Rough size in KB
     }
   end
   
   defp action_to_history_type(GenerateFromOpenAPIAction), do: :openapi_generation
-  defp action_to_history_type(GenerateFromCodeAction), do: :code_generation
+  defp action_to_history_type(GenerateFromCodeAction), do: "code_generation"
   defp action_to_history_type(_), do: :unknown_generation
   
   defp extract_action_params(result_data) do

@@ -31,8 +31,8 @@ defmodule RubberDuck.Tools.Agents.CodeNavigatorAgent do
     tool: :code_navigator,
     name: "code_navigator_agent",
     description: "Manages intelligent code navigation and symbol exploration workflows",
-    category: :navigation,
-    tags: [:navigation, :search, :symbols, :exploration],
+    category: "navigation",
+    tags: ["navigation", "search", :symbols, :exploration],
     schema: [
       # Navigation preferences
       default_search_type: [type: :string, default: "comprehensive"],

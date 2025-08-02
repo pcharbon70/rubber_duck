@@ -26,7 +26,7 @@ defmodule RubberDuck.Tools.Agents.CodeGeneratorAgent do
     tool: :code_generator,
     name: "code_generator_agent",
     description: "Manages AI-powered code generation workflows",
-    category: :code_generation,
+    category: "code_generation",
     tags: [:code, :generation, :ai, :templates],
     schema: [
       # Generation history

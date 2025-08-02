@@ -270,16 +270,20 @@ defmodule RubberDuck.QualityImprovement.QualityEnforcer do
         extract_method_refactoring(ast, target, patterns, options)
         
       "inline_method" ->
-        inline_method_refactoring(ast, target, patterns, options)
+        # TODO: Implement inline_method_refactoring/4
+        {:ok, ast}
         
       "move_method" ->
-        move_method_refactoring(ast, target, patterns, options)
+        # TODO: Implement move_method_refactoring/4
+        {:ok, ast}
         
       "rename_method" ->
-        rename_method_refactoring(ast, target, patterns, options)
+        # TODO: Implement rename_method_refactoring/4
+        {:ok, ast}
         
       "extract_variable" ->
-        extract_variable_refactoring(ast, target, patterns, options)
+        # TODO: Implement extract_variable_refactoring/4
+        {:ok, ast}
         
       "inline_variable" ->
         inline_variable_refactoring(ast, target, patterns, options)
@@ -590,7 +594,7 @@ defmodule RubberDuck.QualityImprovement.QualityEnforcer do
     end
   end
 
-  defp fix_formatting_improvement(ast, improvement) do
+  defp fix_formatting_improvement(ast, _improvement) do
     # Format code according to standards (simplified)
     # In practice, this would use a proper formatter
     {:ok, ast}
@@ -737,7 +741,7 @@ defmodule RubberDuck.QualityImprovement.QualityEnforcer do
     }
   end
 
-  defp identify_applied_optimizations(original_code, optimized_code, target) do
+  defp identify_applied_optimizations(_original_code, optimized_code, _target) do
     # Identify which optimizations were applied
     optimizations = []
     
@@ -757,7 +761,7 @@ defmodule RubberDuck.QualityImprovement.QualityEnforcer do
     optimizations
   end
 
-  defp estimate_performance_improvement(original_code, optimized_code, target) do
+  defp estimate_performance_improvement(_original_code, _optimized_code, _target) do
     # Estimate performance improvement (simplified)
     %{
       estimated_speedup: 1.2,  # 20% improvement
@@ -985,7 +989,7 @@ defmodule RubberDuck.QualityImprovement.QualityEnforcer do
     |> then(&{:ok, &1})
   end
 
-  defp rename_module_references(ast, old_name, new_name) do
+  defp rename_module_references(ast, _old_name, _new_name) do
     # Rename module references (simplified)
     {:ok, ast}
   end
@@ -1051,12 +1055,12 @@ defmodule RubberDuck.QualityImprovement.QualityEnforcer do
     end
   end
 
-  defp add_function_documentation(ast, improvement) do
+  defp add_function_documentation(ast, _improvement) do
     # Add function documentation (simplified)
     {:ok, ast}
   end
 
-  defp add_type_documentation(ast, improvement) do
+  defp add_type_documentation(ast, _improvement) do
     # Add type documentation (simplified)
     {:ok, ast}
   end

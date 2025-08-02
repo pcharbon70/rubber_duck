@@ -72,7 +72,7 @@ defmodule RubberDuck.Jido.Actions.Conversation.General.GetConversationMetricsAct
     end)
   end
 
-  defp calculate_uptime(agent) do
+  defp calculate_uptime(_agent) do
     # This would ideally track agent start time
     # For now, using a placeholder calculation
     case Process.info(self(), :dictionary) do

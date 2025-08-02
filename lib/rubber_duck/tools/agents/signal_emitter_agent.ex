@@ -12,43 +12,23 @@ defmodule RubberDuck.Tools.Agents.SignalEmitterAgent do
     description: "Manages signal emission, routing, and orchestration in the system",
     schema: [
       # Signal tracking and management
-      active_signals: [type: :map, default: %{}],
+      active_signals: [type: :map, default: quote do %{} end],
       signal_queue: [type: {:list, :map}, default: []],
       emission_history: [type: {:list, :map}, default: []],
       max_history: [type: :integer, default: 200],
       
       # Routing and filtering
-      signal_routes: [type: :map, default: %{}],
+      signal_routes: [type: :map, default: quote do %{} end],
       filters: [type: {:list, :map}, default: []],
-      transformations: [type: :map, default: %{}],
+      transformations: [type: :map, default: quote do %{} end],
       
       # Delivery tracking
-      delivery_confirmations: [type: :map, default: %{}],
+      delivery_confirmations: [type: :map, default: quote do %{} end],
       failed_deliveries: [type: {:list, :map}, default: []],
-      retry_config: [type: :map, default: %{
-        max_retries: 3,
-        retry_delay: 1000,
-        backoff_multiplier: 2
-      }],
+      retry_config: [type: :map, default: quote do %{} end],
       
       # Signal patterns and templates
-      signal_templates: [type: :map, default: %{
-        notification: %{
-          type: "system.notification",
-          source: "system",
-          data: %{message: "", priority: :normal}
-        },
-        event: %{
-          type: "system.event",
-          source: "system", 
-          data: %{event_type: "", payload: %{}}
-        },
-        command: %{
-          type: "system.command",
-          source: "system",
-          data: %{command: "", parameters: %{}}
-        }
-      }]
+      signal_templates: [type: :map, default: quote do %{} end]
     ]
   
   # Define additional actions for this agent
@@ -525,7 +505,7 @@ defmodule RubberDuck.Tools.Agents.SignalEmitterAgent do
           values: [:delivered, :failed, :pending],
           required: true
         ],
-        details: [type: :map, default: %{}]
+        details: [type: :map, default: quote do %{} end]
       ]
     
     @impl true

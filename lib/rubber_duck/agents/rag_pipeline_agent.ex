@@ -42,7 +42,7 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
     category: "ai_infrastructure"
 
   alias RubberDuck.RAG.{RAGQuery, RetrievedDocument, AugmentedContext, RetrievalEngine}
-  alias RubberDuck.RAG.{AugmentationProcessor, GenerationCoordinator, PipelineMetrics}
+  alias RubberDuck.RAG.{AugmentationProcessor, GenerationCoordinator}
   require Logger
 
   @default_config %{
@@ -56,7 +56,6 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
     streaming_enabled: true
   }
 
-  @retrieval_strategies [:vector_only, :keyword_only, :hybrid, :ensemble]
 
   ## Initialization
 
@@ -605,7 +604,7 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
     # Check token limits
     if String.length(prompt) > config.max_prompt_length do
       # Apply fallback strategy
-      prompt = apply_fallback_strategy(prompt, context, config)
+      _ = apply_fallback_strategy(prompt, context, config)
     end
     
     # Emit generation request
@@ -726,7 +725,7 @@ defmodule RubberDuck.Agents.RAGPipelineAgent do
     end)
   end
 
-  defp update_pipeline_metrics(agent, total_time) do
+  defp update_pipeline_metrics(agent, _total_time) do
     completed = agent.metrics.pipelines_completed + 1
     
     update_in(agent.metrics.pipelines_completed, fn _ -> completed end)

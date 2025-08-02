@@ -27,8 +27,8 @@ defmodule RubberDuck.Tools.Agents.CodeSummarizerAgent do
     tool: :code_summarizer,
     name: "code_summarizer_agent",
     description: "Manages intelligent code summarization and architectural overview workflows",
-    category: :documentation,
-    tags: [:documentation, :summary, :analysis, :understanding],
+    category: "documentation",
+    tags: ["documentation", :summary, "analysis", "understanding"],
     schema: [
       # User preferences
       default_summary_type: [type: :string, default: "comprehensive"],
@@ -545,7 +545,7 @@ defmodule RubberDuck.Tools.Agents.CodeSummarizerAgent do
       %{
         path: path,
         summary: summary.summary,
-        complexity: get_in(summary, [:analysis, "complexity"]) || 0
+        complexity: get_in(summary, ["analysis", "complexity"]) || 0
       }
     end)
     

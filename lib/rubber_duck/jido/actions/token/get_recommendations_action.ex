@@ -70,7 +70,7 @@ defmodule RubberDuck.Jido.Actions.Token.GetRecommendationsAction do
     
     # Check for overuse of expensive models for simple tasks
     if high_volume_simple_tasks > 0.3 do
-      recommendations = [%{
+      _ = [%{
         type: "model_optimization",
         priority: "high",
         category: "cost_reduction",
@@ -126,7 +126,7 @@ defmodule RubberDuck.Jido.Actions.Token.GetRecommendationsAction do
     
     # Check for overly long prompts
     if avg_prompt_tokens > 1000 do
-      recommendations = [%{
+      _ = [%{
         type: "prompt_optimization",
         priority: "medium",
         category: "efficiency",
@@ -155,7 +155,7 @@ defmodule RubberDuck.Jido.Actions.Token.GetRecommendationsAction do
     # Check for peak usage times
     peak_usage = analyze_peak_usage(usage_data)
     if peak_usage[:variation] > 0.5 do
-      recommendations = [%{
+      _ = [%{
         type: "usage_optimization",
         priority: "low",
         category: "efficiency",

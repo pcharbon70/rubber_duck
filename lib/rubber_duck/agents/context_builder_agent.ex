@@ -46,7 +46,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     description: "Manages context aggregation, prioritization, and optimization for LLM interactions",
     category: "memory"
 
-  alias RubberDuck.Context.{ContextEntry, ContextSource, ContextRequest, ContextOptimizer}
+  alias RubberDuck.Context.{ContextEntry, ContextSource, ContextRequest}
   require Logger
 
   @default_config %{
@@ -329,7 +329,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     sources_to_query = determine_sources(agent, request)
     
     # Parallel fetch from sources
-    tasks = Enum.map(sources_to_query, fn {source_id, source} ->
+    tasks = Enum.map(sources_to_query, fn {_source_id, source} ->
       Task.async(fn ->
         fetch_from_source(agent, source, request)
       end)
@@ -430,22 +430,22 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     end
   end
 
-  defp fetch_doc_context(_agent, source, request) do
+  defp fetch_doc_context(_agent, _source, _request) do
     # Fetch relevant documentation
     {:ok, []}  # Placeholder
   end
 
-  defp fetch_conversation_context(_agent, source, request) do
+  defp fetch_conversation_context(_agent, _source, _request) do
     # Get recent conversation history
     {:ok, []}  # Placeholder
   end
 
-  defp fetch_planning_context(_agent, source, request) do
+  defp fetch_planning_context(_agent, _source, _request) do
     # Get planning and task context
     {:ok, []}  # Placeholder
   end
 
-  defp fetch_custom_context(_agent, source, request) do
+  defp fetch_custom_context(_agent, source, _request) do
     # Use custom transformer if provided
     if source.config["transformer"] do
       # Apply custom transformation
@@ -787,7 +787,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     }
   end
 
-  defp build_context_metadata(entries, source_contexts) do
+  defp build_context_metadata(entries, _source_contexts) do
     %{
       "total_entries" => length(entries),
       "total_tokens" => calculate_total_tokens(entries),

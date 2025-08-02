@@ -40,7 +40,7 @@ defmodule RubberDuck.Jido.Actions.CodeAnalysis.CodeAnalysisRequestAction do
   @impl true
   def run(params, context) do
     agent = context.agent
-    %{file_path: file_path, options: options, request_id: request_id} = params
+    %{file_path: file_path, options: options, request_id: _request_id} = params
     
     Logger.info("Processing code analysis request for #{file_path}")
     
@@ -68,7 +68,7 @@ defmodule RubberDuck.Jido.Actions.CodeAnalysis.CodeAnalysisRequestAction do
     end
   end
   
-  defp handle_cache_miss(agent, params, cache_key) do
+  defp handle_cache_miss(agent, params, _cache_key) do
     %{file_path: file_path, options: options, request_id: request_id} = params
     
     # Add to queue and start analysis

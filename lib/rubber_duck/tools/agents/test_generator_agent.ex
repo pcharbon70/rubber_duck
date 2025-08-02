@@ -27,19 +27,19 @@ defmodule RubberDuck.Tools.Agents.TestGeneratorAgent do
     tool: :test_generator,
     name: "test_generator_agent",
     description: "Manages automated test generation workflows",
-    category: :testing,
-    tags: [:testing, :quality, :automation, :tdd],
+    category: "testing",
+    tags: ["testing", "quality", "automation", "tdd"],
     schema: [
       # Test suite management
-      test_suites: [type: :map, default: %{}],
+      test_suites: [type: :map, default: quote do %{} end],
       active_suite: [type: {:nullable, :string}, default: nil],
       
       # Coverage tracking
-      coverage_data: [type: :map, default: %{}],
-      coverage_goals: [type: :map, default: %{"default" => 90}],
+      coverage_data: [type: :map, default: quote do %{} end],
+      coverage_goals: [type: :map, default: quote do %{} end],
       
       # Test patterns
-      custom_patterns: [type: :map, default: %{}],
+      custom_patterns: [type: :map, default: quote do %{} end],
       preferred_frameworks: [type: {:list, :string}, default: ["exunit"]],
       
       # Generation history
@@ -47,12 +47,7 @@ defmodule RubberDuck.Tools.Agents.TestGeneratorAgent do
       max_history_size: [type: :integer, default: 50],
       
       # Statistics
-      test_stats: [type: :map, default: %{
-        total_tests_generated: 0,
-        by_type: %{},
-        average_coverage: 0,
-        modules_tested: 0
-      }]
+      test_stats: [type: :map, default: quote do %{} end]
     ]
   
   require Logger

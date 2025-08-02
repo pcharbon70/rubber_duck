@@ -46,7 +46,7 @@ defmodule RubberDuck.Jido.Actions.Conversation.General.ClarificationResponseActi
 
   # Private functions
 
-  defp process_clarified_conversation(agent_id, params, clarified_query) do
+  defp process_clarified_conversation(_agent_id, params, clarified_query) do
     start_time = System.monotonic_time(:millisecond)
     
     try do
@@ -163,7 +163,7 @@ defmodule RubberDuck.Jido.Actions.Conversation.General.ClarificationResponseActi
     end
   end
 
-  defp generate_response_async(params, clarified_query, classification) do
+  defp generate_response_async(_params, clarified_query, classification) do
     # This would integrate with the LLM service
     # For now, returning a placeholder that includes clarification context
     "Generated response for clarified query: #{clarified_query} (classification: #{classification})"

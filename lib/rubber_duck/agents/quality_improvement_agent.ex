@@ -53,15 +53,12 @@ defmodule RubberDuck.Agents.QualityImprovementAgent do
 
   alias RubberDuck.QualityImprovement.{
     QualityAnalyzer,
-    QualityEnforcer,
-    QualityMetrics
+    QualityEnforcer
   }
 
   require Logger
 
   @max_history_size 1000
-  @analysis_timeout 120_000  # 2 minutes
-  @improvement_timeout 300_000  # 5 minutes
 
   # Helper function for signal emission
   defp emit_signal(topic, data) when is_binary(topic) and is_map(data) do
@@ -404,7 +401,7 @@ defmodule RubberDuck.Agents.QualityImprovementAgent do
     end
   end
 
-  defp execute_complexity_analysis(agent, code, options) do
+  defp execute_complexity_analysis(_agent, code, options) do
     case QualityAnalyzer.analyze_complexity(code, options) do
       {:ok, complexity_analysis} ->
         analysis_result = %{
@@ -506,7 +503,7 @@ defmodule RubberDuck.Agents.QualityImprovementAgent do
 
   ## Private Functions - Quality Improvements
 
-  defp apply_quality_improvements(agent, code, improvements, strategy, options) do
+  defp apply_quality_improvements(_agent, code, improvements, strategy, options) do
     case QualityEnforcer.apply_improvements(code, improvements, strategy, options) do
       {:ok, improvement_result} ->
         result = %{
@@ -572,7 +569,7 @@ defmodule RubberDuck.Agents.QualityImprovementAgent do
     end
   end
 
-  defp apply_performance_optimizations(agent, code, target, options) do
+  defp apply_performance_optimizations(_agent, code, target, options) do
     case QualityEnforcer.optimize_performance(code, target, options) do
       {:ok, optimization_result} ->
         result = %{
@@ -900,7 +897,7 @@ defmodule RubberDuck.Agents.QualityImprovementAgent do
   defp generate_improvement_roadmap(analyses) do
     # Generate prioritized improvement recommendations
     roadmap_items = analyses
-    |> Enum.flat_map(fn {type, result} ->
+    |> Enum.flat_map(fn {type, _result} ->
       case type do
         :metrics -> [%{priority: "high", action: "Reduce cyclomatic complexity", scope: "methods"}]
         :style -> [%{priority: "medium", action: "Fix formatting issues", scope: "codebase"}]

@@ -251,7 +251,7 @@ defmodule RubberDuck.Jido.Actions.RestartTracker.GetStatsAction do
     end
   end
   
-  defp calculate_stability_score(history, now) do
+  defp calculate_stability_score(history, _now) do
     if Enum.empty?(history) do
       1.0  # No restarts = perfectly stable
     else

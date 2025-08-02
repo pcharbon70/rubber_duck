@@ -61,22 +61,15 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
     # Merge default schema with any provided schema
     default_schema = [
       # Request tracking
-      active_requests: [type: :map, default: %{}],
+      active_requests: [type: :map, default: nil],
       request_queue: [type: {:list, :map}, default: []],
       
       # Caching
-      results_cache: [type: :map, default: %{}],
+      results_cache: [type: :map, default: nil],
       cache_ttl: [type: :integer, default: cache_ttl],
       
       # Metrics
-      metrics: [type: :map, default: %{
-        total_requests: 0,
-        successful_requests: 0,
-        failed_requests: 0,
-        cache_hits: 0,
-        average_execution_time: 0,
-        last_request_at: nil
-      }],
+      metrics: [type: :map, default: nil],
       
       # Rate limiting
       rate_limit_window: [type: :integer, default: 60_000], # 1 minute
@@ -99,7 +92,7 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
           name: "execute_tool",
           description: "Execute the #{unquote(tool_name)} tool",
           schema: [
-            params: [type: :map, default: %{}],
+            params: [type: :map, default: nil],
             priority: [type: :atom, values: [:low, :normal, :high], default: :normal],
             cache_key: [type: :string, required: false]
           ]

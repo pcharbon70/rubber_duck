@@ -181,7 +181,7 @@ defmodule RubberDuck.LogicCorrection.ConstraintChecker do
 
   ## Private Functions - Single Constraint Checking
 
-  defp check_single_constraint(ast, constraint, constraint_definitions, options) do
+  defp check_single_constraint(ast, constraint, constraint_definitions, _options) do
     # Get constraint definition
     constraint_def = Map.get(constraint_definitions, constraint, %{})
     

@@ -107,7 +107,7 @@ defmodule RubberDuck.Jido.Agents.MetricsAgent do
     )
   end
 
-  defp handle_telemetry_event([:rubber_duck, :agent, :action, :stop], measurements, metadata, %{agent_id: metrics_agent_id}) do
+  defp handle_telemetry_event([:rubber_duck, :agent, :action, :stop], measurements, metadata, %{agent_id: _metrics_agent_id}) do
     duration_us = System.convert_time_unit(measurements.duration, :native, :microsecond)
     agent_id = Map.get(metadata, :agent_id)
     action = Map.get(metadata, :action)

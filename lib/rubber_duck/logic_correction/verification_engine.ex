@@ -278,7 +278,7 @@ defmodule RubberDuck.LogicCorrection.VerificationEngine do
     }
   end
 
-  defp perform_model_verification(ast, properties, options) do
+  defp perform_model_verification(_ast, properties, options) do
     # Perform model checking verification
     case model_check("", properties, options) do
       {:ok, model_result} ->
@@ -445,7 +445,7 @@ defmodule RubberDuck.LogicCorrection.VerificationEngine do
     }
   end
 
-  defp check_until_property(model, property) do
+  defp check_until_property(_model, property) do
     # Check "P until Q" property (A[P U Q] in CTL)
     # Simplified implementation
     %{
@@ -687,7 +687,7 @@ defmodule RubberDuck.LogicCorrection.VerificationEngine do
 
   ## Private Functions - Proof Helpers
 
-  defp verify_base_case(property, _ast) do
+  defp verify_base_case(_property, _ast) do
     # Verify base case for induction (simplified)
     %{
       valid: true,
@@ -695,7 +695,7 @@ defmodule RubberDuck.LogicCorrection.VerificationEngine do
     }
   end
 
-  defp verify_inductive_step(property, _ast, _constraints) do
+  defp verify_inductive_step(_property, _ast, _constraints) do
     # Verify inductive step (simplified)
     %{
       valid: true,

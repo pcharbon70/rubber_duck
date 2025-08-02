@@ -27,8 +27,8 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
   use Jido.Agent,
     name: "test_runner_agent",
     description: "Manages intelligent test execution and analysis workflows",
-    category: :testing,
-    tags: [:testing, :quality, :ci, :automation, :coverage],
+    category: "testing",
+    tags: ["testing", "quality", :ci, "automation", :coverage],
     schema: [
       # Test execution history
       test_history: [type: {:list, :map}, default: []],
@@ -110,7 +110,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
         },
         "slow_tests" => %{
           description: "Tests that take longer than average",
-          filter_type: :performance
+          filter_type: "performance"
         }
       }]
     ]
@@ -364,7 +364,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
       # Performance recommendations
       recommendations = if results.summary.duration_ms > 30_000 do
         [%{
-          type: :performance,
+          type: "performance",
           priority: :medium,
           message: "Test suite is running slowly (#{results.summary.duration_ms}ms)",
           action: "Consider parallel execution or test optimization"
@@ -668,7 +668,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
         
         recommendations = if avg_duration > 60_000 do
           [%{
-            type: :performance,
+            type: "performance",
             priority: :medium,
             message: "Average test execution time is high (#{round(avg_duration)}ms)",
             action: "Consider test optimization or parallel execution"
@@ -748,7 +748,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
       name: "optimize_execution",
       description: "Generate test execution optimization suggestions",
       schema: [
-        focus_areas: [type: {:list, :atom}, default: [:performance, :coverage, :reliability]],
+        focus_areas: [type: {:list, :atom}, default: ["performance", :coverage, :reliability]],
         current_settings: [type: :map, default: %{}],
         constraints: [type: :map, default: %{}]
       ]
@@ -760,7 +760,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
       optimizations = []
       
       # Performance optimizations
-      optimizations = if :performance in params.focus_areas do
+      optimizations = if "performance" in params.focus_areas do
         optimizations ++ generate_performance_optimizations(agent, params.constraints)
       else
         optimizations
@@ -795,8 +795,8 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
       avg_duration = agent.state.execution_stats.average_duration
       suggestions = if avg_duration > 30_000 do
         [%{
-          type: :performance,
-          category: :execution_time,
+          type: "performance",
+          category: "execution_time",
           priority: :high,
           suggestion: "Enable parallel test execution to reduce overall run time",
           expected_improvement: "30-50% faster execution",
@@ -814,8 +814,8 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
       slow_tests = agent.state.test_health.slow_tests
       suggestions = if length(slow_tests) > 0 do
         [%{
-          type: :performance,
-          category: :slow_tests,
+          type: "performance",
+          category: "slow_tests",
           priority: :medium,
           suggestion: "Optimize or isolate slow tests to separate suite",
           expected_improvement: "Faster feedback loop for quick tests",
@@ -842,7 +842,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
         gap = target_coverage - current_coverage
         [%{
           type: :coverage,
-          category: :increase_coverage,
+          category: "increase_coverage",
           priority: if(gap > 20, do: :high, else: :medium),
           suggestion: "Add tests for uncovered modules to reach target coverage",
           expected_improvement: "Increase coverage by #{gap}%",
@@ -867,7 +867,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
       suggestions = if length(flaky_tests) > 0 do
         [%{
           type: :reliability,
-          category: :flaky_tests,
+          category: "flaky_tests",
           priority: :high,
           suggestion: "Fix or isolate flaky tests to improve test reliability",
           expected_improvement: "More consistent test results",
@@ -886,7 +886,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
       suggestions = if stability_score < 85 do
         [%{
           type: :reliability,
-          category: :stability,
+          category: "stability",
           priority: :high,
           suggestion: "Improve test stability by addressing frequent failures",
           expected_improvement: "Higher success rate and confidence",

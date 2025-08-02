@@ -393,7 +393,7 @@ defmodule RubberDuck.CodeCorrection.TestIntegration do
     end
   end
 
-  defp analyze_test_results(results, fix_data) do
+  defp analyze_test_results(results, _fix_data) do
     case results do
       %{failures: 0, errors: 0} ->
         {:ok, %{

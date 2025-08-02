@@ -10,8 +10,8 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
   use Jido.Agent,
     name: "test_summarizer_agent",
     description: "Orchestrates test result analysis and provides actionable insights",
-    category: :testing,
-    tags: [:testing, :analysis, :reporting, :quality, :metrics],
+    category: "testing",
+    tags: ["testing", "analysis", :reporting, "quality", "metrics"],
     vsn: "1.0.0",
     schema: [
       analysis_config: [
@@ -440,7 +440,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
       name: "generate_test_improvement_plan",
       description: "Generate actionable plan for improving test suite",
       schema: [
-        focus_areas: [type: {:list, :atom}, default: [:failures, :coverage, :performance, :flakiness]],
+        focus_areas: [type: {:list, :atom}, default: [:failures, :coverage, "performance", :flakiness]],
         max_recommendations: [type: :integer, default: 10],
         priority_threshold: [type: :atom, default: :medium]
       ]
@@ -465,7 +465,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
         recommendations
       end
       
-      recommendations = if :performance in params.focus_areas do
+      recommendations = if "performance" in params.focus_areas do
         perf_recs = analyze_performance_improvements(agent_state)
         recommendations ++ perf_recs
       else
@@ -507,7 +507,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
       |> Enum.filter(fn {_type, count} -> count > 3 end)
       |> Enum.map(fn {type, count} ->
         %{
-          category: :failures,
+          category: "failures",
           title: "Fix systematic #{type} errors",
           description: "#{count} tests are failing with #{type} errors",
           priority_score: min(count * 10, 100),
@@ -525,7 +525,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
       
       recommendations = if coverage.line_coverage < 80 do
         [%{
-          category: :coverage,
+          category: "coverage",
           title: "Increase test coverage",
           description: "Current line coverage is #{coverage.line_coverage}%, target is 80%",
           priority_score: 80 - coverage.line_coverage,
@@ -538,7 +538,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
       
       recommendations = if length(coverage.uncovered_files) > 0 do
         [%{
-          category: :coverage,
+          category: "coverage",
           title: "Add tests for uncovered files",
           description: "#{length(coverage.uncovered_files)} files have no test coverage",
           priority_score: min(length(coverage.uncovered_files) * 15, 90),
@@ -558,7 +558,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
       
       recommendations = if metrics.average_duration > 60 do
         [%{
-          category: :performance,
+          category: "performance",
           title: "Optimize slow tests",
           description: "Average test duration is #{Float.round(metrics.average_duration, 1)}s",
           priority_score: min(metrics.average_duration, 100),
@@ -577,7 +577,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
       
       if flaky_count > 0 do
         [%{
-          category: :flakiness,
+          category: "flakiness",
           title: "Fix flaky tests",
           description: "#{flaky_count} tests show inconsistent behavior",
           priority_score: min(flaky_count * 20, 95),
@@ -694,7 +694,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
         
         comparison = case params.focus do
           :failures -> compare_failures(newer, older)
-          :performance -> compare_performance(newer, older)
+          "performance" -> compare_performance(newer, older)
           :coverage -> compare_coverage(newer, older)
           _ -> compare_all_aspects(newer, older)
         end

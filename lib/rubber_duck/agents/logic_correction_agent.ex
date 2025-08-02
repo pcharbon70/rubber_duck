@@ -54,15 +54,12 @@ defmodule RubberDuck.Agents.LogicCorrectionAgent do
   alias RubberDuck.LogicCorrection.{
     LogicAnalyzer,
     ConstraintChecker,
-    VerificationEngine,
-    LogicMetrics
+    VerificationEngine
   }
 
   require Logger
 
   @max_history_size 1000
-  @analysis_timeout 60_000  # 60 seconds
-  @verification_timeout 300_000  # 5 minutes
 
   # Helper function for signal emission
   defp emit_signal(topic, data) when is_binary(topic) and is_map(data) do
@@ -367,7 +364,7 @@ defmodule RubberDuck.Agents.LogicCorrectionAgent do
     end
   end
 
-  defp execute_loop_validation(agent, code, options) do
+  defp execute_loop_validation(_agent, code, options) do
     case LogicAnalyzer.validate_loops(code, options) do
       {:ok, loop_analysis} ->
         analysis_result = %{
@@ -387,7 +384,7 @@ defmodule RubberDuck.Agents.LogicCorrectionAgent do
     end
   end
 
-  defp execute_state_tracking(agent, code, options) do
+  defp execute_state_tracking(_agent, code, options) do
     case LogicAnalyzer.track_state_changes(code, options) do
       {:ok, state_analysis} ->
         analysis_result = %{
@@ -487,7 +484,7 @@ defmodule RubberDuck.Agents.LogicCorrectionAgent do
 
   ## Private Functions - Verification
 
-  defp perform_property_verification(agent, code, properties, level) do
+  defp perform_property_verification(_agent, code, properties, level) do
     verification_levels = %{
       "basic" => [:syntax_check, :type_check],
       "standard" => [:syntax_check, :type_check, :logic_check],
@@ -523,7 +520,7 @@ defmodule RubberDuck.Agents.LogicCorrectionAgent do
 
   ## Private Functions - Logic Correction
 
-  defp apply_logic_corrections(agent, errors, strategy, options) do
+  defp apply_logic_corrections(_agent, errors, strategy, options) do
     case LogicAnalyzer.generate_corrections(errors, strategy, options) do
       {:ok, corrections} ->
         correction_result = %{

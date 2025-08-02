@@ -290,13 +290,13 @@ defmodule RubberDuck.Context.ContextSource do
     }
   end
 
-  defp maybe_update_field(source, field, nil, _validator), do: source
+  defp maybe_update_field(source, _field, nil, _validator), do: source
   defp maybe_update_field(source, field, value, validator) do
     validated_value = validator.(value)
     Map.put(source, field, validated_value)
   end
 
-  defp maybe_update_field(source, field, nil), do: source
+  defp maybe_update_field(source, _field, nil), do: source
   defp maybe_update_field(source, field, value) do
     Map.put(source, field, value)
   end

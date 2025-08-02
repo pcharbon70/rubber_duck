@@ -262,7 +262,7 @@ defmodule RubberDuck.RAG.GenerationCoordinator do
     end
   end
 
-  defp assess_accuracy(response, context) do
+  defp assess_accuracy(_response, _context) do
     # Check if response contradicts context
     # This is simplified - in production, use NLI models
     
