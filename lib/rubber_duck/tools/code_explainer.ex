@@ -77,7 +77,7 @@ defmodule RubberDuck.Tools.CodeExplainer do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:llm_access, :code_analysis]
       rate_limit [max_requests: 150, window_seconds: 60]
     end
