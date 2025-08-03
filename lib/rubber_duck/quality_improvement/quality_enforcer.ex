@@ -320,59 +320,7 @@ defmodule RubberDuck.QualityImprovement.QualityEnforcer do
     end
   end
 
-  defp inline_method_refactoring(ast, target, _patterns, _options) do
-    # Inline method refactoring (simplified implementation)
-    case find_method_to_inline(ast, target) do
-      {:ok, method_info} ->
-        # Replace method calls with method body
-        updated_ast = replace_method_calls_with_body(ast, method_info)
-        
-        # Remove original method definition
-        final_ast = remove_method_definition(updated_ast, method_info)
-        
-        {:ok, final_ast}
-        
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp rename_method_refactoring(ast, target, _patterns, options) do
-    # Rename method refactoring
-    old_name = target
-    new_name = Map.get(options, "new_name", "#{old_name}_renamed")
-    
-    case find_method_definition(ast, old_name) do
-      {:ok, _method_info} ->
-        # Rename method definition
-        updated_ast = rename_method_definition(ast, old_name, new_name)
-        
-        # Rename all method calls
-        final_ast = rename_method_calls(updated_ast, old_name, new_name)
-        
-        {:ok, final_ast}
-        
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp extract_variable_refactoring(ast, target, _patterns, _options) do
-    # Extract variable refactoring
-    case find_expression_to_extract(ast, target) do
-      {:ok, expression_info} ->
-        # Create new variable
-        var_name = generate_variable_name(expression_info)
-        
-        # Replace expression with variable
-        updated_ast = replace_expression_with_variable(ast, expression_info, var_name)
-        
-        {:ok, updated_ast}
-        
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
+  # Refactoring functions removed - not currently used
 
   defp inline_variable_refactoring(ast, target, _patterns, _options) do
     # Inline variable refactoring
@@ -829,41 +777,8 @@ defmodule RubberDuck.QualityImprovement.QualityEnforcer do
     end
   end
 
-  defp find_method_to_inline(_ast, _target) do
-    # Find method that should be inlined (simplified)
-    {:ok, %{name: :target_method, body: {:ok, [], nil}}}
-  end
-
-  defp replace_method_calls_with_body(ast, method_info) do
-    # Replace method calls with method body (simplified)
-    method_name = method_info.name
-    method_body = method_info.body
-    
-    Macro.prewalk(ast, fn
-      {^method_name, _, []} -> method_body
-      node -> node
-    end)
-  end
-
-  defp remove_method_definition(ast, method_info) do
-    # Remove method definition (simplified)
-    method_name = method_info.name
-    
-    Macro.prewalk(ast, fn
-      {:def, _, [{^method_name, _, _} | _]} -> nil
-      node -> node
-    end)
-  end
-
-  defp find_method_definition(_ast, method_name) do
-    # Find method definition (simplified)
-    if is_binary(method_name) do
-      {:ok, %{name: String.to_atom(method_name), definition: {:def, [], []}}}
-    else
-      {:error, "Method not found"}
-    end
-  end
-
+  # Helper functions for refactoring operations
+  
   defp rename_method_definition(ast, old_name, new_name) do
     # Rename method definition (simplified)
     old_atom = if is_binary(old_name), do: String.to_atom(old_name), else: old_name
@@ -884,27 +799,6 @@ defmodule RubberDuck.QualityImprovement.QualityEnforcer do
     
     Macro.prewalk(ast, fn
       {^old_atom, meta, args} -> {new_atom, meta, args}
-      node -> node
-    end)
-  end
-
-  defp find_expression_to_extract(_ast, _target) do
-    # Find expression to extract (simplified)
-    {:ok, %{expression: {:+, [], [1, 2]}, location: :line_5}}
-  end
-
-  defp generate_variable_name(_expression_info) do
-    # Generate appropriate variable name (simplified)
-    "extracted_var_#{:rand.uniform(1000)}"
-  end
-
-  defp replace_expression_with_variable(ast, expression_info, var_name) do
-    # Replace expression with variable (simplified)
-    var_atom = String.to_atom(var_name)
-    target_expression = expression_info.expression
-    
-    Macro.prewalk(ast, fn
-      ^target_expression -> {var_atom, [], nil}
       node -> node
     end)
   end

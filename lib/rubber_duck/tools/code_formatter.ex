@@ -106,7 +106,7 @@ defmodule RubberDuck.Tools.CodeFormatter do
     with {:ok, validated} <- validate_code(params.code),
          {:ok, formatter_opts} <- build_formatter_options(params, context),
          {:ok, formatted} <- format_code(validated, formatter_opts),
-         {:ok, verified} <- verify_formatting(params.code, formatted, params) do
+         {:ok, _verified} <- verify_formatting(params.code, formatted, params) do
       
       analysis = analyze_changes(params.code, formatted)
       

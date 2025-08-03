@@ -81,9 +81,9 @@ defmodule RubberDuck.Tools.CodeRefactorer do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:llm_access, :code_analysis]
-      rate_limit 100
+      rate_limit [max_requests: 100, window_seconds: 60]
     end
   end
   

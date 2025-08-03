@@ -166,7 +166,7 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
       end)
     end
     
-    defp process_batch(files, batch_idx, params, agent_state) do
+    defp process_batch(files, _batch_idx, params, agent_state) do
       patterns = build_patterns(params, agent_state)
       
       Enum.flat_map(files, fn file ->
@@ -214,7 +214,7 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
       end)
     end
     
-    defp build_todo_entry(file, line, line_num, pattern, [_full, _pattern, description | _]) do
+    defp build_todo_entry(file, _line, line_num, pattern, [_full, _pattern, description | _]) do
       %{
         id: generate_todo_id(file, line_num),
         type: String.downcase(pattern),
@@ -346,7 +346,7 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
       }
     end
     
-    defp identify_critical_areas(todos, agent_state) do
+    defp identify_critical_areas(todos, _agent_state) do
       file_scores = todos
       |> Enum.group_by(& &1.file)
       |> Enum.map(fn {file, file_todos} ->
@@ -383,15 +383,19 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
       
       # Priority-based recommendations
       high_priority = Map.get(distribution.by_priority, :high, 0)
-      if high_priority > 5 do
-        recommendations = ["Address #{high_priority} high-priority items immediately" | recommendations]
+      recommendations = if high_priority > 5 do
+        ["Address #{high_priority} high-priority items immediately" | recommendations]
+      else
+        recommendations
       end
       
       # File hotspot recommendations
-      if length(critical_areas) > 0 do
+      recommendations = if length(critical_areas) > 0 do
         [{worst_file, stats} | _] = critical_areas
         filename = Path.basename(worst_file)
-        recommendations = ["File '#{filename}' has #{stats.count} TODOs and needs refactoring" | recommendations]
+        ["File '#{filename}' has #{stats.count} TODOs and needs refactoring" | recommendations]
+      else
+        recommendations
       end
       
       recommendations
@@ -600,8 +604,10 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
       
       # High priority recommendations
       high_priority = Enum.count(todos, &(&1[:priority] == :high))
-      if high_priority > 10 do
-        recommendations = ["Create a dedicated sprint to address #{high_priority} high-priority items" | recommendations]
+      recommendations = if high_priority > 10 do
+        ["Create a dedicated sprint to address #{high_priority} high-priority items" | recommendations]
+      else
+        recommendations
       end
       
       # File hotspot recommendations
@@ -609,16 +615,18 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
       |> Enum.group_by(& &1.file)
       |> Enum.filter(fn {_, file_todos} -> length(file_todos) > 10 end)
       
-      if length(hotspots) > 0 do
-        recommendations = ["Refactor #{length(hotspots)} files with excessive TODOs" | recommendations]
+      recommendations = if length(hotspots) > 0 do
+        ["Refactor #{length(hotspots)} files with excessive TODOs" | recommendations]
+      else
+        recommendations
       end
       
       # Debt trend recommendations
-      case agent_state.debt_trends.trend_direction do
+      recommendations = case agent_state.debt_trends.trend_direction do
         :increasing ->
-          recommendations = ["Technical debt is increasing. Allocate time for debt reduction." | recommendations]
+          ["Technical debt is increasing. Allocate time for debt reduction." | recommendations]
         :stable ->
-          recommendations = ["Technical debt is stable but should be actively reduced." | recommendations]
+          ["Technical debt is stable but should be actively reduced." | recommendations]
         _ ->
           recommendations
       end
@@ -919,7 +927,7 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
   end
   
   @impl true
-  def handle_signal(state, signal) do
+  def handle_signal(state, _signal) do
     {:ok, state}
   end
   

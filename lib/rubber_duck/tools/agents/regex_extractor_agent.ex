@@ -505,7 +505,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     
     @impl true
     def run(params, context) do
-      agent = context.agent
+      _agent = context.agent
       
       # Build pattern based on requirements
       pattern_components = analyze_requirements(params.requirements)
@@ -544,7 +544,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
       }
     end
     
-    defp construct_base_pattern(components, params) do
+    defp construct_base_pattern(components, _params) do
       # Build pattern from components
       pattern_parts = []
       
@@ -557,17 +557,21 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
       end
       
       # Add character constraints
-      if Map.has_key?(components.character_sets, "allowed") do
+      pattern_parts = if Map.has_key?(components.character_sets, "allowed") do
         allowed = components.character_sets["allowed"]
-        pattern_parts = pattern_parts ++ ["[#{allowed}]"]
+        pattern_parts ++ ["[#{allowed}]"]
+      else
+        pattern_parts
       end
       
       # Add length constraints
-      if Map.has_key?(components.length_constraints, "min") or Map.has_key?(components.length_constraints, "max") do
+      pattern_parts = if Map.has_key?(components.length_constraints, "min") or Map.has_key?(components.length_constraints, "max") do
         min = components.length_constraints["min"] || ""
         max = components.length_constraints["max"] || ""
         quantifier = "{#{min},#{max}}"
-        pattern_parts = pattern_parts ++ [quantifier]
+        pattern_parts ++ [quantifier]
+      else
+        pattern_parts
       end
       
       # Combine parts
@@ -663,7 +667,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
       end
     end
     
-    defp generate_pattern_examples(pattern, content_type) do
+    defp generate_pattern_examples(_pattern, content_type) do
       # Generate example strings that should match the pattern
       case content_type do
         "email" -> ["user@example.com", "admin@test.org", "contact@domain.co.uk"]
@@ -734,7 +738,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     
     @impl true
     def run(params, context) do
-      agent = context.agent
+      _agent = context.agent
       
       # Compile the pattern
       case Regex.compile(params.pattern) do
@@ -1002,7 +1006,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     
     @impl true
     def run(params, context) do
-      agent = context.agent
+      _agent = context.agent
       
       # Analyze the original pattern
       original_analysis = analyze_pattern_for_optimization(params.pattern)
@@ -1053,8 +1057,8 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
       optimizations = []
       
       # Replace .* with more specific patterns
-      optimized = if String.contains?(pattern, ".*") do
-        optimizations = [%{
+      optimizations = if String.contains?(pattern, ".*") do
+        [%{
           type: "performance",
           pattern: String.replace(pattern, ".*", "[^\\s]*"),
           explanation: "Replaced .* with [^\\s]* for better performance",
@@ -1065,7 +1069,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
       end
       
       # Add anchoring for better performance
-      optimized = if not (String.starts_with?(pattern, "^") or String.ends_with?(pattern, "$")) do
+      optimizations = if not (String.starts_with?(pattern, "^") or String.ends_with?(pattern, "$")) do
         [%{
           type: "performance",
           pattern: "^" <> pattern <> "$",
@@ -1077,7 +1081,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
       end
       
       # Convert capturing groups to non-capturing where possible
-      optimized = if String.contains?(pattern, "(") and not String.contains?(pattern, "?:") do
+      optimizations = if String.contains?(pattern, "(") and not String.contains?(pattern, "?:") do
         non_capturing_pattern = String.replace(pattern, "(", "(?:")
         [%{
           type: "performance",
@@ -1154,7 +1158,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
       |> String.replace("[ \\t\\n\\r\\f]", "\\s")
       
       if size_optimized != pattern do
-        optimizations = [%{
+        [%{
           type: :size,
           pattern: size_optimized,
           explanation: "Used character class shortcuts to reduce pattern size",
@@ -1167,7 +1171,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
       optimizations
     end
     
-    defp select_best_optimization(original_pattern, optimizations, params) do
+    defp select_best_optimization(original_pattern, optimizations, _params) do
       if length(optimizations) == 0 do
         %{
           type: :none,
@@ -1415,7 +1419,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
   # Action result handlers
   
   @impl true
-  def handle_action_result(agent, BatchExtractAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, BatchExtractAction, {:ok, result}, _metadata) do
     # Update batch extraction tracking
     agent = put_in(agent.state.active_batch_extractions[result.batch_id], %{
       status: :completed,
@@ -1443,7 +1447,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
   end
   
   @impl true
-  def handle_action_result(agent, AnalyzePatternsAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, AnalyzePatternsAction, {:ok, result}, _metadata) do
     # Store pattern analysis results
     analysis_key = "patterns_#{DateTime.utc_now() |> DateTime.to_unix()}"
     agent = put_in(agent.state.pattern_cache[analysis_key], %{
@@ -1467,7 +1471,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
   end
   
   @impl true
-  def handle_action_result(agent, BuildPatternAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, BuildPatternAction, {:ok, result}, _metadata) do
     # Add built pattern to custom patterns library
     pattern_name = "built_#{DateTime.utc_now() |> DateTime.to_unix()}"
     agent = put_in(agent.state.custom_patterns[pattern_name], %{
@@ -1489,7 +1493,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
   end
   
   @impl true
-  def handle_action_result(agent, TestPatternAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, TestPatternAction, {:ok, result}, _metadata) do
     # Update pattern usage statistics based on test results
     pattern_key = "pattern_#{result.pattern |> :crypto.hash(:md5) |> Base.encode16()}"
     agent = update_in(agent.state.pattern_usage_stats, fn stats ->
@@ -1519,36 +1523,38 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
   end
   
   @impl true
-  def handle_action_result(agent, OptimizePatternAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, OptimizePatternAction, {:ok, result}, _metadata) do
     # Update performance metrics
     agent = update_in(agent.state.performance_metrics.patterns_optimized, &(&1 + 1))
     
     # Store optimized pattern if it's significantly better
-    if result.improvement_metrics.complexity_change < -2 do
+    updated_agent = if result.improvement_metrics.complexity_change < -2 do
       optimization_key = "optimized_#{DateTime.utc_now() |> DateTime.to_unix()}"
-      agent = put_in(agent.state.custom_patterns[optimization_key], %{
+      put_in(agent.state.custom_patterns[optimization_key], %{
         original_pattern: result.original_pattern,
         optimized_pattern: result.optimized_pattern,
         optimization_type: result.optimization_applied,
         improvement: result.improvement_metrics,
         created_at: DateTime.utc_now()
       })
+    else
+      agent
     end
     
     # Emit pattern optimized signal
     signal = Jido.Signal.new!(%{
       type: "pattern.optimized",
-      source: "agent:#{agent.id}",
+      source: "agent:#{updated_agent.id}",
       data: result
     })
-    emit_signal(agent, signal)
+    emit_signal(updated_agent, signal)
     
-    {:ok, agent}
+    {:ok, updated_agent}
   end
   
   # Handle main tool execution results
   @impl true
-  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, _metadata) do
     # Record successful extraction
     extraction_record = %{
       pattern: result.pattern,

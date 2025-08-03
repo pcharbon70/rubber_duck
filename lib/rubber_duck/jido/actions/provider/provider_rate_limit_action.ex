@@ -134,7 +134,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderRateLimitAction do
         new_limiter = apply_rate_limit_adjustments(current_limiter, params)
         
         # Update the agent state
-        updated_agent = put_in(agent.state.rate_limiter, new_limiter)
+        _updated_agent = put_in(agent.state.rate_limiter, new_limiter)
         
         Logger.info("Rate limits adjusted for #{agent.name}", 
           old_limit: current_limiter.limit,
@@ -167,7 +167,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderRateLimitAction do
       window_start: nil
     }
     
-    updated_agent = put_in(agent.state.rate_limiter, reset_limiter)
+    _updated_agent = put_in(agent.state.rate_limiter, reset_limiter)
     
     Logger.info("Rate limiter reset for #{agent.name}")
     
@@ -237,7 +237,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderRateLimitAction do
       window_start: nil
     }
     
-    updated_agent = put_in(agent.state.rate_limiter, backed_off_limiter)
+    _updated_agent = put_in(agent.state.rate_limiter, backed_off_limiter)
     
     Logger.warning("Applied backoff strategy for #{agent.name}", 
       backoff_factor: params.backoff_factor,
@@ -344,7 +344,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderRateLimitAction do
     }
   end
   
-  defp calculate_performance_metrics(rate_limiter, metrics, now) do
+  defp calculate_performance_metrics(rate_limiter, metrics, _now) do
     %{
       current_utilization_percent: calculate_utilization_percent(rate_limiter),
       requests_per_second: calculate_requests_per_second(metrics, rate_limiter),
@@ -355,7 +355,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderRateLimitAction do
     }
   end
   
-  defp generate_rate_limit_recommendations(performance_metrics, rate_limiter) do
+  defp generate_rate_limit_recommendations(performance_metrics, _rate_limiter) do
     recommendations = []
     
     # Check utilization
@@ -386,7 +386,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderRateLimitAction do
     end
   end
   
-  defp should_auto_adjust?(performance_metrics, rate_limiter) do
+  defp should_auto_adjust?(performance_metrics, _rate_limiter) do
     # Auto-adjust if utilization is consistently low or high
     performance_metrics.current_utilization_percent < 30 or 
     performance_metrics.current_utilization_percent > 85
@@ -435,7 +435,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderRateLimitAction do
     end
   end
   
-  defp calculate_requests_per_second(metrics, rate_limiter) do
+  defp calculate_requests_per_second(_metrics, rate_limiter) do
     if rate_limiter.window && rate_limiter.window > 0 do
       Float.round(rate_limiter.current_count / (rate_limiter.window / 1000), 2)
     else

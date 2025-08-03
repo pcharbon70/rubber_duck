@@ -109,9 +109,9 @@ defmodule RubberDuck.Tools.CodeNavigator do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:file_read]
-      rate_limit 100
+      rate_limit [max_requests: 100]
     end
   end
   

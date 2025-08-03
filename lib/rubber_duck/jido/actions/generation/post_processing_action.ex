@@ -255,8 +255,8 @@ defmodule RubberDuck.Jido.Actions.Generation.PostProcessingAction do
   end
 
   defp optimize_code(code, :elixir, optimization_level) do
-    optimizations = []
-    optimized_code = code
+    _optimizations = []
+    _optimized_code = code
     
     # Apply various optimizations based on level
     {optimized_code, optimizations} = 
@@ -333,19 +333,21 @@ defmodule RubberDuck.Jido.Actions.Generation.PostProcessingAction do
   end
 
   defp apply_standard_optimizations(code) do
-    optimizations = []
-    optimized_code = code
+    _optimizations = []
+    _optimized_code = code
     
     # Remove unnecessary parentheses
-    if String.contains?(code, "()") do
-      optimized_code = String.replace(optimized_code, ~r/\(\s*\)/, "")
-      optimizations = ["removed_empty_parentheses" | optimizations]
+    {optimized_code, optimizations} = if String.contains?(code, "()") do
+      {String.replace(code, ~r/\(\s*\)/, ""), ["removed_empty_parentheses"]}
+    else
+      {code, []}
     end
     
     # Simplify boolean expressions
-    if String.contains?(code, "== true") do
-      optimized_code = String.replace(optimized_code, ~r/\s*==\s*true/, "")
-      optimizations = ["simplified_boolean_expressions" | optimizations]
+    {optimized_code, optimizations} = if String.contains?(optimized_code, "== true") do
+      {String.replace(optimized_code, ~r/\s*==\s*true/, ""), ["simplified_boolean_expressions" | optimizations]}
+    else
+      {optimized_code, optimizations}
     end
     
     {optimized_code, optimizations}
@@ -427,7 +429,7 @@ defmodule RubberDuck.Jido.Actions.Generation.PostProcessingAction do
     end
   end
 
-  defp extract_public_functions(ast) do
+  defp extract_public_functions(_ast) do
     # Extract public function definitions for test generation
     # This is a simplified implementation
     []

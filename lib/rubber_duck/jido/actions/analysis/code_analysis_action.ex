@@ -251,7 +251,7 @@ defmodule RubberDuck.Jido.Actions.Analysis.CodeAnalysisAction do
     {params.file_path, params.analysis_types, params.apply_self_correction}
   end
   
-  defp update_cache(agent, cache_key, result) do
+  defp update_cache(_agent, cache_key, _result) do
     # Note: In a real implementation, this would update the agent's state
     # For now, we just log the cache update
     Logger.debug("Cache updated for key: #{inspect(cache_key)}")

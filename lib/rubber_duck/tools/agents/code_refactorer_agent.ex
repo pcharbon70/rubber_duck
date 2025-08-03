@@ -29,7 +29,7 @@ defmodule RubberDuck.Tools.Agents.CodeRefactorerAgent do
     name: "code_refactorer_agent",
     description: "Manages intelligent code refactoring workflows and pattern application",
     category: "code_transformation",
-    tags: ["refactoring", "code_quality", :transformation, "patterns"],
+    tags: ["refactoring", "code_quality", "transformation", "patterns"],
     schema: [
       # Refactoring preferences
       default_refactoring_type: [type: :string, default: "general"],

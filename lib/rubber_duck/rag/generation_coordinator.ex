@@ -57,7 +57,9 @@ defmodule RubberDuck.RAG.GenerationCoordinator do
   @doc """
   Builds a prompt from template and augmented context.
   """
-  def build_prompt(template_name, context, config \\ %{}) when is_binary(template_name) do
+  def build_prompt(template_name, context, config \\ %{})
+  
+  def build_prompt(template_name, context, config) when is_binary(template_name) do
     template = get_template(template_name)
     
     prompt_data = %{

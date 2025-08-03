@@ -349,7 +349,7 @@ defmodule RubberDuck.Agents.Migration.ActionGenerator do
     """
   end
   
-  defp generate_test_code(agent_module, function_name, options) do
+  defp generate_test_code(_agent_module, function_name, options) do
     module_name = Map.get(options, :module_name, 
       Macro.camelize(Atom.to_string(function_name)) <> "Action")
     namespace = Map.get(options, :namespace, "RubberDuck.Actions")

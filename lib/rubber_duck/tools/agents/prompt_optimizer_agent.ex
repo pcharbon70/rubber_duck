@@ -106,7 +106,7 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
       prompt = params.prompt
       aspects = params.analysis_aspects
       target_model = params.target_model
-      context = params.context
+      _context = params.context
       
       analysis_results = Enum.map(aspects, fn aspect ->
         {aspect, analyze_aspect(prompt, aspect, target_model, agent_context)}
@@ -1763,7 +1763,7 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
   
   # Override action result handler to update optimization history and metrics
   @impl true
-  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, _metadata) do
+  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
     # Handle the standard processing
     {:ok, agent} = {:ok, agent}
     
@@ -1822,7 +1822,7 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
     {:ok, agent}
   end
   
-  def handle_action_result(agent, action, result, metadata) do
+  def handle_action_result(agent, _action, _result, _metadata) do
     # Default handling for other actions
     {:ok, agent}
   end

@@ -126,25 +126,7 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
   
   
   
-  defp can_handle_request?(agent) do
-    # Check current resource usage
-    resources = agent.state.resource_monitor
-    
-    resources.cpu_usage < 80.0 && 
-    resources.memory_usage < 85.0 &&
-    map_size(agent.state.active_requests) < agent.state.max_concurrent_requests
-  end
-  
-  
-  defp get_system_resources do
-    # In production, would use actual system monitoring
-    %{
-      cpu_usage: :rand.uniform() * 100,  # Mock CPU usage
-      memory_usage: :rand.uniform() * 100,  # Mock memory usage
-      gpu_usage: :rand.uniform() * 100,  # Mock GPU usage
-      gpu_memory: :rand.uniform() * 100  # Mock GPU memory
-    }
-  end
+  # Functions removed after Action migration - resource monitoring is now handled by GetResourceStatusAction
   
   defp get_available_memory_gb do
     # In production, would check actual available memory

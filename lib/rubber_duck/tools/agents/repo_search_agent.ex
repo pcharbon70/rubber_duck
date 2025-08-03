@@ -487,28 +487,28 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
     end
     
     # Simplified implementations for other helper functions
-    defp detect_line_clusters(line_numbers) do
+    defp detect_line_clusters(_line_numbers) do
       # Simplified line clustering
       %{clusters: [], cluster_count: 0}
     end
     
-    defp find_common_prefixes(names), do: []
-    defp find_common_suffixes(names), do: []
-    defp detect_naming_conventions(names), do: %{}
-    defp detect_function_patterns(matches), do: %{}
-    defp detect_module_patterns(matches), do: %{}
-    defp detect_usage_patterns(matches), do: %{}
-    defp analyze_layer_distribution(matches), do: %{}
-    defp detect_coupling_indicators(matches), do: %{}
-    defp detect_design_patterns(matches), do: %{}
-    defp identify_hotspots(matches), do: []
-    defp identify_patterns(matches), do: []
-    defp generate_detailed_recommendations(matches), do: []
+    defp find_common_prefixes(_names), do: []
+    defp find_common_suffixes(_names), do: []
+    defp detect_naming_conventions(_names), do: %{}
+    defp detect_function_patterns(_matches), do: %{}
+    defp detect_module_patterns(_matches), do: %{}
+    defp detect_usage_patterns(_matches), do: %{}
+    defp analyze_layer_distribution(_matches), do: %{}
+    defp detect_coupling_indicators(_matches), do: %{}
+    defp detect_design_patterns(_matches), do: %{}
+    defp identify_hotspots(_matches), do: []
+    defp identify_patterns(_matches), do: []
+    defp generate_detailed_recommendations(_matches), do: []
     defp build_comprehensive_summary(matches), do: "Comprehensive analysis of #{length(matches)} matches"
-    defp perform_detailed_analysis(matches), do: %{}
-    defp build_architectural_view(matches), do: %{}
-    defp generate_actionable_insights(matches), do: []
-    defp generate_comprehensive_recommendations(matches), do: []
+    defp perform_detailed_analysis(_matches), do: %{}
+    defp build_architectural_view(_matches), do: %{}
+    defp generate_actionable_insights(_matches), do: []
+    defp generate_comprehensive_recommendations(_matches), do: []
   end
   
   defmodule SuggestSearchesAction do
@@ -530,16 +530,22 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
       suggestions = []
       
       # Generate different types of suggestions
-      if :related in params.suggestion_types do
-        suggestions = suggestions ++ generate_related_suggestions(agent, params.context)
+      suggestions = if :related in params.suggestion_types do
+        suggestions ++ generate_related_suggestions(agent, params.context)
+      else
+        suggestions
       end
       
-      if :exploratory in params.suggestion_types do
-        suggestions = suggestions ++ generate_exploratory_suggestions(agent, params.context)
+      suggestions = if :exploratory in params.suggestion_types do
+        suggestions ++ generate_exploratory_suggestions(agent, params.context)
+      else
+        suggestions
       end
       
-      if :refactoring in params.suggestion_types do
-        suggestions = suggestions ++ generate_refactoring_suggestions(agent, params.context)
+      suggestions = if :refactoring in params.suggestion_types do
+        suggestions ++ generate_refactoring_suggestions(agent, params.context)
+      else
+        suggestions
       end
       
       # Filter by priority if specified
@@ -559,7 +565,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
       }}
     end
     
-    defp generate_related_suggestions(agent, context) do
+    defp generate_related_suggestions(agent, _context) do
       # Generate suggestions based on search history and current context
       recent_searches = Enum.take(agent.state.search_history, 5)
       
@@ -584,7 +590,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
       end)
     end
     
-    defp generate_exploratory_suggestions(agent, context) do
+    defp generate_exploratory_suggestions(_agent, _context) do
       # Generate exploratory search suggestions
       [
         %{
@@ -606,7 +612,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
       ]
     end
     
-    defp generate_refactoring_suggestions(agent, context) do
+    defp generate_refactoring_suggestions(_agent, _context) do
       # Generate suggestions for potential refactoring opportunities
       [
         %{
@@ -752,7 +758,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
         {:error, _} when params.create_new_pattern ->
           create_pattern_from_params(params)
         {:error, reason} ->
-          return {:error, reason}
+          {:error, reason}
       end
       
       # Execute the pattern search
@@ -834,7 +840,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
       end)
     end
     
-    defp save_search_pattern(agent, pattern_name, pattern) do
+    defp save_search_pattern(_agent, pattern_name, pattern) do
       # In a real implementation, this would update the agent state
       Logger.info("Saving search pattern '#{pattern_name}': #{inspect(pattern)}")
       :ok
@@ -940,7 +946,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
   # Action result handlers
   
   @impl true
-  def handle_action_result(agent, BatchSearchAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, BatchSearchAction, {:ok, result}, _metadata) do
     # Update batch search tracking
     agent = put_in(agent.state.active_batch_searches[result.batch_id], %{
       status: :completed,
@@ -968,7 +974,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
   end
   
   @impl true
-  def handle_action_result(agent, AnalyzeResultsAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, AnalyzeResultsAction, {:ok, result}, _metadata) do
     # Cache analysis result
     cache_key = "analysis_#{System.unique_integer([:positive])}"
     agent = put_in(agent.state.result_analysis_cache[cache_key], %{
@@ -988,7 +994,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
   end
   
   @impl true
-  def handle_action_result(agent, SuggestSearchesAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, SuggestSearchesAction, {:ok, result}, _metadata) do
     # Store suggestions
     agent = put_in(agent.state.suggested_searches, result.suggestions)
     
@@ -1005,7 +1011,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
   
   # Handle main tool execution results
   @impl true
-  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, _metadata) do
     # Record successful search
     search_record = %{
       query: result.query,
@@ -1037,7 +1043,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
       stats
       |> Map.update!(:total_searches, &(&1 + 1))
       |> Map.update!(:successful_searches, &(&1 + 1))
-      |> put(:average_results_per_search, new_avg)
+      |> Map.put(:average_results_per_search, new_avg)
       |> update_in([:most_searched_terms, result.query], fn
         nil -> 1
         count -> count + 1

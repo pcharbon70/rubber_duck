@@ -117,31 +117,7 @@ defmodule RubberDuck.Agents.AnthropicProviderAgent do
   end
   
   
-  defp should_block_content?(messages, safety_config) do
-    if safety_config.block_flagged_content do
-      # Simple content filtering
-      blocked_terms = get_blocked_terms(safety_config.content_filtering)
-      
-      Enum.any?(messages, fn %{"content" => content} ->
-        content_lower = String.downcase(content || "")
-        Enum.any?(blocked_terms, &String.contains?(content_lower, &1))
-      end)
-    else
-      false
-    end
-  end
-  
-  defp get_blocked_terms(:strict) do
-    # Comprehensive list for strict filtering
-    ["harmful", "illegal", "violence", "abuse", "explicit"]
-  end
-  
-  defp get_blocked_terms(:moderate) do
-    # Moderate filtering
-    ["illegal", "extreme violence", "abuse"]
-  end
-  
-  defp get_blocked_terms(_), do: []
+  # Functions removed after Action migration - safety is now handled by ConfigureSafetyAction
   
   
   # Note: Anthropic-specific handling would be done via configuration and signal processing

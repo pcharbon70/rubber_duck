@@ -223,7 +223,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
       insights = []
       
       # Check pass rate trend
-      if pass_trend = trends[:pass_rate] do
+      insights = if pass_trend = trends[:pass_rate] do
         recent = Enum.take(pass_trend, -3)
         older = Enum.take(pass_trend, 3)
         
@@ -239,8 +239,12 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
             true -> nil
           end
           
-          insights = if insight, do: [insight | insights], else: insights
+          if insight, do: [insight | insights], else: insights
+        else
+          insights
         end
+      else
+        insights
       end
       
       insights
@@ -378,8 +382,8 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
       failed_names = Enum.map(run.failures || [], & &1.test_name)
       
       # Estimate total tests (would need better parsing in production)
-      total_count = run.statistics.total
-      passed_count = run.statistics.passed
+      _total_count = run.statistics.total
+      _passed_count = run.statistics.passed
       
       # For now, just return the failed test names
       # In production, would extract all test names from the output
@@ -497,7 +501,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
     end
     
     defp analyze_failure_improvements(state) do
-      recent_failures = get_recent_failures(state)
+      _recent_failures = get_recent_failures(state)
       failure_patterns = state.failure_patterns
       
       recommendations = []
@@ -755,7 +759,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
       }
     end
     
-    defp calculate_percent_change(old, new) when old == 0, do: 0
+    defp calculate_percent_change(old, _new) when old == 0, do: 0
     defp calculate_percent_change(old, new) do
       ((new - old) / old * 100) |> Float.round(2)
     end
@@ -773,13 +777,17 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
     defp identify_improvements(comparison) do
       improvements = []
       
-      if get_in(comparison, [:overall, :pass_rate_change]) > 0 do
-        improvements = ["Pass rate improved by #{get_in(comparison, [:overall, :pass_rate_change])}%" | improvements]
+      improvements = if get_in(comparison, [:overall, :pass_rate_change]) > 0 do
+        ["Pass rate improved by #{get_in(comparison, [:overall, :pass_rate_change])}%" | improvements]
+      else
+        improvements
       end
       
-      if get_in(comparison, [:failures, :fixed_tests]) != [] do
+      improvements = if get_in(comparison, [:failures, :fixed_tests]) != [] do
         fixed_count = length(get_in(comparison, [:failures, :fixed_tests]))
-        improvements = ["#{fixed_count} previously failing tests now pass" | improvements]
+        ["#{fixed_count} previously failing tests now pass" | improvements]
+      else
+        improvements
       end
       
       improvements
@@ -788,13 +796,17 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
     defp identify_regressions(comparison) do
       regressions = []
       
-      if get_in(comparison, [:overall, :pass_rate_change]) < 0 do
-        regressions = ["Pass rate decreased by #{abs(get_in(comparison, [:overall, :pass_rate_change]))}%" | regressions]
+      regressions = if get_in(comparison, [:overall, :pass_rate_change]) < 0 do
+        ["Pass rate decreased by #{abs(get_in(comparison, [:overall, :pass_rate_change]))}%" | regressions]
+      else
+        regressions
       end
       
-      if get_in(comparison, [:failures, :new_failures]) != [] do
+      regressions = if get_in(comparison, [:failures, :new_failures]) != [] do
         new_count = length(get_in(comparison, [:failures, :new_failures]))
-        regressions = ["#{new_count} new test failures introduced" | regressions]
+        ["#{new_count} new test failures introduced" | regressions]
+      else
+        regressions
       end
       
       regressions
@@ -1085,7 +1097,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
   end
   
   @impl true
-  def handle_signal(state, signal) do
+  def handle_signal(state, _signal) do
     {:ok, state}
   end
   

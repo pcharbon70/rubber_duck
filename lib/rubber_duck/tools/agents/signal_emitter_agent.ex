@@ -542,7 +542,7 @@ defmodule RubberDuck.Tools.Agents.SignalEmitterAgent do
     end
     
     defp get_retry_count(signal_id, recipient, agent) do
-      key = "#{signal_id}:#{recipient}"
+      _key = "#{signal_id}:#{recipient}"
       failed_deliveries = agent.state.failed_deliveries
       
       failed_deliveries
@@ -774,10 +774,7 @@ defmodule RubberDuck.Tools.Agents.SignalEmitterAgent do
   
   # Override action result handler to update signal tracking
   @impl true
-  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, _metadata) do
-    # Handle the standard processing
-    {:ok, agent} = {:ok, agent}
-    
+  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
     # Update emission history if not from cache
     if result[:from_cache] == false && result[:result] do
       emission_entry = %{

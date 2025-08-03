@@ -66,7 +66,7 @@ defmodule RubberDuck.Tools.CodeGenerator do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:llm_access, :code_generation]
       rate_limit [max_requests: 100, window_seconds: 60]
     end

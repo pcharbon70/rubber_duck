@@ -162,7 +162,7 @@ defmodule RubberDuck.Jido.Actions.Analysis.SecurityReviewAction do
     end
   end
   
-  defp scan_dependencies(agent) do
+  defp scan_dependencies(_agent) do
     # Simplified dependency scanning
     # In real implementation, would check mix.lock, package.json, etc.
     [

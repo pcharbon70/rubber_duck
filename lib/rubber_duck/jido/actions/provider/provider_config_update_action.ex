@@ -22,8 +22,8 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderConfigUpdateAction do
       restart_connections: [type: :boolean, default: false]
     ]
 
-  alias RubberDuck.LLM.{ProviderConfig, ConfigLoader}
-  alias RubberDuck.Jido.Actions.Base.UpdateStateAction
+  # alias RubberDuck.LLM.{ProviderConfig, ConfigLoader}
+  # alias RubberDuck.Jido.Actions.Base.UpdateStateAction
   
   require Logger
 
