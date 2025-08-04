@@ -58,12 +58,14 @@ defmodule RubberDuck.Jido.Signals.Pipeline.SchemaValidator do
     
     if Enum.empty?(errors) do
       {:ok, signal}
-    elsif strict_mode do
-      {:error, {:validation_failed, errors}}
     else
-      # Log warnings but continue
-      Logger.warning("Schema validation warnings: #{inspect(errors)}")
-      {:ok, add_validation_warnings(signal, errors)}
+      if strict_mode do
+        {:error, {:validation_failed, errors}}
+      else
+        # Log warnings but continue
+        Logger.warning("Schema validation warnings: #{inspect(errors)}")
+        {:ok, add_validation_warnings(signal, errors)}
+      end
     end
   end
   

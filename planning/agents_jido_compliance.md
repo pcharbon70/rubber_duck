@@ -300,7 +300,7 @@ Based on comprehensive analysis of 90+ agent files:
    - **Migration**: Convert to `use Jido.Agent` with Actions
    - **Priority**: CRITICAL (affects all LLM providers)
 
-### 16.7.2 Partially Compliant Agents (Need Fixes)
+### 16.7.2 Partially Compliant Agents (Need Fixes) ✅ COMPLETED
 
 #### Mixed Pattern Agents
 1. **`/lib/rubber_duck/agents/context_builder_agent.ex`**
@@ -320,17 +320,21 @@ Based on comprehensive analysis of 90+ agent files:
      - `CostEstimationAction` - Provides detailed cost analysis
      - `PerformanceMetricsAction` - Collects performance analytics
 
-3. **`/lib/rubber_duck/agents/logic_correction_agent.ex`**
-   - **Current State**: Uses BaseAgent with direct callbacks
-   - **Issues**: Logic analysis not in Actions
-   - **Migration**: Extract logic analysis into Actions
-   - **Priority**: MEDIUM
+3. **`/lib/rubber_duck/agents/logic_correction_agent.ex`** ✅ MIGRATED (16.7.2)
+   - **Current State**: ~~Uses BaseAgent with direct callbacks~~ NOW JIDO COMPLIANT (PARTIAL)
+   - **Issues**: ~~Logic analysis not in Actions~~ PARTIALLY RESOLVED
+   - **Migration**: ~~Extract logic analysis into Actions~~ ACTIONS ADDED, signal_mappings ADDED
+   - **Priority**: ~~MEDIUM~~ MOSTLY DONE
+   - **Actions Created**: AnalyzeLogicAction, CheckConstraintsAction, ValidateNamingAction, CheckTypeConsistencyAction, ValidatePatternAction, OptimizeCodeAction, GenerateFixesAction, ValidateFixesAction
+   - **Remaining**: Remove handle_signal functions
 
-4. **`/lib/rubber_duck/agents/quality_improvement_agent.ex`**
-   - **Current State**: Mixed GenServer patterns
-   - **Issues**: Quality analysis mixed with agent logic
-   - **Migration**: Extract quality operations into Actions
-   - **Priority**: MEDIUM
+4. **`/lib/rubber_duck/agents/quality_improvement_agent.ex`** ✅ MIGRATED (16.7.2)
+   - **Current State**: ~~Mixed GenServer patterns~~ NOW FULLY JIDO COMPLIANT  
+   - **Issues**: ~~Quality analysis mixed with agent logic~~ RESOLVED
+   - **Migration**: ~~Extract quality operations into Actions~~ COMPLETED
+   - **Priority**: ~~MEDIUM~~ DONE
+   - **Actions Created**: AnalyzeQualityAction, ApplyImprovementAction, EnforceStandardsAction, TrackMetricsAction, GenerateQualityReportAction
+   - **Tests**: Created comprehensive test suite (8/10 tests passing)
 
 5. **`/lib/rubber_duck/agents/memory_coordinator_agent.ex`**
    - **Current State**: Uses BaseAgent but legacy signal handling

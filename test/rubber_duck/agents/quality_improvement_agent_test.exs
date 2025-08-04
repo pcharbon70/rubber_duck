@@ -3,610 +3,180 @@ defmodule RubberDuck.Agents.QualityImprovementAgentTest do
   
   alias RubberDuck.Agents.QualityImprovementAgent
   
-  @sample_code """
-  defmodule TestModule do
-    @moduledoc "Test module for quality analysis"
+  setup do
+    # Start the agent with test configuration
+    {:ok, agent} = QualityImprovementAgent.start_link(
+      id: "test_quality_agent",
+      quality_standards: %{
+        complexity_threshold: 5,
+        line_length_limit: 100,
+        test_coverage: 0.8
+      },
+      best_practices: %{
+        use_descriptive_names: true,
+        avoid_deep_nesting: true
+      }
+    )
     
-    def complex_function(x, y, z) do
-      if x > 0 do
-        if y > 0 do
-          if z > 0 do
-            x + y + z
-          else
-            x + y
-          end
-        else
-          x
-        end
-      else
-        0
-      end
-    end
+    on_exit(fn ->
+      if Process.alive?(agent), do: GenServer.stop(agent)
+    end)
     
-    def simple_function(a, b) do
-      a + b
-    end
+    {:ok, agent: agent}
   end
-  """
   
-  describe "Quality Improvement Agent initialization" do
-    test "mounts successfully with default configuration" do
-      agent = %{id: "test_agent", state: %{}}
+  describe "signal_mappings/0" do
+    test "returns correct action mappings" do
+      mappings = QualityImprovementAgent.signal_mappings()
       
-      {:ok, mounted_agent} = QualityImprovementAgent.mount(agent)
+      assert Map.has_key?(mappings, "analyze_quality")
+      assert Map.has_key?(mappings, "apply_improvements")
+      assert Map.has_key?(mappings, "enforce_standards")
+      assert Map.has_key?(mappings, "track_metrics")
+      assert Map.has_key?(mappings, "generate_report")
       
-      assert mounted_agent.state.analysis_status == :idle
-      assert mounted_agent.state.active_analyses == %{}
-      assert mounted_agent.state.improvement_history == []
-      assert is_map(mounted_agent.state.quality_standards)
-      assert is_map(mounted_agent.state.best_practices)
-      assert is_map(mounted_agent.state.refactoring_patterns)
-      assert is_map(mounted_agent.state.metrics)
-    end
-    
-    test "initializes with default quality standards" do
-      agent = %{id: "test_agent", state: %{}}
-      
-      {:ok, mounted_agent} = QualityImprovementAgent.mount(agent)
-      
-      standards = mounted_agent.state.quality_standards
-      assert Map.has_key?(standards, "cyclomatic_complexity")
-      assert Map.has_key?(standards, "method_length")
-      assert Map.has_key?(standards, "documentation_coverage")
-    end
-    
-    test "initializes with default best practices" do
-      agent = %{id: "test_agent", state: %{}}
-      
-      {:ok, mounted_agent} = QualityImprovementAgent.mount(agent)
-      
-      practices = mounted_agent.state.best_practices
-      assert Map.has_key?(practices, "single_responsibility")
-      assert Map.has_key?(practices, "dry_principle")
-      assert Map.has_key?(practices, "meaningful_names")
+      # Verify each mapping has an action and extractor
+      Enum.each(mappings, fn {_signal_type, {action, extractor}} ->
+        assert is_atom(action)
+        assert is_function(extractor, 1)
+      end)
     end
   end
   
-  describe "analyze_quality signal handling" do
-    setup do
-      agent = %{
-        id: "test_agent",
+  describe "parameter extraction" do
+    test "extract_analyze_params/1 parses analyze quality signal correctly" do
+      signal = %{
+        "payload" => %{
+          "code" => "def test, do: :ok",
+          "language" => "elixir",
+          "depth" => "comprehensive"
+        }
+      }
+      
+      mappings = QualityImprovementAgent.signal_mappings()
+      {_action, extractor} = mappings["analyze_quality"]
+      params = extractor.(signal)
+      
+      assert params.code == "def test, do: :ok"
+      assert params.language == "elixir"
+      assert params.analysis_depth == "comprehensive"
+    end
+    
+    test "extract_improvements_params/1 parses apply improvements signal correctly" do
+      signal = %{
+        "payload" => %{
+          "improvements" => ["refactor_function", "add_docs"],
+          "code" => "def test, do: :ok",
+          "apply_automatically" => true
+        }
+      }
+      
+      mappings = QualityImprovementAgent.signal_mappings()
+      {_action, extractor} = mappings["apply_improvements"]
+      params = extractor.(signal)
+      
+      assert params.improvements == ["refactor_function", "add_docs"]
+      assert params.code == "def test, do: :ok"
+      assert params.apply_automatically == true
+      assert params.backup_original == true
+    end
+  end
+  
+  describe "lifecycle hooks" do
+    test "on_before_init sets default configurations" do
+      config = %{}
+      updated_config = QualityImprovementAgent.on_before_init(config)
+      
+      assert Map.has_key?(updated_config, :quality_standards)
+      assert Map.has_key?(updated_config, :best_practices)
+      assert Map.has_key?(updated_config, :refactoring_patterns)
+      
+      # Check default values
+      assert updated_config.quality_standards.complexity_threshold == 10
+      assert updated_config.best_practices.use_descriptive_names == true
+    end
+    
+    test "on_after_start logs agent information", %{agent: agent} do
+      # This should not fail
+      result = QualityImprovementAgent.on_after_start(agent)
+      assert result == agent
+    end
+    
+    test "on_after_run updates metrics for AnalyzeQualityAction", %{agent: agent} do
+      action = QualityImprovementAgent.AnalyzeQualityAction
+      result = {:ok, %{quality_score: 0.85}}
+      
+      # Get agent state/struct and call on_after_run
+      # Create a mock agent struct with the expected state structure
+      mock_agent = %{
         state: %{
-          analysis_status: :idle,
-          active_analyses: %{},
-          improvement_history: [],
-          quality_standards: %{},
-          best_practices: %{},
-          refactoring_patterns: %{},
-          metrics: %{}
-        }
-      }
-      
-      {:ok, mounted_agent} = QualityImprovementAgent.mount(agent)
-      {:ok, agent: mounted_agent}
-    end
-    
-    test "handles metrics analysis request", %{agent: agent} do
-      signal = %{
-        "type" => "analyze_quality",
-        "analysis_id" => "test_analysis_1",
-        "code" => @sample_code,
-        "analysis_scope" => "metrics",
-        "options" => %{}
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, updated_agent} = result
-      assert response.analysis_id == "test_analysis_1"
-      assert response.success == true
-      assert is_map(response.result)
-      assert response.result.type == :metrics_analysis
-      
-      # Check agent state updates
-      assert updated_agent.state.analysis_status == :idle
-      assert length(updated_agent.state.improvement_history) == 1
-    end
-    
-    test "handles style analysis request", %{agent: agent} do
-      signal = %{
-        "type" => "analyze_quality",
-        "analysis_id" => "test_analysis_2",
-        "code" => @sample_code,
-        "analysis_scope" => "style",
-        "options" => %{}
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, updated_agent} = result
-      assert response.result.type == :style_analysis
-      assert is_list(response.result.formatting_issues)
-      assert is_list(response.result.naming_violations)
-    end
-    
-    test "handles comprehensive analysis request", %{agent: agent} do
-      signal = %{
-        "type" => "analyze_quality",
-        "analysis_id" => "test_analysis_3",
-        "code" => @sample_code,
-        "analysis_scope" => "comprehensive",
-        "options" => %{}
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, updated_agent} = result
-      assert response.result.type == :comprehensive_quality
-      assert is_map(response.result.analyses)
-      assert is_number(response.result.overall_quality_score)
-      assert is_list(response.result.priority_issues)
-      assert is_list(response.result.improvement_roadmap)
-    end
-    
-    test "handles invalid code gracefully", %{agent: agent} do
-      signal = %{
-        "type" => "analyze_quality",
-        "analysis_id" => "test_analysis_4",
-        "code" => "invalid elixir code {{{",
-        "analysis_scope" => "metrics",
-        "options" => %{}
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:error, _reason, updated_agent} = result
-      assert updated_agent.state.analysis_status == :idle
-      assert length(updated_agent.state.improvement_history) == 1
-    end
-  end
-  
-  describe "apply_improvements signal handling" do
-    setup do
-      agent = %{
-        id: "test_agent",
-        state: %{
-          analysis_status: :idle,
-          active_analyses: %{},
-          improvement_history: [],
-          quality_standards: %{},
-          best_practices: %{},
-          refactoring_patterns: %{},
-          metrics: %{}
-        }
-      }
-      
-      {:ok, mounted_agent} = QualityImprovementAgent.mount(agent)
-      {:ok, agent: mounted_agent}
-    end
-    
-    test "applies conservative improvements", %{agent: agent} do
-      improvements = [
-        %{
-          "type" => "rename_for_clarity",
-          "old_name" => "x",
-          "new_name" => "input_value",
-          "name_type" => "variable",
-          "risk_level" => "low",
-          "confidence" => 0.9
-        }
-      ]
-      
-      signal = %{
-        "type" => "apply_improvements",
-        "improvement_id" => "improvement_1",
-        "code" => @sample_code,
-        "improvements" => improvements,
-        "strategy" => "conservative",
-        "options" => %{}
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, updated_agent} = result
-      assert response.strategy == "conservative"
-      assert is_binary(response.improved_code)
-      assert is_list(response.improvements_applied)
-      assert is_map(response.quality_delta)
-      
-      # Check history update
-      assert length(updated_agent.state.improvement_history) == 1
-    end
-    
-    test "applies targeted improvements", %{agent: agent} do
-      improvements = [
-        %{
-          "type" => "reduce_complexity",
-          "complexity_type" => "cyclomatic",
-          "target_function" => "complex_function",
-          "area" => "complexity",
-          "risk_level" => "medium"
-        }
-      ]
-      
-      signal = %{
-        "type" => "apply_improvements",
-        "improvement_id" => "improvement_2",
-        "code" => @sample_code,
-        "improvements" => improvements,
-        "strategy" => "targeted",
-        "options" => %{"target_area" => "complexity"}
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, _updated_agent} = result
-      assert response.strategy == "targeted"
-      assert is_map(response.validation_status)
-    end
-  end
-  
-  describe "check_best_practices signal handling" do
-    setup do
-      agent = %{
-        id: "test_agent",
-        state: %{
-          analysis_status: :idle,
-          active_analyses: %{},
-          improvement_history: [],
-          quality_standards: %{},
-          best_practices: %{
-            "single_responsibility" => %{
-              definition: %{description: "Each class should have only one reason to change"}
-            },
-            "dry_principle" => %{
-              definition: %{description: "Don't repeat yourself"}
-            }
-          },
-          refactoring_patterns: %{},
-          metrics: %{}
-        }
-      }
-      
-      {:ok, mounted_agent} = QualityImprovementAgent.mount(agent)
-      {:ok, agent: mounted_agent}
-    end
-    
-    test "checks best practices compliance", %{agent: agent} do
-      practices = ["single_responsibility", "dry_principle"]
-      
-      signal = %{
-        "type" => "check_best_practices",
-        "code" => @sample_code,
-        "practices" => practices,
-        "options" => %{}
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, _updated_agent} = result
-      assert response.practices_checked == 2
-      assert is_list(response.violations)
-      assert is_list(response.compliant_practices)
-      assert is_number(response.compliance_score)
-      assert is_list(response.recommendations)
-    end
-  end
-  
-  describe "refactor_code signal handling" do
-    setup do
-      agent = %{
-        id: "test_agent",
-        state: %{
-          analysis_status: :idle,
-          active_analyses: %{},
-          improvement_history: [],
-          quality_standards: %{},
-          best_practices: %{},
-          refactoring_patterns: %{
-            "extract_method" => %{
-              definition: %{description: "Extract repeated code into separate methods"}
-            }
-          },
-          metrics: %{}
-        }
-      }
-      
-      {:ok, mounted_agent} = QualityImprovementAgent.mount(agent)
-      {:ok, agent: mounted_agent}
-    end
-    
-    test "performs extract method refactoring", %{agent: agent} do
-      signal = %{
-        "type" => "refactor_code",
-        "code" => @sample_code,
-        "refactoring_type" => "extract_method",
-        "target" => "complex_logic",
-        "options" => %{"new_method_name" => "extracted_logic"}
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, _updated_agent} = result
-      assert is_binary(response.refactored_code)
-      assert response.refactoring_type == "extract_method"
-      assert response.target == "complex_logic"
-      assert is_map(response.changes_made)
-      assert is_map(response.impact_analysis)
-      assert is_map(response.validation_status)
-    end
-    
-    test "performs rename method refactoring", %{agent: agent} do
-      signal = %{
-        "type" => "refactor_code",
-        "code" => @sample_code,
-        "refactoring_type" => "rename_method",
-        "target" => "complex_function",
-        "options" => %{"new_name" => "calculate_complex_value"}
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, _updated_agent} = result
-      assert response.refactoring_type == "rename_method"
-    end
-  end
-  
-  describe "optimize_performance signal handling" do
-    setup do
-      agent = %{
-        id: "test_agent",
-        state: %{
-          analysis_status: :idle,
-          active_analyses: %{},
-          improvement_history: [],
-          quality_standards: %{},
-          best_practices: %{},
-          refactoring_patterns: %{},
-          metrics: %{}
-        }
-      }
-      
-      {:ok, mounted_agent} = QualityImprovementAgent.mount(agent)
-      {:ok, agent: mounted_agent}
-    end
-    
-    test "applies memory optimizations", %{agent: agent} do
-      signal = %{
-        "type" => "optimize_performance",
-        "code" => @sample_code,
-        "optimization_target" => "memory",
-        "options" => %{}
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, _updated_agent} = result
-      assert is_binary(response.optimized_code)
-      assert response.target == "memory"
-      assert is_list(response.optimizations_applied)
-      assert is_map(response.performance_improvement)
-      assert is_map(response.validation_status)
-    end
-    
-    test "applies general optimizations", %{agent: agent} do
-      signal = %{
-        "type" => "optimize_performance",
-        "code" => @sample_code,
-        "optimization_target" => "general",
-        "options" => %{}
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, _updated_agent} = result
-      assert response.target == "general"
-      assert is_map(response.performance_improvement)
-    end
-  end
-  
-  describe "get_quality_metrics signal handling" do
-    setup do
-      # Setup agent with some history
-      improvement_entry = %{
-        type: :improvement,
-        improvement_id: "test_improvement",
-        result: %{overall_score: 0.75},
-        timestamp: DateTime.utc_now()
-      }
-      
-      agent = %{
-        id: "test_agent",
-        state: %{
-          analysis_status: :idle,
-          active_analyses: %{},
-          improvement_history: [improvement_entry],
-          quality_standards: %{},
-          best_practices: %{},
-          refactoring_patterns: %{},
           metrics: %{
-            total_analyses: 5,
-            successful_analyses: 4,
-            failed_analyses: 1,
-            quality_score: 0.8
+            total_analyses: 0,
+            quality_score: 0.0,
+            improvements_applied: 0,
+            avg_improvement_time: 0.0,
+            quality_trends: %{}
           }
         }
       }
       
-      {:ok, agent: agent}
-    end
-    
-    test "returns quality metrics for all time", %{agent: agent} do
-      signal = %{
-        "type" => "get_quality_metrics",
-        "time_range" => "all"
-      }
+      {:ok, updated_agent} = QualityImprovementAgent.on_after_run(mock_agent, action, result)
       
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, _updated_agent} = result
-      assert response.total_analyses == 5
-      assert response.successful_analyses == 4
-      assert response.failed_analyses == 1
-      assert response.quality_score == 0.8
-    end
-    
-    test "returns quality metrics for specific time range", %{agent: agent} do
-      signal = %{
-        "type" => "get_quality_metrics",
-        "time_range" => "day"
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, _updated_agent} = result
-      assert is_map(response)
-      assert Map.has_key?(response, :time_range)
+      # Metrics should be updated
+      assert updated_agent.state.metrics.total_analyses == 1
+      assert updated_agent.state.metrics.quality_score == 0.85
     end
   end
   
-  describe "configuration signal handling" do
-    setup do
-      agent = %{
-        id: "test_agent",
-        state: %{
-          analysis_status: :idle,
-          active_analyses: %{},
-          improvement_history: [],
-          quality_standards: %{},
-          best_practices: %{},
-          refactoring_patterns: %{},
-          metrics: %{}
-        }
-      }
+  describe "health_check/1" do
+    test "reports healthy status with valid configuration", %{agent: agent} do
+      # Call health_check via GenServer
+      {:healthy, status} = GenServer.call(agent, :health_check)
       
-      {:ok, agent: agent}
+      assert status.status == "All systems operational"
+      assert status.standards_count > 0
+      assert is_struct(status.last_check, DateTime)
     end
     
-    test "adds quality standard", %{agent: agent} do
-      signal = %{
-        "type" => "update_standards",
-        "standard_id" => "test_standard",
-        "standard_definition" => %{
-          "max_complexity" => 15,
-          "description" => "Maximum allowed complexity"
-        }
-      }
+    test "reports unhealthy status with missing standards" do
+      {:ok, agent} = QualityImprovementAgent.start_link(
+        id: "unhealthy_agent",
+        quality_standards: %{},
+        best_practices: %{}
+      )
       
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, updated_agent} = result
-      assert response.updated == true
-      assert response.standard_id == "test_standard"
-      assert Map.has_key?(updated_agent.state.quality_standards, "test_standard")
-    end
-    
-    test "adds best practice", %{agent: agent} do
-      signal = %{
-        "type" => "add_best_practice",
-        "practice_id" => "test_practice",
-        "practice_definition" => %{
-          "description" => "Test practice description"
-        }
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, updated_agent} = result
-      assert response.added == true
-      assert response.practice_id == "test_practice"
-      assert Map.has_key?(updated_agent.state.best_practices, "test_practice")
-    end
-    
-    test "adds refactoring pattern", %{agent: agent} do
-      signal = %{
-        "type" => "add_refactoring_pattern",
-        "pattern_id" => "test_pattern",
-        "pattern_definition" => %{
-          "description" => "Test refactoring pattern"
-        }
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:ok, response, updated_agent} = result
-      assert response.added == true
-      assert response.pattern_id == "test_pattern"
-      assert Map.has_key?(updated_agent.state.refactoring_patterns, "test_pattern")
+      try do
+        {:unhealthy, status} = GenServer.call(agent, :health_check)
+        assert "Missing quality standards" in status.issues
+        assert "Missing best practices" in status.issues
+      after
+        GenServer.stop(agent)
+      end
     end
   end
   
-  describe "error handling" do
-    setup do
-      agent = %{
-        id: "test_agent",
-        state: %{
-          analysis_status: :idle,
-          active_analyses: %{},
-          improvement_history: [],
-          quality_standards: %{},
-          best_practices: %{},
-          refactoring_patterns: %{},
-          metrics: %{}
-        }
-      }
-      
-      {:ok, agent: agent}
+  describe "actions integration" do
+    test "actions are defined and accessible" do
+      # Verify that actions are properly defined
+      assert Code.ensure_loaded?(QualityImprovementAgent.AnalyzeQualityAction)
+      assert Code.ensure_loaded?(QualityImprovementAgent.ApplyImprovementAction)
+      assert Code.ensure_loaded?(QualityImprovementAgent.EnforceStandardsAction)
+      assert Code.ensure_loaded?(QualityImprovementAgent.TrackMetricsAction)
+      assert Code.ensure_loaded?(QualityImprovementAgent.GenerateQualityReportAction)
     end
     
-    test "handles unknown signal type", %{agent: agent} do
-      signal = %{
-        "type" => "unknown_signal",
-        "data" => "test"
+    test "AnalyzeQualityAction runs successfully" do
+      params = %{
+        code: "def test, do: :ok",
+        language: "elixir",
+        analysis_depth: "standard"
       }
       
-      result = QualityImprovementAgent.handle_signal(agent, signal)
+      {:ok, result} = QualityImprovementAgent.AnalyzeQualityAction.run(params, %{})
       
-      assert {:error, error_message, _updated_agent} = result
-      assert String.contains?(error_message, "Unknown signal type")
-    end
-    
-    test "handles invalid analysis scope", %{agent: agent} do
-      signal = %{
-        "type" => "analyze_quality",
-        "analysis_id" => "test_analysis",
-        "code" => @sample_code,
-        "analysis_scope" => "invalid_scope",
-        "options" => %{}
-      }
-      
-      result = QualityImprovementAgent.handle_signal(agent, signal)
-      
-      assert {:error, _reason, updated_agent} = result
-      assert updated_agent.state.analysis_status == :idle
-    end
-  end
-  
-  describe "agent lifecycle" do
-    test "unmounts successfully and cleans up active analyses" do
-      # Setup agent with active analysis
-      analysis_info = %{
-        analysis_id: "active_analysis",
-        status: :in_progress,
-        started_at: DateTime.utc_now()
-      }
-      
-      agent = %{
-        id: "test_agent",
-        state: %{
-          analysis_status: :analyzing,
-          active_analyses: %{"active_analysis" => analysis_info},
-          improvement_history: [],
-          quality_standards: %{},
-          best_practices: %{},
-          refactoring_patterns: %{},
-          metrics: %{}
-        }
-      }
-      
-      {:ok, unmounted_agent} = QualityImprovementAgent.unmount(agent)
-      
-      assert unmounted_agent.state.active_analyses == %{}
-      assert length(unmounted_agent.state.improvement_history) == 1
-      
-      # Check that the active analysis was marked as interrupted
-      interrupted_analysis = List.first(unmounted_agent.state.improvement_history)
-      assert interrupted_analysis.status == :interrupted
+      assert is_map(result)
+      assert Map.has_key?(result, :metrics)
+      assert Map.has_key?(result, :improvements)
     end
   end
 end

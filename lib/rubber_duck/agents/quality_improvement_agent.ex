@@ -69,6 +69,109 @@ defmodule RubberDuck.Agents.QualityImprovementAgent do
   alias RubberDuck.Agents.ErrorHandling
   require Logger
 
+  # Signal-to-Action Mappings
+  # This replaces all handle_signal callbacks with Jido action routing
+  
+  @impl true
+  def signal_mappings do
+    %{
+      "analyze_quality" => {AnalyzeQualityAction, &extract_analyze_params/1},
+      "apply_improvements" => {ApplyImprovementAction, &extract_improvements_params/1},
+      "enforce_standards" => {EnforceStandardsAction, &extract_standards_params/1},
+      "track_metrics" => {TrackMetricsAction, &extract_metrics_params/1},
+      "generate_report" => {GenerateQualityReportAction, &extract_report_params/1}
+    }
+  end
+  
+  # Parameter extraction functions for signal-to-action mapping
+  
+  defp extract_analyze_params(%{"payload" => payload}) do
+    code = Map.get(payload, "code")
+    language = Map.get(payload, "language", "elixir")
+    depth = Map.get(payload, "depth", "standard")
+    
+    %{
+      code: code,
+      language: language,
+      analysis_depth: depth,
+      metrics_to_check: Map.get(payload, "metrics_to_check"),
+      context: Map.get(payload, "context", %{})
+    }
+  end
+  
+  defp extract_improvements_params(%{"payload" => payload}) do
+    %{
+      improvements: Map.get(payload, "improvements", []),
+      code: Map.get(payload, "code"),
+      language: Map.get(payload, "language", "elixir"),
+      apply_automatically: Map.get(payload, "apply_automatically", false),
+      backup_original: Map.get(payload, "backup_original", true)
+    }
+  end
+  
+  defp extract_standards_params(%{"payload" => payload}) do
+    %{
+      standards: Map.get(payload, "standards", []),
+      code: Map.get(payload, "code"),
+      language: Map.get(payload, "language", "elixir"),
+      enforcement_level: parse_enforcement_level(Map.get(payload, "enforcement_level", "standard")),
+      auto_fix: Map.get(payload, "auto_fix", false)
+    }
+  end
+  
+  defp extract_metrics_params(%{"payload" => payload}) do
+    %{
+      metrics_type: parse_metrics_type(Map.get(payload, "metrics_type", "quality")),
+      time_range: parse_time_range(Map.get(payload, "time_range", "recent")),
+      include_trends: Map.get(payload, "include_trends", true),
+      aggregation_level: parse_aggregation_level(Map.get(payload, "aggregation_level", "summary"))
+    }
+  end
+  
+  defp extract_report_params(%{"payload" => payload}) do
+    %{
+      report_type: parse_report_type(Map.get(payload, "report_type", "comprehensive")),
+      include_recommendations: Map.get(payload, "include_recommendations", true),
+      format: parse_report_format(Map.get(payload, "format", "markdown")),
+      time_range: parse_time_range(Map.get(payload, "time_range", "recent")),
+      include_metrics: Map.get(payload, "include_metrics", true)
+    }
+  end
+  
+  # Parsing helper functions
+  
+  defp parse_enforcement_level("strict"), do: :strict
+  defp parse_enforcement_level("standard"), do: :standard
+  defp parse_enforcement_level("lenient"), do: :lenient
+  defp parse_enforcement_level(_), do: :standard
+  
+  defp parse_metrics_type("quality"), do: :quality
+  defp parse_metrics_type("performance"), do: :performance
+  defp parse_metrics_type("maintainability"), do: :maintainability
+  defp parse_metrics_type("all"), do: :all
+  defp parse_metrics_type(_), do: :quality
+  
+  defp parse_time_range("recent"), do: :recent
+  defp parse_time_range("all"), do: :all
+  defp parse_time_range("last_week"), do: :last_week
+  defp parse_time_range("last_month"), do: :last_month
+  defp parse_time_range(_), do: :recent
+  
+  defp parse_aggregation_level("summary"), do: :summary
+  defp parse_aggregation_level("detailed"), do: :detailed
+  defp parse_aggregation_level("raw"), do: :raw
+  defp parse_aggregation_level(_), do: :summary
+  
+  defp parse_report_type("comprehensive"), do: :comprehensive
+  defp parse_report_type("summary"), do: :summary
+  defp parse_report_type("metrics_only"), do: :metrics_only
+  defp parse_report_type(_), do: :comprehensive
+  
+  defp parse_report_format("markdown"), do: :markdown
+  defp parse_report_format("json"), do: :json
+  defp parse_report_format("html"), do: :html
+  defp parse_report_format(_), do: :markdown
+
   # Action definitions
 
   defmodule AnalyzeQualityAction do
@@ -655,269 +758,154 @@ defmodule RubberDuck.Agents.QualityImprovementAgent do
     defp estimate_effort(_), do: "1 hour"
   end
 
-  # Signal handling
-
-  @impl Jido.Agent
-  def handle_signal(agent, %{"type" => "analyze_quality"} = signal) do
-    ErrorHandling.safe_execute(fn ->
-      # Validate signal payload
-      case validate_analyze_signal(signal) do
-        {:ok, params} ->
-          Logger.info("Starting quality analysis for #{params.language} code")
-          
-          # Update status to analyzing
-          agent = put_in(agent.state.analysis_status, :analyzing)
-          
-          case AnalyzeQualityAction.run(params, %{agent: agent}) do
-            {:ok, result} ->
-              Logger.info("Quality analysis completed with score: #{Map.get(result, :quality_score, "N/A")}")
-              
-              updated_agent = agent
-              |> update_in([:state, :active_analyses], fn analyses ->
-                Map.put(analyses, signal["id"] || generate_analysis_id(), result)
-              end)
-              |> put_in([:state, :analysis_status], :idle)
-              
-              {:ok, updated_agent, result}
-              
-            {:error, error} ->
-              Logger.error("Quality analysis failed: #{inspect(error)}")
-              _updated_agent = put_in(agent.state.analysis_status, :idle)
-              ErrorHandling.categorize_error(error)
-          end
-          
-        error -> error
-      end
-    end)
+  # Lifecycle hooks for Jido compliance
+  
+  @impl true
+  def on_before_init(config) do
+    # Initialize default quality standards if not provided
+    standards = Map.get(config, :quality_standards) || default_quality_standards()
+    best_practices = Map.get(config, :best_practices) || default_best_practices()
+    refactoring_patterns = Map.get(config, :refactoring_patterns) || default_refactoring_patterns()
+    
+    config
+    |> Map.put(:quality_standards, standards)
+    |> Map.put(:best_practices, best_practices)
+    |> Map.put(:refactoring_patterns, refactoring_patterns)
   end
   
-  defp validate_analyze_signal(%{"payload" => payload}) when is_map(payload) do
-    code = Map.get(payload, "code")
-    language = Map.get(payload, "language", "elixir")
-    depth = Map.get(payload, "depth", "standard")
-    
-    cond do
-      not is_binary(code) or byte_size(code) == 0 ->
-        ErrorHandling.validation_error("Missing or empty code in signal payload", %{payload: payload})
-      not is_binary(language) or byte_size(language) == 0 ->
-        ErrorHandling.validation_error("Missing or invalid language in signal payload", %{payload: payload})
-      depth not in ["basic", "standard", "comprehensive"] ->
-        ErrorHandling.validation_error("Invalid analysis depth", %{depth: depth})
-      true ->
-        {:ok, %{code: code, language: language, analysis_depth: depth}}
+  @impl true
+  def on_after_start(agent) do
+    Logger.info("Quality Improvement Agent started successfully",
+      name: agent.name,
+      standards: map_size(agent.state.quality_standards),
+      patterns: map_size(agent.state.refactoring_patterns)
+    )
+    agent
+  end
+  
+  @impl true
+  def on_after_run(agent, action, result) do
+    # Update metrics and state based on action results
+    case action do
+      AnalyzeQualityAction ->
+        update_analysis_metrics(agent, result)
+      ApplyImprovementAction ->
+        update_improvement_metrics(agent, result)
+      TrackMetricsAction ->
+        update_tracking_metrics(agent, result)
+      _ ->
+        {:ok, agent}
     end
   end
-  defp validate_analyze_signal(signal), do: ErrorHandling.validation_error("Invalid signal format", %{signal: signal})
   
-  defp generate_analysis_id do
-    :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
-  end
-
-  @impl Jido.Agent
-  def handle_signal(agent, %{"type" => "apply_improvements"} = signal) do
-    ErrorHandling.safe_execute(fn ->
-      case validate_improvements_signal(signal) do
-        {:ok, params} ->
-          Logger.info("Applying #{length(params.improvements)} code improvements")
-          
-          # Update status to improving
-          agent = put_in(agent.state.analysis_status, :improving)
-          
-          case ApplyImprovementAction.run(params, %{agent: agent}) do
-            {:ok, result} ->
-              Logger.info("Successfully applied #{Map.get(result, :improvements_applied, 0)} improvements")
-              
-              updated_agent = agent
-              |> update_in([:state, :improvement_history], fn history ->
-                [result | history] |> Enum.take(1000)
-              end)
-              |> put_in([:state, :analysis_status], :idle)
-              |> update_in([:state, :metrics, :improvements_applied], &(&1 + Map.get(result, :improvements_applied, 0)))
-              
-              {:ok, updated_agent, result}
-              
-            {:error, error} ->
-              Logger.error("Improvement application failed: #{inspect(error)}")
-              _updated_agent = put_in(agent.state.analysis_status, :idle)
-              ErrorHandling.categorize_error(error)
-          end
-          
-        error -> error
-      end
-    end)
+  # Default configuration helpers
+  
+  defp default_quality_standards do
+    %{
+      complexity_threshold: 10,
+      line_length_limit: 120,
+      function_length_limit: 20,
+      documentation_coverage: 0.8,
+      test_coverage: 0.85
+    }
   end
   
-  defp validate_improvements_signal(%{"payload" => payload}) when is_map(payload) do
-    code = Map.get(payload, "code")
-    improvements = Map.get(payload, "improvements")
-    language = Map.get(payload, "language", "elixir")
-    auto_fix = Map.get(payload, "auto_fix", false)
-    
-    cond do
-      not is_binary(code) or byte_size(code) == 0 ->
-        ErrorHandling.validation_error("Missing or empty code in signal payload", %{payload: payload})
-      not is_list(improvements) or improvements == [] ->
-        ErrorHandling.validation_error("Missing or empty improvements list", %{payload: payload})
-      not is_binary(language) ->
-        ErrorHandling.validation_error("Invalid language parameter", %{language: language})
-      not is_boolean(auto_fix) ->
-        ErrorHandling.validation_error("Invalid auto_fix parameter", %{auto_fix: auto_fix})
-      true ->
-        {:ok, %{code: code, improvements: improvements, language: language, auto_fix: auto_fix}}
+  defp default_best_practices do
+    %{
+      use_descriptive_names: true,
+      avoid_deep_nesting: true,
+      single_responsibility: true,
+      dry_principle: true,
+      error_handling: true
+    }
+  end
+  
+  defp default_refactoring_patterns do
+    %{
+      extract_function: "Break large functions into smaller ones",
+      extract_variable: "Replace complex expressions with descriptive variables",
+      rename_variable: "Use meaningful names for variables",
+      eliminate_duplication: "Remove duplicate code blocks",
+      simplify_conditionals: "Simplify complex conditional logic"
+    }
+  end
+  
+  # Metrics update helpers
+  
+  defp update_analysis_metrics(agent, result) do
+    case result do
+      {:ok, analysis_result} ->
+        new_metrics = agent.state.metrics
+        |> Map.update(:total_analyses, 1, &(&1 + 1))
+        |> Map.put(:quality_score, Map.get(analysis_result, :quality_score, 0.0))
+        
+        new_state = %{agent.state | metrics: new_metrics}
+        {:ok, %{agent | state: new_state}}
+      _ ->
+        {:ok, agent}
     end
   end
-  defp validate_improvements_signal(signal), do: ErrorHandling.validation_error("Invalid signal format", %{signal: signal})
-
-  @impl Jido.Agent
-  def handle_signal(agent, %{"type" => "enforce_standards"} = signal) do
-    ErrorHandling.safe_execute(fn ->
-      case validate_standards_signal(signal) do
-        {:ok, params} ->
-          Logger.info("Enforcing #{length(params.standards)} coding standards")
-          
-          case EnforceStandardsAction.run(params, %{agent: agent}) do
-            {:ok, result} ->
-              violations_count = Map.get(result, :violations_count, 0)
-              if violations_count > 0 do
-                Logger.info("Found #{violations_count} standard violations")
-              else
-                Logger.info("Code complies with all standards")
-              end
-              
-              {:ok, agent, result}
-              
-            {:error, error} ->
-              Logger.error("Standards enforcement failed: #{inspect(error)}")
-              ErrorHandling.categorize_error(error)
-          end
-          
-        error -> error
-      end
-    end)
-  end
   
-  defp validate_standards_signal(%{"payload" => payload}) when is_map(payload) do
-    code = Map.get(payload, "code")
-    language = Map.get(payload, "language", "elixir")
-    standards = Map.get(payload, "standards", [])
-    auto_fix = Map.get(payload, "auto_fix", false)
-    
-    cond do
-      not is_binary(code) or byte_size(code) == 0 ->
-        ErrorHandling.validation_error("Missing or empty code in signal payload", %{payload: payload})
-      not is_binary(language) ->
-        ErrorHandling.validation_error("Invalid language parameter", %{language: language})
-      not is_list(standards) ->
-        ErrorHandling.validation_error("Standards must be a list", %{standards: standards})
-      not is_boolean(auto_fix) ->
-        ErrorHandling.validation_error("Invalid auto_fix parameter", %{auto_fix: auto_fix})
-      true ->
-        {:ok, %{code: code, language: language, standards: standards, auto_fix: auto_fix}}
+  defp update_improvement_metrics(agent, result) do
+    case result do
+      {:ok, improvement_result} ->
+        improvements_count = Map.get(improvement_result, :improvements_applied, 0)
+        
+        new_metrics = agent.state.metrics
+        |> Map.update(:improvements_applied, improvements_count, &(&1 + improvements_count))
+        
+        new_state = %{agent.state | metrics: new_metrics}
+        {:ok, %{agent | state: new_state}}
+      _ ->
+        {:ok, agent}
     end
   end
-  defp validate_standards_signal(signal), do: ErrorHandling.validation_error("Invalid signal format", %{signal: signal})
-
-  @impl Jido.Agent
-  def handle_signal(agent, %{"type" => "track_metrics"} = signal) do
-    ErrorHandling.safe_execute(fn ->
-      case validate_metrics_signal(signal) do
-        {:ok, params} ->
-          Logger.debug("Tracking quality metrics")
-          
-          case TrackMetricsAction.run(params, %{agent: agent}) do
-            {:ok, result} ->
-              updated_agent = put_in(agent.state.metrics, result.metrics)
-              Logger.debug("Quality metrics updated successfully")
-              
-              {:ok, updated_agent, result}
-              
-            {:error, error} ->
-              Logger.error("Metrics tracking failed: #{inspect(error)}")
-              ErrorHandling.categorize_error(error)
-          end
-          
-        error -> error
-      end
-    end)
+  
+  defp update_tracking_metrics(agent, _result) do
+    # Update last tracking time
+    new_metrics = Map.put(agent.state.metrics, :last_tracked, DateTime.utc_now())
+    new_state = %{agent.state | metrics: new_metrics}
+    {:ok, %{agent | state: new_state}}
   end
   
-  defp validate_metrics_signal(%{"payload" => payload}) when is_map(payload) do
-    metrics = Map.get(payload, "metrics")
-    timestamp = Map.get(payload, "timestamp")
-    project_id = Map.get(payload, "project_id")
+  # Health check implementation
+  @impl true
+  def health_check(agent) do
+    issues = []
     
-    cond do
-      not is_map(metrics) ->
-        ErrorHandling.validation_error("Metrics must be a map", %{metrics: metrics})
-      true ->
-        {:ok, %{metrics: metrics, timestamp: timestamp, project_id: project_id}}
+    # Check agent status
+    issues = if agent.state.analysis_status == :idle do
+      issues
+    else
+      ["Agent not in idle state" | issues]
     end
-  end
-  defp validate_metrics_signal(signal), do: ErrorHandling.validation_error("Invalid signal format", %{signal: signal})
-
-  @impl Jido.Agent
-  def handle_signal(agent, %{"type" => "generate_report"} = signal) do
-    ErrorHandling.safe_execute(fn ->
-      case validate_report_signal(signal) do
-        {:ok, params} ->
-          Logger.info("Generating quality report in #{params.report_format} format")
-          
-          # Update status to reporting
-          agent = put_in(agent.state.analysis_status, :reporting)
-          
-          case GenerateQualityReportAction.run(params, %{agent: agent}) do
-            {:ok, result} ->
-              Logger.info("Quality report generated successfully")
-              agent = put_in(agent.state.analysis_status, :idle)
-              
-              {:ok, agent, result}
-              
-            {:error, error} ->
-              Logger.error("Report generation failed: #{inspect(error)}")
-              _updated_agent = put_in(agent.state.analysis_status, :idle)
-              ErrorHandling.categorize_error(error)
-          end
-          
-        error -> error
-      end
-    end)
-  end
-  
-  defp validate_report_signal(%{"payload" => payload}) when is_map(payload) do
-    results = Map.get(payload, "results", %{})
-    format = Map.get(payload, "format", "detailed")
-    include_recommendations = Map.get(payload, "include_recommendations", true)
-    include_trends = Map.get(payload, "include_trends", true)
     
-    cond do
-      not is_map(results) ->
-        ErrorHandling.validation_error("Analysis results must be a map", %{results: results})
-      format not in ["summary", "detailed", "executive"] ->
-        ErrorHandling.validation_error("Invalid report format", %{format: format})
-      not is_boolean(include_recommendations) ->
-        ErrorHandling.validation_error("include_recommendations must be boolean", %{include_recommendations: include_recommendations})
-      not is_boolean(include_trends) ->
-        ErrorHandling.validation_error("include_trends must be boolean", %{include_trends: include_trends})
-      true ->
-        {:ok, %{
-          analysis_results: results,
-          report_format: format,
-          include_recommendations: include_recommendations,
-          include_trends: include_trends
-        }}
+    # Check quality standards
+    issues = if map_size(agent.state.quality_standards) > 0 do
+      issues
+    else
+      ["Missing quality standards" | issues]
     end
-  end
-  defp validate_report_signal(signal), do: ErrorHandling.validation_error("Invalid signal format", %{signal: signal})
-
-  @impl Jido.Agent
-  def handle_signal(_agent, signal) do
-    signal_type = Map.get(signal, "type", "unknown")
-    Logger.warning("Unhandled signal type in QualityImprovementAgent: #{signal_type}")
     
-    ErrorHandling.validation_error("Unknown signal type", %{
-      signal_type: signal_type,
-      available_types: ["analyze_quality", "apply_improvements", "enforce_standards", "track_metrics", "generate_report"]
-    })
+    # Check best practices
+    issues = if map_size(agent.state.best_practices) > 0 do
+      issues
+    else
+      ["Missing best practices" | issues]
+    end
+    
+    if length(issues) == 0 do
+      {:healthy, %{
+        status: "All systems operational",
+        standards_count: map_size(agent.state.quality_standards),
+        patterns_count: map_size(agent.state.refactoring_patterns),
+        total_analyses: agent.state.metrics.total_analyses,
+        quality_score: agent.state.metrics.quality_score,
+        last_check: DateTime.utc_now()
+      }}
+    else
+      {:unhealthy, %{issues: issues, last_check: DateTime.utc_now()}}
+    end
   end
 
   # Helper module for UUID generation (if not available)

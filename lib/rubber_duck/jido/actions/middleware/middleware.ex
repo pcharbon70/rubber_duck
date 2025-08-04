@@ -14,7 +14,7 @@ defmodule RubberDuck.Jido.Actions.Middleware do
         @impl true
         def call(action, params, context, next) do
           # Pre-processing
-          Logger.info("Executing action: #{action}")
+          Logger.info("Executing action: \#{inspect(action)}")
           
           # Call next middleware or action
           result = next.(params, context)

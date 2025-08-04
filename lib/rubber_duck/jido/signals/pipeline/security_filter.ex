@@ -86,7 +86,7 @@ defmodule RubberDuck.Jido.Signals.Pipeline.SecurityFilter do
       end
     end)
     |> Map.new(fn {k, v} ->
-      {k, if is_map(v), do: filter_nested_sensitive(v, config), else: v}
+      {k, (if is_map(v), do: filter_nested_sensitive(v, config), else: v)}
     end)
   end
   defp filter_nested_sensitive(data, _config), do: data
@@ -275,7 +275,7 @@ defmodule RubberDuck.Jido.Signals.Pipeline.SecurityFilter do
     end)
     |> Map.new()
     |> Map.new(fn {k, v} ->
-      {k, if is_map(v), do: remove_field_recursive(v, field_name), else: v}
+      {k, (if is_map(v), do: remove_field_recursive(v, field_name), else: v)}
     end)
   end
   defp remove_field_recursive(value, _), do: value
