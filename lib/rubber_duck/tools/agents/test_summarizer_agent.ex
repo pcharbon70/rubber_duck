@@ -1074,12 +1074,8 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
     params = Map.get(signal, "data", %{})
     context = %{agent: %{state: state}}
     
-    case AnalyzeTrendsAction.run(params, context) do
-      {:ok, result} -> 
-        {:ok, put_in(state.test_metrics.health_trend, result.health_trend)}
-      {:error, reason} -> 
-        {:error, reason}
-    end
+    {:ok, result} = AnalyzeTrendsAction.run(params, context)
+    {:ok, put_in(state.test_metrics.health_trend, result.health_trend)}
   end
   
   @impl true
@@ -1087,12 +1083,8 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
     params = Map.get(signal, "data", %{})
     context = %{agent: %{state: state}}
     
-    case IdentifyFlakyTestsAction.run(params, context) do
-      {:ok, result} -> 
-        {:ok, update_flaky_tests(state, result)}
-      {:error, reason} -> 
-        {:error, reason}
-    end
+    {:ok, result} = IdentifyFlakyTestsAction.run(params, context)
+    {:ok, update_flaky_tests(state, result)}
   end
   
   @impl true
