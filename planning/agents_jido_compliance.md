@@ -180,19 +180,19 @@ Based on comprehensive analysis of 90+ agent files:
   - [x] Create backup and recovery - BackupMemoryAction for backup operations
 
 ### 16.4.2 Workflow and Legacy Agents
-- [ ] **16.4.2.1 Migrate RetrievalAgent**
-  - [ ] Convert from legacy architecture
-  - [ ] Extract retrieval algorithms into Actions
-  - [ ] Implement vector and keyword search
-  - [ ] Add result ranking and filtering
-  - [ ] Create caching and optimization
+- [x] **16.4.2.1 Migrate RetrievalAgent**
+  - [x] Convert from legacy architecture
+  - [x] Extract retrieval algorithms into Actions
+  - [x] Implement vector and keyword search
+  - [x] Add result ranking and filtering
+  - [x] Create caching and optimization
 
-- [ ] **16.4.2.2 Migrate WorkflowAgent**
-  - [ ] Convert from traditional GenServer
-  - [ ] Extract workflow execution into Actions
-  - [ ] Implement step coordination
-  - [ ] Add progress tracking and recovery
-  - [ ] Create workflow composition
+- [x] **16.4.2.2 Migrate WorkflowAgent**
+  - [x] Convert from traditional GenServer
+  - [x] Extract workflow execution into Actions
+  - [x] Implement step coordination
+  - [x] Add progress tracking and recovery
+  - [x] Create workflow composition
 
 ---
 

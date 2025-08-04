@@ -7,7 +7,7 @@ defmodule RubberDuck.Jido.Actions.ShortTermMemory.SearchBySessionAction do
       session_id: [type: :string, required: true]
     ]
   
-  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
+  alias RubberDuck.Agents.ErrorHandling
   require Logger
   
   @impl true

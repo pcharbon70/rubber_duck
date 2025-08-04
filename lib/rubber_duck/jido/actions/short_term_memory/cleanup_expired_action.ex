@@ -4,7 +4,7 @@ defmodule RubberDuck.Jido.Actions.ShortTermMemory.CleanupExpiredAction do
     description: "Remove expired memory items",
     schema: []
   
-  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
+  alias RubberDuck.Agents.ErrorHandling
   require Logger
   
   @impl true

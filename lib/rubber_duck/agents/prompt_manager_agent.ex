@@ -67,7 +67,7 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
       RubberDuck.Jido.Actions.PromptManager.ClearCacheAction
     ]
 
-  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
+  alias RubberDuck.Agents.ErrorHandling
   alias RubberDuck.Agents.Prompt.Template
   require Logger
 

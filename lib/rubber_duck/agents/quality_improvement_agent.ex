@@ -66,7 +66,7 @@ defmodule RubberDuck.Agents.QualityImprovementAgent do
       ]
     ]
 
-  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
+  alias RubberDuck.Agents.ErrorHandling
   require Logger
 
   # Action definitions
@@ -682,7 +682,7 @@ defmodule RubberDuck.Agents.QualityImprovementAgent do
               
             {:error, error} ->
               Logger.error("Quality analysis failed: #{inspect(error)}")
-              agent = put_in(agent.state.analysis_status, :idle)
+              _updated_agent = put_in(agent.state.analysis_status, :idle)
               ErrorHandling.categorize_error(error)
           end
           
@@ -738,7 +738,7 @@ defmodule RubberDuck.Agents.QualityImprovementAgent do
               
             {:error, error} ->
               Logger.error("Improvement application failed: #{inspect(error)}")
-              agent = put_in(agent.state.analysis_status, :idle)
+              _updated_agent = put_in(agent.state.analysis_status, :idle)
               ErrorHandling.categorize_error(error)
           end
           
@@ -874,7 +874,7 @@ defmodule RubberDuck.Agents.QualityImprovementAgent do
               
             {:error, error} ->
               Logger.error("Report generation failed: #{inspect(error)}")
-              agent = put_in(agent.state.analysis_status, :idle)
+              _updated_agent = put_in(agent.state.analysis_status, :idle)
               ErrorHandling.categorize_error(error)
           end
           
@@ -910,7 +910,7 @@ defmodule RubberDuck.Agents.QualityImprovementAgent do
   defp validate_report_signal(signal), do: ErrorHandling.validation_error("Invalid signal format", %{signal: signal})
 
   @impl Jido.Agent
-  def handle_signal(agent, signal) do
+  def handle_signal(_agent, signal) do
     signal_type = Map.get(signal, "type", "unknown")
     Logger.warning("Unhandled signal type in QualityImprovementAgent: #{signal_type}")
     

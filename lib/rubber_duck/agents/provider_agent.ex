@@ -167,10 +167,6 @@ defmodule RubberDuck.Agents.ProviderAgent do
     end
   end
   
-  defp calculate_success_rate(%{total_requests: 0}), do: 100.0
-  defp calculate_success_rate(%{total_requests: total, successful_requests: successful}) do
-    Float.round(successful / total * 100, 2)
-  end
   
   # Safe wrapper for handling request completion
   def safe_handle_request_completed(agent, request_id, status, latency, usage) do
