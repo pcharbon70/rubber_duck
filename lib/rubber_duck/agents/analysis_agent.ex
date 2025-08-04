@@ -44,7 +44,7 @@ defmodule RubberDuck.Agents.AnalysisAgent do
       Jido.Signal.Bus.publish(signal)
   """
 
-  use RubberDuck.Agents.BaseAgent,
+  use Jido.Agent,
     name: "analysis_agent",
     description: "Code analysis and quality assessment agent",
     schema: [
@@ -94,22 +94,37 @@ defmodule RubberDuck.Agents.AnalysisAgent do
         ],
         doc: "Agent capabilities"
       ]
-    ],
-    actions: [
-      RubberDuck.Jido.Actions.Analysis.CodeAnalysisAction,
-      RubberDuck.Jido.Actions.Analysis.ComplexityAnalysisAction,
-      RubberDuck.Jido.Actions.Analysis.PatternDetectionAction,
-      RubberDuck.Jido.Actions.Analysis.SecurityReviewAction,
-      RubberDuck.Jido.Actions.Analysis.StyleCheckAction
     ]
 
   
   require Logger
 
+  # Mount callback required by Jido.Agent
+  @impl Jido.Agent
+  def mount(opts, initial_state) do
+    Logger.info("Mounting AnalysisAgent", opts: opts)
+    
+    # Initialize engines based on configuration
+    engines = initialize_engines(opts)
+    
+    # Merge engines into state
+    state = Map.merge(initial_state, %{
+      engines: engines,
+      analysis_cache: Map.get(opts, :analysis_cache, %{}),
+      metrics: Map.get(opts, :metrics, %{
+        tasks_completed: 0,
+        cache_hits: 0,
+        cache_misses: 0,
+        total_execution_time: 0
+      })
+    })
+    
+    {:ok, state}
+  end
+
   # Signal-to-Action Mappings
   # This replaces the old handle_task callbacks with Jido signal routing
   
-  @impl true
   def signal_mappings do
     %{
       "analysis.code.request" => {RubberDuck.Jido.Actions.Analysis.CodeAnalysisAction, :extract_code_params},
@@ -172,30 +187,39 @@ defmodule RubberDuck.Agents.AnalysisAgent do
   
   # Lifecycle hooks for Jido compliance
   
-  @impl true
-  def on_before_init(config) do
-    # Initialize engines based on configuration
-    engines = initialize_engines(config)
-    
-    # Merge engine configuration into initial state
-    Map.put(config, :engines, engines)
-  end
-  
-  @impl true
-  def on_after_start(agent) do
-    Logger.info("Analysis Agent started successfully", 
-      name: agent.name,
-      capabilities: agent.state.capabilities
-    )
-    agent
-  end
-  
-  @impl true
-  def on_before_stop(agent) do
-    Logger.info("Analysis Agent stopping, cleaning up cache",
+  @impl Jido.Agent
+  def on_before_run(agent) do
+    # Log before running any action
+    Logger.debug("AnalysisAgent preparing to run action", 
+      agent_id: agent.id,
       cache_size: map_size(agent.state.analysis_cache)
     )
-    agent
+    {:ok, agent}
+  end
+  
+  @impl Jido.Agent
+  def on_after_run(agent, _result, metadata) do
+    # Update metrics after action completion
+    updated_metrics = Map.update(agent.state.metrics, :tasks_completed, 1, &(&1 + 1))
+    updated_state = Map.put(agent.state, :metrics, updated_metrics)
+    
+    Logger.debug("AnalysisAgent completed action",
+      agent_id: agent.id,
+      action: metadata[:action],
+      tasks_completed: updated_metrics.tasks_completed
+    )
+    
+    {:ok, %{agent | state: updated_state}}
+  end
+  
+  @impl Jido.Agent
+  def shutdown(agent, reason) do
+    Logger.info("AnalysisAgent shutting down",
+      agent_id: agent.id,
+      reason: reason,
+      cache_size: map_size(agent.state.analysis_cache)
+    )
+    :ok
   end
 
   # Helper Functions
