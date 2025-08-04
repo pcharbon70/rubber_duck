@@ -9,10 +9,18 @@ defmodule RubberDuck.Jido.Actions.Base do
   
   ## Available Base Actions
   
+  ### Core Actions
   - `UpdateStateAction` - Safe state updates with validation
   - `EmitSignalAction` - CloudEvents signal emission
   - `InitializeAgentAction` - Agent initialization with lifecycle hooks
   - `ComposeAction` - Action composition for complex workflows
+  
+  ### Standardized Base Action Categories
+  - `RequestAction` - External request handling with retry, timeout, and error recovery
+  - `ProcessingAction` - Business logic processing with progress tracking and telemetry
+  - `CoordinationAction` - Multi-agent coordination and workflow orchestration
+  - `MonitoringAction` - Metrics collection, health checks, and alerting
+  - `UtilityAction` - Common utility operations with caching and validation
   
   ## Usage Example
   
@@ -33,7 +41,12 @@ defmodule RubberDuck.Jido.Actions.Base do
     UpdateStateAction,
     EmitSignalAction,
     InitializeAgentAction,
-    ComposeAction
+    ComposeAction,
+    RequestAction,
+    ProcessingAction,
+    CoordinationAction,
+    MonitoringAction,
+    UtilityAction
   }
   
   @doc """
@@ -44,7 +57,12 @@ defmodule RubberDuck.Jido.Actions.Base do
       UpdateStateAction,
       EmitSignalAction,
       InitializeAgentAction,
-      ComposeAction
+      ComposeAction,
+      RequestAction,
+      ProcessingAction,
+      CoordinationAction,
+      MonitoringAction,
+      UtilityAction
     ]
   end
   
