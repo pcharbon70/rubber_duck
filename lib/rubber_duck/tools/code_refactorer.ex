@@ -9,7 +9,7 @@ defmodule RubberDuck.Tools.CodeRefactorer do
   use RubberDuck.Tool
   
   alias RubberDuck.LLM.Service
-  alias RubberDuck.Analysis.AST.Parser
+  # alias RubberDuck.Analysis.AST.Parser  # Unused
   
   tool do
     name :code_refactorer
@@ -95,7 +95,7 @@ defmodule RubberDuck.Tools.CodeRefactorer do
          {:ok, analysis} <- analyze_code(ast, params.code),
          {:ok, refactoring_plan} <- create_refactoring_plan(params, analysis),
          {:ok, refactored_code} <- apply_refactoring(params, refactoring_plan, context),
-         {:ok, validated_code} <- validate_refactoring(params.code, refactored_code) do
+         {:ok, _validated_code} <- validate_refactoring(params.code, refactored_code) do
       
       {:ok, %{
         original_code: params.code,
@@ -156,7 +156,7 @@ defmodule RubberDuck.Tools.CodeRefactorer do
     end
   end
   
-  defp build_refactoring_prompt(params, plan) do
+  defp build_refactoring_prompt(params, _plan) do
     """
     Refactor the following Elixir code according to the instruction.
     

@@ -11,7 +11,15 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
   - Performance benchmarking
   """
   
-  use RubberDuck.Tools.BaseToolAgent, tool: :performance_analyzer
+  use RubberDuck.Tools.Agents.BaseToolAgent,
+    tool: :performance_analyzer,
+    name: "performance_analyzer_agent",
+    description: "Analyzes code performance and provides optimization recommendations",
+    schema: [
+      # Performance analysis history
+      analysis_history: [type: {:list, :map}, default: []],
+      profiling_data: [type: :map, default: quote do %{} end]
+    ]
   
   alias Jido.Agent.Server.State
   
@@ -20,7 +28,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     @moduledoc """
     Profiles code execution to identify performance bottlenecks.
     """
-    use Jido.Action
+    use Jido.Action, name: "profile_code"
     
     def parameter_schema do
       %{
@@ -50,7 +58,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
       }}
     end
     
-    defp perform_profiling(code, language, type, context) do
+    defp perform_profiling(code, language, type, _context) do
       # Analyze code structure
       functions = extract_functions(code, language)
       
@@ -112,7 +120,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
       1 + loop_count * 2 + condition_count
     end
     
-    defp identify_cpu_hotspots(functions, code) do
+    defp identify_cpu_hotspots(_functions, code) do
       patterns = [
         {~r/nested.*loop|loop.*loop/, 10, "Nested loops detected"},
         {~r/recursion|recursive/, 8, "Recursive calls detected"},
@@ -142,7 +150,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
       |> Enum.sort_by(& -&1.severity)
     end
     
-    defp identify_memory_hotspots(functions, code) do
+    defp identify_memory_hotspots(_functions, code) do
       patterns = [
         {~r/new Array|malloc|allocate/, 8, "Memory allocation detected"},
         {~r/concat|join.*large/, 7, "String concatenation in loop"},
@@ -365,7 +373,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     @moduledoc """
     Analyzes time and space complexity of algorithms.
     """
-    use Jido.Action
+    use Jido.Action, name: "analyze_complexity"
     
     def parameter_schema do
       %{
@@ -674,7 +682,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     @moduledoc """
     Analyzes and optimizes database queries for better performance.
     """
-    use Jido.Action
+    use Jido.Action, name: "optimize_database_queries"
     
     def parameter_schema do
       %{
@@ -772,7 +780,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
       issues
     end
     
-    defp suggest_query_optimizations(query, issues, _db_type) do
+    defp suggest_query_optimizations(_query, issues, _db_type) do
       optimizations = []
       
       Enum.reduce(issues, optimizations, fn issue, opts ->
@@ -986,7 +994,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     @moduledoc """
     Identifies opportunities for caching to improve performance.
     """
-    use Jido.Action
+    use Jido.Action, name: "identify_caching_opportunities"
     
     def parameter_schema do
       %{
@@ -1377,25 +1385,33 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     end
     
     defp estimate_resource_savings(opportunities) do
-      savings = []
+      base_savings = []
       
-      if Enum.any?(opportunities, &(&1.type == :query_result_cache)) do
-        savings = ["Reduced database load" | savings]
+      query_savings = if Enum.any?(opportunities, &(&1.type == :query_result_cache)) do
+        ["Reduced database load"]
+      else
+        []
       end
       
-      if Enum.any?(opportunities, &(&1.type == :computation_memoization)) do
-        savings = ["Lower CPU usage" | savings]
+      cpu_savings = if Enum.any?(opportunities, &(&1.type == :computation_memoization)) do
+        ["Lower CPU usage"]
+      else
+        []
       end
       
-      if Enum.any?(opportunities, &(&1.type == :http_response_cache)) do
-        savings = ["Reduced network traffic" | savings]
+      network_savings = if Enum.any?(opportunities, &(&1.type == :http_response_cache)) do
+        ["Reduced network traffic"]
+      else
+        []
       end
       
-      if Enum.any?(opportunities, &(&1.type == :file_content_cache)) do
-        savings = ["Fewer disk I/O operations" | savings]
+      io_savings = if Enum.any?(opportunities, &(&1.type == :file_content_cache)) do
+        ["Fewer disk I/O operations"]
+      else
+        []
       end
       
-      savings
+      base_savings ++ query_savings ++ cpu_savings ++ network_savings ++ io_savings
     end
     
     defp recommend_cache_strategy(opportunities) do
@@ -1412,21 +1428,27 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     end
     
     defp recommend_cache_layers(opportunities) do
-      layers = []
+      base_layers = []
       
-      if Enum.any?(opportunities, &(&1.type in [:computation_memoization])) do
-        layers = ["Application-level cache" | layers]
+      app_layers = if Enum.any?(opportunities, &(&1.type in [:computation_memoization])) do
+        ["Application-level cache"]
+      else
+        []
       end
       
-      if Enum.any?(opportunities, &(&1.type in [:query_result_cache, :http_response_cache])) do
-        layers = ["Distributed cache (Redis/Memcached)" | layers]
+      distributed_layers = if Enum.any?(opportunities, &(&1.type in [:query_result_cache, :http_response_cache])) do
+        ["Distributed cache (Redis/Memcached)"]
+      else
+        []
       end
       
-      if Enum.any?(opportunities, &(&1.type == :http_response_cache)) do
-        layers = ["CDN/Edge cache" | layers]
+      cdn_layers = if Enum.any?(opportunities, &(&1.type == :http_response_cache)) do
+        ["CDN/Edge cache"]
+      else
+        []
       end
       
-      layers
+      base_layers ++ app_layers ++ distributed_layers ++ cdn_layers
     end
     
     defp recommend_invalidation_strategy(opportunities) do
@@ -1442,7 +1464,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     @moduledoc """
     Generates performance benchmarks for code.
     """
-    use Jido.Action
+    use Jido.Action, name: "generate_benchmark"
     
     def parameter_schema do
       %{
@@ -1827,7 +1849,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     @moduledoc """
     Analyzes memory usage patterns and identifies memory leaks.
     """
-    use Jido.Action
+    use Jido.Action, name: "analyze_memory_usage"
     
     def parameter_schema do
       %{
@@ -2121,21 +2143,27 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     end
     
     defp generate_allocation_recommendations(code) do
-      recommendations = []
+      base_recommendations = []
       
-      if String.match?(code, ~r/new.*loop|while.*new/) do
-        recommendations = ["Consider object pooling for loop allocations" | recommendations]
+      pooling_recs = if String.match?(code, ~r/new.*loop|while.*new/) do
+        ["Consider object pooling for loop allocations"]
+      else
+        []
       end
       
-      if String.match?(code, ~r/concat|join/) do
-        recommendations = ["Use StringBuilder pattern for string operations" | recommendations]
+      string_recs = if String.match?(code, ~r/concat|join/) do
+        ["Use StringBuilder pattern for string operations"]
+      else
+        []
       end
       
-      if String.match?(code, ~r/Array\(\d{4,}/) do
-        recommendations = ["Pre-allocate large arrays with fixed size" | recommendations]
+      array_recs = if String.match?(code, ~r/Array\(\d{4,}/) do
+        ["Pre-allocate large arrays with fixed size"]
+      else
+        []
       end
       
-      recommendations
+      base_recommendations ++ pooling_recs ++ string_recs ++ array_recs
     end
     
     defp analyze_runtime_memory(runtime_data) do
@@ -2242,45 +2270,51 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     defp suggest_memory_optimizations(analysis) do
       issues = analysis.static_analysis.issues
       
-      optimizations = []
+      base_optimizations = []
       
       # Loop allocation optimizations
       loop_allocs = Enum.filter(issues, &(&1.type == :loop_allocation))
-      if length(loop_allocs) > 0 do
-        optimizations = [%{
+      loop_opts = if length(loop_allocs) > 0 do
+        [%{
           type: :object_pooling,
           description: "Implement object pooling for frequently allocated objects",
           impact: :high,
           complexity: :medium,
           example: generate_object_pool_example()
-        } | optimizations]
+        }]
+      else
+        []
       end
       
       # Large allocation optimizations
       large_allocs = Enum.filter(issues, &(&1.type == :large_allocation))
-      if length(large_allocs) > 0 do
-        optimizations = [%{
+      large_opts = if length(large_allocs) > 0 do
+        [%{
           type: :lazy_loading,
           description: "Implement lazy loading for large data structures",
           impact: :high,
           complexity: :low,
           example: "Load data on demand rather than upfront"
-        } | optimizations]
+        }]
+      else
+        []
       end
       
       # String optimization
       string_issues = Enum.filter(issues, &(&1.type in [:string_concatenation, :excessive_concatenation]))
-      if length(string_issues) > 0 do
-        optimizations = [%{
+      string_opts = if length(string_issues) > 0 do
+        [%{
           type: :string_builder,
           description: "Use efficient string building techniques",
           impact: :medium,
           complexity: :low,
           example: "Use array.join() or template literals"
-        } | optimizations]
+        }]
+      else
+        []
       end
       
-      optimizations
+      base_optimizations ++ loop_opts ++ large_opts ++ string_opts
     end
     
     defp generate_object_pool_example do
@@ -2373,7 +2407,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     @moduledoc """
     Generates comprehensive performance analysis reports.
     """
-    use Jido.Action
+    use Jido.Action, name: "generate_performance_report"
     
     def parameter_schema do
       %{
@@ -2441,15 +2475,21 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     end
     
     defp calculate_performance_grade(results) do
-      scores = []
+      base_scores = []
       
-      if results[:profile] do
-        scores = [results.profile.metrics.profile_score | scores]
+      profile_scores = if results[:profile] do
+        [results.profile.metrics.profile_score]
+      else
+        []
       end
       
-      if results[:memory] do
-        scores = [results.memory.static_analysis.memory_score | scores]
+      memory_scores = if results[:memory] do
+        [results.memory.static_analysis.memory_score]
+      else
+        []
       end
+      
+      scores = base_scores ++ profile_scores ++ memory_scores
       
       if length(scores) > 0 do
         avg_score = Enum.sum(scores) / length(scores)
@@ -2467,33 +2507,47 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     end
     
     defp extract_key_findings(results) do
-      findings = []
+      base_findings = []
       
       # Profile findings
-      if results[:profile] && results.profile[:bottlenecks] do
+      profile_findings = if results[:profile] && results.profile[:bottlenecks] do
         top_bottleneck = List.first(results.profile.bottlenecks)
         if top_bottleneck do
-          findings = ["Critical bottleneck in #{top_bottleneck.function}" | findings]
+          ["Critical bottleneck in #{top_bottleneck.function}"]
+        else
+          []
         end
+      else
+        []
       end
       
       # Complexity findings
-      if results[:complexity] && results.complexity[:overall_assessment] do
+      complexity_findings = if results[:complexity] && results.complexity[:overall_assessment] do
         worst_case = results.complexity.overall_assessment.worst_case_complexity
         if String.contains?(worst_case, "n²") || String.contains?(worst_case, "2^n") do
-          findings = ["High complexity detected: #{worst_case}" | findings]
+          ["High complexity detected: #{worst_case}"]
+        else
+          []
         end
+      else
+        []
       end
       
       # Memory findings
-      if results[:memory] && results.memory[:leak_detection] do
+      memory_findings = if results[:memory] && results.memory[:leak_detection] do
         leak_count = length(results.memory.leak_detection.potential_leaks)
         if leak_count > 0 do
-          findings = ["#{leak_count} potential memory leaks detected" | findings]
+          ["#{leak_count} potential memory leaks detected"]
+        else
+          []
         end
+      else
+        []
       end
       
-      Enum.take(findings, 5)
+      all_findings = base_findings ++ profile_findings ++ complexity_findings ++ memory_findings
+      
+      Enum.take(all_findings, 5)
     end
     
     defp extract_key_metrics(results) do
@@ -2553,15 +2607,21 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     end
     
     defp calculate_quality_metrics(results) do
-      metrics = []
+      base_metrics = []
       
-      if results[:profile] do
-        metrics = [results.profile.metrics.profile_score | metrics]
+      profile_metrics = if results[:profile] do
+        [results.profile.metrics.profile_score]
+      else
+        []
       end
       
-      if results[:memory] do
-        metrics = [results.memory.static_analysis.memory_score | metrics]
+      memory_metrics = if results[:memory] do
+        [results.memory.static_analysis.memory_score]
+      else
+        []
       end
+      
+      metrics = base_metrics ++ profile_metrics ++ memory_metrics
       
       if length(metrics) > 0 do
         %{
@@ -2574,19 +2634,20 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     end
     
     defp identify_bottlenecks(results) do
-      bottlenecks = []
+      base_bottlenecks = []
       
       # CPU bottlenecks
-      if results[:profile] && results.profile[:bottlenecks] do
-        cpu_bottlenecks = Enum.map(results.profile.bottlenecks, fn b ->
+      cpu_bottlenecks = if results[:profile] && results.profile[:bottlenecks] do
+        Enum.map(results.profile.bottlenecks, fn b ->
           Map.put(b, :category, :cpu)
         end)
-        bottlenecks = bottlenecks ++ cpu_bottlenecks
+      else
+        []
       end
       
       # Complexity bottlenecks
-      if results[:complexity] && results.complexity[:optimization_targets] do
-        complexity_bottlenecks = Enum.map(results.complexity.optimization_targets, fn t ->
+      complexity_bottlenecks = if results[:complexity] && results.complexity[:optimization_targets] do
+        Enum.map(results.complexity.optimization_targets, fn t ->
           %{
             category: "algorithmic",
             function: t.function,
@@ -2594,12 +2655,13 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
             impact: t.improvement_potential
           }
         end)
-        bottlenecks = bottlenecks ++ complexity_bottlenecks
+      else
+        []
       end
       
       # Memory bottlenecks
-      if results[:memory] && results.memory[:memory_hotspots] do
-        memory_bottlenecks = Enum.map(results.memory.memory_hotspots, fn h ->
+      memory_bottlenecks = if results[:memory] && results.memory[:memory_hotspots] do
+        Enum.map(results.memory.memory_hotspots, fn h ->
           %{
             category: "memory",
             location: "Line #{h.line}",
@@ -2607,31 +2669,38 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
             types: h.types
           }
         end)
-        bottlenecks = bottlenecks ++ memory_bottlenecks
+      else
+        []
       end
       
-      bottlenecks |> Enum.sort_by(& &1.severity)
+      all_bottlenecks = base_bottlenecks ++ cpu_bottlenecks ++ complexity_bottlenecks ++ memory_bottlenecks
+      all_bottlenecks |> Enum.sort_by(& &1.severity)
     end
     
     defp consolidate_optimizations(results) do
-      all_optimizations = []
+      base_optimizations = []
       
-      if results[:profile] && results.profile[:recommendations] do
-        all_optimizations = all_optimizations ++ results.profile.recommendations
+      profile_opts = if results[:profile] && results.profile[:recommendations] do
+        results.profile.recommendations
+      else
+        []
       end
       
-      if results[:complexity] && results.complexity[:optimization_targets] do
-        complexity_opts = Enum.flat_map(results.complexity.optimization_targets, fn target ->
+      complexity_opts = if results[:complexity] && results.complexity[:optimization_targets] do
+        Enum.flat_map(results.complexity.optimization_targets, fn target ->
           ["Optimize #{target.function}: #{target.improvement_potential}"]
         end)
-        all_optimizations = all_optimizations ++ complexity_opts
+      else
+        []
       end
       
-      if results[:memory] && results.memory[:optimization_suggestions] do
-        memory_opts = Enum.map(results.memory.optimization_suggestions, & &1.description)
-        all_optimizations = all_optimizations ++ memory_opts
+      memory_opts = if results[:memory] && results.memory[:optimization_suggestions] do
+        Enum.map(results.memory.optimization_suggestions, & &1.description)
+      else
+        []
       end
       
+      all_optimizations = base_optimizations ++ profile_opts ++ complexity_opts ++ memory_opts
       all_optimizations |> Enum.uniq() |> Enum.take(10)
     end
     
@@ -2883,7 +2952,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
           priority: idx,
           optimization: opt,
           estimated_effort: estimate_optimization_effort(opt),
-          expected_impact: estimate_optimization_impact(opt)
+          expected_impact: estimate_single_optimization_impact(opt)
         }
       end)
     end
@@ -2897,7 +2966,7 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
       end
     end
     
-    defp estimate_optimization_impact(optimization) do
+    defp estimate_single_optimization_impact(optimization) do
       cond do
         String.contains?(optimization, ["n²", "exponential"]) -> "Very High (10x+)"
         String.contains?(optimization, ["database", "query"]) -> "High (5-10x)"
@@ -2948,51 +3017,63 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     end
     
     defp generate_immediate_recommendations(results) do
-      recs = []
+      base_recs = []
       
       # Critical performance issues
-      if results[:profile] && results.profile.metrics.critical_hotspots > 0 do
-        recs = ["Address critical performance hotspots immediately" | recs]
+      hotspot_recs = if results[:profile] && results.profile.metrics.critical_hotspots > 0 do
+        ["Address critical performance hotspots immediately"]
+      else
+        []
       end
       
       # Memory leaks
-      if results[:memory] && length(results.memory.leak_detection.potential_leaks) > 0 do
-        recs = ["Fix identified memory leaks" | recs]
+      memory_recs = if results[:memory] && length(results.memory.leak_detection.potential_leaks) > 0 do
+        ["Fix identified memory leaks"]
+      else
+        []
       end
       
       # High complexity
-      if results[:complexity] do
+      complexity_recs = if results[:complexity] do
         targets = results.complexity.optimization_targets
         critical = Enum.filter(targets, &(&1.priority == "critical"))
         if length(critical) > 0 do
-          recs = ["Refactor high-complexity functions" | recs]
+          ["Refactor high-complexity functions"]
+        else
+          []
         end
+      else
+        []
       end
       
-      recs
+      base_recs ++ hotspot_recs ++ memory_recs ++ complexity_recs
     end
     
     defp generate_short_term_recommendations(results) do
-      recs = []
+      base_recs = []
       
       # Caching opportunities
-      if results[:caching] && length(results.caching.caching_opportunities) > 0 do
-        recs = ["Implement identified caching strategies" | recs]
+      caching_recs = if results[:caching] && length(results.caching.caching_opportunities) > 0 do
+        ["Implement identified caching strategies"]
+      else
+        []
       end
       
       # Query optimization
-      if results[:queries] && results.queries.optimization_summary.total_issues > 0 do
-        recs = ["Optimize database queries" | recs]
+      query_recs = if results[:queries] && results.queries.optimization_summary.total_issues > 0 do
+        ["Optimize database queries"]
+      else
+        []
       end
       
       # General optimizations
-      recs = [
+      general_recs = [
         "Set up performance monitoring",
         "Establish performance baselines",
         "Create performance test suite"
-      ] ++ recs
+      ]
       
-      recs
+      base_recs ++ caching_recs ++ query_recs ++ general_recs
     end
     
     defp generate_long_term_recommendations(_results) do
@@ -3029,7 +3110,6 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     end
   end
   
-  @impl BaseToolAgent
   def initial_state do
     %{
       profile_cache: %{},
@@ -3042,39 +3122,38 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     }
   end
   
-  @impl BaseToolAgent
+  @impl true
   def handle_tool_signal(%State{} = state, signal) do
     signal_type = signal["type"]
     data = signal["data"] || %{}
     
     case signal_type do
       "profile_code" ->
-        cmd_async(state, ProfileCodeAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, ProfileCodeAction, data)
         
       "analyze_complexity" ->
-        cmd_async(state, AnalyzeComplexityAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, AnalyzeComplexityAction, data)
         
       "optimize_queries" ->
-        cmd_async(state, OptimizeDatabaseQueriesAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, OptimizeDatabaseQueriesAction, data)
         
       "identify_caching" ->
-        cmd_async(state, IdentifyCachingOpportunitiesAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, IdentifyCachingOpportunitiesAction, data)
         
       "generate_benchmark" ->
-        cmd_async(state, GenerateBenchmarkAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, GenerateBenchmarkAction, data)
         
       "analyze_memory" ->
-        cmd_async(state, AnalyzeMemoryUsageAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, AnalyzeMemoryUsageAction, data)
         
       "generate_report" ->
-        cmd_async(state, GeneratePerformanceReportAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, GeneratePerformanceReportAction, data)
         
       _ ->
         super(state, signal)
     end
   end
   
-  @impl BaseToolAgent
   def handle_action_result(state, action, result, metadata) do
     case action do
       ProfileCodeAction ->
@@ -3207,12 +3286,12 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
     {:ok, state}
   end
   
-  @impl BaseToolAgent
+  @impl true
   def process_result(result, _metadata) do
     Map.put(result, :analyzed_at, DateTime.utc_now())
   end
   
-  @impl BaseToolAgent
+  @impl true
   def additional_actions do
     [
       ProfileCodeAction,
@@ -3235,34 +3314,40 @@ defmodule RubberDuck.Tools.Agents.PerformanceAnalyzerAgent do
   end
   
   defp check_performance_alerts(profile_result, thresholds) do
-    alerts = []
+    base_alerts = []
     
     # Check CPU threshold
-    if profile_result.profile_type == "cpu" && profile_result.metrics[:estimated_cpu_usage] do
+    cpu_alerts = if profile_result.profile_type == "cpu" && profile_result.metrics[:estimated_cpu_usage] do
       cpu_usage = String.trim_trailing(profile_result.metrics.estimated_cpu_usage, "%") |> String.to_integer()
       if cpu_usage > thresholds.cpu_threshold do
-        alerts = [%{
+        [%{
           type: :high_cpu_usage,
           severity: :warning,
           value: cpu_usage,
           threshold: thresholds.cpu_threshold,
           message: "CPU usage #{cpu_usage}% exceeds threshold"
-        } | alerts]
+        }]
+      else
+        []
       end
+    else
+      []
     end
     
     # Check critical hotspots
-    if profile_result.metrics.critical_hotspots > thresholds.critical_hotspot_threshold do
-      alerts = [%{
+    hotspot_alerts = if profile_result.metrics.critical_hotspots > thresholds.critical_hotspot_threshold do
+      [%{
         type: :critical_hotspots,
         severity: :critical,
         value: profile_result.metrics.critical_hotspots,
         threshold: thresholds.critical_hotspot_threshold,
         message: "#{profile_result.metrics.critical_hotspots} critical performance hotspots detected"
-      } | alerts]
+      }]
+    else
+      []
     end
     
-    alerts
+    base_alerts ++ cpu_alerts ++ hotspot_alerts
   end
   
   defp emit_performance_alert(state, alert) do

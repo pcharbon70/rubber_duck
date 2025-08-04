@@ -843,7 +843,7 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
     }
     
     # Execute the fetch
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, ExecuteToolAction, %{params: params})
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, ExecuteToolAction, %{params: params})
     
     {:ok, agent}
   end
@@ -851,7 +851,7 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
   def handle_signal(agent, %{"type" => "batch_fetch"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, BatchFetchAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, BatchFetchAction, %{
       queries: data["queries"],
       strategy: String.to_atom(data["strategy"] || "parallel"),
       max_concurrency: data["max_concurrency"] || 5,
@@ -864,7 +864,7 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
   def handle_signal(agent, %{"type" => "search_documentation"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, SearchDocumentationAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, SearchDocumentationAction, %{
       search_query: data["search_query"],
       search_in: Enum.map(data["search_in"] || ["modules", "functions"], &String.to_atom/1),
       sources: data["sources"] || ["hexdocs", "elixir"],
@@ -878,7 +878,7 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
   def handle_signal(agent, %{"type" => "fetch_related_docs"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, FetchRelatedDocsAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, FetchRelatedDocsAction, %{
       base_query: data["base_query"],
       relation_types: Enum.map(data["relation_types"] || ["functions", "types"], &String.to_atom/1),
       max_depth: data["max_depth"] || 2,
@@ -891,7 +891,7 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
   def handle_signal(agent, %{"type" => "generate_doc_index"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, GenerateDocIndexAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, GenerateDocIndexAction, %{
       packages: data["packages"],
       include_stdlib: data["include_stdlib"] || true,
       include_deps: data["include_deps"] || false,
@@ -904,7 +904,7 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
   def handle_signal(agent, %{"type" => "update_cache"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, UpdateCacheAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, UpdateCacheAction, %{
       operation: String.to_atom(data["operation"]),
       target: data["target"],
       force: data["force"] || false

@@ -17,6 +17,7 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
     description: "Analyzes CVE vulnerabilities across dependency chains"
   
   # Additional actions for CVE analysis
+  @impl true
   def additional_actions do
     [
       __MODULE__.BatchScanAction,
@@ -30,28 +31,29 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
   end
   
   # Handle custom signals
+  @impl true
   def handle_tool_signal(state, signal) do
     case signal["type"] do
       "batch_scan" ->
-        {:ok, state, {:cmd_async, __MODULE__.BatchScanAction, signal["data"]}}
+        {:ok, state, {:cmd, __MODULE__.BatchScanAction, signal["data"]}}
         
       "analyze_trends" ->
-        {:ok, state, {:cmd_async, __MODULE__.AnalyzeTrendsAction, signal["data"]}}
+        {:ok, state, {:cmd, __MODULE__.AnalyzeTrendsAction, signal["data"]}}
         
       "generate_advisory" ->
-        {:ok, state, {:cmd_async, __MODULE__.GenerateAdvisoryAction, signal["data"]}}
+        {:ok, state, {:cmd, __MODULE__.GenerateAdvisoryAction, signal["data"]}}
         
       "compare_scans" ->
-        {:ok, state, {:cmd_async, __MODULE__.CompareScansAction, signal["data"]}}
+        {:ok, state, {:cmd, __MODULE__.CompareScansAction, signal["data"]}}
         
       "generate_compliance" ->
-        {:ok, state, {:cmd_async, __MODULE__.GenerateComplianceReportAction, signal["data"]}}
+        {:ok, state, {:cmd, __MODULE__.GenerateComplianceReportAction, signal["data"]}}
         
       "monitor_vulnerabilities" ->
-        {:ok, state, {:cmd_async, __MODULE__.MonitorVulnerabilitiesAction, signal["data"]}}
+        {:ok, state, {:cmd, __MODULE__.MonitorVulnerabilitiesAction, signal["data"]}}
         
       "generate_patch_plan" ->
-        {:ok, state, {:cmd_async, __MODULE__.GeneratePatchPlanAction, signal["data"]}}
+        {:ok, state, {:cmd, __MODULE__.GeneratePatchPlanAction, signal["data"]}}
         
       _ ->
         # Let BaseToolAgent handle standard signals
@@ -166,16 +168,13 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
       Enum.map(projects, &scan_single_project(&1, options, context))
     end
     
-    defp scan_single_project(project, options, context) do
+    defp scan_single_project(project, options, _context) do
       # Use CVE checker tool
-      tool_call = %RubberDuck.Types.ToolCall{
-        name: :cve_checker,
-        arguments: Map.merge(options, %{
-          dependencies: project.dependencies
-        })
-      }
+      tool_params = Map.merge(options, %{
+        dependencies: project.dependencies
+      })
       
-      case RubberDuck.Tools.CVEChecker.execute(tool_call) do
+      case RubberDuck.Tools.CVEChecker.execute(tool_params, %{}) do
         {:ok, result} ->
           %{
             project: project.name,
@@ -255,7 +254,7 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
       {:ok, trends}
     end
     
-    defp analyze_trends(history, period, group_by, include_resolved) do
+    defp analyze_trends(history, period, group_by, _include_resolved) do
       filtered_history = filter_by_period(history, period)
       
       %{
@@ -356,12 +355,12 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
       end
     end
     
-    defp find_most_improved_areas(history) do
+    defp find_most_improved_areas(_history) do
       # Simplified - would need more sophisticated analysis
       []
     end
     
-    defp find_concerning_areas(history) do
+    defp find_concerning_areas(_history) do
       # Simplified - would need more sophisticated analysis
       []
     end
@@ -398,7 +397,7 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
     @moduledoc """
     Generates security advisories for critical vulnerabilities.
     """
-    use Jido.Action
+    use Jido.Action, name: "generate_advisory"
     
     def parameter_schema do
       %{
@@ -532,7 +531,7 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
     @moduledoc """
     Compares two vulnerability scans to identify changes.
     """
-    use Jido.Action
+    use Jido.Action, name: "compare_scans"
     
     def parameter_schema do
       %{
@@ -604,7 +603,7 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
     @moduledoc """
     Generates compliance reports based on security policies.
     """
-    use Jido.Action
+    use Jido.Action, name: "generate_compliance_report"
     
     def parameter_schema do
       %{
@@ -616,7 +615,7 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
     end
     
     @impl true
-    def run(params, context) do
+    def run(params, _context) do
       policies = params.policies || get_default_policies(params.compliance_framework)
       
       report = generate_compliance_report(
@@ -667,34 +666,34 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
     end
     
     defp check_policy_violations(scan_results, policies) do
-      violations = []
-      
       # Check vulnerability limits
       summary = scan_results.summary
       
-      if (summary[:critical] || 0) > policies.max_critical_vulnerabilities do
-        violations = [{:critical_vulnerability_limit_exceeded, %{
-          limit: policies.max_critical_vulnerabilities,
-          actual: summary[:critical] || 0
-        }} | violations]
-      end
-      
-      if (summary[:high] || 0) > policies.max_high_vulnerabilities do
-        violations = [{:high_vulnerability_limit_exceeded, %{
-          limit: policies.max_high_vulnerabilities,
-          actual: summary[:high] || 0
-        }} | violations]
-      end
-      
-      total = summary[:total_vulnerabilities] || 0
-      if total > policies.max_total_vulnerabilities do
-        violations = [{:total_vulnerability_limit_exceeded, %{
-          limit: policies.max_total_vulnerabilities,
-          actual: total
-        }} | violations]
-      end
-      
-      violations
+      [] ++
+        (if (summary[:critical] || 0) > policies.max_critical_vulnerabilities do
+           [{:critical_vulnerability_limit_exceeded, %{
+             limit: policies.max_critical_vulnerabilities,
+             actual: summary[:critical] || 0
+           }}]
+         else
+           []
+         end) ++
+        (if (summary[:high] || 0) > policies.max_high_vulnerabilities do
+           [{:high_vulnerability_limit_exceeded, %{
+             limit: policies.max_high_vulnerabilities,
+             actual: summary[:high] || 0
+           }}]
+         else
+           []
+         end) ++
+        (if (summary[:total_vulnerabilities] || 0) > policies.max_total_vulnerabilities do
+           [{:total_vulnerability_limit_exceeded, %{
+             limit: policies.max_total_vulnerabilities,
+             actual: summary[:total_vulnerabilities] || 0
+           }}]
+         else
+           []
+         end)
     end
     
     defp calculate_compliance_score(violations, _policies) do
@@ -743,7 +742,7 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
     @moduledoc """
     Sets up continuous monitoring for new vulnerabilities.
     """
-    use Jido.Action
+    use Jido.Action, name: "monitor_vulnerabilities"
     
     def parameter_schema do
       %{
@@ -795,7 +794,7 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
     @moduledoc """
     Generates a comprehensive patching plan for vulnerabilities.
     """
-    use Jido.Action
+    use Jido.Action, name: "generate_patch_plan"
     
     def parameter_schema do
       %{
@@ -1034,19 +1033,16 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
     thresholds = state.monitoring_config.alert_thresholds
     summary = scan_results.summary_by_severity || %{}
     
-    alerts = []
-    
-    if (summary[:critical] || 0) > thresholds.critical do
-      alerts = [:critical_threshold_exceeded | alerts]
-    end
-    
-    if (summary[:high] || 0) > thresholds.high do
-      alerts = [:high_threshold_exceeded | alerts]
-    end
-    
-    if (summary[:medium] || 0) > thresholds.medium do
-      alerts = [:medium_threshold_exceeded | alerts]
-    end
+    alerts = [] ++
+      (if (summary[:critical] || 0) > thresholds.critical,
+       do: [:critical_threshold_exceeded],
+       else: []) ++
+      (if (summary[:high] || 0) > thresholds.high,
+       do: [:high_threshold_exceeded],
+       else: []) ++
+      (if (summary[:medium] || 0) > thresholds.medium,
+       do: [:medium_threshold_exceeded],
+       else: [])
     
     if length(alerts) > 0 do
       emit_monitoring_alerts(alerts, scan_results)

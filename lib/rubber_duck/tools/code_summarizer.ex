@@ -731,13 +731,11 @@ defmodule RubberDuck.Tools.CodeSummarizer do
     """
   end
   
-  defp generate_template_summary(extracted, params) do
+  defp generate_template_summary(extracted, _params) do
     # Template-based fallback summary
     module_count = length(extracted.modules)
     function_count = length(extracted.functions)
     public_count = Enum.count(extracted.functions, &(&1.visibility == :public))
-    
-    summary_parts = []
     
     # Basic description
     basic = if module_count == 1 do
@@ -746,25 +744,30 @@ defmodule RubberDuck.Tools.CodeSummarizer do
     else
       "This code contains #{module_count} modules"
     end
-    summary_parts = [basic | summary_parts]
     
     # Function information
-    if function_count > 0 do
-      func_desc = "with #{public_count} public and #{function_count - public_count} private functions"
-      summary_parts = [func_desc | summary_parts]
+    func_desc = if function_count > 0 do
+      "with #{public_count} public and #{function_count - public_count} private functions"
+    else
+      nil
     end
     
     # Patterns
-    if length(extracted.patterns) > 0 do
-      pattern_desc = "implementing #{Enum.join(extracted.patterns, ", ")} patterns"
-      summary_parts = [pattern_desc | summary_parts]
+    pattern_desc = if length(extracted.patterns) > 0 do
+      "implementing #{Enum.join(extracted.patterns, ", ")} patterns"
+    else
+      nil
     end
     
     # Dependencies
-    if extracted.dependencies != [] and length(extracted.dependencies.imports) > 0 do
-      dep_desc = "and depending on #{Enum.join(Enum.take(extracted.dependencies.imports, 3), ", ")}"
-      summary_parts = [dep_desc | summary_parts]
+    dep_desc = if extracted.dependencies != [] and length(extracted.dependencies.imports) > 0 do
+      "and depending on #{Enum.join(Enum.take(extracted.dependencies.imports, 3), ", ")}"
+    else
+      nil
     end
+    
+    summary_parts = [basic, func_desc, pattern_desc, dep_desc]
+    |> Enum.reject(&is_nil/1)
     
     summary = summary_parts
     |> Enum.reverse()

@@ -705,7 +705,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
     parallel = get_in(signal, ["data", "parallel"]) || true
     
     # Execute batch extract action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, BatchExtractAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, BatchExtractAction, %{
       files: files,
       language: language,
       options: options,
@@ -721,7 +721,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
     language = get_in(signal, ["data", "language"])
     
     # Execute signature analysis action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, AnalyzeSignaturesAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, AnalyzeSignaturesAction, %{
       signatures: signatures,
       analysis_type: analysis_type,
       language: language
@@ -737,7 +737,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
     group_by = get_in(signal, ["data", "group_by"]) || :module
     
     # Execute API docs generation action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, GenerateAPIDocsAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, GenerateAPIDocsAction, %{
       signatures: signatures,
       format: format,
       include_private: include_private,
@@ -753,7 +753,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
     comparison_type = get_in(signal, ["data", "comparison_type"]) || :api_changes
     
     # Execute signature comparison action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, CompareSignaturesAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, CompareSignaturesAction, %{
       signatures1: signatures1,
       signatures2: signatures2,
       comparison_type: comparison_type
@@ -762,7 +762,7 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
     {:ok, agent}
   end
   
-  def handle_tool_signal(agent, _signal), do: super(agent, _signal)
+  def handle_tool_signal(agent, signal), do: super(agent, signal)
   
   # Process extraction results to update signature database
   @impl true
@@ -772,7 +772,6 @@ defmodule RubberDuck.Tools.Agents.FunctionSignatureExtractorAgent do
   end
   
   # Override action result handler to update signature database
-  @impl true
   def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
     # Let parent handle the standard processing
     {:ok, agent} = super(agent, ExecuteToolAction, {:ok, result}, metadata)

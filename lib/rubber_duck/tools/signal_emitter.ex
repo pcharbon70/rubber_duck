@@ -100,9 +100,9 @@ defmodule RubberDuck.Tools.SignalEmitter do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:jido_signal]
-      rate_limit 200
+      rate_limit [max_requests: 200, window_seconds: 60]
     end
   end
   

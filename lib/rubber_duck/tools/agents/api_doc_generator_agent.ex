@@ -458,7 +458,7 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
       |> Map.new()
     end
     
-    defp resolve_conflict(val1, val2, :first_wins), do: val1
+    defp resolve_conflict(val1, _val2, :first_wins), do: val1
     defp resolve_conflict(_val1, val2, :last_wins), do: val2
     defp resolve_conflict(val1, val2, :manual) do
       # In real implementation, this would trigger manual resolution
@@ -535,7 +535,7 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
       }}
     end
     
-    defp publish_to_platform(documentation, :github_pages, config) do
+    defp publish_to_platform(_documentation, :github_pages, config) do
       repo = config[:repository] || "unknown/repo"
       branch = config[:branch] || "gh-pages"
       
@@ -605,7 +605,7 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
     output_path = get_in(signal, ["data", "output_path"])
     
     # Execute OpenAPI generation action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, GenerateFromOpenAPIAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, GenerateFromOpenAPIAction, %{
       spec_source: spec_source,
       format: format,
       theme: theme,
@@ -627,7 +627,7 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
     template = get_in(signal, ["data", "template"])
     
     # Execute code generation action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, GenerateFromCodeAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, GenerateFromCodeAction, %{
       source_paths: source_paths,
       language: language,
       doc_type: doc_type,
@@ -646,7 +646,7 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
     strict_mode = get_in(signal, ["data", "strict_mode"]) || false
     
     # Execute validation action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, ValidateDocumentationAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, ValidateDocumentationAction, %{
       documentation: documentation,
       validation_rules: validation_rules,
       strict_mode: strict_mode
@@ -662,7 +662,7 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
     output_format = get_in(signal, ["data", "output_format"]) || :html
     
     # Execute merge action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, MergeDocumentationAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, MergeDocumentationAction, %{
       sources: sources,
       merge_strategy: merge_strategy,
       conflict_resolution: conflict_resolution,
@@ -680,7 +680,7 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
     changelog = get_in(signal, ["data", "changelog"])
     
     # Execute publish action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, PublishDocumentationAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, PublishDocumentationAction, %{
       documentation: documentation,
       platforms: platforms,
       publish_config: publish_config,
@@ -691,7 +691,7 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
     {:ok, agent}
   end
   
-  def handle_tool_signal(agent, _signal), do: super(agent, _signal)
+  def handle_tool_signal(agent, signal), do: super(agent, signal)
   
   # Process generation results to update cache and history
   @impl true
@@ -701,7 +701,6 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
   end
   
   # Override action result handler to update cache and history
-  @impl true
   def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
     # Let parent handle the standard processing
     {:ok, agent} = super(agent, ExecuteToolAction, {:ok, result}, metadata)
@@ -737,7 +736,7 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
     end
   end
   
-  def handle_action_result(agent, action, result, metadata) when action in [
+  def handle_action_result(agent, action, result, _metadata) when action in [
     GenerateFromOpenAPIAction, 
     GenerateFromCodeAction
   ] do

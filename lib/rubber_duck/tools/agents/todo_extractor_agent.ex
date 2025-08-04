@@ -931,7 +931,6 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
     {:ok, state}
   end
   
-  @impl true
   def handle_action_result(state, ExecuteToolAction, {:ok, result}, _params) do
     # Update TODO database
     new_todos = Enum.reduce(result.todos, state.todo_database, fn todo, acc ->
@@ -947,7 +946,6 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
     {:ok, state}
   end
   
-  @impl true
   def handle_action_result(state, ScanCodebaseAction, {:ok, result}, _params) do
     # Add to scan history
     scan_entry = %{
@@ -974,7 +972,6 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
     {:ok, state}
   end
   
-  @impl true
   def handle_action_result(state, AnalyzeDebtAction, {:ok, result}, _params) do
     # Update debt metrics
     metrics = %{
@@ -997,7 +994,6 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
     {:ok, state}
   end
   
-  @impl true
   def handle_action_result(state, _action, _result, _params) do
     {:ok, state}
   end

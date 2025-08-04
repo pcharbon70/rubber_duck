@@ -1655,7 +1655,7 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
     context = get_in(signal, ["data", "context"]) || %{}
     
     # Execute prompt analysis action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, AnalyzePromptAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, AnalyzePromptAction, %{
       prompt: prompt,
       analysis_aspects: analysis_aspects,
       target_model: if(target_model, do: String.to_atom(target_model)),
@@ -1673,7 +1673,7 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
     max_length = get_in(signal, ["data", "max_length"])
     
     # Execute prompt optimization action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, OptimizePromptAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, OptimizePromptAction, %{
       prompt: prompt,
       optimization_strategies: optimization_strategies,
       target_model: if(target_model, do: String.to_atom(target_model)),
@@ -1692,7 +1692,7 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
     confidence_level = get_in(signal, ["data", "confidence_level"]) || 0.95
     
     # Execute A/B testing setup action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, ABTestPromptsAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, ABTestPromptsAction, %{
       test_name: test_name,
       prompt_variants: prompt_variants,
       test_criteria: test_criteria,
@@ -1710,7 +1710,7 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
     target_model = get_in(signal, ["data", "target_model"])
     
     # Execute variation generation action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, GenerateVariationsAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, GenerateVariationsAction, %{
       base_prompt: base_prompt,
       variation_types: variation_types,
       count: count,
@@ -1727,7 +1727,7 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
     baseline_scores = get_in(signal, ["data", "baseline_scores"]) || %{}
     
     # Execute effectiveness evaluation action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, EvaluateEffectivenessAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, EvaluateEffectivenessAction, %{
       prompt: prompt,
       responses: responses,
       evaluation_criteria: evaluation_criteria,
@@ -1743,7 +1743,7 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
     customizations = get_in(signal, ["data", "customizations"]) || %{}
     
     # Execute template application action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, ApplyTemplateAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, ApplyTemplateAction, %{
       template_name: template_name,
       variables: variables,
       customizations: customizations
@@ -1762,7 +1762,6 @@ defmodule RubberDuck.Tools.Agents.PromptOptimizerAgent do
   end
   
   # Override action result handler to update optimization history and metrics
-  @impl true
   def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
     # Handle the standard processing
     {:ok, agent} = {:ok, agent}

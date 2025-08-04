@@ -88,7 +88,7 @@ defmodule RubberDuck.Tools.FunctionMover do
     end
     
     parameter :affected_files do
-      type {:list, :map}
+      type :list
       required false
       description "List of files that may contain references to update"
       default []
@@ -119,9 +119,9 @@ defmodule RubberDuck.Tools.FunctionMover do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:llm_access, :code_analysis]
-      rate_limit 50
+      rate_limit [max_requests: 50, window_seconds: 60]
     end
   end
   
@@ -416,13 +416,17 @@ defmodule RubberDuck.Tools.FunctionMover do
     |> Enum.map(fn {name, arity} -> {name, arity} end)
     |> MapSet.new()
     
-    if MapSet.member?(existing_names, {move_plan.main_function.name, move_plan.main_function.arity}) do
-      warnings = ["Target module already has a function #{move_plan.main_function.name}/#{move_plan.main_function.arity}" | warnings]
+    warnings = if MapSet.member?(existing_names, {move_plan.main_function.name, move_plan.main_function.arity}) do
+      ["Target module already has a function #{move_plan.main_function.name}/#{move_plan.main_function.arity}" | warnings]
+    else
+      warnings
     end
     
     # Check for circular dependencies
-    if imports_module?(target_analysis, source_analysis.module_name) do
-      warnings = ["Moving this function may create circular dependencies" | warnings]
+    warnings = if imports_module?(target_analysis, source_analysis.module_name) do
+      ["Moving this function may create circular dependencies" | warnings]
+    else
+      warnings
     end
     
     warnings
@@ -439,7 +443,7 @@ defmodule RubberDuck.Tools.FunctionMover do
   defp extract_functions(ast) do
     {_, functions} = Macro.postwalk(ast, [], fn node, acc ->
       case node do
-        {:def, meta, [{name, _, args} | rest]} when is_atom(name) ->
+        {:def, meta, [{name, _, args} | _rest]} when is_atom(name) ->
           func_info = %{
             name: name,
             arity: length(args || []),
@@ -449,7 +453,7 @@ defmodule RubberDuck.Tools.FunctionMover do
           }
           {node, [func_info | acc]}
           
-        {:defp, meta, [{name, _, args} | rest]} when is_atom(name) ->
+        {:defp, meta, [{name, _, args} | _rest]} when is_atom(name) ->
           func_info = %{
             name: name,
             arity: length(args || []),

@@ -1335,7 +1335,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     }
     
     # Execute the extraction
-    {:ok, _ref} = __MODULE__.cmd_async(agent, ExecuteToolAction, %{params: params},
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, ExecuteToolAction, %{params: params},
       context: %{agent: agent}
     )
     
@@ -1346,7 +1346,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
   def handle_tool_signal(agent, %{"type" => "batch_extract"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, BatchExtractAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, BatchExtractAction, %{
       sources: data["sources"],
       pattern: data["pattern"],
       pattern_library: data["pattern_library"],
@@ -1362,7 +1362,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
   def handle_tool_signal(agent, %{"type" => "analyze_patterns"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, AnalyzePatternsAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, AnalyzePatternsAction, %{
       patterns: data["patterns"],
       sample_content: data["sample_content"],
       analysis_depth: String.to_atom(data["analysis_depth"] || "detailed")
@@ -1375,7 +1375,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
   def handle_tool_signal(agent, %{"type" => "build_pattern"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, BuildPatternAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, BuildPatternAction, %{
       requirements: data["requirements"],
       target_content_type: data["target_content_type"] || "general",
       complexity_preference: String.to_atom(data["complexity_preference"] || "balanced"),
@@ -1389,7 +1389,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
   def handle_tool_signal(agent, %{"type" => "test_pattern"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, TestPatternAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, TestPatternAction, %{
       pattern: data["pattern"],
       test_cases: data["test_cases"],
       performance_test: data["performance_test"] || false,
@@ -1406,7 +1406,7 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     optimization_goals = (data["optimization_goals"] || ["performance", "readability"])
     |> Enum.map(&String.to_atom/1)
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, OptimizePatternAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, OptimizePatternAction, %{
       pattern: data["pattern"],
       optimization_goals: optimization_goals,
       sample_content: data["sample_content"],
@@ -1418,7 +1418,6 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
   
   # Action result handlers
   
-  @impl true
   def handle_action_result(agent, BatchExtractAction, {:ok, result}, _metadata) do
     # Update batch extraction tracking
     agent = put_in(agent.state.active_batch_extractions[result.batch_id], %{
@@ -1446,7 +1445,6 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     {:ok, agent}
   end
   
-  @impl true
   def handle_action_result(agent, AnalyzePatternsAction, {:ok, result}, _metadata) do
     # Store pattern analysis results
     analysis_key = "patterns_#{DateTime.utc_now() |> DateTime.to_unix()}"
@@ -1470,7 +1468,6 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     {:ok, agent}
   end
   
-  @impl true
   def handle_action_result(agent, BuildPatternAction, {:ok, result}, _metadata) do
     # Add built pattern to custom patterns library
     pattern_name = "built_#{DateTime.utc_now() |> DateTime.to_unix()}"
@@ -1492,7 +1489,6 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     {:ok, agent}
   end
   
-  @impl true
   def handle_action_result(agent, TestPatternAction, {:ok, result}, _metadata) do
     # Update pattern usage statistics based on test results
     pattern_key = "pattern_#{result.pattern |> :crypto.hash(:md5) |> Base.encode16()}"
@@ -1522,7 +1518,6 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     {:ok, agent}
   end
   
-  @impl true
   def handle_action_result(agent, OptimizePatternAction, {:ok, result}, _metadata) do
     # Update performance metrics
     agent = update_in(agent.state.performance_metrics.patterns_optimized, &(&1 + 1))
@@ -1553,7 +1548,6 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
   end
   
   # Handle main tool execution results
-  @impl true
   def handle_action_result(agent, ExecuteToolAction, {:ok, result}, _metadata) do
     # Record successful extraction
     extraction_record = %{
@@ -1606,7 +1600,6 @@ defmodule RubberDuck.Tools.Agents.RegexExtractorAgent do
     {:ok, agent}
   end
   
-  @impl true
   def handle_action_result(agent, ExecuteToolAction, {:error, reason}, metadata) do
     # Update failure metrics
     agent = update_in(agent.state.performance_metrics.failed_extractions, &(&1 + 1))

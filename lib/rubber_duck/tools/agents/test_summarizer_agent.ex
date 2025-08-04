@@ -1101,7 +1101,6 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
     {:ok, state}
   end
   
-  @impl true
   def handle_action_result(state, ExecuteToolAction, {:ok, result}, _params) do
     # Add to test history
     history_entry = %{
@@ -1123,7 +1122,7 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
     
     # Cache recommendations
     if result[:recommendations] do
-      state = update_recommendations_cache(state, result.recommendations)
+      update_recommendations_cache(state, result.recommendations)
     else
       state
     end
@@ -1131,7 +1130,6 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
     {:ok, state}
   end
   
-  @impl true
   def handle_action_result(state, IdentifyFlakyTestsAction, {:ok, result}, _params) do
     # Update flaky tests tracking
     new_flaky = Enum.reduce(result.flaky_tests, state.flaky_tests, fn test, acc ->
@@ -1147,7 +1145,6 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
     {:ok, put_in(state.flaky_tests, new_flaky)}
   end
   
-  @impl true
   def handle_action_result(state, _action, _result, _params) do
     {:ok, state}
   end

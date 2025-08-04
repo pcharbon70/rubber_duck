@@ -95,16 +95,16 @@ defmodule RubberDuck.Tools.FunctionSignatureExtractor do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:code_analysis]
-      rate_limit 100
+      rate_limit [max_requests: 100, window_seconds: 60]
     end
   end
   
   @doc """
   Executes function signature extraction from the provided code.
   """
-  def execute(params, context) do
+  def execute(params, _context) do
     with {:ok, ast} <- parse_code(params.code),
          {:ok, extracted} <- extract_functions(ast, params),
          {:ok, analyzed} <- analyze_functions(extracted, params),
@@ -311,17 +311,19 @@ defmodule RubberDuck.Tools.FunctionSignatureExtractor do
           examples: ["#{func.name}(id) => :ok | {:error, reason}"]
         }
       
-      name when String.ends_with?(to_string(name), "?") ->
-        %{
-          documentation: "Returns a boolean indicating a condition.",
-          examples: ["#{func.name}(value) => true | false"]
-        }
-      
-      _ ->
-        %{
-          documentation: nil,
-          examples: []
-        }
+      name ->
+        name_str = to_string(name)
+        if String.ends_with?(name_str, "?") do
+          %{
+            documentation: "Returns a boolean indicating a condition.",
+            examples: ["#{func.name}(value) => true | false"]
+          }
+        else
+          %{
+            documentation: "Performs #{name} operation.",
+            examples: ["#{func.name}() => result"]
+          }
+        end
     end
   end
   
@@ -347,13 +349,14 @@ defmodule RubberDuck.Tools.FunctionSignatureExtractor do
       {name, 2} when name in [:update, :put] ->
         "@spec #{func.name}(data :: term(), changes :: term()) :: term()"
       
-      {name, _} when String.ends_with?(to_string(name), "?") ->
+      {name, _} ->
+        name_str = to_string(name)
         args = List.duplicate("term()", func.arity) |> Enum.join(", ")
-        "@spec #{func.name}(#{args}) :: boolean()"
-      
-      _ ->
-        args = List.duplicate("term()", func.arity) |> Enum.join(", ")
-        "@spec #{func.name}(#{args}) :: term()"
+        if String.ends_with?(name_str, "?") do
+          "@spec #{func.name}(#{args}) :: boolean()"
+        else
+          "@spec #{func.name}(#{args}) :: term()"
+        end
     end
   end
   

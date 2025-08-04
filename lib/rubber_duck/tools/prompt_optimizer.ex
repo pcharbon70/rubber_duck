@@ -129,9 +129,9 @@ defmodule RubberDuck.Tools.PromptOptimizer do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:llm_access]
-      rate_limit 50
+      rate_limit [max_requests: 50, window_seconds: 60]
     end
   end
   
@@ -141,7 +141,7 @@ defmodule RubberDuck.Tools.PromptOptimizer do
   def execute(params, context) do
     with {:ok, analyzed} <- analyze_prompt(params),
          {:ok, optimized} <- optimize_prompt(analyzed, params, context),
-         {:ok, validated} <- validate_optimization(params.prompt, optimized, params) do
+         {:ok, _validated} <- validate_optimization(params.prompt, optimized, params) do
       
       {:ok, %{
         original_prompt: params.prompt,
@@ -507,7 +507,7 @@ defmodule RubberDuck.Tools.PromptOptimizer do
     
     # Add clear task instruction if missing
     optimized = if :unclear_instructions in issues do
-      "Please " <> String.downcase(String.slice(optimized, 0..0)) <> String.slice(optimized, 1..-1)
+      "Please " <> String.downcase(String.slice(optimized, 0..0)) <> String.slice(optimized, 1..-1//1)
     else
       optimized
     end
@@ -522,7 +522,7 @@ defmodule RubberDuck.Tools.PromptOptimizer do
     String.trim(optimized)
   end
   
-  defp optimize_for_conciseness(analysis, params, _context) do
+  defp optimize_for_conciseness(_analysis, params, _context) do
     # Template-based conciseness optimization
     optimized = params.prompt
     |> remove_redundancy()
@@ -571,7 +571,7 @@ defmodule RubberDuck.Tools.PromptOptimizer do
     |> String.replace(~r/\.\s+It\s+/i, " and it ")
   end
   
-  defp optimize_for_accuracy(analysis, params, _context) do
+  defp optimize_for_accuracy(_analysis, params, _context) do
     # Add specificity and constraints for accuracy
     optimized = enhance_for_accuracy(params.prompt, params)
     
@@ -607,10 +607,10 @@ defmodule RubberDuck.Tools.PromptOptimizer do
       ""
     end
     
-    accuracy_prefix <> String.downcase(String.slice(prompt, 0..0)) <> String.slice(prompt, 1..-1) <> constraints
+    accuracy_prefix <> String.downcase(String.slice(prompt, 0..0)) <> String.slice(prompt, 1..-1//1) <> constraints
   end
   
-  defp optimize_for_creativity(analysis, params, _context) do
+  defp optimize_for_creativity(_analysis, params, _context) do
     # Enhance for creative output
     optimized = enhance_for_creativity(params.prompt, params)
     
@@ -641,10 +641,10 @@ defmodule RubberDuck.Tools.PromptOptimizer do
       "\n\nBe imaginative and think outside conventional boundaries."
     end
     
-    creative_prefix <> String.downcase(String.slice(prompt, 0..0)) <> String.slice(prompt, 1..-1) <> creative_suffix
+    creative_prefix <> String.downcase(String.slice(prompt, 0..0)) <> String.slice(prompt, 1..-1//1) <> creative_suffix
   end
   
-  defp optimize_for_consistency(analysis, params, _context) do
+  defp optimize_for_consistency(_analysis, params, _context) do
     # Add structure for consistent outputs
     optimized = enhance_for_consistency(params.prompt, params)
     
@@ -677,7 +677,7 @@ defmodule RubberDuck.Tools.PromptOptimizer do
     prompt <> format_spec
   end
   
-  defp optimize_for_safety(analysis, params, _context) do
+  defp optimize_for_safety(_analysis, params, _context) do
     # Add safety guidelines and constraints
     optimized = enhance_for_safety(params.prompt, params)
     
@@ -703,7 +703,7 @@ defmodule RubberDuck.Tools.PromptOptimizer do
     safety_prefix = "Please respond responsibly and safely to: "
     safety_suffix = "\n\nEnsure the response is appropriate, accurate, and follows ethical guidelines."
     
-    safety_prefix <> String.downcase(String.slice(prompt, 0..0)) <> String.slice(prompt, 1..-1) <> safety_suffix
+    safety_prefix <> String.downcase(String.slice(prompt, 0..0)) <> String.slice(prompt, 1..-1//1) <> safety_suffix
   end
   
   defp validate_optimization(original, optimized, params) do

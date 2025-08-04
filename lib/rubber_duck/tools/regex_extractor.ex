@@ -152,9 +152,9 @@ defmodule RubberDuck.Tools.RegexExtractor do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:regex_processing]
-      rate_limit 200
+      rate_limit [max_requests: 200, window_seconds: 60]
     end
   end
   
@@ -383,7 +383,7 @@ defmodule RubberDuck.Tools.RegexExtractor do
     {:ok, processed}
   end
   
-  defp add_position_info(matches, params) when is_list(matches) do
+  defp add_position_info(matches, _params) when is_list(matches) do
     # For modes that don't already include position info
     Enum.with_index(matches, fn match, index ->
       %{

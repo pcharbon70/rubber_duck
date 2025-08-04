@@ -865,7 +865,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
     }
     
     # Execute the search
-    {:ok, _ref} = __MODULE__.cmd_async(agent, ExecuteToolAction, %{params: params},
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, ExecuteToolAction, %{params: params},
       context: %{agent: agent}
     )
     
@@ -876,7 +876,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
   def handle_tool_signal(agent, %{"type" => "batch_search"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, BatchSearchAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, BatchSearchAction, %{
       searches: data["searches"],
       execution_strategy: String.to_atom(data["execution_strategy"] || "smart"),
       max_concurrency: data["max_concurrency"] || 4,
@@ -891,7 +891,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
   def handle_tool_signal(agent, %{"type" => "analyze_search_results"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, AnalyzeResultsAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, AnalyzeResultsAction, %{
       search_results: data["search_results"],
       analysis_type: String.to_atom(data["analysis_type"] || "detailed"),
       include_suggestions: data["include_suggestions"] || true,
@@ -905,7 +905,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
   def handle_tool_signal(agent, %{"type" => "suggest_searches"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, SuggestSearchesAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, SuggestSearchesAction, %{
       context: data["context"] || %{},
       suggestion_types: Enum.map(data["suggestion_types"] || ["related", "exploratory"], &String.to_atom/1),
       max_suggestions: data["max_suggestions"] || 10,
@@ -919,7 +919,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
   def handle_tool_signal(agent, %{"type" => "find_references"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, FindReferencesAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, FindReferencesAction, %{
       symbol: data["symbol"],
       symbol_type: String.to_atom(data["symbol_type"] || "any"),
       include_definitions: data["include_definitions"] || false,
@@ -933,7 +933,7 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
   def handle_tool_signal(agent, %{"type" => "search_patterns"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, SearchPatternsAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, SearchPatternsAction, %{
       pattern_name: data["pattern_name"],
       pattern_params: data["pattern_params"] || %{},
       create_new_pattern: data["create_new_pattern"] || false,
@@ -945,7 +945,6 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
   
   # Action result handlers
   
-  @impl true
   def handle_action_result(agent, BatchSearchAction, {:ok, result}, _metadata) do
     # Update batch search tracking
     agent = put_in(agent.state.active_batch_searches[result.batch_id], %{
@@ -973,7 +972,6 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
     {:ok, agent}
   end
   
-  @impl true
   def handle_action_result(agent, AnalyzeResultsAction, {:ok, result}, _metadata) do
     # Cache analysis result
     cache_key = "analysis_#{System.unique_integer([:positive])}"
@@ -993,7 +991,6 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
     {:ok, agent}
   end
   
-  @impl true
   def handle_action_result(agent, SuggestSearchesAction, {:ok, result}, _metadata) do
     # Store suggestions
     agent = put_in(agent.state.suggested_searches, result.suggestions)
@@ -1010,7 +1007,6 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
   end
   
   # Handle main tool execution results
-  @impl true
   def handle_action_result(agent, ExecuteToolAction, {:ok, result}, _metadata) do
     # Record successful search
     search_record = %{
@@ -1071,7 +1067,6 @@ defmodule RubberDuck.Tools.Agents.RepoSearchAgent do
     {:ok, agent}
   end
   
-  @impl true
   def handle_action_result(agent, ExecuteToolAction, {:error, reason}, metadata) do
     # Update failure statistics
     agent = update_in(agent.state.search_stats.failed_searches, &(&1 + 1))

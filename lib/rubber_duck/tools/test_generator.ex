@@ -9,7 +9,6 @@ defmodule RubberDuck.Tools.TestGenerator do
   use RubberDuck.Tool
   
   alias RubberDuck.LLM.Service
-  alias RubberDuck.Analysis.AST.Parser
   
   tool do
     name :test_generator
@@ -95,9 +94,9 @@ defmodule RubberDuck.Tools.TestGenerator do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:llm_access, :code_analysis]
-      rate_limit 100
+      rate_limit [max_requests: 100, window_seconds: 60]
     end
   end
   
@@ -131,7 +130,7 @@ defmodule RubberDuck.Tools.TestGenerator do
     end
   end
   
-  defp analyze_code_for_testing(ast, code) do
+  defp analyze_code_for_testing(ast, _code) do
     analysis = %{
       modules: extract_modules(ast),
       functions: extract_testable_functions(ast),
@@ -456,7 +455,7 @@ defmodule RubberDuck.Tools.TestGenerator do
   end
   
   defp identify_edge_cases(analysis) do
-    edge_cases = []
+    _edge_cases = []
     
     # Identify numeric parameters
     edge_cases = analysis.functions
@@ -576,10 +575,10 @@ defmodule RubberDuck.Tools.TestGenerator do
   defp parse_spec(_), do: %{}
   
   defp has_genserver_callbacks?(ast) do
-    callbacks = [:init, :handle_call, :handle_cast, :handle_info]
+    _callbacks = [:init, :handle_call, :handle_cast, :handle_info]
     
     {_, found} = Macro.postwalk(ast, false, fn
-      {:def, _, [{name, _, _} | _]}, _ when name in callbacks ->
+      {:def, _, [{name, _, _} | _]}, _ when name in [:init, :handle_call, :handle_cast, :handle_info] ->
         {nil, true}
       node, acc ->
         {node, acc}

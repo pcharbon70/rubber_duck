@@ -1054,7 +1054,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     }
     
     # Execute the analysis
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, ExecuteToolAction, %{params: params})
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, ExecuteToolAction, %{params: params})
     
     {:ok, agent}
   end
@@ -1062,7 +1062,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
   def handle_signal(agent, %{"type" => "check_circular_dependencies"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, CheckCircularDependenciesAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, CheckCircularDependenciesAction, %{
       paths: data["paths"] || ["lib"],
       include_transitive: data["include_transitive"] || true,
       max_cycle_length: data["max_cycle_length"] || 10
@@ -1074,7 +1074,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
   def handle_signal(agent, %{"type" => "find_unused_dependencies"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, FindUnusedDependenciesAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, FindUnusedDependenciesAction, %{
       project_path: data["project_path"] || ".",
       check_dev_deps: data["check_dev_deps"] || false,
       check_test_deps: data["check_test_deps"] || false,
@@ -1087,7 +1087,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
   def handle_signal(agent, %{"type" => "analyze_dependency_tree"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, AnalyzeDependencyTreeAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, AnalyzeDependencyTreeAction, %{
       root_path: data["root_path"] || ".",
       max_depth: data["max_depth"] || 3,
       include_dev: data["include_dev"] || false,
@@ -1101,7 +1101,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
   def handle_signal(agent, %{"type" => "monitor_dependency_health"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, MonitorDependencyHealthAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, MonitorDependencyHealthAction, %{
       project_path: data["project_path"] || ".",
       check_outdated: data["check_outdated"] || true,
       check_security: data["check_security"] || true,
@@ -1115,7 +1115,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
   def handle_signal(agent, %{"type" => "compare_dependencies"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, CompareDependenciesAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, CompareDependenciesAction, %{
       source_path: data["source_path"],
       target_path: data["target_path"],
       comparison_type: String.to_atom(data["comparison_type"] || "versions"),

@@ -677,7 +677,7 @@ defmodule RubberDuck.Tools.Agents.SignalEmitterAgent do
     timeout = get_in(signal, ["data", "timeout"]) || 5000
     
     # Execute broadcast action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, BroadcastSignalAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, BroadcastSignalAction, %{
       signal: signal_data,
       recipients: recipients,
       broadcast_type: broadcast_type,
@@ -694,7 +694,7 @@ defmodule RubberDuck.Tools.Agents.SignalEmitterAgent do
     default_route = get_in(signal, ["data", "default_route"])
     
     # Execute route action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, RouteSignalAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, RouteSignalAction, %{
       signal: signal_data,
       routing_rules: routing_rules,
       default_route: default_route
@@ -709,7 +709,7 @@ defmodule RubberDuck.Tools.Agents.SignalEmitterAgent do
     filter_mode = get_in(signal, ["data", "filter_mode"]) || :include
     
     # Execute filter action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, FilterSignalsAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, FilterSignalsAction, %{
       signals: signals,
       filter_criteria: filter_criteria,
       filter_mode: filter_mode
@@ -723,7 +723,7 @@ defmodule RubberDuck.Tools.Agents.SignalEmitterAgent do
     transformations = get_in(signal, ["data", "transformations"]) || []
     
     # Execute transform action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, TransformSignalAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, TransformSignalAction, %{
       signal: signal_data,
       transformations: transformations
     }, context: %{agent: agent})
@@ -738,7 +738,7 @@ defmodule RubberDuck.Tools.Agents.SignalEmitterAgent do
     details = get_in(signal, ["data", "details"]) || %{}
     
     # Execute delivery confirmation action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, ConfirmDeliveryAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, ConfirmDeliveryAction, %{
       signal_id: signal_id,
       recipient: recipient,
       status: status,
@@ -754,7 +754,7 @@ defmodule RubberDuck.Tools.Agents.SignalEmitterAgent do
     template_data = get_in(signal, ["data", "template_data"])
     
     # Execute template management action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, ManageSignalTemplatesAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, ManageSignalTemplatesAction, %{
       operation: String.to_atom(operation || "list"),
       template_name: template_name,
       template_data: template_data
@@ -773,7 +773,6 @@ defmodule RubberDuck.Tools.Agents.SignalEmitterAgent do
   end
   
   # Override action result handler to update signal tracking
-  @impl true
   def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
     # Update emission history if not from cache
     if result[:from_cache] == false && result[:result] do
@@ -825,10 +824,10 @@ defmodule RubberDuck.Tools.Agents.SignalEmitterAgent do
     
     # Update delivery confirmations
     key = "#{confirmation.signal_id}:#{confirmation.recipient}"
-    agent = put_in(agent.state.delivery_confirmations[key], confirmation)
+    updated_agent = put_in(agent.state.delivery_confirmations[key], confirmation)
     
     # If it's a failure and retry is needed, add to failed deliveries
-    if confirmation.status == :failed && result.retry_needed do
+    final_agent = if confirmation.status == :failed && result.retry_needed do
       failed_entry = %{
         signal_id: confirmation.signal_id,
         recipient: confirmation.recipient,
@@ -837,12 +836,14 @@ defmodule RubberDuck.Tools.Agents.SignalEmitterAgent do
         retry_count: result.retry_count
       }
       
-      agent = update_in(agent.state.failed_deliveries, fn failures ->
+      update_in(updated_agent.state.failed_deliveries, fn failures ->
         [failed_entry | failures]
       end)
+    else
+      updated_agent
     end
     
-    {:ok, agent}
+    {:ok, final_agent}
   end
   
   def handle_action_result(agent, ManageSignalTemplatesAction, {:ok, result}, _metadata) do
