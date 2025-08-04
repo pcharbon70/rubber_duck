@@ -369,7 +369,7 @@ defmodule RubberDuck.Tools.Agents.TestGeneratorAgent do
     {:ok, agent}
   end
   
-  def handle_signal(agent, signal) do
+  def handle_signal(agent, _signal) do
     # Return agent unchanged for unhandled signals
     {:ok, agent}
   end

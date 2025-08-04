@@ -209,7 +209,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderFailoverAction do
   
   # Failure pattern analysis
   
-  defp analyze_failure_patterns(agent, params) do
+  defp analyze_failure_patterns(agent, _params) do
     # Get historical failure data (would come from metrics store in production)
     failure_history = get_failure_history(agent)
     

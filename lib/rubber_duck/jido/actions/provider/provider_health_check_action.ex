@@ -21,7 +21,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderHealthCheckAction do
       check_connectivity: [type: :boolean, default: true]
     ]
 
-  alias RubberDuck.LLM.{ProviderConfig, ConfigLoader}
+  # alias RubberDuck.LLM.{ProviderConfig, ConfigLoader}
   
   require Logger
 
@@ -266,7 +266,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderHealthCheckAction do
     }
   end
   
-  defp calculate_health_score(basic_health, provider_metrics, connectivity) do
+  defp calculate_health_score(basic_health, _provider_metrics, connectivity) do
     # Circuit breaker health (30%)
     circuit_score = case basic_health.circuit_breaker.state do
       :closed -> 1.0
@@ -308,7 +308,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderHealthCheckAction do
     end
   end
   
-  defp generate_recommendations(basic_health, provider_metrics, connectivity) do
+  defp generate_recommendations(basic_health, _provider_metrics, connectivity) do
     recommendations = []
     
     # Circuit breaker recommendations

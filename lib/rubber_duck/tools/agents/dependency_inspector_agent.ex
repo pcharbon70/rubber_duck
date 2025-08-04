@@ -123,7 +123,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     
     @impl true
     def run(action_params, context) do
-      agent = context.agent
+      _agent = context.agent
       params = action_params.params
       
       # Execute the DependencyInspector tool
@@ -212,7 +212,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
         Enum.map(all_deps, fn dep ->
           {name, type} = case dep do
             {mod, package} when is_atom(package) -> {to_string(mod), package}
-            {mod, package} -> {to_string(mod), :hex}
+            {mod, _package} -> {to_string(mod), :hex}
             mod -> {to_string(mod), :unknown}
           end
           
@@ -389,7 +389,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     
     @impl true
     def run(params, context) do
-      agent = context.agent
+      _agent = context.agent
       
       # Analyze each path for dependencies
       all_dependencies = Enum.map(params.paths, fn path ->
@@ -566,7 +566,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     
     @impl true
     def run(params, context) do
-      agent = context.agent
+      _agent = context.agent
       
       # Get declared dependencies from mix.exs
       declared_deps = get_declared_dependencies(params.project_path, params)
@@ -652,7 +652,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
       end
     end
     
-    defp calculate_confidence_scores(unused, usage_result) do
+    defp calculate_confidence_scores(unused, _usage_result) do
       # Calculate confidence that deps are truly unused
       Enum.map(unused, fn dep ->
         # Simple heuristic - would be more sophisticated
@@ -722,7 +722,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
       hex_deps = deps_result.external.hex || []
       
       outdated = Enum.take_random(hex_deps, div(length(hex_deps), 3))
-      |> Enum.map(fn {module, package} ->
+      |> Enum.map(fn {_module, package} ->
         %{
           package: package,
           current_version: "1.0.0",
@@ -901,7 +901,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     
     @impl true
     def run(params, context) do
-      agent = context.agent
+      _agent = context.agent
       
       # Analyze source dependencies
       source_params = %{
@@ -971,7 +971,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     
     defp calculate_change_percentage(source_hex, target_hex, source_internal, target_internal) do
       total_source = MapSet.size(source_hex) + MapSet.size(source_internal)
-      total_target = MapSet.size(target_hex) + MapSet.size(target_internal)
+      _total_target = MapSet.size(target_hex) + MapSet.size(target_internal)
       
       added = MapSet.size(MapSet.difference(target_hex, source_hex)) +
               MapSet.size(MapSet.difference(target_internal, source_internal))
@@ -1010,29 +1010,33 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
       recommendations = []
       
       # Check for major additions
-      if length(comparison.added.hex) > 5 do
-        recommendations = [%{
+      recommendations = if length(comparison.added.hex) > 5 do
+        [%{
           type: :review,
           priority: :high,
           message: "Significant number of new dependencies added (#{length(comparison.added.hex)})",
           action: "Review new dependencies for necessity and security"
         } | recommendations]
+      else
+        recommendations
       end
       
       # Check for removals
-      if length(comparison.removed.hex) > 0 do
-        recommendations = [%{
+      recommendations = if length(comparison.removed.hex) > 0 do
+        [%{
           type: :compatibility,
           priority: :medium,
           message: "Dependencies removed: #{Enum.join(comparison.removed.hex, ", ")}",
           action: "Ensure no breaking changes from removed dependencies"
         } | recommendations]
+      else
+        recommendations
       end
       
       recommendations
     end
-  end
   
+  end
   # Signal handlers
   
   def handle_signal(agent, %{"type" => "analyze_dependencies"} = signal) do
@@ -1123,7 +1127,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
   
   # Action result handlers
   
-  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, _metadata) do
     # Record analysis
     analysis_record = %{
       type: result[:analysis_type] || "comprehensive",
@@ -1184,7 +1188,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     {:ok, agent}
   end
   
-  def handle_action_result(agent, CheckCircularDependenciesAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, CheckCircularDependenciesAction, {:ok, result}, _metadata) do
     # Update dependency graph
     agent = if result.circular_dependencies_found do
       update_in(agent.state.dependency_graph, fn graph ->
@@ -1212,7 +1216,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     {:ok, agent}
   end
   
-  def handle_action_result(agent, FindUnusedDependenciesAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, FindUnusedDependenciesAction, {:ok, result}, _metadata) do
     # Update health metrics
     agent = update_in(agent.state.health_metrics, fn metrics ->
       Map.put(metrics, :unused_count, result.unused_count)
@@ -1232,7 +1236,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     {:ok, agent}
   end
   
-  def handle_action_result(agent, MonitorDependencyHealthAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, MonitorDependencyHealthAction, {:ok, result}, _metadata) do
     # Update health metrics
     agent = update_in(agent.state.health_metrics, fn metrics ->
       metrics
@@ -1252,7 +1256,7 @@ defmodule RubberDuck.Tools.Agents.DependencyInspectorAgent do
     {:ok, agent}
   end
   
-  def handle_action_result(agent, CompareDependenciesAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, CompareDependenciesAction, {:ok, result}, _metadata) do
     # Emit signal
     signal = Jido.Signal.new!(%{
       type: "dependency_changes_detected",

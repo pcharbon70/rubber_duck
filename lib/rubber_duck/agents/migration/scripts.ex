@@ -398,7 +398,7 @@ defmodule RubberDuck.Agents.Migration.Scripts do
       {agent_code, issues, ["Generated skeleton agent code - requires manual completion" | warnings]}
     rescue
       error ->
-        {agent_code = "", ["Failed to generate agent code: #{inspect(error)}" | issues], warnings}
+        {_agent_code = "", ["Failed to generate agent code: #{inspect(error)}" | issues], warnings}
     end
   end
   

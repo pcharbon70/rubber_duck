@@ -122,27 +122,27 @@ Based on comprehensive analysis of 90+ agent files:
   - [x] `ContextSourceManagementAction` - Manage context sources
   - [x] `ContextConfigurationAction` - Configure priorities and limits
 
-### 16.3.2 Provider Implementation Agents
-- [ ] **16.3.2.1 Migrate AnthropicProviderAgent**
-  - [ ] Convert from direct signal handling to Actions
-  - [ ] Implement Claude-specific features through Actions
-  - [ ] Add streaming and safety features
-  - [ ] Create context window management
-  - [ ] Add usage tracking and billing
+### 16.3.2 Provider Implementation Agents ✅ **COMPLETED**
+- [x] **16.3.2.1 Migrate AnthropicProviderAgent**
+  - [x] Convert from direct signal handling to Actions
+  - [x] Implement Claude-specific features through Actions
+  - [x] Add streaming and safety features (`ConfigureSafetyAction`, `VisionRequestAction`)
+  - [x] Create context window management (`ContextWindowManagementAction`)
+  - [x] Add usage tracking and billing (`UsageTrackingAction`)
 
-- [ ] **16.3.2.2 Migrate OpenAIProviderAgent**
-  - [ ] Convert to action-based architecture
-  - [ ] Extract model selection logic
-  - [ ] Implement usage optimization
-  - [ ] Add function calling support
-  - [ ] Create batch processing capabilities
+- [x] **16.3.2.2 Migrate OpenAIProviderAgent**
+  - [x] Convert to action-based architecture
+  - [x] Extract model selection logic (`ModelSelectionAction`)
+  - [x] Implement usage optimization
+  - [x] Add function calling support (`ConfigureFunctionsAction`)
+  - [x] Create batch processing capabilities (`BatchProcessingAction`, `StreamRequestAction`)
 
-- [ ] **16.3.2.3 Migrate LocalProviderAgent**
-  - [ ] Convert from GenServer patterns
-  - [ ] Extract model loading into Actions
-  - [ ] Implement resource management
-  - [ ] Add performance optimization
-  - [ ] Create model switching capabilities
+- [x] **16.3.2.3 Migrate LocalProviderAgent**
+  - [x] Convert from GenServer patterns (removed `handle_info` callbacks)
+  - [x] Extract model loading into Actions (`LoadModelAction`, `UnloadModelAction`)
+  - [x] Implement resource management (`GetResourceStatusAction`)
+  - [x] Add performance optimization (`PerformanceOptimizationAction`)
+  - [x] Create model switching capabilities (`ModelSwitchingAction`, `ListAvailableModelsAction`)
 
 ### 16.3.3 Quality and Enhancement Agents
 - [ ] **16.3.3.1 Fix QualityImprovementAgent Mixed Patterns**

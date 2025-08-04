@@ -27,7 +27,7 @@ defmodule RubberDuck.Jido.Actions.Provider.ProviderRequestAction do
       stream: [type: :boolean, default: false]
     ]
 
-  alias RubberDuck.LLM.{Request, Response}
+  alias RubberDuck.LLM.Request
   alias RubberDuck.Jido.Actions.Base.{UpdateStateAction, EmitSignalAction}
   
   require Logger

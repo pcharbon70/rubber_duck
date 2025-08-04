@@ -141,7 +141,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
     
     @impl true
     def run(action_params, context) do
-      agent = context.agent
+      _agent = context.agent
       params = action_params.params
       
       # Execute the TestRunner tool
@@ -643,7 +643,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
       end
     end
     
-    defp generate_health_recommendations(history, agent) do
+    defp generate_health_recommendations(history, _agent) do
       recommendations = []
       
       # Check for stability issues
@@ -676,6 +676,8 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
         else
           recommendations
         end
+      else
+        recommendations
       end
       
       recommendations
@@ -981,7 +983,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
   
   # Action result handlers
   
-  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, _metadata) do
     # Record test run
     test_record = %{
       total: result.summary.total,
@@ -1072,7 +1074,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
     {:error, reason}
   end
   
-  def handle_action_result(agent, AnalyzeResultsAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, AnalyzeResultsAction, {:ok, result}, _metadata) do
     # Emit analysis complete signal
     signal = Jido.Signal.new!(%{
       type: "test_results_analyzed",
@@ -1084,7 +1086,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
     {:ok, agent}
   end
   
-  def handle_action_result(agent, MonitorHealthAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, MonitorHealthAction, {:ok, result}, _metadata) do
     # Update health metrics
     agent = update_in(agent.state.test_health, fn health ->
       health
@@ -1103,7 +1105,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
     {:ok, agent}
   end
   
-  def handle_action_result(agent, OptimizeExecutionAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, OptimizeExecutionAction, {:ok, result}, _metadata) do
     # Store optimization suggestions
     agent = put_in(agent.state.optimization_suggestions, result.optimizations)
     

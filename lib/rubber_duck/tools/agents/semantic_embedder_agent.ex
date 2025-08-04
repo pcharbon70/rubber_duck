@@ -131,7 +131,7 @@ defmodule RubberDuck.Tools.Agents.SemanticEmbedderAgent do
       ]
     
     def run(params, context) do
-      agent_state = context.agent.state
+      _agent_state = context.agent.state
       start_time = System.monotonic_time(:millisecond)
       
       # Process embeddings
@@ -296,7 +296,7 @@ defmodule RubberDuck.Tools.Agents.SemanticEmbedderAgent do
       1.0 / (1.0 + distance)
     end
     
-    defp passes_filter?(metadata, filter) when map_size(filter) == 0, do: true
+    defp passes_filter?(_metadata, filter) when map_size(filter) == 0, do: true
     defp passes_filter?(metadata, filter) do
       Enum.all?(filter, fn {key, value} ->
         Map.get(metadata, key) == value
@@ -672,7 +672,7 @@ defmodule RubberDuck.Tools.Agents.SemanticEmbedderAgent do
   end
   
   @impl true
-  def handle_signal(state, signal) do
+  def handle_signal(state, _signal) do
     {:ok, state}
   end
   
@@ -736,7 +736,7 @@ defmodule RubberDuck.Tools.Agents.SemanticEmbedderAgent do
     |> update_in([:performance_metrics, :total_embeddings], &(&1 + 1))
   end
   
-  defp update_state_after_search(state, result) do
+  defp update_state_after_search(state, _result) do
     state
     |> update_in([:performance_metrics, :total_searches], &(&1 + 1))
   end

@@ -265,8 +265,8 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
             {:ok, agent}
             
           _ ->
-            # Let parent handle unknown actions
-            super(agent, action, result, metadata)
+            # Default handling for unknown actions
+            {:ok, agent}
         end
       end
       

@@ -25,7 +25,9 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
       RubberDuck.Jido.Actions.Provider.Local.LoadModelAction,
       RubberDuck.Jido.Actions.Provider.Local.UnloadModelAction,
       RubberDuck.Jido.Actions.Provider.Local.GetResourceStatusAction,
-      RubberDuck.Jido.Actions.Provider.Local.ListAvailableModelsAction
+      RubberDuck.Jido.Actions.Provider.Local.ListAvailableModelsAction,
+      RubberDuck.Jido.Actions.Provider.Local.ModelSwitchingAction,
+      RubberDuck.Jido.Actions.Provider.Local.PerformanceOptimizationAction
     ]
   
   alias RubberDuck.LLM.Providers.Ollama
@@ -67,9 +69,7 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
     })
     |> Map.put(:model_performance, %{})  # model => {avg_tokens_per_sec, requests}
     
-    # Start resource monitoring
-    schedule_resource_check(state)
-    
+    # Resource monitoring is now handled through Actions
     {:ok, state}
   end
   
@@ -80,64 +80,9 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
     {:ok, agent}
   end
   
-  # GenServer callbacks
-  
-  @impl true
-  def handle_info(:check_resources, agent) do
-    # Monitor system resources
-    resources = get_system_resources()
-    
-    agent = put_in(agent.state.resource_monitor, Map.merge(resources, %{
-      last_check: System.monotonic_time(:millisecond)
-    }))
-    
-    # Schedule next check
-    schedule_resource_check(agent)
-    
-    # Emit warning if resources are low
-    if resources.cpu_usage > 90.0 or resources.memory_usage > 90.0 do
-      signal = Jido.Signal.new!(%{
-        type: "provider.resource.warning",
-        source: "agent:#{agent.id}",
-        data: %{
-          provider: "local",
-          cpu_usage: resources.cpu_usage,
-          memory_usage: resources.memory_usage,
-          severity: "high",
-          timestamp: DateTime.utc_now()
-        }
-      })
-      Jido.Signal.Bus.publish(RubberDuck.SignalBus, [signal])
-    end
-    
-    {:noreply, agent}
-  end
-  
-  def handle_info({:model_performance, model, tokens_per_sec}, agent) do
-    # Update model performance metrics
-    agent = update_in(agent.state.model_performance[model], fn
-      nil -> {tokens_per_sec, 1}
-      {avg, count} -> 
-        # Running average
-        new_avg = (avg * count + tokens_per_sec) / (count + 1)
-        {new_avg, count + 1}
-    end)
-    
-    {:noreply, agent}
-  end
-
-  def handle_info({:model_loaded, model_name, load_time}, agent) do
-    agent = update_in(agent.state.loaded_models, &Map.put(&1, model_name, %{
-      loaded_at: System.monotonic_time(:millisecond),
-      load_time_ms: load_time
-    }))
-    
-    # Update available models in config
-    models = Map.keys(agent.state.loaded_models)
-    agent = put_in(agent.state.provider_config.models, models)
-    
-    {:noreply, agent}
-  end
+  # Resource monitoring is now handled through Actions and periodic agent runs
+  # Model performance tracking is handled through Actions
+  # Model loading is handled through LoadModelAction
   
   # Private functions
   
@@ -179,30 +124,9 @@ defmodule RubberDuck.Agents.LocalProviderAgent do
     ) |> max(1)
   end
   
-  defp schedule_resource_check(_state) do
-    Process.send_after(self(), :check_resources, 5_000)  # Every 5 seconds
-  end
   
   
-  defp can_handle_request?(agent) do
-    # Check current resource usage
-    resources = agent.state.resource_monitor
-    
-    resources.cpu_usage < 80.0 && 
-    resources.memory_usage < 85.0 &&
-    map_size(agent.state.active_requests) < agent.state.max_concurrent_requests
-  end
-  
-  
-  defp get_system_resources do
-    # In production, would use actual system monitoring
-    %{
-      cpu_usage: :rand.uniform() * 100,  # Mock CPU usage
-      memory_usage: :rand.uniform() * 100,  # Mock memory usage
-      gpu_usage: :rand.uniform() * 100,  # Mock GPU usage
-      gpu_memory: :rand.uniform() * 100  # Mock GPU memory
-    }
-  end
+  # Functions removed after Action migration - resource monitoring is now handled by GetResourceStatusAction
   
   defp get_available_memory_gb do
     # In production, would check actual available memory

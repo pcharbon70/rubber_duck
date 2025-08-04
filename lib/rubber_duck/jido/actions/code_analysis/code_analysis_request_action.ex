@@ -31,8 +31,8 @@ defmodule RubberDuck.Jido.Actions.CodeAnalysis.CodeAnalysisRequestAction do
       ]
     ]
 
-  alias RubberDuck.CoT.Manager, as: ConversationManager
-  alias RubberDuck.CoT.Chains.AnalysisChain
+  # alias RubberDuck.CoT.Manager, as: ConversationManager
+  # alias RubberDuck.CoT.Chains.AnalysisChain
   alias RubberDuck.LLM
   alias RubberDuck.Jido.Actions.Base.{UpdateStateAction, EmitSignalAction}
   require Logger
@@ -418,7 +418,7 @@ defmodule RubberDuck.Jido.Actions.CodeAnalysis.CodeAnalysisRequestAction do
     UpdateStateAction.run(%{updates: state_updates}, %{agent: agent})
   end
   
-  defp emit_analysis_result(agent, result, params, from_cache \\ false) do
+  defp emit_analysis_result(agent, result, params, from_cache) do
     signal_params = %{
       signal_type: "analysis.result",
       data: %{

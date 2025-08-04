@@ -121,7 +121,7 @@ defmodule RubberDuck.Tools.CodeComparer do
   @doc """
   Executes code comparison based on the provided parameters.
   """
-  def execute(params, context) do
+  def execute(params, _context) do
     with {:ok, preprocessed} <- preprocess_code(params),
          {:ok, parsed} <- parse_both_versions(preprocessed),
          {:ok, differences} <- analyze_differences(parsed, params),
@@ -252,7 +252,7 @@ defmodule RubberDuck.Tools.CodeComparer do
     
     diff_ops
     |> Enum.with_index()
-    |> Enum.flat_map(fn {op, index} ->
+    |> Enum.flat_map(fn {op, _index} ->
       case op do
         {:add, line, line_num} ->
           [%{
@@ -606,7 +606,7 @@ defmodule RubberDuck.Tools.CodeComparer do
     Enum.reverse(signatures)
   end
   
-  defp categorize_differences(differences, params) do
+  defp categorize_differences(differences, _params) do
     categorized = %{
       critical: [],
       important: [],
@@ -656,7 +656,7 @@ defmodule RubberDuck.Tools.CodeComparer do
     {:ok, %{unified_diff: Enum.join(unified, "\n")}}
   end
   
-  defp format_side_by_side(categorized) do
+  defp format_side_by_side(_categorized) do
     # Simplified side-by-side format
     {:ok, %{side_by_side: "Side-by-side view not fully implemented"}}
   end

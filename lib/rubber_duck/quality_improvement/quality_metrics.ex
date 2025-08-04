@@ -402,7 +402,6 @@ defmodule RubberDuck.QualityImprovement.QualityMetrics do
       time_span_days = case {Enum.min(timestamps), Enum.max(timestamps)} do
         {min_time, max_time} -> 
           DateTime.diff(max_time, min_time, :day)
-        _ -> 1
       end
       
       time_span_days = max(1, time_span_days)  # Avoid division by zero

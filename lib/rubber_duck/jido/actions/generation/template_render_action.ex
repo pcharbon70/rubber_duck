@@ -69,7 +69,7 @@ defmodule RubberDuck.Jido.Actions.Generation.TemplateRenderAction do
   @template_directory "priv/templates/generation"
 
   @impl true
-  def run(params, context) do
+  def run(params, _context) do
     Logger.info("Rendering template: #{params.template_name}")
 
     with {:ok, template_content} <- load_template(params),

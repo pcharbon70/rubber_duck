@@ -91,7 +91,7 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
             
             {:ok, updated_state}
             
-          error -> 
+          _error -> 
             {:ok, state}
         end
         
@@ -123,7 +123,7 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
     @moduledoc """
     Scans multiple projects or dependency files in batch.
     """
-    use Jido.Action
+    use Jido.Action, name: "batch_scan"
     
     def parameter_schema do
       %{
@@ -231,7 +231,7 @@ defmodule RubberDuck.Tools.Agents.CVEAnalyzerAgent do
     @moduledoc """
     Analyzes vulnerability trends over time.
     """
-    use Jido.Action
+    use Jido.Action, name: "analyze_trends"
     
     def parameter_schema do
       %{

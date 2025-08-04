@@ -442,7 +442,7 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
     end
     
     defp extract_related_items(doc, relation_types) do
-      metadata = doc.metadata || %{}
+      _metadata = doc.metadata || %{}
       related = []
       
       # Extract from documentation content
@@ -564,7 +564,7 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
     
     @impl true
     def run(params, context) do
-      agent = context.agent
+      _agent = context.agent
       
       # Build documentation index
       index = %{
@@ -915,7 +915,7 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
   
   # Action result handlers
   
-  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, ExecuteToolAction, {:ok, result}, _metadata) do
     # Update fetch history
     fetch_record = %{
       query: result.query,
@@ -980,7 +980,7 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
     {:ok, agent}
   end
   
-  def handle_action_result(agent, BatchFetchAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, BatchFetchAction, {:ok, result}, _metadata) do
     # Update batch tracking
     agent = put_in(agent.state.active_batches[result.batch_id], %{
       status: :completed,
@@ -1002,7 +1002,7 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
     {:ok, agent}
   end
   
-  def handle_action_result(agent, GenerateDocIndexAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, GenerateDocIndexAction, {:ok, result}, _metadata) do
     # Update doc index
     agent = put_in(agent.state.doc_index, Map.merge(result.index, %{
       last_updated: DateTime.utc_now()
@@ -1019,7 +1019,7 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
     {:ok, agent}
   end
   
-  def handle_action_result(agent, FetchRelatedDocsAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, FetchRelatedDocsAction, {:ok, result}, _metadata) do
     # Store related docs information
     agent = put_in(agent.state.related_docs[result.base_query], %{
       related_items: result.related_documentation,
@@ -1041,13 +1041,21 @@ defmodule RubberDuck.Tools.Agents.DocFetcherAgent do
     {:ok, agent}
   end
   
-  def handle_action_result(agent, UpdateCacheAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, UpdateCacheAction, {:ok, result}, _metadata) do
     # Handle cache update results
     agent = case result.operation do
-      :clear when result[:cleared_entries] ->
-        put_in(agent.state.doc_cache, %{})
-      :evict when result.success ->
-        update_in(agent.state.doc_cache, &Map.delete(&1, result.evicted_key))
+      :clear ->
+        if result[:cleared_entries] do
+          put_in(agent.state.doc_cache, %{})
+        else
+          agent
+        end
+      :evict ->
+        if result[:success] do
+          update_in(agent.state.doc_cache, &Map.delete(&1, result[:evicted_key]))
+        else
+          agent
+        end
       _ ->
         agent
     end

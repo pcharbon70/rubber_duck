@@ -9,7 +9,7 @@ defmodule RubberDuck.Tools.CodeExplainer do
   use RubberDuck.Tool
   
   alias RubberDuck.LLM.Service
-  alias RubberDuck.Analysis.AST.Parser
+  # alias RubberDuck.Analysis.AST.Parser # Currently unused
   
   tool do
     name :code_explainer
@@ -77,7 +77,7 @@ defmodule RubberDuck.Tools.CodeExplainer do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:llm_access, :code_analysis]
       rate_limit [max_requests: 150, window_seconds: 60]
     end
@@ -419,7 +419,7 @@ defmodule RubberDuck.Tools.CodeExplainer do
     |> Enum.reverse()
   end
   
-  defp extract_function_doc([{:do, block} | _]), do: nil
+  defp extract_function_doc([{:do, _block} | _]), do: nil
   defp extract_function_doc(_), do: nil
   
   defp extract_module_doc([{:do, _} | _]), do: nil
