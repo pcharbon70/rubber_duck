@@ -164,20 +164,20 @@ Based on comprehensive analysis of 90+ agent files:
 
 ## 16.4 Low Priority Migrations (Support Systems)
 
-### 16.4.1 Memory Management Agents
-- [ ] **16.4.1.1 Fix MemoryCoordinatorAgent**
-  - [ ] Remove legacy signal handling
-  - [ ] Extract memory operations into Actions
-  - [ ] Implement distributed coordination
-  - [ ] Add consistency and synchronization
-  - [ ] Create memory optimization
+### 16.4.1 Memory Management Agents ✅ COMPLETED
+- [x] **16.4.1.1 Fix MemoryCoordinatorAgent** ✅
+  - [x] Remove legacy signal handling - Migrated to pure Jido.Agent
+  - [x] Extract memory operations into Actions - Created 6 Action modules
+  - [x] Implement distributed coordination - CoordinateOperationAction handles cross-tier ops
+  - [x] Add consistency and synchronization - SyncMemoryTiersAction manages sync
+  - [x] Create memory optimization - Metrics tracking and health checks implemented
 
-- [ ] **16.4.1.2 Fix LongTermMemoryAgent**
-  - [ ] Convert mixed patterns to pure Jido
-  - [ ] Extract storage operations into Actions
-  - [ ] Implement search and indexing
-  - [ ] Add archival and compression
-  - [ ] Create backup and recovery
+- [x] **16.4.1.2 Fix LongTermMemoryAgent** ✅
+  - [x] Convert mixed patterns to pure Jido - Migrated to Jido.Agent
+  - [x] Extract storage operations into Actions - Created 8 Action modules
+  - [x] Implement search and indexing - SearchMemoryAction and QueryMemoryAction
+  - [x] Add archival and compression - OptimizeStorageAction handles lifecycle
+  - [x] Create backup and recovery - BackupMemoryAction for backup operations
 
 ### 16.4.2 Workflow and Legacy Agents
 - [ ] **16.4.2.1 Migrate RetrievalAgent**
