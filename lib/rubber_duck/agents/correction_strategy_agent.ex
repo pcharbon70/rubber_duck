@@ -95,166 +95,165 @@ defmodule RubberDuck.Agents.CorrectionStrategyAgent do
           "cost_prediction_accuracy" => 0.0
         }
       }]
+    ],
+    actions: [
+      RubberDuck.Jido.Actions.Correction.StrategySelectionAction,
+      RubberDuck.Jido.Actions.Correction.StrategyFeedbackAction,
+      RubberDuck.Jido.Actions.Correction.CostEstimationAction,
+      RubberDuck.Jido.Actions.Correction.PerformanceMetricsAction
     ]
 
   require Logger
 
-  # Signal Handlers
-
-  def handle_signal(agent, %{"type" => "strategy_selection_request"} = signal) do
+  # Signal-to-Action Mappings
+  # This replaces all handle_signal callbacks with Jido action routing
+  
+  @impl true
+  def signal_mappings do
     %{
-      "data" => %{
-        "error_data" => error_data,
-        "constraints" => constraints
-      }
-    } = signal
-    
-    selection_id = signal["id"]
-    
-    Logger.info("Processing strategy selection request for error: #{error_data["error_id"]}")
-    
-    # Update agent status
-    agent = %{agent | state: %{agent.state | strategy_status: :selecting}}
-    
-    # Track active evaluation
-    evaluation_info = %{
-      error_data: error_data,
-      constraints: constraints,
-      started_at: DateTime.utc_now(),
-      status: :in_progress
+      "strategy_selection_request" => {RubberDuck.Jido.Actions.Correction.StrategySelectionAction, &extract_selection_params/1},
+      "strategy_outcome_feedback" => {RubberDuck.Jido.Actions.Correction.StrategyFeedbackAction, &extract_feedback_params/1},
+      "cost_estimation_request" => {RubberDuck.Jido.Actions.Correction.CostEstimationAction, &extract_estimation_params/1},
+      "performance_metrics_request" => {RubberDuck.Jido.Actions.Correction.PerformanceMetricsAction, &extract_metrics_params/1}
     }
-    
-    agent = put_in(agent.state.active_evaluations[selection_id], evaluation_info)
-    
-    # Perform strategy selection
-    selection_result = select_strategies(agent, error_data, constraints)
-    
-    # Update metrics
-    agent = update_selection_metrics(agent, selection_id, selection_result)
-    
-    # Emit selection result
-    result_signal = Jido.Signal.new!(%{
-      type: "correction.strategy.selection.result",
-      source: "agent:#{agent.id}",
-      data: %{
-        selection_id: selection_id,
-        strategies: selection_result.strategies,
-        cost_estimates: selection_result.cost_estimates,
-        confidence_scores: selection_result.confidence_scores,
-        recommendation: selection_result.recommendation,
-        timestamp: DateTime.utc_now()
-      }
-    })
-    
-    emit_signal(agent, result_signal)
-    
-    # Update evaluation status before cleanup
-    agent = put_in(agent.state.active_evaluations[selection_id].status, :completed)
-    
-    # Clean up active evaluation  
-    agent = %{agent | state: %{agent.state | 
-      strategy_status: :idle,
-      active_evaluations: Map.delete(agent.state.active_evaluations, selection_id)
-    }}
-    
-    {:ok, agent}
   end
-
-  def handle_signal(agent, %{"type" => "strategy_outcome_feedback"} = signal) do
+  
+  # Parameter extraction functions for signal-to-action mapping
+  
+  defp extract_selection_params(%{"data" => data, "id" => id}) do
     %{
-      "data" => outcome_data
-    } = signal
-    
-    feedback_id = signal["id"]
-    
-    Logger.info("Processing strategy outcome feedback for: #{outcome_data["strategy_id"]}")
-    
-    # Update agent status
-    agent = %{agent | state: %{agent.state | strategy_status: :learning}}
-    
-    # Process learning feedback
-    agent = process_learning_feedback(agent, outcome_data)
-    
-    # Update performance metrics
-    agent = update_performance_metrics(agent, outcome_data)
-    
-    # Emit learning confirmation
-    learning_signal = Jido.Signal.new!(%{
-      type: "correction.strategy.learning.updated",
-      source: "agent:#{agent.id}",
-      data: %{
-        feedback_id: feedback_id,
-        strategy_id: outcome_data["strategy_id"],
-        learning_applied: true,
-        timestamp: DateTime.utc_now()
-      }
-    })
-    
-    emit_signal(agent, learning_signal)
-    
-    # Reset status
-    agent = %{agent | state: %{agent.state | strategy_status: :idle}}
-    
-    {:ok, agent}
+      error_data: data["error_data"],
+      constraints: data["constraints"] || %{},
+      selection_id: id,
+      include_alternatives: Map.get(data, "include_alternatives", true),
+      max_strategies: Map.get(data, "max_strategies", 5)
+    }
   end
-
-  def handle_signal(agent, %{"type" => "cost_estimation_request"} = signal) do
+  
+  defp extract_feedback_params(%{"data" => data, "id" => id}) do
     %{
-      "data" => %{
-        "error_context" => error_context,
-        "strategies" => strategies
-      }
-    } = signal
-    
-    estimation_id = signal["id"]
-    
-    Logger.info("Processing cost estimation request for #{length(strategies)} strategies")
-    
-    # Calculate cost estimates
-    cost_estimates = calculate_cost_estimates(agent, error_context, strategies)
-    
-    # Emit cost estimation result
-    cost_signal = Jido.Signal.new!(%{
-      type: "correction.strategy.cost.estimation.result",
-      source: "agent:#{agent.id}",
-      data: %{
-        estimation_id: estimation_id,
-        cost_estimates: cost_estimates,
-        timestamp: DateTime.utc_now()
-      }
-    })
-    
-    emit_signal(agent, cost_signal)
-    
-    {:ok, agent}
+      strategy_id: data["strategy_id"],
+      success: data["success"],
+      actual_cost: data["actual_cost"],
+      execution_time: data["execution_time"],
+      error_context: data["error_context"],
+      feedback_id: id,
+      predicted_cost: Map.get(data, "predicted_cost"),
+      user_satisfaction: parse_satisfaction(Map.get(data, "user_satisfaction", "neutral"))
+    }
   end
-
-  def handle_signal(agent, %{"type" => "performance_metrics_request"} = signal) do
-    metrics_id = signal["id"]
-    
-    # Collect comprehensive performance metrics
-    detailed_metrics = collect_performance_metrics(agent.state.performance_metrics)
-    
-    # Emit metrics report
-    metrics_signal = Jido.Signal.new!(%{
-      type: "correction.strategy.performance.metrics.report",
-      source: "agent:#{agent.id}",
-      data: %{
-        metrics_id: metrics_id,
-        metrics: detailed_metrics,
-        collection_timestamp: DateTime.utc_now()
-      }
-    })
-    
-    emit_signal(agent, metrics_signal)
-    
-    {:ok, agent}
+  
+  defp extract_estimation_params(%{"data" => data, "id" => id}) do
+    %{
+      error_context: data["error_context"],
+      strategies: data["strategies"],
+      estimation_id: id,
+      include_breakdown: Map.get(data, "include_breakdown", true),
+      include_roi: Map.get(data, "include_roi", true),
+      confidence_threshold: Map.get(data, "confidence_threshold", 0.7)
+    }
   end
-
-  # Default signal handler
-  def handle_signal(agent, signal) do
-    Logger.warning("Unhandled signal type: #{signal["type"]}")
-    {:ok, agent}
+  
+  defp extract_metrics_params(%{"data" => data, "id" => id}) do
+    data = data || %{}
+    %{
+      metrics_id: id,
+      time_range: parse_time_range(Map.get(data, "time_range", "all_time")),
+      include_strategies: Map.get(data, "include_strategies", []),
+      include_trends: Map.get(data, "include_trends", true),
+      include_predictions: Map.get(data, "include_predictions", true),
+      group_by: parse_group_by(Map.get(data, "group_by", "strategy"))
+    }
+  end
+  
+  # Parsing helper functions
+  
+  defp parse_satisfaction("satisfied"), do: :satisfied
+  defp parse_satisfaction("dissatisfied"), do: :dissatisfied
+  defp parse_satisfaction(_), do: :neutral
+  
+  defp parse_time_range("last_24_hours"), do: :last_24_hours
+  defp parse_time_range("last_7_days"), do: :last_7_days
+  defp parse_time_range("last_30_days"), do: :last_30_days
+  defp parse_time_range(_), do: :all_time
+  
+  defp parse_group_by("error_type"), do: :error_type
+  defp parse_group_by("complexity"), do: :complexity
+  defp parse_group_by("time_period"), do: :time_period
+  defp parse_group_by(_), do: :strategy
+  
+  # Lifecycle hooks for Jido compliance
+  
+  @impl true
+  def on_before_init(config) do
+    # Initialize strategy library if not provided
+    library = Map.get(config, :strategy_library) || default_strategy_library()
+    Map.put(config, :strategy_library, library)
+  end
+  
+  @impl true
+  def on_after_start(agent) do
+    Logger.info("Correction Strategy Agent started successfully",
+      name: agent.name,
+      strategies: map_size(agent.state.strategy_library)
+    )
+    agent
+  end
+  
+  @impl true
+  def on_after_run(agent, action, result) do
+    # Update agent state based on action results
+    case action do
+      RubberDuck.Jido.Actions.Correction.StrategyFeedbackAction ->
+        # Merge updated state from feedback action
+        case result do
+          {:ok, _result, state_updates} ->
+            new_state = Map.merge(agent.state, state_updates)
+            {:ok, %{agent | state: new_state}}
+          _ ->
+            {:ok, agent}
+        end
+      _ ->
+        {:ok, agent}
+    end
+  end
+  
+  defp default_strategy_library do
+    %{
+      "syntax_fix_basic" => %{
+        name: "Basic Syntax Fix",
+        category: "syntax",
+        description: "Automated fixing of common syntax errors",
+        base_cost: 2.0,
+        success_rate: 0.85,
+        prerequisites: [],
+        constraints: ["file_size < 1000", "complexity == low"],
+        metadata: %{
+          "supported_languages" => ["elixir", "javascript", "python"],
+          "avg_execution_time" => 1500,
+          "risk_level" => "low",
+          "reversible" => true,
+          "modifies_code" => true
+        }
+      },
+      "logic_fix_guided" => %{
+        name: "Guided Logic Fix",
+        category: "logic",
+        description: "Interactive logic error correction with user guidance",
+        base_cost: 8.0,
+        success_rate: 0.75,
+        prerequisites: ["user_available"],
+        constraints: ["complexity <= high"],
+        metadata: %{
+          "supported_languages" => ["elixir"],
+          "avg_execution_time" => 5000,
+          "risk_level" => "medium",
+          "reversible" => false,
+          "modifies_code" => true,
+          "uses_llm" => true
+        }
+      }
+    }
   end
 
   # Public API Functions
@@ -285,36 +284,7 @@ defmodule RubberDuck.Agents.CorrectionStrategyAgent do
   end
 
   # Private Implementation Functions
-
-  defp select_strategies(agent, error_data, constraints) do
-    # Get applicable strategies
-    applicable_strategies = get_applicable_strategies(agent.state.strategy_library, error_data)
-    
-    # Calculate costs for each strategy
-    cost_estimates = Enum.map(applicable_strategies, fn {strategy_id, strategy} ->
-      cost = calculate_strategy_cost(agent.state.cost_models, strategy, error_data)
-      {strategy_id, cost}
-    end) |> Map.new()
-    
-    # Calculate confidence scores
-    confidence_scores = Enum.map(applicable_strategies, fn {strategy_id, strategy} ->
-      confidence = calculate_selection_confidence(agent.state.learning_data, strategy, error_data)
-      {strategy_id, confidence}
-    end) |> Map.new()
-    
-    # Rank strategies by composite score
-    ranked_strategies = rank_strategies(applicable_strategies, cost_estimates, confidence_scores, constraints)
-    
-    # Select top recommendation
-    recommendation = get_top_recommendation(ranked_strategies, constraints)
-    
-    %{
-      strategies: ranked_strategies,
-      cost_estimates: cost_estimates,
-      confidence_scores: confidence_scores,
-      recommendation: recommendation
-    }
-  end
+  # Note: Most logic has been moved to Actions for better testability and reusability
 
   defp get_applicable_strategies(strategy_library, error_context) do
     strategy_library
@@ -417,79 +387,6 @@ defmodule RubberDuck.Agents.CorrectionStrategyAgent do
     end
   end
 
-  defp rank_strategies(strategies, cost_estimates, confidence_scores, constraints) do
-    max_cost = Map.get(constraints, "max_cost", 100.0)
-    confidence_threshold = Map.get(constraints, "confidence_threshold", 0.5)
-    
-    strategies
-    |> Enum.filter(fn {strategy_id, _strategy} ->
-      cost_estimates[strategy_id] <= max_cost and
-      confidence_scores[strategy_id] >= confidence_threshold
-    end)
-    |> Enum.map(fn {strategy_id, strategy} ->
-      cost = cost_estimates[strategy_id]
-      confidence = confidence_scores[strategy_id]
-      
-      # Composite score: higher confidence, lower cost is better
-      composite_score = confidence / (1 + cost * 0.1)
-      
-      %{
-        strategy_id: strategy_id,
-        strategy: strategy,
-        cost: cost,
-        confidence: confidence,
-        composite_score: composite_score
-      }
-    end)
-    |> Enum.sort_by(& &1.composite_score, :desc)
-  end
-
-  defp get_top_recommendation(ranked_strategies, _constraints) do
-    case ranked_strategies do
-      [top_strategy | _] ->
-        %{
-          strategy_id: top_strategy.strategy_id,
-          confidence: top_strategy.confidence,
-          estimated_cost: top_strategy.cost,
-          reasoning: "Highest composite score based on confidence and cost effectiveness"
-        }
-      
-      [] ->
-        %{
-          strategy_id: nil,
-          confidence: 0.0,
-          estimated_cost: 0.0,
-          reasoning: "No strategies meet the specified constraints"
-        }
-    end
-  end
-
-  defp calculate_cost_estimates(agent, error_context, strategies) do
-    strategies
-    |> Enum.map(fn strategy_id ->
-      strategy = agent.state.strategy_library[strategy_id]
-      
-      if strategy do
-        cost = calculate_strategy_cost(agent.state.cost_models, strategy, error_context)
-        confidence = calculate_cost_confidence(agent.state.learning_data, strategy_id, error_context)
-        time_estimate = estimate_execution_time(strategy, error_context)
-        
-        {strategy_id, %{
-          estimated_cost: cost,
-          confidence: confidence,
-          time_estimate: time_estimate
-        }}
-      else
-        {strategy_id, %{
-          estimated_cost: 0.0,
-          confidence: 0.0,
-          time_estimate: 0,
-          error: "Strategy not found"
-        }}
-      end
-    end)
-    |> Map.new()
-  end
 
   defp calculate_cost_confidence(learning_data, strategy_id, _error_context) do
     # Simple confidence calculation based on historical accuracy
@@ -528,81 +425,6 @@ defmodule RubberDuck.Agents.CorrectionStrategyAgent do
     round(base_time * complexity_multiplier)
   end
 
-  defp process_learning_feedback(agent, outcome_data) do
-    # Update outcome history
-    outcome_entry = %{
-      "strategy_id" => outcome_data["strategy_id"],
-      "success" => outcome_data["success"],
-      "actual_cost" => outcome_data["actual_cost"],
-      "execution_time" => outcome_data["execution_time"],
-      "error_context" => outcome_data["error_context"],
-      "timestamp" => DateTime.utc_now()
-    }
-    
-    learning_data = agent.state.learning_data
-    current_history = Map.get(learning_data, "outcome_history", [])
-    updated_history = [outcome_entry | current_history]
-    |> Enum.take(1000)  # Keep last 1000 outcomes
-    
-    updated_learning_data = Map.put(learning_data, "outcome_history", updated_history)
-    
-    %{agent | state: %{agent.state | learning_data: updated_learning_data}}
-  end
-
-  defp update_performance_metrics(agent, outcome_data) do
-    strategy_id = outcome_data["strategy_id"]
-    success = outcome_data["success"]
-    
-    current_metrics = agent.state.performance_metrics[strategy_id] || %{
-      "success_count" => 0,
-      "total_attempts" => 0,
-      "avg_cost" => 0.0
-    }
-    
-    new_success_count = current_metrics["success_count"] + (if success, do: 1, else: 0)
-    new_total_attempts = current_metrics["total_attempts"] + 1
-    
-    # Update average cost with exponential moving average
-    actual_cost = outcome_data["actual_cost"] || 0.0
-    alpha = 0.1  # Learning rate
-    new_avg_cost = current_metrics["avg_cost"] * (1 - alpha) + actual_cost * alpha
-    
-    updated_metrics = %{
-      "success_count" => new_success_count,
-      "total_attempts" => new_total_attempts,
-      "avg_cost" => new_avg_cost
-    }
-    
-    performance_metrics = Map.put(agent.state.performance_metrics, strategy_id, updated_metrics)
-    
-    %{agent | state: %{agent.state | performance_metrics: performance_metrics}}
-  end
-
-  defp update_selection_metrics(agent, _selection_id, _selection_result) do
-    # Update overall selection metrics
-    overall_metrics = agent.state.performance_metrics["overall"] || %{
-      "total_selections" => 0,
-      "successful_corrections" => 0,
-      "avg_selection_time" => 0.0,
-      "cost_prediction_accuracy" => 0.0
-    }
-    
-    updated_overall = %{overall_metrics | 
-      "total_selections" => overall_metrics["total_selections"] + 1
-    }
-    
-    performance_metrics = Map.put(agent.state.performance_metrics, "overall", updated_overall)
-    
-    %{agent | state: %{agent.state | performance_metrics: performance_metrics}}
-  end
-
-  defp collect_performance_metrics(performance_metrics) do
-    %{
-      overall_metrics: performance_metrics["overall"] || %{},
-      strategy_metrics: Map.delete(performance_metrics, "overall"),
-      collection_timestamp: DateTime.utc_now()
-    }
-  end
 
   # Health check implementation
   @impl true
