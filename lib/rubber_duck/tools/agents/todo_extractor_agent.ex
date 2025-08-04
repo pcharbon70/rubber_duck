@@ -875,7 +875,6 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
     end
   end
   
-  @impl true
   def additional_actions do
     [
       ExecuteToolAction,

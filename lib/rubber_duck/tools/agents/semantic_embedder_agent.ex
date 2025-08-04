@@ -620,7 +620,6 @@ defmodule RubberDuck.Tools.Agents.SemanticEmbedderAgent do
     end
   end
   
-  @impl true
   def additional_actions do
     [
       ExecuteToolAction,

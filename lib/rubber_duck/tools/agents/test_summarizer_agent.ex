@@ -1045,7 +1045,6 @@ defmodule RubberDuck.Tools.Agents.TestSummarizerAgent do
     defp format_value(value), do: to_string(value)
   end
   
-  @impl true
   def additional_actions do
     [
       ExecuteToolAction,
