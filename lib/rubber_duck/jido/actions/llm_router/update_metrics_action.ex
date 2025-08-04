@@ -18,7 +18,7 @@ defmodule RubberDuck.Jido.Actions.LLMRouter.UpdateMetricsAction do
     ]
 
   alias RubberDuck.Jido.Actions.Base.UpdateStateAction
-  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
+  alias RubberDuck.Agents.ErrorHandling
   require Logger
 
   @impl true

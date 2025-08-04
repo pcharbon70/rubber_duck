@@ -11,7 +11,7 @@ defmodule RubberDuck.Jido.Actions.Token.GetStatusAction do
     description: "Retrieves Token Manager Agent status and health metrics",
     schema: []
 
-  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
+  alias RubberDuck.Agents.ErrorHandling
   require Logger
 
   @impl true

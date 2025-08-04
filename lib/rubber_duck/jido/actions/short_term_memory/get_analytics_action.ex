@@ -4,7 +4,7 @@ defmodule RubberDuck.Jido.Actions.ShortTermMemory.GetAnalyticsAction do
     description: "Get memory analytics and metrics",
     schema: []
   
-  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
+  alias RubberDuck.Agents.ErrorHandling
   require Logger
   
   @impl true

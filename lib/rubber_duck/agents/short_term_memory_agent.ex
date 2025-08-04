@@ -71,7 +71,7 @@ defmodule RubberDuck.Agents.ShortTermMemoryAgent do
       RubberDuck.Jido.Actions.ShortTermMemory.StoreWithPersistenceAction
     ]
   
-  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
+  alias RubberDuck.Agents.ErrorHandling
   require Logger
   
   # alias RubberDuck.Memory  # Commented out as not currently used

@@ -14,7 +14,7 @@ defmodule RubberDuck.Jido.Actions.Provider.FeatureCheckAction do
     ]
 
   alias RubberDuck.Jido.Actions.Base.EmitSignalAction
-  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
+  alias RubberDuck.Agents.ErrorHandling
   
   require Logger
 

@@ -14,7 +14,7 @@ defmodule RubberDuck.Jido.Actions.Provider.OpenAI.ConfigureFunctionsAction do
     ]
 
   alias RubberDuck.Jido.Actions.Base.{UpdateStateAction, EmitSignalAction}
-  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
+  alias RubberDuck.Agents.ErrorHandling
   
   require Logger
 

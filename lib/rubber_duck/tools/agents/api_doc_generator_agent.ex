@@ -36,7 +36,7 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
       }]
     ]
 
-  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
+  alias RubberDuck.Agents.ErrorHandling
   require Logger
   
   # Define additional actions for this agent
@@ -146,13 +146,6 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
       end
     end
     
-    # Legacy function for backward compatibility
-    defp get_theme_config(agent, theme_name) do
-      case safe_get_theme_config(agent, theme_name) do
-        {:ok, config} -> config
-        {:error, _} -> %{}
-      end
-    end
   end
   
   defmodule GenerateFromCodeAction do
@@ -280,13 +273,6 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
       end
     end
     
-    # Legacy function for backward compatibility
-    defp get_template_config(agent, doc_type, custom_template) do
-      case safe_get_template_config(agent, doc_type, custom_template) do
-        {:ok, config} -> config
-        {:error, _} -> "default_template"
-      end
-    end
   end
   
   defmodule ValidateDocumentationAction do

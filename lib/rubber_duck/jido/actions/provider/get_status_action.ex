@@ -12,7 +12,7 @@ defmodule RubberDuck.Jido.Actions.Provider.GetStatusAction do
     schema: []
 
   alias RubberDuck.Jido.Actions.Base.EmitSignalAction
-  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
+  alias RubberDuck.Agents.ErrorHandling
   
   require Logger
 
