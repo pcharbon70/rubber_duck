@@ -8,7 +8,9 @@ defmodule RubberDuck.Agents.ErrorHandling do
   
   require Logger
   
-  @type error_type :: :network_error | :validation_error | :resource_error | :system_error
+  @type error_type :: :network_error | :validation_error | :resource_error | :system_error |
+                       :database_error | :api_error | :timeout_error | :permission_error |
+                       :rate_limit_error | :circuit_breaker_error
   
   @type error_response :: {:error, %{
     type: error_type(),
@@ -69,6 +71,85 @@ defmodule RubberDuck.Agents.ErrorHandling do
       details: details,
       retry_after: Map.get(details, :retry_after, 10000),
       recoverable: Map.get(details, :recoverable, false)
+    }}
+  end
+  
+  @doc """
+  Creates a standardized database error response.
+  """
+  def database_error(message, details \\ %{}) do
+    {:error, %{
+      type: :database_error,
+      message: message,
+      details: details,
+      retry_after: Map.get(details, :retry_after, 2000),
+      recoverable: Map.get(details, :recoverable, true)
+    }}
+  end
+  
+  @doc """
+  Creates a standardized API error response.
+  """
+  def api_error(message, details \\ %{}) do
+    {:error, %{
+      type: :api_error,
+      message: message,
+      details: details,
+      retry_after: Map.get(details, :retry_after, 3000),
+      recoverable: Map.get(details, :recoverable, true)
+    }}
+  end
+  
+  @doc """
+  Creates a standardized timeout error response.
+  """
+  def timeout_error(message, details \\ %{}) do
+    {:error, %{
+      type: :timeout_error,
+      message: message,
+      details: details,
+      retry_after: Map.get(details, :retry_after, 1000),
+      recoverable: true
+    }}
+  end
+  
+  @doc """
+  Creates a standardized permission error response.
+  """
+  def permission_error(message, details \\ %{}) do
+    {:error, %{
+      type: :permission_error,
+      message: message,
+      details: details,
+      retry_after: nil,
+      recoverable: false
+    }}
+  end
+  
+  @doc """
+  Creates a standardized rate limit error response.
+  """
+  def rate_limit_error(message, details \\ %{}) do
+    retry_after = Map.get(details, :retry_after, 60_000)
+    {:error, %{
+      type: :rate_limit_error,
+      message: message,
+      details: details,
+      retry_after: retry_after,
+      recoverable: true
+    }}
+  end
+  
+  @doc """
+  Creates a standardized circuit breaker error response.
+  """
+  def circuit_breaker_error(message, details \\ %{}) do
+    {:error, %{
+      type: :circuit_breaker_error,
+      message: message,
+      details: details,
+      retry_after: Map.get(details, :retry_after, 30_000),
+      recoverable: true
     }}
   end
   
@@ -363,10 +444,125 @@ defmodule RubberDuck.Agents.ErrorHandling do
       
       :system_error ->
         Logger.error("System error: #{message}", details)
+      
+      :database_error ->
+        Logger.error("Database error: #{message}", details)
+      
+      :api_error ->
+        Logger.error("API error: #{message}", details)
+      
+      :timeout_error ->
+        Logger.warning("Timeout error: #{message}", details)
+      
+      :permission_error ->
+        Logger.error("Permission error: #{message}", details)
+      
+      :rate_limit_error ->
+        Logger.warning("Rate limit error: #{message}", details)
+      
+      :circuit_breaker_error ->
+        Logger.warning("Circuit breaker error: #{message}", details)
     end
   end
   
   def log_error(error) do
     Logger.error("Unknown error: #{inspect(error)}")
   end
+  
+  @doc """
+  Categorizes an error and returns a standardized error response.
+  """
+  def categorize_error(error) do
+    case error do
+      {:error, %{type: _} = details} ->
+        # Already categorized
+        {:error, details}
+      
+      {:error, :timeout} ->
+        timeout_error("Operation timed out", %{})
+      
+      {:error, :enoent} ->
+        resource_error("File not found", %{error: :enoent})
+      
+      {:error, :eacces} ->
+        permission_error("Permission denied", %{error: :eacces})
+      
+      {:error, :econnrefused} ->
+        network_error("Connection refused", %{error: :econnrefused})
+      
+      {:error, :nxdomain} ->
+        network_error("Domain not found", %{error: :nxdomain})
+      
+      {:error, {:shutdown, reason}} ->
+        system_error("Process shutdown", %{reason: reason})
+      
+      {:error, %DBConnection.ConnectionError{} = error} ->
+        database_error("Database connection failed", %{error: inspect(error)})
+      
+      {:error, %Jason.DecodeError{} = error} ->
+        validation_error("JSON decode failed", %{error: inspect(error)})
+      
+      {:error, reason} when is_atom(reason) ->
+        system_error("System error", %{reason: reason})
+      
+      {:error, reason} when is_binary(reason) ->
+        system_error(reason, %{})
+      
+      error ->
+        system_error("Unknown error", %{error: inspect(error)})
+    end
+  end
+  
+  @doc """
+  Aggregates errors from batch operations.
+  """
+  def aggregate_errors(results) do
+    {successes, failures} = Enum.split_with(results, fn
+      {:ok, _} -> true
+      _ -> false
+    end)
+    
+    if failures == [] do
+      {:ok, Enum.map(successes, fn {:ok, result} -> result end)}
+    else
+      error_details = failures
+      |> Enum.map(&categorize_error/1)
+      |> Enum.map(fn {:error, details} -> details end)
+      |> Enum.group_by(& &1.type)
+      
+      {:error, %{
+        type: :batch_error,
+        message: "Batch operation had #{length(failures)} failures out of #{length(results)}",
+        details: %{
+          total: length(results),
+          successful: length(successes),
+          failed: length(failures),
+          errors_by_type: error_details
+        },
+        retry_after: nil,
+        recoverable: length(successes) > 0
+      }}
+    end
+  end
+  
+  @doc """
+  Determines error severity level.
+  """
+  def error_severity({:error, %{type: type}}) do
+    case type do
+      :permission_error -> :critical
+      :system_error -> :critical
+      :database_error -> :high
+      :circuit_breaker_error -> :high
+      :api_error -> :medium
+      :network_error -> :medium
+      :rate_limit_error -> :medium
+      :timeout_error -> :low
+      :validation_error -> :low
+      :resource_error -> :low
+      _ -> :unknown
+    end
+  end
+  
+  def error_severity(_), do: :unknown
 end
