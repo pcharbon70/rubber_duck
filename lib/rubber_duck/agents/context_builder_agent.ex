@@ -44,10 +44,9 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
   ```
   """
 
-  use RubberDuck.Agents.BaseAgent,
+  use Jido.Agent,
     name: "context_builder",
     description: "Manages context aggregation, prioritization, and optimization for LLM interactions",
-    category: "memory",
     schema: [
       sources: [type: :map, default: %{}, doc: "Registered context sources"],
       cache: [type: :map, default: %{}, doc: "Built context cache"],
@@ -55,12 +54,6 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
       priorities: [type: :map, default: %{}, doc: "Context prioritization weights"],
       metrics: [type: :map, default: %{}, doc: "Performance and usage metrics"],
       config: [type: :map, default: %{}, doc: "Agent configuration"]
-    ],
-    actions: [
-      RubberDuck.Jido.Actions.Context.ContextAssemblyAction,
-      RubberDuck.Jido.Actions.Context.ContextCacheAction,
-      RubberDuck.Jido.Actions.Context.ContextSourceManagementAction,
-      RubberDuck.Jido.Actions.Context.ContextConfigurationAction
     ]
 
   alias RubberDuck.Context.ContextSource
@@ -88,9 +81,11 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
 
   ## Initialization
 
-  @impl true
-  def init(_args) do
-    state = %{
+  @impl Jido.Agent
+  def mount(opts, initial_state) do
+    Logger.info("Mounting ContextBuilderAgent", opts: opts)
+    
+    state = Map.merge(initial_state, %{
       sources: initialize_default_sources(),
       cache: %{},
       active_builds: %{},
@@ -104,11 +99,11 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
         avg_compression_ratio: 1.0,
         source_failures: %{}
       },
-      config: @default_config
-    }
+      config: Map.merge(@default_config, Map.get(opts, :config, %{}))
+    })
     
     # Schedule periodic cache cleanup
-    schedule_cache_cleanup()
+    Process.send_after(self(), :cleanup_cache, 60_000)
     
     {:ok, state}
   end
@@ -307,7 +302,7 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     Process.send_after(self(), :cleanup_cache, 60_000)  # Every minute
   end
 
-  @impl true
+  # Handle periodic cache cleanup  
   def handle_info(:cleanup_cache, agent) do
     # Remove expired cache entries
     now = DateTime.utc_now()
@@ -330,10 +325,55 @@ defmodule RubberDuck.Agents.ContextBuilderAgent do
     {:noreply, %{agent | cache: updated_cache}}
   end
 
-  @impl true
+  # Handle streaming completion
   def handle_info({:streaming_complete, request_id}, agent) do
     # Clean up active build
     agent = update_in(agent.active_builds, &Map.delete(&1, request_id))
     {:noreply, agent}
+  end
+
+  ## Lifecycle Hooks
+
+  @impl Jido.Agent
+  def on_before_run(agent) do
+    Logger.debug("ContextBuilderAgent preparing to run action",
+      agent_id: agent.id,
+      cache_size: map_size(agent.state.cache)
+    )
+    {:ok, agent}
+  end
+
+  @impl Jido.Agent
+  def on_after_run(agent, _result, metadata) do
+    # Update metrics after action completion
+    updated_metrics = Map.update(agent.state.metrics, :builds_completed, 1, &(&1 + 1))
+    updated_state = Map.put(agent.state, :metrics, updated_metrics)
+    
+    Logger.debug("ContextBuilderAgent completed action",
+      agent_id: agent.id,
+      action: metadata[:action],
+      builds_completed: updated_metrics.builds_completed
+    )
+    
+    {:ok, %{agent | state: updated_state}}
+  end
+
+  @impl Jido.Agent
+  def on_error(agent, error) do
+    Logger.error("ContextBuilderAgent encountered error",
+      agent_id: agent.id,
+      error: error
+    )
+    {:ok, agent}
+  end
+
+  @impl Jido.Agent
+  def shutdown(agent, reason) do
+    Logger.info("ContextBuilderAgent shutting down",
+      agent_id: agent.id,
+      reason: reason,
+      cache_size: map_size(agent.state.cache)
+    )
+    :ok
   end
 end

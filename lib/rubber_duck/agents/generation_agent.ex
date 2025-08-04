@@ -57,7 +57,7 @@ defmodule RubberDuck.Agents.GenerationAgent do
       {:ok, result} = GenerationAgent.cmd(agent, CodeGenerationAction, params)
   """
 
-  use RubberDuck.Agents.BaseAgent,
+  use Jido.Agent,
     name: "generation_agent",
     description: "Code generation and quality improvement agent",
     schema: [
@@ -147,13 +147,6 @@ defmodule RubberDuck.Agents.GenerationAgent do
         ],
         doc: "Agent capabilities"
       ]
-    ],
-    actions: [
-      RubberDuck.Jido.Actions.Generation.CodeGenerationAction,
-      RubberDuck.Jido.Actions.Generation.TemplateRenderAction,
-      RubberDuck.Jido.Actions.Generation.QualityValidationAction,
-      RubberDuck.Jido.Actions.Generation.StreamingGenerationAction,
-      RubberDuck.Jido.Actions.Generation.PostProcessingAction
     ]
 
   require Logger
@@ -166,8 +159,50 @@ defmodule RubberDuck.Agents.GenerationAgent do
     PostProcessingAction
   }
 
+  # Mount callback required by Jido.Agent
+  @impl Jido.Agent
+  def mount(opts, initial_state) do
+    Logger.info("Mounting GenerationAgent", opts: opts)
+    
+    # Merge provided options into state
+    state = Map.merge(initial_state, %{
+      generation_cache: Map.get(opts, :generation_cache, %{}),
+      user_preferences: Map.get(opts, :user_preferences, %{
+        code_style: :balanced,
+        comments: :helpful,
+        error_handling: :comprehensive,
+        naming_convention: :snake_case
+      }),
+      generation_history: Map.get(opts, :generation_history, []),
+      metrics: Map.get(opts, :metrics, %{
+        tasks_completed: 0,
+        generate_code: 0,
+        refactor_code: 0,
+        fix_code: 0,
+        complete_code: 0,
+        generate_docs: 0,
+        template_renders: 0,
+        streaming_sessions: 0,
+        total_tokens_used: 0,
+        cache_hits: 0,
+        cache_misses: 0
+      }),
+      llm_config: Map.get(opts, :llm_config, %{
+        provider: :openai,
+        model: "gpt-4",
+        temperature: 0.7,
+        max_tokens: 2048
+      }),
+      streaming_sessions: Map.get(opts, :streaming_sessions, %{}),
+      template_cache: Map.get(opts, :template_cache, %{}),
+      enable_self_correction: Map.get(opts, :enable_self_correction, true),
+      cache_ttl_seconds: Map.get(opts, :cache_ttl_seconds, 3600)
+    })
+    
+    {:ok, state}
+  end
+
   # Signal mappings for generation workflows
-  @impl true
   def signal_mappings do
     %{
       "generation.code.request" => {CodeGenerationAction, &extract_generation_params/1},
@@ -184,7 +219,7 @@ defmodule RubberDuck.Agents.GenerationAgent do
 
   # Lifecycle hooks
 
-  @impl true
+  @impl Jido.Agent
   def on_before_validate_state(state) do
     # Ensure metrics are properly initialized
     if is_map(state.metrics) and Map.has_key?(state.metrics, :tasks_completed) do
@@ -194,26 +229,33 @@ defmodule RubberDuck.Agents.GenerationAgent do
     end
   end
 
-  @impl true
+  @impl Jido.Agent
   def on_after_validate_state(state) do
     # Update last activity timestamp
     {:ok, %{state | last_activity: DateTime.utc_now()}}
   end
 
-  @impl true
+  @impl Jido.Agent
   def on_before_run(agent) do
     # Log generation activity
     Logger.info("Generation Agent #{agent.id} starting task execution")
     {:ok, agent}
   end
 
-  @impl true
-  def on_after_run(agent, _action, result) do
+  @impl Jido.Agent
+  def on_after_run(agent, result, metadata) do
     # Update metrics based on successful execution
     case result do
       {:ok, _} ->
         new_metrics = update_task_metrics(agent.state.metrics, :tasks_completed)
         new_state = %{agent.state | metrics: new_metrics, last_activity: DateTime.utc_now()}
+        
+        Logger.debug("GenerationAgent completed action",
+          agent_id: agent.id,
+          action: metadata[:action],
+          tasks_completed: new_metrics.tasks_completed
+        )
+        
         {:ok, %{agent | state: new_state}}
       
       {:error, _} ->
@@ -223,7 +265,7 @@ defmodule RubberDuck.Agents.GenerationAgent do
     end
   end
 
-  @impl true
+  @impl Jido.Agent
   def on_error(agent, error) do
     Logger.error("Generation Agent #{agent.id} encountered error: #{inspect(error)}")
     
@@ -239,8 +281,17 @@ defmodule RubberDuck.Agents.GenerationAgent do
     end
   end
 
+  @impl Jido.Agent
+  def shutdown(agent, reason) do
+    Logger.info("GenerationAgent shutting down",
+      agent_id: agent.id,
+      reason: reason,
+      cache_size: map_size(agent.state.generation_cache)
+    )
+    :ok
+  end
+
   # Health check implementation
-  @impl true
   def health_check(agent) do
     health_status = %{
       healthy: true,
