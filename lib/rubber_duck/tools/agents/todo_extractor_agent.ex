@@ -904,12 +904,8 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
     params = Map.get(signal, "data", %{})
     context = %{agent: %{state: state}}
     
-    case ScanCodebaseAction.run(params, context) do
-      {:ok, result} -> 
-        {:ok, update_state_after_scan(state, result)}
-      {:error, reason} -> 
-        {:error, reason}
-    end
+    {:ok, result} = ScanCodebaseAction.run(params, context)
+    {:ok, update_state_after_scan(state, result)}
   end
   
   @impl true
@@ -917,12 +913,8 @@ defmodule RubberDuck.Tools.Agents.TodoExtractorAgent do
     params = Map.get(signal, "data", %{})
     context = %{agent: %{state: state}}
     
-    case AnalyzeDebtAction.run(params, context) do
-      {:ok, result} -> 
-        {:ok, update_debt_metrics(state, result)}
-      {:error, reason} -> 
-        {:error, reason}
-    end
+    {:ok, result} = AnalyzeDebtAction.run(params, context)
+    {:ok, update_debt_metrics(state, result)}
   end
   
   @impl true
