@@ -9,18 +9,14 @@ defmodule RubberDuck.Tools.CVEChecker do
 
   # alias RubberDuck.Types.{ToolCall, ToolResult}
 
-  @impl true
   def name, do: :cve_checker
 
-  @impl true
   def description do
     "Checks for CVE vulnerabilities in dependency chains across multiple registries"
   end
 
-  @impl true
   def category, do: :security
 
-  @impl true
   def input_schema do
     %{
       type: "object",
@@ -88,7 +84,6 @@ defmodule RubberDuck.Tools.CVEChecker do
     }
   end
 
-  @impl true
   def output_schema do
     %{
       type: "object",
@@ -154,7 +149,6 @@ defmodule RubberDuck.Tools.CVEChecker do
     }
   end
 
-  @impl true
   def execute(params, _context) do
     start_time = System.monotonic_time(:millisecond)
     
