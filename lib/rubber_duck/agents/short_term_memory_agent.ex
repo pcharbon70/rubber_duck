@@ -71,6 +71,7 @@ defmodule RubberDuck.Agents.ShortTermMemoryAgent do
       RubberDuck.Jido.Actions.ShortTermMemory.StoreWithPersistenceAction
     ]
   
+  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
   require Logger
   
   # alias RubberDuck.Memory  # Commented out as not currently used
@@ -79,28 +80,46 @@ defmodule RubberDuck.Agents.ShortTermMemoryAgent do
   
   @impl Jido.Agent
   def mount(agent, opts \\ []) do
-    # Initialize configuration with provided options
-    config = Map.merge(agent.state.config, Map.new(opts))
-    updated_state = Map.put(agent.state, :config, config)
-    agent = Map.put(agent, :state, updated_state)
-    
-    # Initialize ETS tables
-    agent = initialize_ets_tables(agent)
-    
-    # Schedule cleanup timer
-    schedule_cleanup(agent.state.config.cleanup_interval)
-    
-    {:ok, agent}
+    ErrorHandling.safe_execute(fn ->
+      Logger.info("Mounting short-term memory agent", agent_id: agent.id)
+      
+      # Initialize configuration with provided options
+      case safe_merge_config(agent.state.config, opts) do
+        {:ok, config} ->
+          updated_state = Map.put(agent.state, :config, config)
+          agent = Map.put(agent, :state, updated_state)
+          
+          # Initialize ETS tables with error handling
+          case safe_initialize_ets_tables(agent) do
+            {:ok, agent} ->
+              # Schedule cleanup timer
+              safe_schedule_cleanup(agent.state.config.cleanup_interval)
+              Logger.info("Short-term memory agent mounted successfully", agent_id: agent.id)
+              {:ok, agent}
+              
+            {:error, error} -> ErrorHandling.categorize_error(error)
+          end
+          
+        {:error, error} -> ErrorHandling.categorize_error(error)
+      end
+    end)
   end
   
   @impl Jido.Agent
-  def shutdown(agent, _reason) do
-    Logger.info("ShortTermMemoryAgent shutting down", agent_id: agent.id)
-    
-    # Clean up ETS tables
-    cleanup_ets_tables(agent)
-    
-    {:ok, agent}
+  def shutdown(agent, reason) do
+    ErrorHandling.safe_execute(fn ->
+      Logger.info("ShortTermMemoryAgent shutting down", agent_id: agent.id, reason: reason)
+      
+      # Clean up ETS tables with error handling
+      case safe_cleanup_ets_tables(agent) do
+        :ok -> 
+          Logger.info("Short-term memory agent shutdown completed", agent_id: agent.id)
+          {:ok, agent}
+        {:error, error} -> 
+          Logger.warning("Error during shutdown cleanup", agent_id: agent.id, error: inspect(error))
+          {:ok, agent}  # Continue shutdown even if cleanup fails
+      end
+    end)
   end
   
   # Convenience functions for accessing agent data
@@ -110,75 +129,183 @@ defmodule RubberDuck.Agents.ShortTermMemoryAgent do
   end
   
   def store_memory(agent_pid, params) when is_pid(agent_pid) do
-    case Jido.Agent.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.StoreMemoryAction, params) do
-      {:ok, result} -> {:ok, result}
-      {:error, reason} -> {:error, reason}
-    end
+    ErrorHandling.safe_execute(fn ->
+      case validate_pid_and_params(agent_pid, params) do
+        :ok ->
+          case __MODULE__.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.StoreMemoryAction, params) do
+            {:ok, result} -> {:ok, result}
+            {:error, reason} -> ErrorHandling.categorize_error(reason)
+          end
+        error -> error
+      end
+    end)
   end
   
   def get_memory(agent_pid, params) when is_pid(agent_pid) do
-    case Jido.Agent.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.GetMemoryAction, params) do
-      {:ok, result} -> {:ok, result}
-      {:error, reason} -> {:error, reason}
-    end
+    ErrorHandling.safe_execute(fn ->
+      case validate_pid_and_params(agent_pid, params) do
+        :ok ->
+          case __MODULE__.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.GetMemoryAction, params) do
+            {:ok, result} -> {:ok, result}
+            {:error, reason} -> ErrorHandling.categorize_error(reason)
+          end
+        error -> error
+      end
+    end)
   end
   
   def search_by_user(agent_pid, params) when is_pid(agent_pid) do
-    case Jido.Agent.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.SearchByUserAction, params) do
-      {:ok, result} -> {:ok, result}
-      {:error, reason} -> {:error, reason}
-    end
+    ErrorHandling.safe_execute(fn ->
+      case validate_pid_and_params(agent_pid, params) do
+        :ok ->
+          case __MODULE__.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.SearchByUserAction, params) do
+            {:ok, result} -> {:ok, result}
+            {:error, reason} -> ErrorHandling.categorize_error(reason)
+          end
+        error -> error
+      end
+    end)
   end
   
   def search_by_session(agent_pid, params) when is_pid(agent_pid) do
-    case Jido.Agent.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.SearchBySessionAction, params) do
-      {:ok, result} -> {:ok, result}
-      {:error, reason} -> {:error, reason}
-    end
+    ErrorHandling.safe_execute(fn ->
+      case validate_pid_and_params(agent_pid, params) do
+        :ok ->
+          case __MODULE__.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.SearchBySessionAction, params) do
+            {:ok, result} -> {:ok, result}
+            {:error, reason} -> ErrorHandling.categorize_error(reason)
+          end
+        error -> error
+      end
+    end)
   end
   
   def cleanup_expired(agent_pid) when is_pid(agent_pid) do
-    case Jido.Agent.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.CleanupExpiredAction, %{}) do
-      {:ok, result} -> {:ok, result}
-      {:error, reason} -> {:error, reason}
-    end
+    ErrorHandling.safe_execute(fn ->
+      case validate_pid(agent_pid) do
+        :ok ->
+          case __MODULE__.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.CleanupExpiredAction, %{}) do
+            {:ok, result} -> {:ok, result}
+            {:error, reason} -> ErrorHandling.categorize_error(reason)
+          end
+        error -> error
+      end
+    end)
   end
   
   def get_analytics(agent_pid) when is_pid(agent_pid) do
-    case Jido.Agent.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.GetAnalyticsAction, %{}) do
-      {:ok, result} -> {:ok, result}
-      {:error, reason} -> {:error, reason}
-    end
+    ErrorHandling.safe_execute(fn ->
+      case validate_pid(agent_pid) do
+        :ok ->
+          case __MODULE__.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.GetAnalyticsAction, %{}) do
+            {:ok, result} -> {:ok, result}
+            {:error, reason} -> ErrorHandling.categorize_error(reason)
+          end
+        error -> error
+      end
+    end)
   end
   
   def store_with_persistence(agent_pid, params) when is_pid(agent_pid) do
-    case Jido.Agent.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.StoreWithPersistenceAction, params) do
-      {:ok, result} -> {:ok, result}
-      {:error, reason} -> {:error, reason}
-    end
+    ErrorHandling.safe_execute(fn ->
+      case validate_pid_and_params(agent_pid, params) do
+        :ok ->
+          case __MODULE__.cmd(agent_pid, RubberDuck.Jido.Actions.ShortTermMemory.StoreWithPersistenceAction, params) do
+            {:ok, result} -> {:ok, result}
+            {:error, reason} -> ErrorHandling.categorize_error(reason)
+          end
+        error -> error
+      end
+    end)
   end
   
   # Support for get_state call
   @impl GenServer
   def handle_call(:get_state, _from, state) do
-    {:reply, state.agent.state, state}
+    case ErrorHandling.safe_execute(fn -> state.agent.state end) do
+      {:ok, agent_state} -> {:reply, agent_state, state}
+      {:error, error} -> 
+        Logger.error("Failed to get agent state: #{inspect(error)}")
+        {:reply, %{error: "Failed to retrieve state"}, state}
+    end
   end
   
   # Timer-based cleanup
   @impl GenServer
   def handle_info(:cleanup_expired, state) do
-    case Jido.Agent.cmd(self(), RubberDuck.Jido.Actions.ShortTermMemory.CleanupExpiredAction, %{}) do
-      {:ok, _result} ->
-        schedule_cleanup(state.agent.state.config.cleanup_interval)
+    case ErrorHandling.safe_execute(fn ->
+      case __MODULE__.cmd(self(), RubberDuck.Jido.Actions.ShortTermMemory.CleanupExpiredAction, %{}) do
+        {:ok, result} ->
+          Logger.debug("Automatic cleanup completed", items_cleaned: Map.get(result, :items_cleaned, 0))
+          :ok
+        {:error, reason} ->
+          Logger.warning("Automatic cleanup failed: #{inspect(reason)}")
+          :ok  # Continue scheduling even if cleanup fails
+      end
+    end) do
+      {:ok, _} -> 
+        safe_schedule_cleanup(state.agent.state.config.cleanup_interval)
         {:noreply, state}
-      {:error, _reason} ->
-        schedule_cleanup(state.agent.state.config.cleanup_interval)
+      {:error, error} ->
+        Logger.error("Error in cleanup timer: #{inspect(error)}")
+        safe_schedule_cleanup(state.agent.state.config.cleanup_interval)
         {:noreply, state}
     end
   end
   
   # Private utility functions
   
+  # Parameter validation functions
+  defp validate_pid(pid) when is_pid(pid) do
+    if Process.alive?(pid) do
+      :ok
+    else
+      ErrorHandling.validation_error("Process is not alive", %{pid: pid})
+    end
+  end
+  defp validate_pid(pid), do: ErrorHandling.validation_error("Invalid PID", %{pid: pid})
+  
+  defp validate_pid_and_params(pid, params) do
+    with :ok <- validate_pid(pid),
+         :ok <- validate_params(params) do
+      :ok
+    end
+  end
+  
+  defp validate_params(params) when is_map(params), do: :ok
+  defp validate_params(params), do: ErrorHandling.validation_error("Invalid parameters format", %{params: params})
+  
+  # Safe configuration handling
+  defp safe_merge_config(base_config, opts) do
+    try do
+      config = Map.merge(base_config, Map.new(opts))
+      
+      # Validate configuration values
+      case validate_config(config) do
+        :ok -> {:ok, config}
+        error -> error
+      end
+    rescue
+      error -> ErrorHandling.system_error("Failed to merge configuration: #{Exception.message(error)}", %{opts: opts})
+    end
+  end
+  
+  defp validate_config(%{ttl_seconds: ttl, max_items: max, cleanup_interval: interval}) 
+       when is_integer(ttl) and ttl > 0 and is_integer(max) and max > 0 and is_integer(interval) and interval > 0 do
+    :ok
+  end
+  defp validate_config(config), do: ErrorHandling.validation_error("Invalid configuration values", %{config: config})
+  
+  # Safe ETS table operations
+  defp safe_initialize_ets_tables(agent) do
+    try do
+      agent = initialize_ets_tables(agent)
+      {:ok, agent}
+    rescue
+      error -> ErrorHandling.system_error("Failed to initialize ETS tables: #{Exception.message(error)}", %{agent_id: agent.id})
+    end
+  end
+
   defp initialize_ets_tables(agent) do
     table_name = :"stm_#{agent.id}"
     user_index_name = :"stm_user_#{agent.id}"
@@ -202,12 +329,29 @@ defmodule RubberDuck.Agents.ShortTermMemoryAgent do
     Map.put(agent, :state, updated_state)
   end
   
+  defp safe_cleanup_ets_tables(agent) do
+    try do
+      cleanup_ets_tables(agent)
+      :ok
+    rescue
+      error -> {:error, "Failed to cleanup ETS tables: #{Exception.message(error)}"}
+    end
+  end
+  
   defp cleanup_ets_tables(agent) do
     Enum.each(agent.state.ets_tables, fn {_name, table} ->
       if :ets.info(table) != :undefined do
         :ets.delete(table)
       end
     end)
+  end
+  
+  defp safe_schedule_cleanup(interval) do
+    try do
+      schedule_cleanup(interval)
+    rescue
+      error -> Logger.error("Failed to schedule cleanup: #{Exception.message(error)}")
+    end
   end
   
   defp schedule_cleanup(interval) do

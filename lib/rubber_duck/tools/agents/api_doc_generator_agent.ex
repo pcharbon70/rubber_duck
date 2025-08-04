@@ -35,6 +35,9 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
         minimal: %{include_examples: false, include_schemas: false, format: :text}
       }]
     ]
+
+  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
+  require Logger
   
   # Define additional actions for this agent
   @impl true
@@ -71,39 +74,84 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
     
     @impl true
     def run(params, context) do
-      agent = context.agent
-      
-      # Get theme configuration
-      theme_config = get_theme_config(agent, params.theme)
-      
-      # Prepare tool parameters
-      tool_params = %{
-        spec_source: params.spec_source,
-        format: params.format,
-        theme: theme_config,
-        include_examples: params.include_examples,
-        include_schemas: params.include_schemas,
-        output_path: params.output_path
-      }
-      
-      case Executor.execute(:api_doc_generator, tool_params) do
-        {:ok, result} ->
-          {:ok, %{
-            format: params.format,
-            theme: params.theme,
-            spec_source: params.spec_source,
-            documentation: result.documentation,
-            metadata: result.metadata || %{},
-            generated_at: DateTime.utc_now()
-          }}
+      ErrorHandling.safe_execute(fn ->
+        # Validate parameters and context
+        with :ok <- validate_openapi_params(params),
+             :ok <- validate_context(context) do
           
-        {:error, reason} ->
-          {:error, reason}
+          agent = context.agent
+          Logger.info("Generating API documentation from OpenAPI spec: #{params.spec_source}")
+          
+          # Get theme configuration with error handling
+          case safe_get_theme_config(agent, params.theme) do
+            {:ok, theme_config} ->
+              # Prepare tool parameters
+              tool_params = %{
+                spec_source: params.spec_source,
+                format: params.format,
+                theme: theme_config,
+                include_examples: params.include_examples,
+                include_schemas: params.include_schemas,
+                output_path: params.output_path
+              }
+              
+              # Execute with enhanced error handling
+              case safe_execute_tool(:api_doc_generator, tool_params) do
+                {:ok, result} ->
+                  Logger.info("Successfully generated API documentation from #{params.spec_source}")
+                  {:ok, %{
+                    format: params.format,
+                    theme: params.theme,
+                    spec_source: params.spec_source,
+                    documentation: result.documentation,
+                    metadata: result.metadata || %{},
+                    generated_at: DateTime.utc_now()
+                  }}
+                  
+                error -> error
+              end
+              
+            error -> error
+          end
+        end
+      end)
+    end
+    
+    defp validate_openapi_params(%{spec_source: source}) when is_binary(source) and byte_size(source) > 0, do: :ok
+    defp validate_openapi_params(params), do: ErrorHandling.validation_error("Invalid OpenAPI parameters", %{params: params})
+    
+    defp validate_context(%{agent: %{state: state}}) when is_map(state), do: :ok
+    defp validate_context(_), do: ErrorHandling.validation_error("Invalid context: missing agent state", %{})
+    
+    defp safe_get_theme_config(agent, theme_name) do
+      try do
+        theme_config = case Map.get(agent.state.themes, theme_name) do
+          nil -> Map.get(agent.state.themes, :modern, %{})
+          config -> config
+        end
+        {:ok, theme_config}
+      rescue
+        error -> ErrorHandling.system_error("Failed to get theme config: #{Exception.message(error)}", %{theme: theme_name})
       end
     end
     
+    defp safe_execute_tool(tool, params) do
+      try do
+        case Executor.execute(tool, params) do
+          {:ok, result} -> {:ok, result}
+          {:error, reason} -> ErrorHandling.system_error("Tool execution failed", %{tool: tool, reason: reason})
+        end
+      rescue
+        error -> ErrorHandling.system_error("Tool executor error: #{Exception.message(error)}", %{tool: tool, error: inspect(error)})
+      end
+    end
+    
+    # Legacy function for backward compatibility
     defp get_theme_config(agent, theme_name) do
-      agent.state.themes[theme_name] || agent.state.themes[:modern]
+      case safe_get_theme_config(agent, theme_name) do
+        {:ok, config} -> config
+        {:error, _} -> %{}
+      end
     end
   end
   
@@ -134,48 +182,109 @@ defmodule RubberDuck.Tools.Agents.APIDocGeneratorAgent do
     
     @impl true
     def run(params, context) do
-      agent = context.agent
-      
-      # Get template configuration
-      template_config = get_template_config(agent, params.doc_type, params.template)
-      
-      # Prepare tool parameters
-      tool_params = %{
-        source_paths: params.source_paths,
-        language: params.language,
-        doc_type: params.doc_type,
-        format: params.format,
-        include_private: params.include_private,
-        include_tests: params.include_tests,
-        template: template_config
-      }
-      
-      case Executor.execute(:api_doc_generator, tool_params) do
-        {:ok, result} ->
-          {:ok, %{
-            doc_type: params.doc_type,
-            language: params.language,
-            format: params.format,
-            source_paths: params.source_paths,
-            documentation: result.documentation,
-            metadata: %{
-              functions_documented: result.functions_documented || 0,
-              modules_processed: result.modules_processed || 0,
-              coverage: result.coverage || %{}
-            },
-            generated_at: DateTime.utc_now()
-          }}
+      ErrorHandling.safe_execute(fn ->
+        # Validate parameters and context
+        with :ok <- validate_code_params(params),
+             :ok <- validate_context(context) do
           
-        {:error, reason} ->
-          {:error, reason}
+          agent = context.agent
+          Logger.info("Generating documentation from code sources: #{inspect(params.source_paths)}")
+          
+          # Validate source paths exist
+          case validate_source_paths(params.source_paths) do
+            :ok ->
+              # Get template configuration with error handling
+              case safe_get_template_config(agent, params.doc_type, params.template) do
+                {:ok, template_config} ->
+                  # Prepare tool parameters
+                  tool_params = %{
+                    source_paths: params.source_paths,
+                    language: params.language,
+                    doc_type: params.doc_type,
+                    format: params.format,
+                    include_private: params.include_private,
+                    include_tests: params.include_tests,
+                    template: template_config
+                  }
+                  
+                  # Execute with enhanced error handling
+                  case safe_execute_tool(:api_doc_generator, tool_params) do
+                    {:ok, result} ->
+                      Logger.info("Successfully generated documentation from #{length(params.source_paths)} source paths")
+                      {:ok, %{
+                        doc_type: params.doc_type,
+                        language: params.language,
+                        format: params.format,
+                        source_paths: params.source_paths,
+                        documentation: result.documentation,
+                        metadata: %{
+                          functions_documented: result.functions_documented || 0,
+                          modules_processed: result.modules_processed || 0,
+                          coverage: result.coverage || %{}
+                        },
+                        generated_at: DateTime.utc_now()
+                      }}
+                      
+                    error -> error
+                  end
+                  
+                error -> error
+              end
+              
+            error -> error
+          end
+        end
+      end)
+    end
+    
+    defp validate_code_params(%{source_paths: paths, language: lang}) 
+         when is_list(paths) and length(paths) > 0 and is_atom(lang), do: :ok
+    defp validate_code_params(params), do: ErrorHandling.validation_error("Invalid code generation parameters", %{params: params})
+    
+    defp validate_context(%{agent: %{state: state}}) when is_map(state), do: :ok
+    defp validate_context(_), do: ErrorHandling.validation_error("Invalid context: missing agent state", %{})
+    
+    defp validate_source_paths(paths) do
+      invalid_paths = Enum.reject(paths, fn path ->
+        File.exists?(path) or File.dir?(path)
+      end)
+      
+      if invalid_paths == [] do
+        :ok
+      else
+        ErrorHandling.resource_error("Source paths not found", %{invalid_paths: invalid_paths})
       end
     end
     
+    defp safe_get_template_config(agent, doc_type, custom_template) do
+      try do
+        template_config = if custom_template do
+          custom_template
+        else
+          Map.get(agent.state.templates, doc_type) || Map.get(agent.state.templates, :library, "default_template")
+        end
+        {:ok, template_config}
+      rescue
+        error -> ErrorHandling.system_error("Failed to get template config: #{Exception.message(error)}", %{doc_type: doc_type})
+      end
+    end
+    
+    defp safe_execute_tool(tool, params) do
+      try do
+        case Executor.execute(tool, params) do
+          {:ok, result} -> {:ok, result}
+          {:error, reason} -> ErrorHandling.system_error("Tool execution failed", %{tool: tool, reason: reason})
+        end
+      rescue
+        error -> ErrorHandling.system_error("Tool executor error: #{Exception.message(error)}", %{tool: tool, error: inspect(error)})
+      end
+    end
+    
+    # Legacy function for backward compatibility
     defp get_template_config(agent, doc_type, custom_template) do
-      if custom_template do
-        custom_template
-      else
-        agent.state.templates[doc_type] || agent.state.templates[:library]
+      case safe_get_template_config(agent, doc_type, custom_template) do
+        {:ok, config} -> config
+        {:error, _} -> "default_template"
       end
     end
   end

@@ -67,30 +67,41 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
       RubberDuck.Jido.Actions.PromptManager.ClearCacheAction
     ]
 
+  alias RubberDuck.Agents.{ErrorHandling, ActionErrorPatterns}
   alias RubberDuck.Agents.Prompt.Template
   require Logger
 
   @impl true
-  def mount(_opts, _initial_state) do
-    # Initialize with some default templates
-    state = %{
-      templates: create_default_templates(),
-      experiments: %{},
-      analytics: %{},
-      cache: %{},
-      config: %{
-        cache_ttl: 3600,
-        max_templates: 1000,
-        analytics_retention_days: 30,
-        default_optimization: true
-      }
-    }
-    
-    # Start periodic cleanup task
-    schedule_cleanup()
-    
-    Logger.info("PromptManagerAgent initialized with #{map_size(state.templates)} templates")
-    {:ok, state}
+  def mount(opts, initial_state) do
+    ErrorHandling.safe_execute(fn ->
+      Logger.info("Mounting prompt manager agent", opts: opts)
+      
+      # Initialize with configuration validation
+      case safe_build_config(opts, initial_state) do
+        {:ok, config} ->
+          # Initialize default templates with error handling
+          case safe_create_default_templates() do
+            {:ok, templates} ->
+              state = %{
+                templates: templates,
+                experiments: %{},
+                analytics: %{},
+                cache: %{},
+                config: config
+              }
+              
+              # Start periodic cleanup task
+              safe_schedule_cleanup()
+              
+              Logger.info("PromptManagerAgent mounted successfully", template_count: map_size(templates))
+              {:ok, state}
+              
+            {:error, error} -> ErrorHandling.categorize_error(error)
+          end
+          
+        {:error, error} -> ErrorHandling.categorize_error(error)
+      end
+    end)
   end
 
   # All signal handling is now managed through actions
@@ -100,15 +111,105 @@ defmodule RubberDuck.Agents.PromptManagerAgent do
 
   @impl true
   def handle_info(:cleanup, %{state: state} = agent) do
-    updated_state = state
-    |> cleanup_expired_cache()
-    |> cleanup_old_analytics()
-    
-    schedule_cleanup()
-    {:noreply, %{agent | state: updated_state}}
+    case ErrorHandling.safe_execute(fn ->
+      Logger.debug("Running periodic cleanup")
+      
+      # Perform cleanup operations with error handling
+      case safe_cleanup_expired_cache(state) do
+        {:ok, updated_state} ->
+          case safe_cleanup_old_analytics(updated_state) do
+            {:ok, final_state} ->
+              safe_schedule_cleanup()
+              Logger.debug("Periodic cleanup completed successfully")
+              {:ok, final_state}
+            {:error, error} ->
+              Logger.warning("Analytics cleanup failed: #{inspect(error)}")
+              {:ok, updated_state}  # Continue with cache cleanup even if analytics fails
+          end
+        {:error, error} ->
+          Logger.warning("Cache cleanup failed: #{inspect(error)}")
+          {:ok, state}  # Return original state if cleanup fails
+      end
+    end) do
+      {:ok, updated_state} ->
+        {:noreply, %{agent | state: updated_state}}
+      {:error, error} ->
+        Logger.error("Cleanup task failed: #{inspect(error)}")
+        safe_schedule_cleanup()  # Reschedule even on failure
+        {:noreply, agent}
+    end
   end
 
   # Private helper functions
+  
+  # Configuration validation and building
+  defp safe_build_config(opts, initial_state) do
+    try do
+      base_config = %{
+        cache_ttl: 3600,
+        max_templates: 1000,
+        analytics_retention_days: 30,
+        default_optimization: true
+      }
+      
+      # Merge with provided options
+      config = if is_map(initial_state) and is_map(initial_state[:config]) do
+        Map.merge(base_config, initial_state.config)
+      else
+        base_config
+      end |> Map.merge(Map.new(opts))
+      
+      case validate_config(config) do
+        :ok -> {:ok, config}
+        error -> error
+      end
+    rescue
+      error -> ErrorHandling.system_error("Failed to build configuration: #{Exception.message(error)}", %{opts: opts})
+    end
+  end
+  
+  defp validate_config(%{cache_ttl: ttl, max_templates: max, analytics_retention_days: retention}) 
+       when is_integer(ttl) and ttl > 0 and is_integer(max) and max > 0 and is_integer(retention) and retention > 0 do
+    :ok
+  end
+  defp validate_config(config), do: ErrorHandling.validation_error("Invalid configuration values", %{config: config})
+  
+  # Safe template creation
+  defp safe_create_default_templates do
+    try do
+      templates = create_default_templates()
+      {:ok, templates}
+    rescue
+      error -> ErrorHandling.system_error("Failed to create default templates: #{Exception.message(error)}", %{})
+    end
+  end
+  
+  # Safe cleanup operations
+  defp safe_cleanup_expired_cache(state) do
+    try do
+      updated_state = cleanup_expired_cache(state)
+      {:ok, updated_state}
+    rescue
+      error -> {:error, "Cache cleanup failed: #{Exception.message(error)}"}
+    end
+  end
+  
+  defp safe_cleanup_old_analytics(state) do
+    try do
+      updated_state = cleanup_old_analytics(state)
+      {:ok, updated_state}
+    rescue
+      error -> {:error, "Analytics cleanup failed: #{Exception.message(error)}"}
+    end
+  end
+  
+  defp safe_schedule_cleanup do
+    try do
+      schedule_cleanup()
+    rescue
+      error -> Logger.error("Failed to schedule cleanup: #{Exception.message(error)}")
+    end
+  end
 
   defp create_default_templates do
     templates = [
