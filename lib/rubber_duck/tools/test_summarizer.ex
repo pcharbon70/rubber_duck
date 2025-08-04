@@ -96,9 +96,9 @@ defmodule RubberDuck.Tools.TestSummarizer do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:llm_access]
-      rate_limit 100
+      rate_limit [max_requests: 100, window_seconds: 60]
     end
   end
   
@@ -559,8 +559,6 @@ defmodule RubberDuck.Tools.TestSummarizer do
   
   defp parse_ai_insights(response) do
     # Simple parsing of AI response
-    sections = String.split(response, ~r/\n\d+\.\s*/)
-    
     key_findings = extract_bullet_points(response, "findings")
     recommendations = extract_bullet_points(response, "recommendations")
     
@@ -571,7 +569,7 @@ defmodule RubberDuck.Tools.TestSummarizer do
     }
   end
   
-  defp extract_bullet_points(text, section) do
+  defp extract_bullet_points(text, _section) do
     # Extract bullet points from sections
     Regex.scan(~r/- (.+)/, text)
     |> Enum.map(fn [_, point] -> String.trim(point) end)

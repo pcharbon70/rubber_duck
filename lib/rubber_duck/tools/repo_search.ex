@@ -93,7 +93,7 @@ defmodule RubberDuck.Tools.RepoSearch do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:file_read]
       rate_limit [max_requests: 200, window_seconds: 60]
     end
@@ -419,7 +419,7 @@ defmodule RubberDuck.Tools.RepoSearch do
     Enum.reverse(matches)
   end
   
-  defp find_ast_matches(ast, pattern) do
+  defp find_ast_matches(_ast, _pattern) do
     # Pattern-based AST matching would go here
     []
   end

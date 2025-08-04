@@ -209,7 +209,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       end
     end
     
-    defp analyze_language_migration(source_path, analysis_depth, migration_rules) do
+    defp analyze_language_migration(source_path, analysis_depth, _migration_rules) do
       # Simulate language-specific analysis
       patterns_found = case analysis_depth do
         :shallow -> [:basic_syntax, :imports]
@@ -229,7 +229,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp analyze_framework_migration(source_path, analysis_depth, migration_rules) do
+    defp analyze_framework_migration(source_path, analysis_depth, _migration_rules) do
       # Simulate framework-specific analysis
       components_analyzed = case analysis_depth do
         :shallow -> 5
@@ -249,7 +249,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp analyze_api_migration(source_path, analysis_depth, migration_rules) do
+    defp analyze_api_migration(source_path, analysis_depth, _migration_rules) do
       # Simulate API migration analysis
       api_calls_found = case analysis_depth do
         :shallow -> 10
@@ -269,7 +269,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp analyze_dependency_migration(source_path, analysis_depth, migration_rules) do
+    defp analyze_dependency_migration(_source_path, analysis_depth, _migration_rules) do
       # Simulate dependency analysis
       dependencies_found = case analysis_depth do
         :shallow -> 5
@@ -290,7 +290,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     end
     
     # Simulation helper functions
-    defp simulate_deprecated_features(source_path, patterns) do
+    defp simulate_deprecated_features(_source_path, patterns) do
       base_count = length(patterns)
       Enum.take_random([
         "print statements",
@@ -311,7 +311,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       ], min(length(patterns), 2))
     end
     
-    defp simulate_api_changes(source_path, component_count) do
+    defp simulate_api_changes(_source_path, component_count) do
       change_count = div(component_count, 3)
       Enum.take_random([
         "lifecycle method renaming",
@@ -404,7 +404,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       base_recommendations ++ type_specific
     end
     
-    defp generate_language_recommendations(analysis, target_language, migration_rules) do
+    defp generate_language_recommendations(analysis, _target_language, _migration_rules) do
       recommendations = [
         "Use automated migration tools where possible",
         "Address deprecated features first"
@@ -417,7 +417,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       end
     end
     
-    defp generate_framework_recommendations(analysis, target_framework, migration_rules) do
+    defp generate_framework_recommendations(analysis, _target_framework, _migration_rules) do
       recommendations = [
         "Update build tools and configuration",
         "Migrate components incrementally"
@@ -736,7 +736,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       base_phases ++ migration_phases ++ post_phases
     end
     
-    defp generate_big_bang_phases(analysis, timeline_weeks) do
+    defp generate_big_bang_phases(_analysis, timeline_weeks) do
       main_duration = timeline_weeks - 2.0 # Account for prep and validation
       
       [
@@ -754,7 +754,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       ]
     end
     
-    defp generate_gradual_phases(analysis, timeline_weeks) do
+    defp generate_gradual_phases(_analysis, timeline_weeks) do
       available_weeks = timeline_weeks - 2.0
       phase_count = 3
       phase_duration = available_weeks / phase_count
@@ -793,7 +793,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       ]
     end
     
-    defp generate_parallel_phases(analysis, timeline_weeks) do
+    defp generate_parallel_phases(_analysis, timeline_weeks) do
       available_weeks = timeline_weeks - 2.0
       
       [
@@ -820,7 +820,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       ]
     end
     
-    defp generate_pilot_phases(analysis, timeline_weeks) do
+    defp generate_pilot_phases(_analysis, timeline_weeks) do
       available_weeks = timeline_weeks - 2.0
       pilot_duration = available_weeks * 0.4
       full_duration = available_weeks * 0.6
@@ -850,7 +850,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       ]
     end
     
-    defp create_migration_timeline(phases, timeline_weeks, team_size) do
+    defp create_migration_timeline(phases, _timeline_weeks, team_size) do
       total_duration = Enum.sum(Enum.map(phases, & &1.duration_weeks))
       
       # Calculate start dates for each phase
@@ -974,7 +974,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp create_rollback_plan(analysis, phases) do
+    defp create_rollback_plan(_analysis, _phases) do
       %{
         rollback_triggers: [
           "Critical functionality broken",
@@ -999,7 +999,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp create_risk_mitigation_plan(analysis, phases) do
+    defp create_risk_mitigation_plan(analysis, _phases) do
       risks = analysis[:risk_assessment][:identified_risks] || []
       
       %{
@@ -1131,7 +1131,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       end
     end
     
-    defp simulate_migration_execution(phase, migration_plan, validation_level) do
+    defp simulate_migration_execution(phase, _migration_plan, validation_level) do
       # Simulate the execution without making actual changes
       activities = phase[:activities] || phase["activities"] || []
       
@@ -1155,7 +1155,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }}
     end
     
-    defp execute_migration_phase(phase, migration_plan, auto_rollback, validation_level, context) do
+    defp execute_migration_phase(phase, _migration_plan, auto_rollback, validation_level, context) do
       phase_name = phase[:name] || phase["name"]
       activities = phase[:activities] || phase["activities"] || []
       
@@ -1239,7 +1239,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       end
     end
     
-    defp simulate_activity_execution(activity, context) do
+    defp simulate_activity_execution(activity, _context) do
       # In real implementation, this would call the actual migration tool
       # For simulation, we'll use probability-based success/failure
       
@@ -1356,7 +1356,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       base_checks ++ activity_checks ++ level_checks
     end
     
-    defp perform_validation_check(check, result, activity) do
+    defp perform_validation_check(check, result, _activity) do
       # Simulate validation check results
       case check do
         "basic_completion" -> %{passed: true, message: "Activity completed"}
@@ -1369,7 +1369,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       end
     end
     
-    defp create_rollback_point(phase_name, context) do
+    defp create_rollback_point(phase_name, _context) do
       %{
         phase: phase_name,
         timestamp: DateTime.utc_now(),
@@ -1379,7 +1379,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp perform_rollback(rollback_point, context) do
+    defp perform_rollback(rollback_point, _context) do
       # Simulate rollback process
       rollback_steps = [
         "Stop current processes",
@@ -1532,7 +1532,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp validate_security_requirements(results, criteria) do
+    defp validate_security_requirements(results, _criteria) do
       security_checks = [
         check_security_vulnerabilities(results),
         check_authentication_integrity(results),
@@ -1562,7 +1562,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     end
     
     # Individual validation check functions
-    defp check_compilation_success(results) do
+    defp check_compilation_success(_results) do
       # Simulate compilation check
       success = :rand.uniform() > 0.1
       
@@ -1574,7 +1574,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_test_results(results) do
+    defp check_test_results(_results) do
       # Simulate test results check
       pass_rate = 0.85 + :rand.uniform() * 0.1
       passed = pass_rate >= 0.9
@@ -1591,7 +1591,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_feature_completeness(results, criteria) do
+    defp check_feature_completeness(_results, criteria) do
       # Check if migration preserved all required features
       preserved_features = 0.9 + :rand.uniform() * 0.1
       passed = preserved_features >= 0.95
@@ -1608,7 +1608,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_error_handling(results) do
+    defp check_error_handling(_results) do
       # Check error handling robustness
       error_handling_score = 0.8 + :rand.uniform() * 0.15
       passed = error_handling_score >= 0.85
@@ -1624,7 +1624,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_performance_regression(results, criteria) do
+    defp check_performance_regression(_results, _criteria) do
       # Check for performance regression
       performance_change = (:rand.uniform() - 0.5) * 0.2 # -10% to +10%
       passed = performance_change >= -0.1 # No more than 10% regression
@@ -1641,7 +1641,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_memory_usage(results) do
+    defp check_memory_usage(_results) do
       # Check memory usage
       memory_change = (:rand.uniform() - 0.5) * 0.15 # -7.5% to +7.5%
       passed = memory_change <= 0.1 # No more than 10% increase
@@ -1658,7 +1658,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_startup_time(results) do
+    defp check_startup_time(_results) do
       # Check application startup time
       startup_change = (:rand.uniform() - 0.5) * 0.3 # -15% to +15%
       passed = startup_change <= 0.2 # No more than 20% increase
@@ -1675,7 +1675,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_response_times(results) do
+    defp check_response_times(_results) do
       # Check API response times
       response_change = (:rand.uniform() - 0.5) * 0.25 # -12.5% to +12.5%
       passed = response_change <= 0.15 # No more than 15% increase
@@ -1692,7 +1692,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_security_vulnerabilities(results) do
+    defp check_security_vulnerabilities(_results) do
       # Check for new security vulnerabilities
       vulnerabilities = :rand.uniform(3) # 0-2 new vulnerabilities
       passed = vulnerabilities == 0
@@ -1708,7 +1708,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_authentication_integrity(results) do
+    defp check_authentication_integrity(_results) do
       # Check authentication system integrity
       auth_integrity = 0.95 + :rand.uniform() * 0.05
       passed = auth_integrity >= 0.98
@@ -1725,7 +1725,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_data_encryption(results) do
+    defp check_data_encryption(_results) do
       # Check data encryption compliance
       encryption_compliance = 0.9 + :rand.uniform() * 0.1
       passed = encryption_compliance >= 0.95
@@ -1742,7 +1742,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_access_controls(results) do
+    defp check_access_controls(_results) do
       # Check access control integrity
       access_control_integrity = 0.92 + :rand.uniform() * 0.08
       passed = access_control_integrity >= 0.95
@@ -1934,7 +1934,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }}
     end
     
-    defp create_rollback_point(project_name, rollback_type, include_database, include_config, context) do
+    defp create_rollback_point(project_name, rollback_type, include_database, include_config, _context) do
       timestamp = System.system_time(:second)
       rollback_id = "#{project_name}_rollback_#{timestamp}"
       
@@ -2050,7 +2050,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     
     defp verify_rollback_integrity(components) do
       # Simulate integrity verification
-      all_verified = Enum.all?(components, fn component ->
+      all_verified = Enum.all?(components, fn _component ->
         # Simulate verification success (95% success rate)
         :rand.uniform() > 0.05
       end)
@@ -2113,7 +2113,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       end)
     end
     
-    defp generate_incremental_procedures(rollback_point) do
+    defp generate_incremental_procedures(_rollback_point) do
       [
         "4. Identify changes since rollback point",
         "5. Reverse changes incrementally",
@@ -2122,7 +2122,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       ]
     end
     
-    defp generate_full_procedures(rollback_point) do
+    defp generate_full_procedures(_rollback_point) do
       [
         "4. Perform complete system restore",
         "5. Restore all components simultaneously",
@@ -2187,7 +2187,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       end)
     end
     
-    defp create_rollback_testing_plan(rollback_point) do
+    defp create_rollback_testing_plan(_rollback_point) do
       %{
         test_environment: "staging",
         test_scenarios: [
@@ -2308,7 +2308,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       end
     end
     
-    defp analyze_dependencies(project_path, context) do
+    defp analyze_dependencies(project_path, _context) do
       # In real implementation, would analyze actual package files
       # Simulate dependency analysis
       
@@ -2383,8 +2383,8 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     defp filter_conservative_updates(dependencies) do
       # Only patch and minor updates
       Enum.filter(dependencies, fn dep ->
-        {old_major, old_minor, old_patch} = parse_version(dep.current_version)
-        {new_major, new_minor, new_patch} = parse_version(dep.latest_version)
+        {old_major, _old_minor, _old_patch} = parse_version(dep.current_version)
+        {new_major, _new_minor, _new_patch} = parse_version(dep.latest_version)
         
         # Only allow same major version
         old_major == new_major
@@ -2463,7 +2463,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       end
     end
     
-    defp assess_update_risk(dependency, strategy) do
+    defp assess_update_risk(dependency, _strategy) do
       base_risk = case determine_update_type(dependency.current_version, dependency.latest_version) do
         :major -> :high
         :minor -> :medium
@@ -2489,7 +2489,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       risk in [:high, :very_high] || is_critical_dependency?(dependency.name)
     end
     
-    defp apply_dependency_updates(project_path, updates, context) do
+    defp apply_dependency_updates(_project_path, updates, _context) do
       # Simulate applying dependency updates
       results = Enum.map(updates, fn update ->
         # Simulate update success/failure based on risk
@@ -2601,7 +2601,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp validate_dependency_compatibility(project_path, update_results, context) do
+    defp validate_dependency_compatibility(project_path, update_results, _context) do
       # Simulate compatibility validation
       compatibility_checks = [
         check_version_conflicts(update_results),
@@ -2620,7 +2620,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_version_conflicts(update_results) do
+    defp check_version_conflicts(_update_results) do
       # Simulate version conflict checking
       conflicts = :rand.uniform(3) # 0-2 conflicts
       
@@ -2632,7 +2632,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_peer_dependencies(update_results) do
+    defp check_peer_dependencies(_update_results) do
       # Simulate peer dependency checking
       peer_issues = :rand.uniform(2) # 0-1 peer dependency issues
       
@@ -2661,7 +2661,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       }
     end
     
-    defp check_runtime_compatibility(project_path, update_results) do
+    defp check_runtime_compatibility(_project_path, _update_results) do
       # Simulate runtime compatibility check
       runtime_issues = :rand.uniform(2) # 0-1 runtime issues
       
@@ -2674,7 +2674,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     end
     
     defp simulate_version_conflicts(count) do
-      Enum.map(1..count, fn i ->
+      Enum.map(1..count, fn _i ->
         "Package A@2.0.0 conflicts with Package B requirement of Package A@^1.0.0"
       end)
     end
@@ -2703,7 +2703,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
       end
     end
     
-    defp run_dependency_tests(project_path, context) do
+    defp run_dependency_tests(_project_path, _context) do
       # Simulate running tests after dependency updates
       test_scenarios = [
         "Unit tests",
@@ -2785,7 +2785,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     analysis_depth = get_in(signal, ["data", "analysis_depth"]) || :medium
     
     # Execute migration analysis action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, AnalyzeMigrationAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, AnalyzeMigrationAction, %{
       source_path: source_path,
       target_language: target_language,
       target_framework: target_framework,
@@ -2804,7 +2804,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     include_rollback_plan = get_in(signal, ["data", "include_rollback_plan"]) || true
     
     # Execute migration planning action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, PlanMigrationAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, PlanMigrationAction, %{
       analysis_results: analysis_results,
       migration_strategy: String.to_atom(migration_strategy),
       timeline_weeks: timeline_weeks,
@@ -2823,7 +2823,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     validation_level = get_in(signal, ["data", "validation_level"]) || :standard
     
     # Execute migration execution action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, ExecuteMigrationAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, ExecuteMigrationAction, %{
       migration_plan: migration_plan,
       phase: phase,
       dry_run: dry_run,
@@ -2840,7 +2840,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     validation_type = get_in(signal, ["data", "validation_type"]) || :comprehensive
     
     # Execute migration validation action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, ValidateMigrationAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, ValidateMigrationAction, %{
       migration_results: migration_results,
       success_criteria: success_criteria,
       validation_type: String.to_atom(validation_type)
@@ -2857,7 +2857,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     retention_days = get_in(signal, ["data", "retention_days"]) || 30
     
     # Execute rollback creation action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, CreateRollbackAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, CreateRollbackAction, %{
       project_name: project_name,
       rollback_type: String.to_atom(rollback_type),
       include_database: include_database,
@@ -2876,7 +2876,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     run_tests = get_in(signal, ["data", "run_tests"]) || true
     
     # Execute dependency update action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, UpdateDependenciesAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, UpdateDependenciesAction, %{
       project_path: project_path,
       update_strategy: String.to_atom(update_strategy),
       target_dependencies: target_dependencies,
@@ -2887,7 +2887,7 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     {:ok, agent}
   end
   
-  def handle_tool_signal(agent, _signal), do: super(agent, _signal)
+  def handle_tool_signal(agent, signal), do: super(agent, signal)
   
   # Process migration results
   @impl true
@@ -2897,7 +2897,6 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
   end
   
   # Override action result handler to update migration tracking
-  @impl true
   def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
     # Let parent handle the standard processing
     {:ok, agent} = super(agent, ExecuteToolAction, {:ok, result}, metadata)
@@ -2948,12 +2947,13 @@ defmodule RubberDuck.Tools.Agents.CodeMigrationAgent do
     
     # Update project status if it exists
     if Map.has_key?(agent.state.migration_projects, project_name) do
-      agent = update_in(agent.state.migration_projects[project_name], fn project ->
+      updated_agent = update_in(agent.state.migration_projects[project_name], fn project ->
         Map.put(project, :rollback_available, true)
       end)
+      {:ok, updated_agent}
+    else
+      {:ok, agent}
     end
-    
-    {:ok, agent}
   end
   
   def handle_action_result(agent, action, result, metadata) do

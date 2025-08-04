@@ -344,25 +344,22 @@ defmodule RubberDuck.Tools.Agents.CodeRefactorerAgent do
       end
       
       # Check for special handling
-      cond do
+      agent = cond do
         # Handle batch refactoring
         batch_id = data.result[:batch_id] ->
-          agent = update_refactoring_batch(agent, batch_id, data.result)
+          update_refactoring_batch(agent, batch_id, data.result)
           
         # Handle suggestion result
         pattern_name = data.result[:pattern_name] ->
-          agent = track_pattern_effectiveness(agent, pattern_name, data.result)
+          track_pattern_effectiveness(agent, pattern_name, data.result)
           
         # Handle regular refactoring
         true ->
-          # Add to history
-          agent = add_to_refactoring_history(agent, data.result)
-          
-          # Track quality improvements
-          agent = track_quality_improvements(agent, data.result)
-          
-          # Update statistics
-          agent = update_refactoring_stats(agent, data.result)
+          # Add to history, track quality improvements, and update statistics
+          agent
+          |> add_to_refactoring_history(data.result)
+          |> track_quality_improvements(data.result)
+          |> update_refactoring_stats(data.result)
       end
       
       # Emit specialized signal
@@ -392,9 +389,6 @@ defmodule RubberDuck.Tools.Agents.CodeRefactorerAgent do
   
   # Private helpers
   
-  defp generate_request_id do
-    "refactor_#{System.unique_integer([:positive, :monotonic])}"
-  end
   
   defp calculate_code_complexity(code) do
     # Simple complexity calculation based on control structures
@@ -432,32 +426,42 @@ defmodule RubberDuck.Tools.Agents.CodeRefactorerAgent do
   end
   
   defp validate_refactoring_changes(original_code, refactored_code, rules) do
-    checks = %{}
-    warnings = []
-    errors = []
+    initial_state = {%{}, [], []}
     
-    # Check functionality preservation (simple AST comparison)
-    if rules["preserve_functionality"] do
-      original_ast = Code.string_to_quoted(original_code)
+    {checks, warnings, errors} = if rules["preserve_functionality"] do
+      {checks, warnings, errors} = initial_state
+      _original_ast = Code.string_to_quoted(original_code)
       refactored_ast = Code.string_to_quoted(refactored_code)
       
       checks = Map.put(checks, :ast_valid, elem(refactored_ast, 0) == :ok)
       
-      if elem(refactored_ast, 0) == :error do
-        errors = ["Refactored code has syntax errors" | errors]
+      errors = if elem(refactored_ast, 0) == :error do
+        ["Refactored code has syntax errors" | errors]
+      else
+        errors
       end
+      
+      {checks, warnings, errors}
+    else
+      initial_state
     end
     
     # Check complexity
-    if rules["check_complexity"] do
+    {checks, warnings, errors} = if rules["check_complexity"] do
       original_complexity = calculate_code_complexity(original_code)
       new_complexity = calculate_code_complexity(refactored_code)
       
       checks = Map.put(checks, :complexity_improved, new_complexity <= original_complexity)
       
-      if new_complexity > original_complexity do
-        warnings = ["Refactoring increased code complexity" | warnings]
+      warnings = if new_complexity > original_complexity do
+        ["Refactoring increased code complexity" | warnings]
+      else
+        warnings
       end
+      
+      {checks, warnings, errors}
+    else
+      {checks, warnings, errors}
     end
     
     %{
@@ -492,7 +496,7 @@ defmodule RubberDuck.Tools.Agents.CodeRefactorerAgent do
         
         updated_batch = batch
         |> Map.put(:completed, completed)
-        |> Map.put_in([:results, file_path], %{
+        |> put_in([:results, file_path], %{
           original: result["original_code"],
           refactored: result["refactored_code"],
           changes: result["changes"]
@@ -502,7 +506,7 @@ defmodule RubberDuck.Tools.Agents.CodeRefactorerAgent do
         if completed >= batch.total_files do
           signal = Jido.Signal.new!(%{
             type: "code.refactoring.batch.completed",
-            source: "agent:#{Process.self()}",
+            source: "agent:#{self()}",
             data: %{
               batch_id: batch_id,
               total_files: batch.total_files,
@@ -634,10 +638,8 @@ defmodule RubberDuck.Tools.Agents.CodeRefactorerAgent do
     
     instruction_lower = String.downcase(instruction)
     
-    Enum.filter_map(
-      issue_keywords,
-      fn {keyword, _issue} -> String.contains?(instruction_lower, keyword) end,
-      fn {_keyword, issue} -> issue end
-    )
+    issue_keywords
+    |> Enum.filter(fn {keyword, _issue} -> String.contains?(instruction_lower, keyword) end)
+    |> Enum.map(fn {_keyword, issue} -> issue end)
   end
 end

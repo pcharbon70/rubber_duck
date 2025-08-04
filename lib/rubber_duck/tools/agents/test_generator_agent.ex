@@ -375,11 +375,6 @@ defmodule RubberDuck.Tools.Agents.TestGeneratorAgent do
   end
   
   # Private helpers
-  
-  defp generate_request_id do
-    "test_#{System.unique_integer([:positive, :monotonic])}"
-  end
-  
   defp analyze_missing_coverage(code, existing_tests) do
     # Parse code to find functions
     case Code.string_to_quoted(code) do

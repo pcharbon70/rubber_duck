@@ -98,16 +98,16 @@ defmodule RubberDuck.Tools.DocFetcher do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:network]
-      rate_limit 50
+      rate_limit [max_requests: 50, window_seconds: 60]
     end
   end
   
   @doc """
   Executes documentation fetching based on the provided parameters.
   """
-  def execute(params, context) do
+  def execute(params, _context) do
     with {:ok, parsed_query} <- parse_query(params),
          {:ok, source_url} <- determine_source_url(parsed_query, params),
          {:ok, raw_docs} <- fetch_documentation(source_url),
@@ -163,7 +163,7 @@ defmodule RubberDuck.Tools.DocFetcher do
       
       # Type notation: t:Module.type_name/0
       query =~ ~r/^t:[A-Z][\w.]*\.\w+\/\d+$/ ->
-        type_spec = String.slice(query, 2..-1)
+        type_spec = String.slice(query, 2..-1//1)
         [module_type, arity] = String.split(type_spec, "/")
         [module, type_name] = String.split(module_type, ".", parts: 2)
         %{
@@ -176,7 +176,7 @@ defmodule RubberDuck.Tools.DocFetcher do
       
       # Callback notation: c:Module.callback_name/arity
       query =~ ~r/^c:[A-Z][\w.]*\.\w+\/\d+$/ ->
-        callback_spec = String.slice(query, 2..-1)
+        callback_spec = String.slice(query, 2..-1//1)
         [module_callback, arity] = String.split(callback_spec, "/")
         [module, callback] = String.split(module_callback, ".", parts: 2)
         %{

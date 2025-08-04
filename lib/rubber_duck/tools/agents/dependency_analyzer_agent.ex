@@ -11,7 +11,15 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
   - Dependency graph visualization
   """
   
-  use RubberDuck.Tools.BaseToolAgent, tool: :dependency_analyzer
+  use RubberDuck.Tools.Agents.BaseToolAgent,
+    tool: :dependency_analyzer,
+    name: "dependency_analyzer_agent",
+    description: "Analyzes project dependencies and provides recommendations",
+    schema: [
+      # Dependency analysis data
+      dependency_data: [type: :map, default: quote do %{} end],
+      analysis_cache: [type: :map, default: quote do %{} end]
+    ]
   
   alias Jido.Agent.Server.State
   
@@ -20,7 +28,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     @moduledoc """
     Analyzes the project dependency tree structure.
     """
-    use Jido.Action
+    use Jido.Action, name: "analyze_dependency_tree"
     
     def parameter_schema do
       %{
@@ -372,12 +380,12 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
       |> Enum.map(fn {name, count} -> %{name: name, usage_count: count} end)
     end
     
-    defp detect_circular_dependencies(tree) do
+    defp detect_circular_dependencies(_tree) do
       # Simplified circular dependency detection
       []
     end
     
-    defp find_orphaned_dependencies(tree) do
+    defp find_orphaned_dependencies(_tree) do
       # Dependencies declared but not used
       []
     end
@@ -387,7 +395,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     @moduledoc """
     Detects version conflicts in the dependency tree.
     """
-    use Jido.Action
+    use Jido.Action, name: "detect_version_conflicts"
     
     def parameter_schema do
       %{
@@ -587,7 +595,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
       versions |> Enum.sort() |> List.last()
     end
     
-    defp generate_resolution_steps(conflict, strategy) do
+    defp generate_resolution_steps(conflict, _strategy) do
       [
         "Update #{conflict.package} to suggested version across all usages",
         "Run dependency installation to verify resolution",
@@ -708,7 +716,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     @moduledoc """
     Checks dependencies for known security vulnerabilities.
     """
-    use Jido.Action
+    use Jido.Action, name: "check_security_vulnerabilities"
     
     def parameter_schema do
       %{
@@ -778,18 +786,15 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
       end)
       
       # Use CVE checker tool
-      tool_call = %RubberDuck.Types.ToolCall{
-        name: :cve_checker,
-        arguments: %{
-          dependencies: dep_list,
-          check_transitive: true,
-          severity_threshold: threshold,
-          include_patched: true,
-          sources: Map.get(context, :cve_sources, ["nvd", "osv", "ghsa"])
-        }
+      tool_params = %{
+        dependencies: dep_list,
+        check_transitive: true,
+        severity_threshold: threshold,
+        include_patched: true,
+        sources: Map.get(context, :cve_sources, ["nvd", "osv", "ghsa"])
       }
       
-      case RubberDuck.Tools.CVEChecker.execute(tool_call) do
+      case RubberDuck.Tools.CVEChecker.execute(tool_params, %{}) do
         {:ok, %{result: cve_result}} ->
           # Convert CVE checker results to our format
           cve_result.vulnerabilities
@@ -1055,7 +1060,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     @moduledoc """
     Analyzes license compatibility across dependencies.
     """
-    use Jido.Action
+    use Jido.Action, name: "analyze_license_compatibility"
     
     def parameter_schema do
       %{
@@ -1139,41 +1144,49 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     defp check_license_compatibility(dep, project_license, policy) do
       compatibility = get_license_compatibility_matrix()
       
-      issues = []
+      base_issues = []
       
       # Check basic compatibility
-      if !is_compatible?(dep.license, project_license, compatibility) do
-        issues = [%{
+      incompatible_issues = if !is_compatible?(dep.license, project_license, compatibility) do
+        [%{
           type: :incompatible_license,
           package: dep.name,
           package_license: dep.license,
           project_license: project_license,
           severity: :high,
           description: "License #{dep.license} may be incompatible with #{project_license}"
-        } | issues]
+        }]
+      else
+        []
       end
       
       # Check against policy
-      if policy && violates_policy?(dep.license, policy) do
-        issues = [%{
+      policy_violation_issues = if policy && violates_policy?(dep.license, policy) do
+        [%{
           type: :policy_violation,
           package: dep.name,
           package_license: dep.license,
           severity: :critical,
           description: "License #{dep.license} violates organization policy"
-        } | issues]
+        }]
+      else
+        []
       end
       
       # Check for copyleft in production dependencies
-      if is_copyleft?(dep.license) && dep.type == :production do
-        issues = [%{
+      copyleft_issues = if is_copyleft?(dep.license) && dep.type == :production do
+        [%{
           type: :copyleft_license,
           package: dep.name,
           package_license: dep.license,
           severity: :moderate,
           description: "Copyleft license #{dep.license} may require source disclosure"
-        } | issues]
+        }]
+      else
+        []
       end
+      
+      issues = base_issues ++ incompatible_issues ++ policy_violation_issues ++ copyleft_issues
       
       issues
     end
@@ -1266,40 +1279,44 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     end
     
     defp generate_license_recommendations(issues) do
-      recommendations = []
-      
       # Group issues by type
       issue_types = Enum.group_by(issues, & &1.type)
       
       # Recommendations for incompatible licenses
-      if issue_types[:incompatible_license] do
-        recommendations = [
+      incompatible_recs = if issue_types[:incompatible_license] do
+        [
           "Review and possibly replace incompatible dependencies",
           "Consider dual licensing if appropriate"
-        ] ++ recommendations
+        ]
+      else
+        []
       end
       
       # Recommendations for policy violations
-      if issue_types[:policy_violation] do
-        recommendations = [
+      policy_recs = if issue_types[:policy_violation] do
+        [
           "Replace dependencies that violate license policy",
           "Request policy exception if dependency is critical"
-        ] ++ recommendations
+        ]
+      else
+        []
       end
       
       # Recommendations for copyleft licenses
-      if issue_types[:copyleft_license] do
-        recommendations = [
+      copyleft_recs = if issue_types[:copyleft_license] do
+        [
           "Ensure compliance with copyleft requirements",
           "Consider isolating copyleft dependencies",
           "Document source code availability requirements"
-        ] ++ recommendations
+        ]
+      else
+        []
       end
       
-      recommendations
+      incompatible_recs ++ policy_recs ++ copyleft_recs
     end
     
-    defp determine_compliance_status(issues, policy) do
+    defp determine_compliance_status(issues, _policy) do
       critical_issues = Enum.filter(issues, &(&1.severity == :critical))
       
       status = cond do
@@ -1322,7 +1339,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     @moduledoc """
     Generates recommendations for dependency updates.
     """
-    use Jido.Action
+    use Jido.Action, name: "generate_update_recommendations"
     
     def parameter_schema do
       %{
@@ -1471,7 +1488,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
       end)
     end
     
-    defp get_changelog_highlights(package, current_version, latest_version) do
+    defp get_changelog_highlights(_package, current_version, latest_version) do
       # Simulated changelog highlights
       if current_version != latest_version do
         [
@@ -1637,7 +1654,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     @moduledoc """
     Creates visualization data for the dependency graph.
     """
-    use Jido.Action
+    use Jido.Action, name: "visualize_dependency_graph"
     
     def parameter_schema do
       %{
@@ -1936,7 +1953,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     @moduledoc """
     Generates comprehensive dependency analysis reports.
     """
-    use Jido.Action
+    use Jido.Action, name: "generate_dependency_report"
     
     def parameter_schema do
       %{
@@ -2009,19 +2026,16 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     end
     
     defp generate_overview_summary(results) do
-      issues = []
-      
-      if results[:conflicts] && results.conflicts[:conflict_count] > 0 do
-        issues = ["#{results.conflicts.conflict_count} version conflicts"] ++ issues
-      end
-      
-      if results[:vulnerabilities] && results.vulnerabilities[:vulnerability_count] > 0 do
-        issues = ["#{results.vulnerabilities.vulnerability_count} security vulnerabilities"] ++ issues
-      end
-      
-      if results[:license_issues] && results.license_issues[:issue_count] > 0 do
-        issues = ["#{results.license_issues.issue_count} license compatibility issues"] ++ issues
-      end
+      issues = [] ++
+        (if results[:conflicts] && results.conflicts[:conflict_count] > 0,
+         do: ["#{results.conflicts.conflict_count} version conflicts"],
+         else: []) ++
+        (if results[:vulnerabilities] && results.vulnerabilities[:vulnerability_count] > 0,
+         do: ["#{results.vulnerabilities.vulnerability_count} security vulnerabilities"],
+         else: []) ++
+        (if results[:license_issues] && results.license_issues[:issue_count] > 0,
+         do: ["#{results.license_issues.issue_count} license compatibility issues"],
+         else: [])
       
       if length(issues) > 0 do
         "Analysis found: " <> Enum.join(issues, ", ")
@@ -2031,58 +2045,50 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     end
     
     defp extract_key_findings(results) do
-      findings = []
-      
-      # Version conflicts
-      if results[:conflicts] && results.conflicts[:severity_breakdown][:critical] > 0 do
-        findings = ["Critical version conflicts require immediate attention"] ++ findings
-      end
-      
-      # Security vulnerabilities
-      if results[:vulnerabilities] && results.vulnerabilities[:severity_breakdown][:critical] > 0 do
-        findings = ["Critical security vulnerabilities found"] ++ findings
-      end
-      
-      # License issues
-      if results[:license_issues] && results.license_issues[:compliance_status][:status] == :non_compliant do
-        findings = ["License compliance issues detected"] ++ findings
-      end
-      
-      # Update recommendations
-      if results[:updates] && results.updates[:update_count]["security"] > 0 do
-        findings = ["Security updates available for #{results.updates.update_count.security} packages"] ++ findings
-      end
+      findings = [] ++
+        (if results[:conflicts] && results.conflicts[:severity_breakdown][:critical] > 0,
+         do: ["Critical version conflicts require immediate attention"],
+         else: []) ++
+        (if results[:vulnerabilities] && results.vulnerabilities[:severity_breakdown][:critical] > 0,
+         do: ["Critical security vulnerabilities found"],
+         else: []) ++
+        (if results[:license_issues] && results.license_issues[:compliance_status][:status] == :non_compliant,
+         do: ["License compliance issues detected"],
+         else: []) ++
+        (if results[:updates] && results.updates[:update_count]["security"] > 0,
+         do: ["Security updates available for #{results.updates.update_count.security} packages"],
+         else: [])
       
       Enum.take(findings, 5)
     end
     
     defp calculate_health_metrics(results) do
-      scores = []
-      
-      # Version conflict score
-      if results[:conflicts] do
-        conflict_score = 100 - (results.conflicts.conflict_count * 10)
-        scores = [max(0, conflict_score) | scores]
-      end
-      
-      # Security score
-      if results[:vulnerabilities] do
-        vuln_score = 100 - (results.vulnerabilities.vulnerability_count * 15)
-        scores = [max(0, vuln_score) | scores]
-      end
-      
-      # License score
-      if results[:license_issues] do
-        license_score = if results.license_issues.compliance_status[:compliant], do: 100, else: 50
-        scores = [license_score | scores]
-      end
-      
-      # Update freshness score
-      if results[:updates] do
-        outdated = results.updates.update_count[:total] || 0
-        freshness_score = 100 - (outdated * 5)
-        scores = [max(0, freshness_score) | scores]
-      end
+      scores = [] ++
+        (if results[:conflicts] do
+           conflict_score = 100 - (results.conflicts.conflict_count * 10)
+           [max(0, conflict_score)]
+         else
+           []
+         end) ++
+        (if results[:vulnerabilities] do
+           vuln_score = 100 - (results.vulnerabilities.vulnerability_count * 15)
+           [max(0, vuln_score)]
+         else
+           []
+         end) ++
+        (if results[:license_issues] do
+           license_score = if results.license_issues.compliance_status[:compliant], do: 100, else: 50
+           [license_score]
+         else
+           []
+         end) ++
+        (if results[:updates] do
+           outdated = results.updates.update_count[:total] || 0
+           freshness_score = 100 - (outdated * 5)
+           [max(0, freshness_score)]
+         else
+           []
+         end)
       
       overall_score = if length(scores) > 0 do
         Enum.sum(scores) / length(scores)
@@ -2113,40 +2119,44 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     end
     
     defp build_risk_summary(results) do
-      risks = []
-      
-      # Security risks
-      if results[:vulnerabilities] do
-        security_risk = results.vulnerabilities[:risk_score] || 0
-        if security_risk > 50 do
-          risks = [%{
-            type: "security",
-            level: :high,
-            description: "High security risk from vulnerable dependencies"
-          } | risks]
-        end
-      end
-      
-      # License risks
-      if results[:license_issues] && results.license_issues[:risk_assessment] do
-        license_risk = results.license_issues.risk_assessment[:risk_level]
-        if license_risk in [:high, :critical] do
-          risks = [%{
-            type: :legal,
-            level: license_risk,
-            description: "License compatibility issues pose legal risk"
-          } | risks]
-        end
-      end
-      
-      # Technical debt risk
-      if results[:updates] && results.updates[:update_count][:major] > 5 do
-        risks = [%{
-          type: :technical_debt,
-          level: :moderate,
-          description: "Multiple major version updates indicate technical debt"
-        } | risks]
-      end
+      risks = [] ++
+        (if results[:vulnerabilities] do
+           security_risk = results.vulnerabilities[:risk_score] || 0
+           if security_risk > 50 do
+             [%{
+               type: "security",
+               level: :high,
+               description: "High security risk from vulnerable dependencies"
+             }]
+           else
+             []
+           end
+         else
+           []
+         end) ++
+        (if results[:license_issues] && results.license_issues[:risk_assessment] do
+           license_risk = results.license_issues.risk_assessment[:risk_level]
+           if license_risk in [:high, :critical] do
+             [%{
+               type: :legal,
+               level: license_risk,
+               description: "License compatibility issues pose legal risk"
+             }]
+           else
+             []
+           end
+         else
+           []
+         end) ++
+        (if results[:updates] && results.updates[:update_count][:major] > 5 do
+           [%{
+             type: :technical_debt,
+             level: :moderate,
+             description: "Multiple major version updates indicate technical debt"
+           }]
+         else
+           []
+         end)
       
       %{
         risk_count: length(risks),
@@ -2178,45 +2188,42 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     end
     
     defp consolidate_recommendations(results) do
-      all_recommendations = []
-      
-      # Conflict resolutions
-      if results[:conflicts] && results.conflicts[:resolutions] do
-        conflict_recs = Enum.map(results.conflicts.resolutions, fn res ->
-          %{
-            type: :version_resolution,
-            package: res.package,
-            action: "Update to #{res.suggested_version}",
-            priority: :high
-          }
-        end)
-        all_recommendations = all_recommendations ++ conflict_recs
-      end
-      
-      # Security updates
-      if results[:vulnerabilities] && results.vulnerabilities[:remediation_plan] do
-        security_recs = Enum.map(results.vulnerabilities.remediation_plan, fn rem ->
-          %{
-            type: :security_update,
-            package: rem.package,
-            action: rem.update_command,
-            priority: :critical
-          }
-        end)
-        all_recommendations = all_recommendations ++ security_recs
-      end
-      
-      # License recommendations
-      if results[:license_issues] && results.license_issues[:recommendations] do
-        license_recs = Enum.map(results.license_issues.recommendations, fn rec ->
-          %{
-            type: :license_compliance,
-            action: rec,
-            priority: :medium
-          }
-        end)
-        all_recommendations = all_recommendations ++ license_recs
-      end
+      all_recommendations = [] ++
+        (if results[:conflicts] && results.conflicts[:resolutions] do
+           Enum.map(results.conflicts.resolutions, fn res ->
+             %{
+               type: :version_resolution,
+               package: res.package,
+               action: "Update to #{res.suggested_version}",
+               priority: :high
+             }
+           end)
+         else
+           []
+         end) ++
+        (if results[:vulnerabilities] && results.vulnerabilities[:remediation_plan] do
+           Enum.map(results.vulnerabilities.remediation_plan, fn rem ->
+             %{
+               type: :security_update,
+               package: rem.package,
+               action: rem.update_command,
+               priority: :critical
+             }
+           end)
+         else
+           []
+         end) ++
+        (if results[:license_issues] && results.license_issues[:recommendations] do
+           Enum.map(results.license_issues.recommendations, fn rec ->
+             %{
+               type: :license_compliance,
+               action: rec,
+               priority: :medium
+             }
+           end)
+         else
+           []
+         end)
       
       # Sort by priority and deduplicate
       all_recommendations
@@ -2231,49 +2238,47 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     defp priority_to_number(:low), do: 3
     
     defp generate_action_items(results) do
-      items = []
-      
-      # Critical security updates
-      if results[:vulnerabilities] && results.vulnerabilities[:severity_breakdown][:critical] > 0 do
-        items = [%{
-          action: "Apply critical security updates immediately",
-          timeline: "Within 24 hours",
-          owner: "Security team",
-          priority: :critical
-        } | items]
-      end
-      
-      # Version conflict resolution
-      if results[:conflicts] && results.conflicts[:conflict_count] > 5 do
-        items = [%{
-          action: "Resolve version conflicts to ensure stability",
-          timeline: "Within 1 week",
-          owner: "Development team",
-          priority: :high
-        } | items]
-      end
-      
-      # License compliance
-      if results[:license_issues] && !results.license_issues[:compliance_status][:compliant] do
-        items = [%{
-          action: "Address license compliance issues",
-          timeline: "Within 2 weeks",
-          owner: "Legal team",
-          priority: :high
-        } | items]
-      end
-      
-      # General updates
-      if results[:updates] && results.updates[:update_count][:total] > 20 do
-        items = [%{
-          action: "Plan and execute dependency update cycle",
-          timeline: "Within 1 month",
-          owner: "Development team",
-          priority: :medium
-        } | items]
-      end
-      
-      items
+      [] ++
+        (if results[:vulnerabilities] && results.vulnerabilities[:severity_breakdown][:critical] > 0 do
+           [%{
+             action: "Apply critical security updates immediately",
+             timeline: "Within 24 hours",
+             owner: "Security team",
+             priority: :critical
+           }]
+         else
+           []
+         end) ++
+        (if results[:conflicts] && results.conflicts[:conflict_count] > 5 do
+           [%{
+             action: "Resolve version conflicts to ensure stability",
+             timeline: "Within 1 week",
+             owner: "Development team",
+             priority: :high
+           }]
+         else
+           []
+         end) ++
+        (if results[:license_issues] && !results.license_issues[:compliance_status][:compliant] do
+           [%{
+             action: "Address license compliance issues",
+             timeline: "Within 2 weeks",
+             owner: "Legal team",
+             priority: :high
+           }]
+         else
+           []
+         end) ++
+        (if results[:updates] && results.updates[:update_count][:total] > 20 do
+           [%{
+             action: "Plan and execute dependency update cycle",
+             timeline: "Within 1 month",
+             owner: "Development team",
+             priority: :medium
+           }]
+         else
+           []
+         end)
     end
     
     defp format_executive_report(base_report) do
@@ -2572,7 +2577,6 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     end
   end
   
-  @impl BaseToolAgent
   def initial_state do
     %{
       dependency_cache: %{},
@@ -2586,39 +2590,38 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     }
   end
   
-  @impl BaseToolAgent
+  @impl true
   def handle_tool_signal(%State{} = state, signal) do
     signal_type = signal["type"]
     data = signal["data"] || %{}
     
     case signal_type do
       "analyze_tree" ->
-        cmd_async(state, AnalyzeDependencyTreeAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, AnalyzeDependencyTreeAction, data)
         
       "detect_conflicts" ->
-        cmd_async(state, DetectVersionConflictsAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, DetectVersionConflictsAction, data)
         
       "check_vulnerabilities" ->
-        cmd_async(state, CheckSecurityVulnerabilitiesAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, CheckSecurityVulnerabilitiesAction, data)
         
       "analyze_licenses" ->
-        cmd_async(state, AnalyzeLicenseCompatibilityAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, AnalyzeLicenseCompatibilityAction, data)
         
       "generate_updates" ->
-        cmd_async(state, GenerateUpdateRecommendationsAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, GenerateUpdateRecommendationsAction, data)
         
       "visualize_graph" ->
-        cmd_async(state, VisualizeDependencyGraphAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, VisualizeDependencyGraphAction, data)
         
       "generate_report" ->
-        cmd_async(state, GenerateDependencyReportAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, GenerateDependencyReportAction, data)
         
       _ ->
         super(state, signal)
     end
   end
   
-  @impl BaseToolAgent
   def handle_action_result(state, action, result, metadata) do
     case action do
       AnalyzeDependencyTreeAction ->
@@ -2705,7 +2708,7 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     {:ok, state}
   end
   
-  defp handle_license_analysis_result(state, {:ok, result}, metadata) do
+  defp handle_license_analysis_result(state, {:ok, result}, _metadata) do
     # Update license database
     if result[:license_summary] do
       license_info = result.license_summary[:license_breakdown] || %{}
@@ -2722,12 +2725,12 @@ defmodule RubberDuck.Tools.Agents.DependencyAnalyzerAgent do
     {:ok, state}
   end
   
-  @impl BaseToolAgent
+  @impl true
   def process_result(result, _metadata) do
     Map.put(result, :analyzed_at, DateTime.utc_now())
   end
   
-  @impl BaseToolAgent
+  @impl true
   def additional_actions do
     [
       AnalyzeDependencyTreeAction,

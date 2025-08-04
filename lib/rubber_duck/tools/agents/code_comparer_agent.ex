@@ -292,7 +292,7 @@ defmodule RubberDuck.Tools.Agents.CodeComparerAgent do
     parallel = get_in(signal, ["data", "parallel"]) || true
     
     # Execute batch compare action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, BatchCompareAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, BatchCompareAction, %{
       comparisons: comparisons,
       parallel: parallel
     }, context: %{agent: agent})
@@ -305,7 +305,7 @@ defmodule RubberDuck.Tools.Agents.CodeComparerAgent do
     min_occurrences = get_in(signal, ["data", "min_occurrences"]) || 2
     
     # Execute pattern analysis action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, AnalyzePatternsAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, AnalyzePatternsAction, %{
       pattern_type: pattern_type,
       min_occurrences: min_occurrences
     }, context: %{agent: agent})
@@ -319,7 +319,7 @@ defmodule RubberDuck.Tools.Agents.CodeComparerAgent do
     time_range = get_in(signal, ["data", "time_range"])
     
     # Execute report generation action
-    {:ok, _ref} = __MODULE__.cmd_async(agent, GenerateReportAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, GenerateReportAction, %{
       format: format,
       include_patterns: include_patterns,
       time_range: time_range
@@ -328,7 +328,7 @@ defmodule RubberDuck.Tools.Agents.CodeComparerAgent do
     {:ok, agent}
   end
   
-  def handle_tool_signal(agent, _signal), do: super(agent, _signal)
+  def handle_tool_signal(agent, signal), do: super(agent, signal)
   
   # Process comparison results to track history and patterns
   @impl true
@@ -338,7 +338,6 @@ defmodule RubberDuck.Tools.Agents.CodeComparerAgent do
   end
   
   # Override action result handler to update history
-  @impl true
   def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
     # Let parent handle the standard processing
     {:ok, agent} = super(agent, ExecuteToolAction, {:ok, result}, metadata)
@@ -359,10 +358,11 @@ defmodule RubberDuck.Tools.Agents.CodeComparerAgent do
       end)
       
       # Update pattern detection
-      agent = detect_and_update_patterns(agent, comparison_record)
+      updated_agent = detect_and_update_patterns(agent, comparison_record)
+      {:ok, updated_agent}
+    else
+      {:ok, agent}
     end
-    
-    {:ok, agent}
   end
   
   def handle_action_result(agent, action, result, metadata) do

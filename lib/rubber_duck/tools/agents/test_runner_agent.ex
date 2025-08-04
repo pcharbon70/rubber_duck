@@ -644,43 +644,41 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
     end
     
     defp generate_health_recommendations(history, _agent) do
-      recommendations = []
-      
       # Check for stability issues
       stability = calculate_stability_rate(history)
-      recommendations = if stability < 80 do
+      stability_recommendations = if stability < 80 do
         [%{
           type: :stability,
           priority: :high,
           message: "Test stability is below acceptable threshold (#{stability}%)",
           action: "Investigate and fix frequently failing tests"
-        } | recommendations]
+        }]
       else
-        recommendations
+        []
       end
       
       # Check for performance issues
-      if length(history) > 0 do
+      performance_recommendations = if length(history) > 0 do
         avg_duration = history
         |> Enum.map(fn run -> run.duration_ms || 0 end)
         |> Enum.sum()
         |> Kernel./(length(history))
         
-        recommendations = if avg_duration > 60_000 do
+        if avg_duration > 60_000 do
           [%{
             type: "performance",
             priority: :medium,
             message: "Average test execution time is high (#{round(avg_duration)}ms)",
             action: "Consider test optimization or parallel execution"
-          } | recommendations]
+          }]
         else
-          recommendations
+          []
         end
       else
-        recommendations
+        []
       end
       
-      recommendations
+      stability_recommendations ++ performance_recommendations
     end
     
     # Helper functions
@@ -924,7 +922,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
     }
     
     # Execute the test run
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, ExecuteToolAction, %{params: params})
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, ExecuteToolAction, %{params: params})
     
     {:ok, agent}
   end
@@ -932,7 +930,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
   def handle_signal(agent, %{"type" => "run_test_suite"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, RunTestSuiteAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, RunTestSuiteAction, %{
       suite_name: data["suite_name"],
       include_coverage: data["include_coverage"] || true,
       parallel: data["parallel"] || true,
@@ -946,7 +944,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
   def handle_signal(agent, %{"type" => "analyze_test_results"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, AnalyzeResultsAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, AnalyzeResultsAction, %{
       test_results: data["test_results"],
       analysis_depth: String.to_atom(data["analysis_depth"] || "detailed"),
       compare_with_history: data["compare_with_history"] || true,
@@ -959,7 +957,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
   def handle_signal(agent, %{"type" => "monitor_test_health"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, MonitorHealthAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, MonitorHealthAction, %{
       time_window: data["time_window"] || 86_400_000,
       include_trends: data["include_trends"] || true,
       detect_flaky_tests: data["detect_flaky_tests"] || true,
@@ -972,7 +970,7 @@ defmodule RubberDuck.Tools.Agents.TestRunnerAgent do
   def handle_signal(agent, %{"type" => "optimize_test_execution"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = Jido.Agent.cmd_async(agent, OptimizeExecutionAction, %{
+    {:ok, agent, _directives} = Jido.Agent.cmd(agent, OptimizeExecutionAction, %{
       focus_areas: Enum.map(data["focus_areas"] || ["performance", "coverage"], &String.to_atom/1),
       current_settings: data["current_settings"] || %{},
       constraints: data["constraints"] || %{}

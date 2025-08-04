@@ -237,7 +237,6 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
       end
       
       # Handler for action results
-      @impl true
       def handle_action_result(agent, action, result, metadata) do
         case action do
           ExecuteToolAction ->
@@ -381,8 +380,8 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
                 request_id: request_id
               }
               
-              # Use async execution
-              {:ok, _ref} = __MODULE__.cmd_async(agent, ExecuteToolAction, params, 
+              # Use execution
+              {:ok, agent, _directives} = __MODULE__.cmd(agent, ExecuteToolAction, params, 
                 context: context,
                 metadata: %{request_id: request_id, cache_key: cache_key}
               )
@@ -448,7 +447,7 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
       
       def handle_signal(agent, %{"type" => "get_metrics"} = _signal) do
         # Execute metrics action
-        {:ok, _ref} = __MODULE__.cmd_async(agent, GetMetricsAction, %{}, 
+        {:ok, agent, _directives} = __MODULE__.cmd(agent, GetMetricsAction, %{}, 
           context: %{agent: agent}
         )
         {:ok, agent}
@@ -456,7 +455,7 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
       
       def handle_signal(agent, %{"type" => "clear_cache"} = _signal) do
         # Execute clear cache action
-        {:ok, _ref} = __MODULE__.cmd_async(agent, ClearCacheAction, %{},
+        {:ok, agent, _directives} = __MODULE__.cmd(agent, ClearCacheAction, %{},
           context: %{agent: agent}
         )
         {:ok, agent}
@@ -568,8 +567,8 @@ defmodule RubberDuck.Tools.Agents.BaseToolAgent do
               request_id: request.id
             }
             
-            # Use async execution
-            {:ok, _ref} = __MODULE__.cmd_async(agent, ExecuteToolAction, params,
+            # Use execution
+            {:ok, agent, _directives} = __MODULE__.cmd(agent, ExecuteToolAction, params,
               context: context,
               metadata: %{request_id: request.id, cache_key: request.cache_key}
             )

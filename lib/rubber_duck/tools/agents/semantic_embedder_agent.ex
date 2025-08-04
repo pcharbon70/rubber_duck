@@ -620,7 +620,6 @@ defmodule RubberDuck.Tools.Agents.SemanticEmbedderAgent do
     end
   end
   
-  @impl true
   def additional_actions do
     [
       ExecuteToolAction,
@@ -676,7 +675,6 @@ defmodule RubberDuck.Tools.Agents.SemanticEmbedderAgent do
     {:ok, state}
   end
   
-  @impl true
   def handle_action_result(state, ExecuteToolAction, {:ok, result}, params) do
     # Cache the embedding if not already cached
     cache_key = result[:cache_key] || ExecuteToolAction.generate_cache_key(params.params)
@@ -702,7 +700,6 @@ defmodule RubberDuck.Tools.Agents.SemanticEmbedderAgent do
     {:ok, update_performance_metrics(state, :generation)}
   end
   
-  @impl true
   def handle_action_result(state, SimilaritySearchAction, {:ok, result}, _params) do
     # Update search history
     history_entry = %{
@@ -717,13 +714,11 @@ defmodule RubberDuck.Tools.Agents.SemanticEmbedderAgent do
     {:ok, update_performance_metrics(state, "search")}
   end
   
-  @impl true
   def handle_action_result(state, BuildIndexAction, {:ok, result}, _params) do
     state = put_in(state.embedding_index, result.index)
     {:ok, state}
   end
   
-  @impl true
   def handle_action_result(state, _action, _result, _params) do
     {:ok, state}
   end

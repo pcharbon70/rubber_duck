@@ -362,22 +362,22 @@ defmodule RubberDuck.Tools.Agents.CodeExplainerAgent do
       # Check for special handling
       request_id = data.request_id
       
-      cond do
+      agent = cond do
         # Handle diff explanation
         diff_metadata = get_in(agent.state.active_requests, [request_id, :diff_metadata]) ->
-          agent = handle_diff_explanation_result(agent, data.result, diff_metadata)
+          handle_diff_explanation_result(agent, data.result, diff_metadata)
           
         # Handle tutorial step
         tutorial_id = data.result[:tutorial_id] ->
-          agent = handle_tutorial_step_result(agent, data.result, tutorial_id)
+          handle_tutorial_step_result(agent, data.result, tutorial_id)
           
         # Handle batch explanation
         batch_id = data.result[:batch_id] ->
-          agent = update_explanation_batch(agent, batch_id, data.result)
+          update_explanation_batch(agent, batch_id, data.result)
           
         # Handle regular explanation
         true ->
-          agent = handle_regular_explanation_result(agent, data.result)
+          handle_regular_explanation_result(agent, data.result)
       end
       
       # Add to history
@@ -412,9 +412,6 @@ defmodule RubberDuck.Tools.Agents.CodeExplainerAgent do
   
   # Private helpers
   
-  defp generate_request_id do
-    "explain_#{System.unique_integer([:positive, :monotonic])}"
-  end
   
   defp detect_code_type(code) do
     cond do
@@ -489,7 +486,7 @@ defmodule RubberDuck.Tools.Agents.CodeExplainerAgent do
     end
   end
   
-  defp create_beginner_steps(code, lines) do
+  defp create_beginner_steps(code, _lines) do
     # Very detailed steps for beginners
     [
       %{
@@ -617,13 +614,13 @@ defmodule RubberDuck.Tools.Agents.CodeExplainerAgent do
         
         updated_batch = batch
         |> Map.put(:completed, completed)
-        |> Map.put_in([:explanations, result[:file_path] || "snippet_#{completed}"], result[:explanation])
+        |> put_in([:explanations, result[:file_path] || "snippet_#{completed}"], result[:explanation])
         
         # Check if batch is complete
         if completed >= batch.total_files do
           signal = Jido.Signal.new!(%{
             type: "code.explanation.batch.completed",
-            source: "agent:#{Process.self()}",
+            source: "agent:#{self()}",
             data: %{
               batch_id: batch_id,
               project_path: batch.project_path,

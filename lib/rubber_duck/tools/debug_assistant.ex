@@ -97,7 +97,7 @@ defmodule RubberDuck.Tools.DebugAssistant do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:llm_access]
       rate_limit [max_requests: 100, window_seconds: 60]
     end
@@ -244,7 +244,7 @@ defmodule RubberDuck.Tools.DebugAssistant do
     end
   end
   
-  defp identify_common_patterns(message, error_type) do
+  defp identify_common_patterns(message, _error_type) do
     patterns = []
     
     # Pattern detection based on error type and message content

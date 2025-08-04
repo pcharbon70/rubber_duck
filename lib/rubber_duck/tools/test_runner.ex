@@ -104,7 +104,7 @@ defmodule RubberDuck.Tools.TestRunner do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:file_read, :process_spawn, :network_local]
       rate_limit [max_requests: 20, window_seconds: 60]
     end
@@ -370,7 +370,7 @@ defmodule RubberDuck.Tools.TestRunner do
     
     include_atoms = Enum.map(include, &String.to_atom/1)
     exclude_atoms = Enum.map(exclude, fn tag ->
-      String.to_atom(String.slice(tag, 1..-1))
+      String.to_atom(String.slice(tag, 1..-1//1))
     end)
     
     {include_atoms, exclude_atoms}
@@ -402,12 +402,9 @@ defmodule RubberDuck.Tools.TestRunner do
   defp generate_tap_output(results) do
     lines = ["TAP version 13", "1..#{results.total}"]
     
-    test_num = 1
-    failed_nums = Enum.map(results.failures, fn _ -> 
-      num = test_num
-      test_num = test_num + 1
-      num
-    end)
+    failed_nums = results.failures
+    |> Enum.with_index(1)
+    |> Enum.map(fn {_, index} -> index end)
     
     lines = lines ++ Enum.map(1..results.total, fn n ->
       if n in failed_nums do

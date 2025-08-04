@@ -106,9 +106,9 @@ defmodule RubberDuck.Tools.SemanticEmbedder do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:llm_access]
-      rate_limit 100
+      rate_limit [max_requests: 100, window_seconds: 60]
     end
   end
   
@@ -364,7 +364,7 @@ defmodule RubberDuck.Tools.SemanticEmbedder do
     end
   end
   
-  defp generate_single_embedding(text, params, context) do
+  defp generate_single_embedding(text, params, _context) do
     # In a real implementation, this would call the embedding API
     # For now, we'll simulate with the LLM service
     

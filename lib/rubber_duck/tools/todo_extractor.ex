@@ -96,7 +96,7 @@ defmodule RubberDuck.Tools.TodoExtractor do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:file_read]
       rate_limit [max_requests: 100, window_seconds: 60]
     end
@@ -233,7 +233,7 @@ defmodule RubberDuck.Tools.TodoExtractor do
     |> Enum.flat_map(fn {pattern_name, regex} ->
       case Regex.run(regex, line) do
         nil -> []
-        [full_match, pattern_match, description] ->
+        [full_match, _pattern_match, description] ->
           context = if params.include_context do
             extract_context(all_lines, line_num - 1, params.context_lines)
           else
@@ -253,7 +253,7 @@ defmodule RubberDuck.Tools.TodoExtractor do
           
           [todo]
         
-        [full_match, pattern_match] ->
+        [full_match, _pattern_match] ->
           # Handle case where there's no description
           todo = %{
             type: String.downcase(pattern_name),

@@ -404,8 +404,10 @@ defmodule RubberDuck.Tools.Agents.CodeNavigatorAgent do
       end
       
       # Handle batch navigation
-      if batch_id = data.result[:batch_id] do
-        agent = update_navigation_batch(agent, batch_id, data.result)
+      agent = if batch_id = data.result[:batch_id] do
+        update_navigation_batch(agent, batch_id, data.result)
+      else
+        agent
       end
       
       # Emit specialized signal
@@ -433,9 +435,6 @@ defmodule RubberDuck.Tools.Agents.CodeNavigatorAgent do
   
   # Private helpers
   
-  defp generate_request_id do
-    "nav_#{System.unique_integer([:positive, :monotonic])}"
-  end
   
   defp generate_cache_key(symbol, params) do
     content = symbol <> inspect(Map.take(params, ["search_type", "scope", "file_pattern"]))
@@ -528,7 +527,7 @@ defmodule RubberDuck.Tools.Agents.CodeNavigatorAgent do
     hierarchy_id = get_in(agent.state.active_requests, [result[:request_id], :metadata, :hierarchy_id])
     
     if hierarchy_id && agent.state.call_hierarchies[hierarchy_id] do
-      agent = update_in(agent.state.call_hierarchies[hierarchy_id], fn hierarchy ->
+      update_in(agent.state.call_hierarchies[hierarchy_id], fn hierarchy ->
         level = get_in(agent.state.active_requests, [result[:request_id], :metadata, :hierarchy_level]) || 0
         
         # Add node to hierarchy
@@ -548,7 +547,7 @@ defmodule RubberDuck.Tools.Agents.CodeNavigatorAgent do
           # Hierarchy complete
           signal = Jido.Signal.new!(%{
             type: "code.navigation.hierarchy.traced",
-            source: "agent:#{Process.self()}",
+            source: "agent:#{self()}",
             data: %{
               hierarchy_id: hierarchy_id,
               root_symbol: hierarchy.root_symbol,
@@ -679,13 +678,13 @@ defmodule RubberDuck.Tools.Agents.CodeNavigatorAgent do
         
         updated_batch = batch
         |> Map.put(:completed, completed)
-        |> Map.put_in([:results, symbol], result["results"])
+        |> put_in([:results, symbol], result["results"])
         
         # Check if batch is complete
         if completed >= batch.total_symbols do
           signal = Jido.Signal.new!(%{
             type: "code.navigation.batch.completed",
-            source: "agent:#{Process.self()}",
+            source: "agent:#{self()}",
             data: %{
               batch_id: batch_id,
               total_symbols: batch.total_symbols,

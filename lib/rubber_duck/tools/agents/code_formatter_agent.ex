@@ -337,12 +337,12 @@ defmodule RubberDuck.Tools.Agents.CodeFormatterAgent do
       request_id = data.request_id
       validation_metadata = get_in(agent.state.active_requests, [request_id, :validation_metadata])
       
-      if validation_metadata do
+      agent = if validation_metadata do
         # Handle validation result
-        agent = handle_validation_result(agent, data.result, validation_metadata)
+        handle_validation_result(agent, data.result, validation_metadata)
       else
         # Handle regular formatting result
-        agent = handle_formatting_result(agent, data.result, data.request_id)
+        handle_formatting_result(agent, data.result, data.request_id)
       end
       
       # Update batch if applicable
@@ -383,9 +383,6 @@ defmodule RubberDuck.Tools.Agents.CodeFormatterAgent do
   
   # Private helpers
   
-  defp generate_request_id do
-    "fmt_#{System.unique_integer([:positive, :monotonic])}"
-  end
   
   defp apply_saved_config(params, nil), do: params
   defp apply_saved_config(params, config) do
@@ -482,7 +479,7 @@ defmodule RubberDuck.Tools.Agents.CodeFormatterAgent do
     agent
   end
   
-  defp handle_formatting_result(agent, result, request_id) do
+  defp handle_formatting_result(agent, result, _request_id) do
     # Write file if requested and file_path provided
     if result[:file_path] && result[:write_file] do
       case File.write(result.file_path, result["formatted_code"]) do
@@ -511,7 +508,7 @@ defmodule RubberDuck.Tools.Agents.CodeFormatterAgent do
         if completed >= batch.total do
           signal = Jido.Signal.new!(%{
             type: "code.format.batch.completed",
-            source: "agent:#{Process.self()}",
+            source: "agent:#{self()}",
             data: %{
               batch_id: batch_id,
               total: batch.total,

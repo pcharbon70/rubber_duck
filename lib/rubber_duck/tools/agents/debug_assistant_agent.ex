@@ -442,9 +442,6 @@ defmodule RubberDuck.Tools.Agents.DebugAssistantAgent do
   
   # Private helpers
   
-  defp generate_request_id do
-    "debug_#{System.unique_integer([:positive, :monotonic])}"
-  end
   
   defp categorize_error_context(error_message) do
     cond do

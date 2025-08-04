@@ -11,7 +11,15 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
   - Remediation guidance with code fixes
   """
   
-  use RubberDuck.Tools.BaseToolAgent, tool: :security_analyzer
+  use RubberDuck.Tools.Agents.BaseToolAgent,
+    tool: :security_analyzer,
+    name: "security_analyzer_agent",
+    description: "Analyzes code for security vulnerabilities and provides remediation recommendations",
+    schema: [
+      # Security analysis history
+      scan_history: [type: {:list, :map}, default: []],
+      vulnerability_data: [type: :map, default: quote do %{} end]
+    ]
   
   alias Jido.Agent.Server.State
   
@@ -20,7 +28,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
     @moduledoc """
     Scans code for security vulnerabilities using pattern matching and static analysis.
     """
-    use Jido.Action
+    use Jido.Action, name: "scan_vulnerabilities"
     
     def parameter_schema do
       %{
@@ -235,7 +243,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       Map.put(vuln, :user_input_flow, check_user_input_flow(vuln, code))
     end
     
-    defp check_user_input_flow(vuln, code) do
+    defp check_user_input_flow(vuln, _code) do
       # Simplified check - in real implementation would trace data flow
       user_input_patterns = [~r/request\./i, ~r/params\[/i, ~r/user_input/i, ~r/req\./]
       
@@ -423,7 +431,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
     @moduledoc """
     Analyzes project dependencies for known vulnerabilities and outdated packages.
     """
-    use Jido.Action
+    use Jido.Action, name: "scan_dependencies"
     
     def parameter_schema do
       %{
@@ -551,7 +559,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       end
     end
     
-    defp find_safe_versions(dep_name, vulnerabilities) do
+    defp find_safe_versions(dep_name, _vulnerabilities) do
       # Simulate finding safe versions
       safe_versions = %{
         "express" => ["4.18.2", "4.19.0"],
@@ -828,7 +836,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
     @moduledoc """
     Validates code against security best practices and coding standards.
     """
-    use Jido.Action
+    use Jido.Action, name: "validate_security_practices"
     
     def parameter_schema do
       %{
@@ -883,7 +891,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       }
     end
     
-    defp get_security_checks(language, categories) do
+    defp get_security_checks(_language, categories) do
       base_checks = [
         %{
           category: "authentication",
@@ -968,7 +976,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       if total_checks == 0 do
         1.0
       else
-        passed = total_checks - length(violations)
+        _passed = total_checks - length(violations)
         
         # Weight by severity
         weighted_violations = violations
@@ -1168,7 +1176,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
     @moduledoc """
     Generates remediation code and guidance for security vulnerabilities.
     """
-    use Jido.Action
+    use Jido.Action, name: "generate_remediation"
     
     def parameter_schema do
       %{
@@ -1217,7 +1225,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       end
     end
     
-    defp remediate_sql_injection(vuln, code, language, _style) do
+    defp remediate_sql_injection(vuln, _code, language, _style) do
       occurrence = hd(vuln.occurrences)
       vulnerable_line = occurrence.code_snippet
       
@@ -1275,7 +1283,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       }
     end
     
-    defp remediate_xss(vuln, code, language, _style) do
+    defp remediate_xss(vuln, _code, language, _style) do
       occurrence = hd(vuln.occurrences)
       vulnerable_line = occurrence.code_snippet
       
@@ -1336,7 +1344,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       }
     end
     
-    defp remediate_command_injection(vuln, _code, language, _style) do
+    defp remediate_command_injection(_vuln, _code, language, _style) do
       fixed_code = case language do
         "python" ->
           """
@@ -1392,7 +1400,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       }
     end
     
-    defp remediate_path_traversal(vuln, _code, language, _style) do
+    defp remediate_path_traversal(_vuln, _code, language, _style) do
       fixed_code = case language do
         "python" ->
           """
@@ -1466,7 +1474,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       }
     end
     
-    defp remediate_weak_crypto(vuln, _code, language, _style) do
+    defp remediate_weak_crypto(_vuln, _code, language, _style) do
       fixed_code = case language do
         "python" ->
           """
@@ -1536,7 +1544,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       }
     end
     
-    defp remediate_hardcoded_secrets(vuln, _code, language, _style) do
+    defp remediate_hardcoded_secrets(_vuln, _code, language, _style) do
       fixed_code = case language do
         "python" ->
           """
@@ -1651,7 +1659,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       if vulnerability[:cwe_id] do
         cwe_ref = %{
           title: vulnerability.cwe_id,
-          url: "https://cwe.mitre.org/data/definitions/#{String.slice(vulnerability.cwe_id, 4..-1)}.html"
+          url: "https://cwe.mitre.org/data/definitions/#{String.slice(vulnerability.cwe_id, 4..-1//-1)}.html"
         }
         base_refs ++ [cwe_ref]
       else
@@ -1664,7 +1672,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
     @moduledoc """
     Performs threat modeling analysis on system architecture and code.
     """
-    use Jido.Action
+    use Jido.Action, name: "threat_model"
     
     def parameter_schema do
       %{
@@ -1835,7 +1843,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       end)
     end
     
-    defp generate_attack_vectors(:spoofing, threats, _components) do
+    defp generate_attack_vectors(:spoofing, _threats, _components) do
       [
         %{
           vector: "Credential theft",
@@ -1850,7 +1858,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       ]
     end
     
-    defp generate_attack_vectors(:tampering, threats, _components) do
+    defp generate_attack_vectors(:tampering, _threats, _components) do
       [
         %{
           vector: "Man-in-the-middle",
@@ -1979,12 +1987,12 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       end
     end
     
-    defp derive_security_requirements(threats, components) do
-      requirements = []
+    defp derive_security_requirements(threats, _components) do
+      base_requirements = []
       
       # Authentication requirements
-      if Enum.any?(threats, &(&1.type == :spoofing)) do
-        auth_reqs = [
+      auth_requirements = if Enum.any?(threats, &(&1.type == :spoofing)) do
+        [
           %{
             category: "authentication",
             requirement: "Multi-factor authentication for sensitive operations",
@@ -1996,12 +2004,13 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
             priority: :high
           }
         ]
-        requirements = requirements ++ auth_reqs
+      else
+        []
       end
       
       # Encryption requirements
-      if Enum.any?(threats, &(&1.type in [:information_disclosure, :tampering])) do
-        crypto_reqs = [
+      crypto_requirements = if Enum.any?(threats, &(&1.type in [:information_disclosure, :tampering])) do
+        [
           %{
             category: "cryptography",
             requirement: "TLS 1.3 for all external communications",
@@ -2013,12 +2022,13 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
             priority: :high
           }
         ]
-        requirements = requirements ++ crypto_reqs
+      else
+        []
       end
       
       # Access control requirements
-      if Enum.any?(threats, &(&1.type == :elevation_of_privilege)) do
-        access_reqs = [
+      access_requirements = if Enum.any?(threats, &(&1.type == :elevation_of_privilege)) do
+        [
           %{
             category: "access_control",
             requirement: "Role-based access control implementation",
@@ -2030,10 +2040,11 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
             priority: :medium
           }
         ]
-        requirements = requirements ++ access_reqs
+      else
+        []
       end
       
-      requirements
+      base_requirements ++ auth_requirements ++ crypto_requirements ++ access_requirements
     end
     
     defp generate_threat_summary(threats, risk_matrix) do
@@ -2102,7 +2113,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
     @moduledoc """
     Generates comprehensive security analysis reports.
     """
-    use Jido.Action
+    use Jido.Action, name: "generate_security_report"
     
     def parameter_schema do
       %{
@@ -2421,7 +2432,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       |> Enum.into(%{})
     end
     
-    defp map_findings_to_framework(results, framework) do
+    defp map_findings_to_framework(_results, framework) do
       %{
         framework: framework,
         status: "Framework mapping not implemented",
@@ -2759,7 +2770,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
       end
     end
     
-    defp estimate_resources(finding) do
+    defp estimate_resources(_finding) do
       %{
         developers: 1,
         security_review: true,
@@ -2812,7 +2823,6 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
     end
   end
   
-  @impl BaseToolAgent
   def initial_state do
     %{
       scan_history: [],
@@ -2826,36 +2836,35 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
     }
   end
   
-  @impl BaseToolAgent
+  @impl true
   def handle_tool_signal(%State{} = state, signal) do
     signal_type = signal["type"]
     data = signal["data"] || %{}
     
     case signal_type do
       "scan_vulnerabilities" ->
-        cmd_async(state, ScanVulnerabilitiesAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, ScanVulnerabilitiesAction, data)
         
       "analyze_dependencies" ->
-        cmd_async(state, AnalyzeDependenciesAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, AnalyzeDependenciesAction, data)
         
       "validate_security_practices" ->
-        cmd_async(state, ValidateSecurityPracticesAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, ValidateSecurityPracticesAction, data)
         
       "generate_remediation" ->
-        cmd_async(state, GenerateRemediationAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, GenerateRemediationAction, data)
         
       "perform_threat_modeling" ->
-        cmd_async(state, PerformThreatModelingAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, PerformThreatModelingAction, data)
         
       "generate_security_report" ->
-        cmd_async(state, GenerateSecurityReportAction, data)
+        {:ok, _state, _directives} = __MODULE__.cmd(state, GenerateSecurityReportAction, data)
         
       _ ->
         super(state, signal)
     end
   end
   
-  @impl BaseToolAgent
   def handle_action_result(state, action, result, metadata) do
     case action do
       ScanVulnerabilitiesAction ->
@@ -2877,7 +2886,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
   
   defp handle_scan_result(state, {:ok, result}, metadata) do
     # Update vulnerability cache
-    cache_key = generate_cache_key(metadata)
+    cache_key = generate_metadata_cache_key(metadata)
     updated_cache = Map.put(state.state.vulnerability_cache, cache_key, %{
       result: result,
       timestamp: DateTime.utc_now(),
@@ -2940,7 +2949,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
     {:ok, state}
   end
   
-  defp handle_practice_validation_result(state, {:ok, result}, metadata) do
+  defp handle_practice_validation_result(state, {:ok, result}, _metadata) do
     # Update security policies based on violations
     if length(result.practice_violations) > 0 do
       updated_policies = update_security_policies(
@@ -2988,12 +2997,12 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
     {:ok, state}
   end
   
-  @impl BaseToolAgent
+  @impl true
   def process_result(result, _metadata) do
     Map.put(result, :analyzed_at, DateTime.utc_now())
   end
   
-  @impl BaseToolAgent
+  @impl true
   def additional_actions do
     [
       ScanVulnerabilitiesAction,
@@ -3006,7 +3015,7 @@ defmodule RubberDuck.Tools.Agents.SecurityAnalyzerAgent do
   end
   
   # Helper functions
-  defp generate_cache_key(metadata) do
+  defp generate_metadata_cache_key(metadata) do
     content = metadata[:source_code] || metadata["dependencies"] || ""
     :crypto.hash(:md5, content) |> Base.encode16()
   end

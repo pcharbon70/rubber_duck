@@ -311,8 +311,10 @@ defmodule RubberDuck.Tools.Agents.CodeGeneratorAgent do
       agent = update_generation_stats(agent, data["result"])
       
       # Check if part of batch
-      if batch_id = get_in(data, ["result", "batch_id"]) do
-        agent = update_batch_progress(agent, batch_id, data["result"])
+      agent = if batch_id = get_in(data, ["result", "batch_id"]) do
+        update_batch_progress(agent, batch_id, data["result"])
+      else
+        agent
       end
       
       # Emit specialized signal
@@ -343,9 +345,6 @@ defmodule RubberDuck.Tools.Agents.CodeGeneratorAgent do
   
   # Private helpers
   
-  defp generate_request_id do
-    "gen_#{System.unique_integer([:positive, :monotonic])}"
-  end
   
   defp build_template_description(template, variables) do
     description = template["description"] || ""

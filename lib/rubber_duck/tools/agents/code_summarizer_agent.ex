@@ -397,26 +397,25 @@ defmodule RubberDuck.Tools.Agents.CodeSummarizerAgent do
       # Check for special handling
       request_id = data.request_id
       
-      cond do
+      agent = cond do
         # Handle batch summary
         batch_id = data.result[:batch_id] ->
-          agent = update_summary_batch(agent, batch_id, data.result)
+          update_summary_batch(agent, batch_id, data.result)
           
         # Handle comparison results
         String.starts_with?(request_id, "compare_") ->
-          agent = handle_comparison_result(agent, request_id, data.result)
+          handle_comparison_result(agent, request_id, data.result)
           
         # Handle architecture overview
         overview_id = data.result[:overview_id] ->
-          agent = update_architecture_overview(agent, overview_id, data.result)
+          update_architecture_overview(agent, overview_id, data.result)
           
         # Handle regular summary
         true ->
-          # Add to history
-          agent = add_to_summary_history(agent, data.result)
-          
-          # Update statistics
-          agent = update_summary_stats(agent, data.result)
+          # Add to history and update statistics
+          agent
+          |> add_to_summary_history(data.result)
+          |> update_summary_stats(data.result)
       end
       
       # Emit specialized signal
@@ -444,11 +443,6 @@ defmodule RubberDuck.Tools.Agents.CodeSummarizerAgent do
   end
   
   # Private helpers
-  
-  defp generate_request_id do
-    "summary_#{System.unique_integer([:positive, :monotonic])}"
-  end
-  
   defp generate_cache_key(code, params) do
     content = code <> inspect(Map.take(params, ["summary_type", "focus_level", "target_audience"]))
     :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
@@ -506,7 +500,7 @@ defmodule RubberDuck.Tools.Agents.CodeSummarizerAgent do
         
         updated_batch = batch
         |> Map.put(:completed, completed)
-        |> Map.put_in([:summaries, file_path], %{
+        |> put_in([:summaries, file_path], %{
           summary: result["summary"],
           analysis: result["analysis"]
         })
@@ -520,7 +514,7 @@ defmodule RubberDuck.Tools.Agents.CodeSummarizerAgent do
           
           signal = Jido.Signal.new!(%{
             type: "code.summary.batch.completed",
-            source: "agent:#{Process.self()}",
+            source: "agent:#{self()}",
             data: %{
               batch_id: batch_id,
               project_path: batch[:project_path],
@@ -612,15 +606,17 @@ defmodule RubberDuck.Tools.Agents.CodeSummarizerAgent do
   end
   
   defp update_architecture_overview(agent, overview_id, result) do
-    update_in(agent.state.architecture_overviews[overview_id], fn overview ->
+    _ = update_in(agent.state.architecture_overviews[overview_id], fn overview ->
       if overview do
         modules_analyzed = overview.modules_analyzed + 1
         
         # Extract module relationships
-        if deps = get_in(result, ["analysis", "dependencies"]) do
-          overview = update_in(overview.relationships, fn rels ->
+        overview = if deps = get_in(result, ["analysis", "dependencies"]) do
+          update_in(overview.relationships, fn rels ->
             Map.put(rels, result[:file_path] || "module_#{modules_analyzed}", deps)
           end)
+        else
+          overview
         end
         
         # Categorize into layers
@@ -731,7 +727,7 @@ defmodule RubberDuck.Tools.Agents.CodeSummarizerAgent do
     Map.put(stats, :most_complex_modules, modules)
   end
   
-  defp maybe_update_state(agent, key, nil), do: agent
+  defp maybe_update_state(agent, _key, nil), do: agent
   defp maybe_update_state(agent, key, value) do
     put_in(agent.state[key], value)
   end

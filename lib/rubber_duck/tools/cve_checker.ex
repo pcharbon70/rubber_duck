@@ -5,22 +5,18 @@ defmodule RubberDuck.Tools.CVEChecker do
   support for multiple package registries and vulnerability databases.
   """
 
-  use RubberDuck.Tools.Base
+  use RubberDuck.Tool
 
-  alias RubberDuck.Types.{ToolCall, ToolResult}
+  # alias RubberDuck.Types.{ToolCall, ToolResult}
 
-  @impl true
   def name, do: :cve_checker
 
-  @impl true
   def description do
     "Checks for CVE vulnerabilities in dependency chains across multiple registries"
   end
 
-  @impl true
   def category, do: :security
 
-  @impl true
   def input_schema do
     %{
       type: "object",
@@ -88,7 +84,6 @@ defmodule RubberDuck.Tools.CVEChecker do
     }
   end
 
-  @impl true
   def output_schema do
     %{
       type: "object",
@@ -154,11 +149,10 @@ defmodule RubberDuck.Tools.CVEChecker do
     }
   end
 
-  @impl true
-  def execute(%ToolCall{name: @name, arguments: args} = _tool_call) do
+  def execute(params, _context) do
     start_time = System.monotonic_time(:millisecond)
     
-    with {:ok, validated_args} <- validate_arguments(args),
+    with {:ok, validated_args} <- validate_arguments(params),
          {:ok, dependency_tree} <- build_dependency_tree(validated_args),
          {:ok, vulnerabilities} <- check_vulnerabilities(dependency_tree, validated_args),
          {:ok, recommendations} <- generate_recommendations(vulnerabilities, dependency_tree) do
@@ -173,14 +167,13 @@ defmodule RubberDuck.Tools.CVEChecker do
         scan_duration
       )
       
-      {:ok, %ToolResult{
-        tool_name: @name,
-        result: result,
-        metadata: %{
-          vulnerabilities_found: length(vulnerabilities),
-          scan_duration_ms: scan_duration
-        }
-      }}
+      result_with_metadata = Map.put(result, :metadata, %{
+        vulnerabilities_found: length(vulnerabilities),
+        scan_duration_ms: scan_duration,
+        tool_name: :cve_checker
+      })
+      
+      {:ok, result_with_metadata}
     end
   end
 
@@ -368,7 +361,7 @@ defmodule RubberDuck.Tools.CVEChecker do
     end
   end
 
-  defp check_package_vulnerabilities(package_id, info, sources) do
+  defp check_package_vulnerabilities(_package_id, info, _sources) do
     # Simulate vulnerability checking against different sources
     # In reality, this would make API calls to vulnerability databases
     
@@ -688,7 +681,7 @@ defmodule RubberDuck.Tools.CVEChecker do
     %{
       bomFormat: "CycloneDX",
       specVersion: "1.4",
-      serialNumber: "urn:uuid:#{UUID.uuid4()}",
+      serialNumber: "urn:uuid:#{__MODULE__.UUID.uuid4()}",
       version: 1,
       metadata: %{
         timestamp: DateTime.utc_now() |> DateTime.to_iso8601(),

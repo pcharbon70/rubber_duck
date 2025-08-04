@@ -273,10 +273,10 @@ defmodule RubberDuck.Tools.CodeFormatter do
   
   defp normalize_ast(ast) do
     Macro.postwalk(ast, fn
-      # Remove line/column metadata
-      {form, _meta, args} -> {form, [], args}
-      # Normalize charlists
+      # Normalize charlists (specific pattern first)
       {:sigil_c, _, [{:<<>>, _, _}, _]} = node -> node
+      # Remove line/column metadata (general pattern second)
+      {form, _meta, args} -> {form, [], args}
       list when is_list(list) ->
         if List.ascii_printable?(list), do: list, else: list
       other -> other

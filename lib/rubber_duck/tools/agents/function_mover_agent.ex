@@ -320,7 +320,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
       }
     end
     
-    defp assess_impact(params, agent) do
+    defp assess_impact(_params, _agent) do
       %{
         modules_affected: 2, # source and target
         estimated_references: Enum.random(1..15),
@@ -331,7 +331,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
       }
     end
     
-    defp analyze_dependencies(params) do
+    defp analyze_dependencies(_params) do
       %{
         function_dependencies: [], # Functions this function calls
         dependent_functions: [], # Functions that call this function
@@ -340,8 +340,8 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
       }
     end
     
-    defp calculate_organizational_benefit(params, agent) do
-      criteria = agent.state.suggestion_criteria
+    defp calculate_organizational_benefit(_params, agent) do
+      _criteria = agent.state.suggestion_criteria
       
       %{
         cohesion_improvement: 0.1,
@@ -355,7 +355,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
       }
     end
     
-    defp assess_risks(params) do
+    defp assess_risks(_params) do
       %{
         risk_level: "low", # low, medium, high
         potential_issues: [
@@ -412,7 +412,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
       }}
     end
     
-    defp analyze_module_for_moves(module, params, agent) do
+    defp analyze_module_for_moves(module, _params, _agent) do
       # Would implement actual module analysis
       # For now, generate some example suggestions
       [
@@ -451,7 +451,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
     
     @impl true
     def run(params, context) do
-      agent = context.agent
+      _agent = context.agent
       
       validation_results = %{
         syntax_check: validate_syntax(params),
@@ -542,7 +542,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
     
     @impl true
     def run(params, context) do
-      agent = context.agent
+      _agent = context.agent
       
       preview = case params.preview_format do
         :diff -> generate_diff_preview(params)
@@ -625,7 +625,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
     }
     
     # Execute the move
-    {:ok, _ref} = __MODULE__.cmd_async(agent, ExecuteToolAction, %{params: params},
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, ExecuteToolAction, %{params: params},
       context: %{agent: agent}
     )
     
@@ -636,7 +636,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
   def handle_tool_signal(agent, %{"type" => "batch_move"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, BatchMoveAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, BatchMoveAction, %{
       moves: data["moves"],
       strategy: String.to_atom(data["strategy"] || "dependency_order"),
       rollback_on_failure: data["rollback_on_failure"] || true,
@@ -650,7 +650,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
   def handle_tool_signal(agent, %{"type" => "analyze_move"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, AnalyzeMoveAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, AnalyzeMoveAction, %{
       source_module: data["source_module"],
       target_module: data["target_module"],
       function_name: data["function_name"],
@@ -665,7 +665,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
   def handle_tool_signal(agent, %{"type" => "suggest_moves"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, SuggestMovesAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, SuggestMovesAction, %{
       modules: data["modules"],
       criteria: Enum.map(data["criteria"] || ["cohesion", "coupling"], &String.to_atom/1),
       max_suggestions: data["max_suggestions"] || 10,
@@ -679,7 +679,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
   def handle_tool_signal(agent, %{"type" => "validate_move"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, ValidateMoveAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, ValidateMoveAction, %{
       source_module: data["source_module"],
       target_module: data["target_module"],
       function_name: data["function_name"],
@@ -694,7 +694,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
   def handle_tool_signal(agent, %{"type" => "preview_move"} = signal) do
     %{"data" => data} = signal
     
-    {:ok, _ref} = __MODULE__.cmd_async(agent, PreviewMoveAction, %{
+    {:ok, agent, _directives} = __MODULE__.cmd(agent, PreviewMoveAction, %{
       source_module: data["source_module"],
       target_module: data["target_module"],
       function_name: data["function_name"],
@@ -708,8 +708,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
   
   # Action result handlers
   
-  @impl true
-  def handle_action_result(agent, BatchMoveAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, BatchMoveAction, {:ok, result}, _metadata) do
     # Update batch move tracking
     agent = put_in(agent.state.active_batch_moves[result.batch_id], %{
       status: :completed,
@@ -736,8 +735,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
     {:ok, agent}
   end
   
-  @impl true
-  def handle_action_result(agent, AnalyzeMoveAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, AnalyzeMoveAction, {:ok, result}, _metadata) do
     # Cache analysis result
     cache_key = "#{result.source_module}:#{result.function}:#{result.target_module}"
     agent = put_in(agent.state.analysis_cache[cache_key], %{
@@ -756,8 +754,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
     {:ok, agent}
   end
   
-  @impl true
-  def handle_action_result(agent, SuggestMovesAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, SuggestMovesAction, {:ok, result}, _metadata) do
     # Store suggestions
     agent = put_in(agent.state.suggested_moves, result.suggestions)
     
@@ -772,8 +769,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
     {:ok, agent}
   end
   
-  @impl true
-  def handle_action_result(agent, ValidateMoveAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, ValidateMoveAction, {:ok, result}, _metadata) do
     # Emit validation complete signal
     signal = Jido.Signal.new!(%{
       type: "function.move.validated",
@@ -785,8 +781,7 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
     {:ok, agent}
   end
   
-  @impl true
-  def handle_action_result(agent, PreviewMoveAction, {:ok, result}, metadata) do
+  def handle_action_result(agent, PreviewMoveAction, {:ok, result}, _metadata) do
     # Emit preview ready signal
     signal = Jido.Signal.new!(%{
       type: "function.move.previewed",
@@ -799,7 +794,6 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
   end
   
   # Handle main tool execution results
-  @impl true
   def handle_action_result(agent, ExecuteToolAction, {:ok, result}, metadata) do
     # Record successful move
     move_record = %{
@@ -847,7 +841,6 @@ defmodule RubberDuck.Tools.Agents.FunctionMoverAgent do
     super(agent, ExecuteToolAction, {:ok, result}, metadata)
   end
   
-  @impl true
   def handle_action_result(agent, ExecuteToolAction, {:error, reason}, metadata) do
     # Update failure metrics
     agent = update_in(agent.state.organization_metrics.failed_moves, &(&1 + 1))

@@ -91,9 +91,9 @@ defmodule RubberDuck.Tools.DependencyInspector do
     end
     
     security do
-      sandbox :restricted
+      sandbox :strict
       capabilities [:file_read]
-      rate_limit 50
+      rate_limit [max_requests: 50, window_seconds: 60]
     end
   end
   
@@ -161,7 +161,7 @@ defmodule RubberDuck.Tools.DependencyInspector do
     end
   end
   
-  defp extract_dependencies(ast, params) do
+  defp extract_dependencies(ast, _params) do
     {_, deps} = Macro.postwalk(ast, %{
       modules: MapSet.new(),
       functions: [],
@@ -419,7 +419,9 @@ defmodule RubberDuck.Tools.DependencyInspector do
     analysis = %{
       categorized: categorized,
       statistics: calculate_statistics(categorized),
-      warnings: []
+      warnings: [],
+      circular_dependencies: [],
+      potentially_unused: []
     }
     
     analysis = case params.analysis_type do

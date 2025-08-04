@@ -195,7 +195,7 @@ defmodule RubberDuck.Tools.CodeNavigator do
     Path.wildcard(pattern)
   end
   
-  defp filter_files_by_pattern(files, pattern) do
+  defp filter_files_by_pattern(files, _pattern) do
     # Pattern already applied in collect_files_in_directory
     files
   end
@@ -432,11 +432,11 @@ defmodule RubberDuck.Tools.CodeNavigator do
     end
   end
   
-  defp rank_results(matches, _params) do
+  defp rank_results(matches, params) do
     # Sort by confidence, then by type importance, then by file
     ranked = matches
     |> Enum.sort_by(&{-&1.confidence, type_priority(&1.type), &1.file, &1.line})
-    |> add_context_to_matches(_params)
+    |> add_context_to_matches(params)
     
     {:ok, ranked}
   end
