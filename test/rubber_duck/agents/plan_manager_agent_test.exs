@@ -12,6 +12,12 @@ defmodule RubberDuck.Agents.PlanManagerAgentTest do
   }
   
   setup do
+    # Clean up any existing plans from previous tests
+    case Ash.read(RubberDuck.Planning.Plan) do
+      {:ok, plans} -> Enum.each(plans, &Ash.destroy!/1)
+      _ -> :ok
+    end
+    
     # Start the agent for testing
     {:ok, agent} = start_supervised({PlanManagerAgent, [id: "test_plan_manager"]})
     
@@ -43,17 +49,17 @@ defmodule RubberDuck.Agents.PlanManagerAgentTest do
       params = %{
         name: "Test Plan",
         description: "A test plan",
-        type: :standard,
+        type: :feature,
         context: %{test: true},
-        dependencies: [],
-        constraints: []
+        dependencies: %{},
+        constraints_data: %{}
       }
       
       context = %{agent: %{state: state}}
       
       assert {:ok, result, updated_context} = CreatePlanAction.run(params, context)
       
-      assert result.plan_id =~ ~r/^plan_/
+      assert is_binary(result.plan_id)
       assert result.status == :creating
       assert result.plan.name == "Test Plan"
       
@@ -74,7 +80,7 @@ defmodule RubberDuck.Agents.PlanManagerAgentTest do
       params = %{
         name: "Overflow Plan",
         description: "Should be rejected",
-        type: :standard
+        type: :feature
       }
       
       assert {:error, :max_plans_reached} = CreatePlanAction.run(params, context)
@@ -83,18 +89,19 @@ defmodule RubberDuck.Agents.PlanManagerAgentTest do
   
   describe "UpdatePlanAction" do
     test "updates an existing plan", %{initial_state: state} do
-      # Create a plan first
-      plan_id = "plan_test_123"
-      existing_plan = %{
-        id: plan_id,
+      # Create a real plan first
+      {:ok, existing_plan} = Ash.create(RubberDuck.Planning.Plan, %{
         name: "Original Name",
         description: "Original Description",
-        status: :draft
-      }
+        type: :feature,
+        context: %{},
+        dependencies: %{},
+        constraints_data: %{}
+      })
       
       state_with_plan = %{state | 
         plans: %{
-          plan_id => %{
+          existing_plan.id => %{
             plan: existing_plan,
             status: :draft,
             created_at: DateTime.utc_now()
@@ -103,7 +110,7 @@ defmodule RubberDuck.Agents.PlanManagerAgentTest do
       }
       
       params = %{
-        plan_id: plan_id,
+        plan_id: existing_plan.id,
         updates: %{
           name: "Updated Name",
           description: "Updated Description"
@@ -115,7 +122,7 @@ defmodule RubberDuck.Agents.PlanManagerAgentTest do
       
       assert {:ok, result, _updated_context} = UpdatePlanAction.run(params, context)
       
-      assert result.plan_id == plan_id
+      assert result.plan_id == existing_plan.id
       assert result.updated_fields == [:name, :description]
     end
     
@@ -134,15 +141,18 @@ defmodule RubberDuck.Agents.PlanManagerAgentTest do
   
   describe "TransitionPlanAction" do
     test "transitions plan state correctly", %{initial_state: state} do
-      plan_id = "plan_transition_test"
-      existing_plan = %{
-        id: plan_id,
-        status: :draft
-      }
+      # Create a real plan
+      {:ok, existing_plan} = Ash.create(RubberDuck.Planning.Plan, %{
+        name: "Transition Test Plan",
+        type: :feature,
+        context: %{},
+        dependencies: %{},
+        constraints_data: %{}
+      })
       
       state_with_plan = %{state |
         plans: %{
-          plan_id => %{
+          existing_plan.id => %{
             plan: existing_plan,
             status: :draft
           }
@@ -150,7 +160,7 @@ defmodule RubberDuck.Agents.PlanManagerAgentTest do
       }
       
       params = %{
-        plan_id: plan_id,
+        plan_id: existing_plan.id,
         new_status: :ready,
         reason: "Validation passed"
       }
@@ -260,15 +270,18 @@ defmodule RubberDuck.Agents.PlanManagerAgentTest do
   
   describe "DeletePlanAction" do
     test "deletes a plan successfully", %{initial_state: state} do
-      plan_id = "plan_to_delete"
-      existing_plan = %{
-        id: plan_id,
-        status: :draft
-      }
+      # Create a real plan
+      {:ok, existing_plan} = Ash.create(RubberDuck.Planning.Plan, %{
+        name: "Plan to Delete",
+        type: :feature,
+        context: %{},
+        dependencies: %{},
+        constraints_data: %{}
+      })
       
       state_with_plan = %{state |
         plans: %{
-          plan_id => %{
+          existing_plan.id => %{
             plan: existing_plan,
             status: :draft
           }
@@ -277,7 +290,7 @@ defmodule RubberDuck.Agents.PlanManagerAgentTest do
       }
       
       params = %{
-        plan_id: plan_id,
+        plan_id: existing_plan.id,
         force: false
       }
       
@@ -285,11 +298,11 @@ defmodule RubberDuck.Agents.PlanManagerAgentTest do
       
       assert {:ok, result, updated_context} = DeletePlanAction.run(params, context)
       
-      assert result.plan_id == plan_id
+      assert result.plan_id == existing_plan.id
       assert Map.has_key?(result, :deleted_at)
       
       # Plan should be removed from state
-      refute Map.has_key?(updated_context.agent.state.plans, plan_id)
+      refute Map.has_key?(updated_context.agent.state.plans, existing_plan.id)
       assert updated_context.agent.state.metrics.active_plans == 0
     end
     
@@ -346,7 +359,7 @@ defmodule RubberDuck.Agents.PlanManagerAgentTest do
       assert metrics.plans_completed == 7
       assert metrics.plans_failed == 2
       assert metrics.active_plans == 1
-      assert metrics.success_rate == 77.77777777777777
+      assert_in_delta metrics.success_rate, 77.77777777777777, 0.0001
     end
     
     test "retrieves specific metrics only", %{initial_state: state} do

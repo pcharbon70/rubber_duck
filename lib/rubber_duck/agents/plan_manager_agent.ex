@@ -84,26 +84,41 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
   
   # Mount callback for initialization
   @impl Jido.Agent
-  def mount(opts, initial_state) do
-    Logger.info("Mounting PlanManagerAgent", opts: opts)
+  def mount(server_state, _opts) do
+    Logger.info("Mounting PlanManagerAgent", agent_id: server_state.agent.id)
     
-    # Initialize state with configuration
-    state = Map.merge(initial_state, %{
-      plans: Map.get(opts, :plans, %{}),
-      plan_locks: Map.get(opts, :plan_locks, %{}),
-      metrics: Map.get(opts, :metrics, initial_state.metrics || %{}),
-      query_cache: Map.get(opts, :query_cache, %{}),
-      workflows: Map.get(opts, :workflows, %{}),
-      config: Map.merge(
-        initial_state.config || %{},
-        Map.get(opts, :config, %{})
-      )
-    })
+    # Get the agent from server state
+    agent = server_state.agent
+    
+    # Update agent state with initialized values
+    updated_agent = %{agent | 
+      state: %{
+        plans: Map.get(agent.state, :plans, %{}),
+        plan_locks: Map.get(agent.state, :plan_locks, %{}),
+        metrics: Map.get(agent.state, :metrics, %{
+          plans_created: 0,
+          plans_completed: 0,
+          plans_failed: 0,
+          active_plans: 0,
+          total_execution_time: 0,
+          average_execution_time: 0
+        }),
+        query_cache: Map.get(agent.state, :query_cache, %{}),
+        workflows: Map.get(agent.state, :workflows, %{}),
+        config: Map.get(agent.state, :config, %{
+          max_concurrent_plans: 10,
+          lock_timeout: 30_000,
+          cache_ttl: 60_000,
+          validation_required: true
+        })
+      }
+    }
     
     # Schedule periodic cache cleanup
-    Process.send_after(self(), :cleanup_cache, state.config.cache_ttl)
+    Process.send_after(self(), :cleanup_cache, updated_agent.state.config.cache_ttl)
     
-    {:ok, state}
+    # Return updated server state
+    {:ok, %{server_state | agent: updated_agent}}
   end
   
   # Signal mappings
@@ -125,10 +140,10 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
     %{
       name: Map.get(data, "name", "Untitled Plan"),
       description: Map.get(data, "description", ""),
-      type: String.to_atom(Map.get(data, "type", "standard")),
+      type: String.to_atom(Map.get(data, "type", "feature")),
       context: Map.get(data, "context", %{}),
-      dependencies: Map.get(data, "dependencies", []),
-      constraints: Map.get(data, "constraints", []),
+      dependencies: Map.get(data, "dependencies", %{}),
+      constraints_data: Map.get(data, "constraints", %{}),
       metadata: Map.get(data, "metadata", %{})
     }
   end
@@ -232,6 +247,7 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
   end
   
   # Handle periodic cache cleanup
+  @impl GenServer
   def handle_info(:cleanup_cache, agent) do
     now = System.system_time(:millisecond)
     cache_ttl = agent.state.config.cache_ttl
@@ -284,13 +300,12 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
       agent = context.agent
       
       with {:ok, :unlocked} <- check_plan_limit(agent),
-           {:ok, plan_id} <- generate_plan_id(),
-           {:ok, plan} <- create_plan_record(params, plan_id),
+           {:ok, plan} <- create_plan_record(params, nil),
            {:ok, workflow_id} <- start_creation_workflow(plan, agent),
-           {:ok, updated_agent} <- track_plan(agent, plan_id, plan, workflow_id) do
+           {:ok, updated_agent} <- track_plan(agent, plan.id, plan, workflow_id) do
         
         {:ok, %{
-          plan_id: plan_id,
+          plan_id: plan.id,
           workflow_id: workflow_id,
           status: :creating,
           plan: plan
@@ -309,19 +324,9 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
       end
     end
     
-    defp generate_plan_id do
-      {:ok, "plan_" <> Ecto.UUID.generate()}
-    end
-    
-    defp create_plan_record(params, plan_id) do
-      plan_params = Map.merge(params, %{
-        id: plan_id,
-        status: :draft,
-        created_at: DateTime.utc_now(),
-        updated_at: DateTime.utc_now()
-      })
-      
-      case Ash.create(Plan, plan_params) do
+    defp create_plan_record(params, _plan_id) do
+      # Plan ID is auto-generated, status is set by the create action
+      case Ash.create(Plan, params) do
         {:ok, plan} -> {:ok, plan}
         {:error, reason} -> {:error, {:plan_creation_failed, reason}}
       end
@@ -412,8 +417,7 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
     end
     
     defp update_plan_record(plan, updates) do
-      updated_params = Map.merge(plan, updates)
-      Ash.update(plan, updated_params)
+      Ash.update(plan, updates)
     end
     
     defp maybe_validate(plan, true) do
@@ -703,7 +707,10 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
     end
     
     defp delete_plan_record(plan) do
-      Ash.destroy(plan)
+      case Ash.destroy(plan) do
+        :ok -> {:ok, plan}
+        error -> error
+      end
     end
     
     defp remove_tracked_plan(agent, plan_id) do
