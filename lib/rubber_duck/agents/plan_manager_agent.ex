@@ -79,7 +79,8 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
   require Logger
   
   alias RubberDuck.Planning.Plan
-  alias RubberDuck.Jido.Workflows.WorkflowCoordinator
+  alias RubberDuck.Jido.Agents.WorkflowCoordinator
+  require Ash
   
   # Mount callback for initialization
   @impl Jido.Agent
@@ -320,7 +321,7 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
         updated_at: DateTime.utc_now()
       })
       
-      case Plan.create(plan_params) do
+      case Ash.create(Plan, plan_params) do
         {:ok, plan} -> {:ok, plan}
         {:error, reason} -> {:error, {:plan_creation_failed, reason}}
       end
@@ -330,7 +331,7 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
       if agent.state.config.validation_required do
         # Start workflow with validation
         WorkflowCoordinator.start_workflow(
-          RubberDuck.Workflows.PlanCreationWorkflow,
+          RubberDuck.Workflows.PlanCreationWorkflowSimple,
           %{plan: plan, validate: true},
           persist: true
         )
@@ -412,14 +413,18 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
     
     defp update_plan_record(plan, updates) do
       updated_params = Map.merge(plan, updates)
-      Plan.update(plan, updated_params)
+      Ash.update(plan, updated_params)
     end
     
     defp maybe_validate(plan, true) do
       # Trigger validation workflow
       case WorkflowCoordinator.execute_workflow(
         RubberDuck.Workflows.PlanValidationWorkflow,
-        %{plan: plan},
+        %{
+          plan: plan,
+          validation_types: [:structure, :dependencies, :constraints],
+          strict: false
+        },
         timeout: 10_000
       ) do
         {:ok, validated_plan} -> {:ok, validated_plan}
@@ -504,10 +509,12 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
     end
     
     defp transition_plan(plan, new_status, reason) do
-      Plan.transition_status(plan, %{
-        new_status: new_status,
-        reason: reason,
-        transitioned_at: DateTime.utc_now()
+      Ash.update(plan, %{
+        status: new_status,
+        metadata: Map.merge(plan.metadata || %{}, %{
+          transition_reason: reason,
+          transitioned_at: DateTime.utc_now()
+        })
       })
     end
     
@@ -544,15 +551,12 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
     defp update_status_metrics(metrics, _), do: metrics
     
     defp emit_transition_signal(plan_id, old_status, new_status) do
-      Jido.Signal.emit(%{
-        type: "plan.status_changed",
-        data: %{
-          plan_id: plan_id,
-          old_status: old_status,
-          new_status: new_status,
-          timestamp: DateTime.utc_now()
-        }
-      })
+      # TODO: Emit signal when Jido.Signal is available
+      Logger.info("Plan status changed",
+        plan_id: plan_id,
+        old_status: old_status,
+        new_status: new_status
+      )
     end
   end
   
@@ -699,7 +703,7 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
     end
     
     defp delete_plan_record(plan) do
-      Plan.destroy(plan)
+      Ash.destroy(plan)
     end
     
     defp remove_tracked_plan(agent, plan_id) do
@@ -805,7 +809,7 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
       
       with {:ok, plan_info} <- get_plan(agent, params.plan_id),
            {:ok, validation_result} <- run_validation(plan_info.plan, params.validation_types),
-           {:ok, updated_plan} <- update_validation_results(plan_info.plan, validation_result) do
+           {:ok, _updated_plan} <- update_validation_results(plan_info.plan, validation_result) do
         
         {:ok, %{
           plan_id: params.plan_id,
@@ -822,7 +826,7 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
       end
     end
     
-    defp run_validation(plan, validation_types) do
+    defp run_validation(_plan, validation_types) do
       # This would integrate with the Critics system
       {:ok, %{
         is_valid: true,
@@ -834,7 +838,9 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
     end
     
     defp update_validation_results(plan, validation_result) do
-      Plan.add_validation_result(plan, %{validation_results: validation_result})
+      Ash.update(plan, %{
+        validation_results: Map.merge(plan.validation_results || %{}, validation_result)
+      })
     end
   end
   
@@ -887,7 +893,7 @@ defmodule RubberDuck.Agents.PlanManagerAgent do
     
     defp start_execution_workflow(plan, params) do
       WorkflowCoordinator.start_workflow(
-        RubberDuck.Workflows.PlanExecutionWorkflow,
+        RubberDuck.Workflows.PlanExecutionWorkflowSimple,
         %{
           plan: plan,
           execution_mode: params.execution_mode,

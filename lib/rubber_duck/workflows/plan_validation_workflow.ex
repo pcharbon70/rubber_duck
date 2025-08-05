@@ -20,8 +20,8 @@ defmodule RubberDuck.Workflows.PlanValidationWorkflow do
   alias RubberDuck.Jido.Steps.ExecuteAgentAction
   
   input :plan
-  input :validation_types, default: [:structure, :dependencies, :constraints]
-  input :strict, default: false
+  input :validation_types
+  input :strict
   
   # Step 1: Structure validation
   step :validate_structure do
@@ -29,7 +29,8 @@ defmodule RubberDuck.Workflows.PlanValidationWorkflow do
     argument :strict, input(:strict)
     
     run fn %{plan: plan, strict: strict} ->
-      validate_plan_structure(plan, strict)
+      strict_mode = strict || false
+      validate_plan_structure(plan, strict_mode)
     end
   end
   
@@ -38,7 +39,7 @@ defmodule RubberDuck.Workflows.PlanValidationWorkflow do
     argument :plan, input(:plan)
     argument :structure_result, result(:validate_structure)
     
-    wait_for result(:validate_structure)
+    wait_for :validate_structure
     
     run fn %{plan: plan} ->
       validate_plan_dependencies(plan)
@@ -49,7 +50,7 @@ defmodule RubberDuck.Workflows.PlanValidationWorkflow do
   step :validate_constraints do
     argument :plan, input(:plan)
     
-    wait_for result(:validate_dependencies)
+    wait_for :validate_dependencies
     
     run fn %{plan: plan} ->
       validate_plan_constraints(plan)
@@ -62,7 +63,7 @@ defmodule RubberDuck.Workflows.PlanValidationWorkflow do
     argument :dependencies, result(:validate_dependencies)
     argument :constraints, result(:validate_constraints)
     
-    wait_for all_previous()
+    wait_for [:validate_structure, :validate_dependencies, :validate_constraints]
     
     run fn results ->
       aggregate_validation_results(results)
